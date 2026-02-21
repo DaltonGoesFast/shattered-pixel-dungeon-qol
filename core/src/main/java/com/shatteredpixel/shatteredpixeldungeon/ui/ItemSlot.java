@@ -58,7 +58,10 @@ public class ItemSlot extends Button {
 	protected BitmapText status;
 	protected BitmapText extra;
 	protected Image      itemIcon;
+	protected Image      noteIcon;
 	protected BitmapText level;
+
+	private static final int NOTE_ICON_SIZE = 8;
 	
 	private static final String TXT_STRENGTH	= ":%d";
 	private static final String TXT_TYPICAL_STR	= "%d?";
@@ -163,6 +166,16 @@ public class ItemSlot extends Button {
 			}
 			PixelScene.align(itemIcon);
 		}
+
+		if (noteIcon != null) {
+			if (noteIcon.width > 0 && noteIcon.scale.x == 1f) {
+				float s = NOTE_ICON_SIZE / (float) noteIcon.width;
+				noteIcon.scale.set(s);
+			}
+			noteIcon.x = x + width - noteIcon.width() - margin.right;
+			noteIcon.y = y + height - noteIcon.height() - margin.bottom;
+			PixelScene.align(noteIcon);
+		}
 		
 		if (level != null) {
 			level.x = x + (width - level.width()) - margin.right;
@@ -178,6 +191,7 @@ public class ItemSlot extends Button {
 		if (extra != null)      extra.alpha(value);
 		if (status != null)     status.alpha(value);
 		if (itemIcon != null)   itemIcon.alpha(value);
+		if (noteIcon != null)   noteIcon.alpha(value);
 		if (level != null)      level.alpha(value);
 	}
 
@@ -224,11 +238,21 @@ public class ItemSlot extends Button {
 			itemIcon = null;
 		}
 
+		if (noteIcon != null) {
+			remove(noteIcon);
+			noteIcon = null;
+		}
+
 		if (item == null){
 			status.visible = extra.visible = level.visible = false;
 			return;
 		} else {
 			status.visible = extra.visible = level.visible = true;
+		}
+
+		if (item.hasNote()) {
+			noteIcon = new Image(Assets.Interfaces.NOTE_ICON);
+			add(noteIcon);
 		}
 
 		status.text( item.status() );
@@ -321,6 +345,7 @@ public class ItemSlot extends Button {
 		extra.alpha( alpha );
 		level.alpha( alpha );
 		if (itemIcon != null) itemIcon.alpha( alpha );
+		if (noteIcon != null) noteIcon.alpha( alpha );
 	}
 
 	public void showExtraInfo( boolean show ){

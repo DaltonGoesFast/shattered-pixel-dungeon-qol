@@ -16,7 +16,7 @@ android {
 
         minSdkVersion appAndroidMinSDK
         targetSdkVersion appAndroidTargetSDK
-        resourceConfigurations += ['en_US', 'cs', 'de', 'el', 'es', 'fr', 'hu', 'in', 'it', 'ja', 'ko', 'nl', 'pl', 'pt', 'ru', 'tr', 'uk', 'vi', 'zh_CN']
+        resourceConfigurations += ['en_US']
 
     }
 
@@ -40,8 +40,8 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
 
             dependencies {
-                releaseImplementation project(':services:updates:githubUpdates')
-                releaseImplementation project(':services:news:shatteredNews')
+                releaseImplementation project(':services:updates:debugUpdates')
+                releaseImplementation project(':services:news:debugNews')
             }
         }
     }

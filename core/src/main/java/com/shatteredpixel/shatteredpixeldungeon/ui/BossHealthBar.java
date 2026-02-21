@@ -25,6 +25,8 @@ import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
+import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
+import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.effects.particles.BloodParticle;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
@@ -59,10 +61,30 @@ public class BossHealthBar extends Component {
 
 	private boolean large;
 
+	// QoL: when no boss is assigned, show full bar for current target (first in target priority)
+	private Mob currentDisplayMob;
+
 	public BossHealthBar() {
 		super();
-		visible = active = (boss != null);
+		// Keep active=true so we always receive update() and can show bar when user targets (Group only calls update() when active)
+		active = true;
+		visible = (getDisplayMob() != null);
 		instance = this;
+	}
+
+	/** Returns the Mob to display: the assigned boss, or the current target if it's a Mob (QoL: full bar for target). */
+	private Mob getDisplayMob() {
+		if (boss != null && boss.isAlive() && Dungeon.level != null && Dungeon.level.mobs.contains(boss))
+			return boss;
+		Char target = null;
+		if (TargetHealthIndicator.instance != null)
+			target = TargetHealthIndicator.instance.target();
+		if (target == null && QuickSlotButton.lastTarget != null)
+			target = QuickSlotButton.lastTarget;
+		if (target instanceof Mob && target.isAlive()
+				&& Actor.chars().contains(target))
+			return (Mob) target;
+		return null;
 	}
 
 	@Override
@@ -96,15 +118,17 @@ public class BossHealthBar extends Component {
 			@Override
 			protected void onClick() {
 				super.onClick();
-				if (boss != null){
-					GameScene.show(new WndInfoMob(boss));
+				Mob display = getDisplayMob();
+				if (display != null){
+					GameScene.show(new WndInfoMob(display));
 				}
 			}
 
 			@Override
 			protected String hoverText() {
-				if (boss != null){
-					return boss.name();
+				Mob display = getDisplayMob();
+				if (display != null){
+					return display.name();
 				}
 				return super.hoverText();
 			}
@@ -117,11 +141,8 @@ public class BossHealthBar extends Component {
 			add(buffs);
 		}
 
-		if (boss != null && large) {
-			skull = boss.sprite();
-		} else {
-			skull = new Image(asset, 64, 0, 6, 6);
-		}
+		// skull set in update() when display mob is known (boss or target)
+		skull = new Image(asset, 64, 0, 6, 6);
 		add(skull);
 
 		blood = new Emitter();
@@ -166,52 +187,99 @@ public class BossHealthBar extends Component {
 	@Override
 	public void update() {
 		super.update();
-		if (boss != null){
-			if (!boss.isAlive() || !Dungeon.level.mobs.contains(boss)){
-				boss = null;
-				visible = active = false;
-				if (buffs != null) {
-					BuffIndicator.setBossInstance(null);
-					remove(buffs);
-					buffs.destroy();
-					buffs = null;
-				}
-			} else {
-
-				int health = boss.HP;
-				int shield = boss.shielding();
-				int max = boss.HT;
-
-				float healthPercent = health/(float)max;
-				float shieldPercent = shield/(float)max;
-
-				if (healthPercent + shieldPercent > 1f){
-					float excess = healthPercent + shieldPercent;
-					healthPercent /= excess;
-					shieldPercent /= excess;
-				}
-
-				hp.scale.x = healthPercent;
-				shieldHP.scale.x = healthPercent + shieldPercent;
-
-				if (bleeding != blood.on){
-					if (bleeding)   skull.tint( 0xcc0000, large ? 0.3f : 0.6f );
-					else            skull.resetColor();
-					bringToFront(blood);
-					blood.pos(skull);
-					blood.on = bleeding;
-				}
-
-				if (shield <= 0){
-					hpText.text(health + "/" + max);
-				} else {
-					hpText.text(health + "+" + shield +  "/" + max);
-				}
-				hpText.measure();
-				hpText.x = hp.x + (large ? (96-hpText.width())/2f : 1);
-
-			}
+		// Clear boss reference if dead or removed (existing behavior)
+		if (boss != null && (!boss.isAlive() || !Dungeon.level.mobs.contains(boss))){
+			boss = null;
 		}
+
+		Mob toShow = getDisplayMob();
+		if (toShow == null) {
+			visible = false;
+			if (currentDisplayMob != null) {
+				teardownDisplayMob();
+				currentDisplayMob = null;
+			}
+			return;
+		}
+
+		visible = true;
+
+		// When display mob changes (boss vs target, or different target), refresh skull and buffs
+		if (toShow != currentDisplayMob) {
+			if (currentDisplayMob != null)
+				teardownDisplayMob();
+			setupDisplayMob(toShow);
+			currentDisplayMob = toShow;
+		}
+
+		int health = toShow.HP;
+		int shield = toShow.shielding();
+		int max = toShow.HT;
+
+		float healthPercent = health/(float)max;
+		float shieldPercent = shield/(float)max;
+
+		if (healthPercent + shieldPercent > 1f){
+			float excess = healthPercent + shieldPercent;
+			healthPercent /= excess;
+			shieldPercent /= excess;
+		}
+
+		hp.scale.x = healthPercent;
+		shieldHP.scale.x = healthPercent + shieldPercent;
+
+		// Bleeding effect only for actual boss
+		boolean showBleeding = (toShow == boss && bleeding);
+		if (showBleeding != blood.on){
+			if (showBleeding)   skull.tint( 0xcc0000, large ? 0.3f : 0.6f );
+			else                skull.resetColor();
+			bringToFront(blood);
+			blood.pos(skull);
+			blood.on = showBleeding;
+		}
+
+		if (shield <= 0){
+			hpText.text(health + "/" + max);
+		} else {
+			hpText.text(health + "+" + shield +  "/" + max);
+		}
+		hpText.measure();
+		hpText.x = hp.x + (large ? (96-hpText.width())/2f : 1);
+	}
+
+	private void teardownDisplayMob() {
+		if (buffs != null) {
+			BuffIndicator.setBossInstance(null);
+			remove(buffs);
+			buffs.destroy();
+			buffs = null;
+		}
+		if (large && skull != null) {
+			// skull may be currentDisplayMob's sprite - do not destroy it, only remove from bar
+			remove(skull);
+			skull = new Image(asset, 64, 0, 6, 6);
+			add(skull);
+		}
+	}
+
+	private void setupDisplayMob(Mob mob) {
+		if (large && mob.sprite != null) {
+			if (skull != null) {
+				remove(skull);
+				// only destroy if it's our default icon (not a mob's sprite)
+				if (skull instanceof Image) skull.destroy();
+			}
+			skull = mob.sprite();
+			add(skull);
+		}
+		if (buffs != null) {
+			remove(buffs);
+			buffs.destroy();
+		}
+		buffs = new BuffIndicator(mob, large);
+		BuffIndicator.setBossInstance(buffs);
+		add(buffs);
+		layout();
 	}
 
 	public static void assignBoss(Mob boss){
@@ -225,11 +293,13 @@ public class BossHealthBar extends Component {
 				@Override
 				public void call() {
 					instance.visible = instance.active = true;
+					instance.currentDisplayMob = boss; // so update() won't re-setup
 					if (boss != null){
 						if (instance.large){
 							if (instance.skull != null){
 								instance.remove(instance.skull);
-								instance.skull.destroy();
+								// only destroy our default icon, not a previous target's sprite
+								if (instance.skull instanceof Image) instance.skull.destroy();
 							}
 							instance.skull = boss.sprite();
 							instance.add(instance.skull);

@@ -631,11 +631,19 @@ public class Notes {
 		}
 	}
 
+	private static Runnable onCustomRecordsChanged;
+
+	/** Set a callback to run when a custom record is added or removed (e.g. refresh inventory UI). */
+	public static void setOnCustomRecordsChanged( Runnable r ) {
+		onCustomRecordsChanged = r;
+	}
+
 	public static boolean add( CustomRecord rec ){
 		rec.assignID();
 		if (!records.contains(rec)){
 			boolean result = records.add(rec);
 			Collections.sort(records, comparator);
+			if (result && onCustomRecordsChanged != null) onCustomRecordsChanged.run();
 			return result;
 		}
 		return false;
@@ -644,6 +652,7 @@ public class Notes {
 	public static boolean remove( CustomRecord rec ){
 		if (records.contains(rec)){
 			records.remove(rec);
+			if (onCustomRecordsChanged != null) onCustomRecordsChanged.run();
 			return true;
 		}
 		return false;

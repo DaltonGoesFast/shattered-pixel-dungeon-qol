@@ -98,10 +98,23 @@ public class Toolbar extends Component {
 
 		add(btnSwap = new SlotSwapTool(128, 0, 21, 23));
 
-		btnQuick = new QuickslotTool[QuickSlot.SIZE];
+		btnQuick = new QuickslotTool[QuickSlot.SLOTS_PER_SET];
 		for (int i = 0; i < btnQuick.length; i++){
 			add( btnQuick[i] = new QuickslotTool(64, 0, 22, 24, i) );
 		}
+
+		// Hidden button: swap quickslot set (e.g. ` key)
+		add(new Button(){
+			@Override
+			protected void onClick() {
+				QuickSlotButton.activeSet = 1 - QuickSlotButton.activeSet;
+				QuickSlotButton.refresh();
+			}
+			@Override
+			public GameAction keyAction() {
+				return SPDAction.QUICKSLOT_SWAP_SET;
+			}
+		});
 
 		//hidden button for quickslot selector keybind
 		add(new Button(){
@@ -121,10 +134,10 @@ public class Toolbar extends Component {
 
 				if (Dungeon.hero != null && Dungeon.hero.ready && !GameScene.cancel()) {
 
-					String[] slotNames = new String[6];
-					Image[] slotIcons = new Image[6];
-					for (int i = 0; i < 6; i++){
-						Item item = Dungeon.quickslot.getItem(i);
+					String[] slotNames = new String[QuickSlot.SLOTS_PER_SET];
+					Image[] slotIcons = new Image[QuickSlot.SLOTS_PER_SET];
+					for (int i = 0; i < QuickSlot.SLOTS_PER_SET; i++){
+						Item item = Dungeon.quickslot.getItem(QuickSlotButton.getActualSlot(i));
 
 						if (item != null && !Dungeon.quickslot.isPlaceholder(i) &&
 								(!Dungeon.hero.belongings.lostInventory() || item.keptThroughLostInventory())){
@@ -150,9 +163,10 @@ public class Toolbar extends Component {
 					Game.scene().addToFront(new RadialMenu(Messages.get(Toolbar.class, "quickslot_prompt"), info, slotNames, slotIcons) {
 						@Override
 						public void onSelect(int idx, boolean alt) {
-							Item item = Dungeon.quickslot.getItem(idx);
+							int actualSlot = QuickSlotButton.getActualSlot(idx);
+							Item item = Dungeon.quickslot.getItem(actualSlot);
 
-							if (item == null || Dungeon.quickslot.isPlaceholder(idx)
+							if (item == null || Dungeon.quickslot.isPlaceholder(actualSlot)
 									|| (Dungeon.hero.belongings.lostInventory() && !item.keptThroughLostInventory())
 									|| alt){
 								//TODO would be nice to use a radial menu for this too
@@ -492,12 +506,12 @@ public class Toolbar extends Component {
 		if (PixelScene.uiCamera.width > 170) quickslotsToShow ++;
 
 		int startingSlot;
-		if (SPDSettings.quickSwapper() && quickslotsToShow < 6){
+		if (SPDSettings.quickSwapper() && quickslotsToShow < QuickSlot.SLOTS_PER_SET){
 			quickslotsToShow = 3;
-			startingSlot = swappedQuickslots ? 3 : 0;
+			startingSlot = swappedQuickslots ? (QuickSlot.SLOTS_PER_SET - 3) : 0;
 			btnSwap.visible = true;
 			btnSwap.active = lastEnabled;
-			QuickSlotButton.lastVisible = 6;
+			QuickSlotButton.lastVisible = QuickSlot.SLOTS_PER_SET;
 		} else {
 			startingSlot = 0;
 			btnSwap.visible = btnSwap.active = false;
@@ -850,10 +864,10 @@ public class Toolbar extends Component {
 			int slot;
 			int slotDir;
 			if (SPDSettings.flipToolbar()){
-				slot = swappedQuickslots ? 0 : 3;
+				slot = swappedQuickslots ? 0 : (QuickSlot.SLOTS_PER_SET - 3);
 				slotDir = +1;
 			} else {
-				slot = swappedQuickslots ? 2 : 5;
+				slot = swappedQuickslots ? 2 : (QuickSlot.SLOTS_PER_SET - 1);
 				slotDir = -1;
 			}
 

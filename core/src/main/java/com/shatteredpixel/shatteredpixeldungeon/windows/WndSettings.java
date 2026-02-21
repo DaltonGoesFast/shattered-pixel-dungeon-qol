@@ -159,8 +159,7 @@ public class WndSettings extends WndTabbed {
 		langs = new LangsTab();
 		langs.setSize(width, 0);
 		height = Math.max(height, langs.height());
-		add( langs );
-
+		//add( langs ); // disabled for English-only build
 
 		IconTab langsTab = new IconTab(Icons.get(Icons.LANGS)){
 			@Override
@@ -180,16 +179,19 @@ public class WndSettings extends WndTabbed {
 					case __UNREVIEW:
 						icon.hardlight(1.5f, 0.75f, 0f);
 						break;
+					case O_COMPLETE:
+						break;
 				}
 			}
 
 		};
-		add( langsTab );
+		//add( langsTab ); // disabled for English-only build
 
 		resize(width, (int)Math.ceil(height));
 
 		layoutTabs();
 
+		if (last_index >= tabs.size()) last_index = tabs.size() - 1;
 		if (tabs.size() == 5 && last_index >= 3){
 			//input tab isn't visible
 			select(last_index-1);
@@ -1109,6 +1111,8 @@ public class WndSettings extends WndTabbed {
 							break;
 						case __UNREVIEW:
 							btn.textColor(0xBBBBBB);
+							break;
+						case O_COMPLETE:
 							break;
 					}
 				}

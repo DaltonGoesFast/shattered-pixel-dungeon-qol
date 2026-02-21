@@ -42,36 +42,45 @@ import com.watabou.utils.BArray;
 import com.watabou.utils.PathFinder;
 
 public class QuickSlotButton extends Button {
-	
-	private static QuickSlotButton[] instance = new QuickSlotButton[QuickSlot.SIZE];
+
+	/** Which set of 6 slots is visible (0 or 1). Toggle with QUICKSLOT_SWAP_SET hotkey. */
+	public static int activeSet = 0;
+
+	private static QuickSlotButton[] instance = new QuickSlotButton[QuickSlot.SLOTS_PER_SET];
+	/** Display slot index 0-5; actual storage index is getActualSlot(slotNum). */
 	private int slotNum;
 
 	private ItemSlot slot;
-	
+
 	private Image crossB;
 	private Image crossM;
-	
-	public static int targetingSlot = -1;
+
+	public static int targetingSlot = -1; // actual slot index 0-11 for getItem(targetingSlot)
 	public static Char lastTarget = null;
-	
+
+	/** Actual quickslot storage index (0-11) for the given display slot (0-5). */
+	public static int getActualSlot(int displaySlot) {
+		return displaySlot + activeSet * QuickSlot.SLOTS_PER_SET;
+	}
+
 	public QuickSlotButton( int slotNum ) {
 		super();
 		this.slotNum = slotNum;
 		item( select( slotNum ) );
-		
+
 		instance[slotNum] = this;
 	}
-	
+
 	@Override
 	public void destroy() {
 		super.destroy();
-		
+
 		reset();
 	}
 
 	public static void reset() {
-		instance = new QuickSlotButton[QuickSlot.SIZE];
-
+		instance = new QuickSlotButton[QuickSlot.SLOTS_PER_SET];
+		activeSet = 0;
 		lastTarget = null;
 		targetingSlot = -1;
 	}
@@ -86,7 +95,7 @@ public class QuickSlotButton extends Button {
 				if (!Dungeon.hero.isAlive() || !Dungeon.hero.ready){
 					return;
 				}
-				if (targetingSlot == slotNum && lastTarget != null) {
+				if (targetingSlot == getActualSlot(slotNum) && lastTarget != null) {
 					int cell = autoAim(lastTarget, select(slotNum));
 
 					if (cell != -1){
@@ -183,22 +192,9 @@ public class QuickSlotButton extends Button {
 
 	@Override
 	public GameAction keyAction() {
-		switch (slotNum){
-			case 0:
-				return SPDAction.QUICKSLOT_1;
-			case 1:
-				return SPDAction.QUICKSLOT_2;
-			case 2:
-				return SPDAction.QUICKSLOT_3;
-			case 3:
-				return SPDAction.QUICKSLOT_4;
-			case 4:
-				return SPDAction.QUICKSLOT_5;
-			case 5:
-				return SPDAction.QUICKSLOT_6;
-			default:
-				return super.keyAction();
-		}
+		if (slotNum >= 0 && slotNum < SPDAction.QUICKSLOT_ACTIONS.length)
+			return SPDAction.QUICKSLOT_ACTIONS[slotNum];
+		return super.keyAction();
 	}
 
 	@Override
@@ -258,7 +254,7 @@ public class QuickSlotButton extends Button {
 		}
 	};
 
-	public static int lastVisible = instance.length;
+	public static int lastVisible = QuickSlot.SLOTS_PER_SET;
 
 	public static void set(Item item){
 		for (int i = 0; i < lastVisible; i++) {
@@ -270,8 +266,8 @@ public class QuickSlotButton extends Button {
 		set(0, item);
 	}
 
-	public static void set(int slotNum, Item item){
-		Dungeon.quickslot.setSlot( slotNum , item );
+	public static void set(int displaySlot, Item item){
+		Dungeon.quickslot.setSlot( getActualSlot(displaySlot) , item );
 		refresh();
 
 		//Remember if the player adds the waterskin as one of their first actions.
@@ -284,8 +280,8 @@ public class QuickSlotButton extends Button {
 		}
 	}
 
-	private static Item select(int slotNum){
-		return Dungeon.quickslot.getItem( slotNum );
+	private static Item select(int displaySlot){
+		return Dungeon.quickslot.getItem( getActualSlot(displaySlot) );
 	}
 	
 	public void item( Item item ) {
@@ -303,8 +299,9 @@ public class QuickSlotButton extends Button {
 	}
 	
 	private void enableSlot() {
-		slot.enable(Dungeon.quickslot.isNonePlaceholder( slotNum )
-				&& (!Dungeon.hero.belongings.lostInventory() || Dungeon.quickslot.getItem(slotNum).keptThroughLostInventory()));
+		int actual = getActualSlot(slotNum);
+		slot.enable(Dungeon.quickslot.isNonePlaceholder( actual )
+				&& (!Dungeon.hero.belongings.lostInventory() || Dungeon.quickslot.getItem(actual).keptThroughLostInventory()));
 	}
 
 	public void slotMargins( int left, int top, int right, int bottom){
@@ -323,7 +320,7 @@ public class QuickSlotButton extends Button {
 				lastTarget.alignment != Char.Alignment.ALLY &&
 				Dungeon.level.heroFOV[lastTarget.pos]) {
 
-			targetingSlot = slotNum;
+			targetingSlot = getActualSlot(slotNum);
 			CharSprite sprite = lastTarget.sprite;
 
 			if (sprite.parent != null) {

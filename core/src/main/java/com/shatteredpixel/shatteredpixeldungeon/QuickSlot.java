@@ -36,8 +36,9 @@ public class QuickSlot {
 	 * which can happen for a stackable item that has been 'used up', these are referred to as placeholders.
 	 */
 
-	//note that the current max size is coded at 6, due to UI constraints, but it could be much much bigger with no issue.
-	public static int SIZE = 6;
+	// Two sets of 6 slots each; hotkey swaps which set is visible (QoL)
+	public static final int SLOTS_PER_SET = 6;
+	public static int SIZE = SLOTS_PER_SET * 2; // 12 total
 	private Item[] slots = new Item[SIZE];
 
 

@@ -66,6 +66,12 @@ public class SPDAction extends GameAction {
 	public static final GameAction QUICKSLOT_4  = new SPDAction("quickslot_4");
 	public static final GameAction QUICKSLOT_5  = new SPDAction("quickslot_5");
 	public static final GameAction QUICKSLOT_6  = new SPDAction("quickslot_6");
+	public static final GameAction QUICKSLOT_SWAP_SET = new SPDAction("quickslot_swap_set");
+
+	/** Quickslot key actions for display slots 0-5 (current set). */
+	public static final GameAction[] QUICKSLOT_ACTIONS = new GameAction[]{
+		QUICKSLOT_1, QUICKSLOT_2, QUICKSLOT_3, QUICKSLOT_4, QUICKSLOT_5, QUICKSLOT_6
+	};
 
 	public static final GameAction BAG_1        = new SPDAction("bag_1");
 	public static final GameAction BAG_2        = new SPDAction("bag_2");
@@ -124,6 +130,7 @@ public class SPDAction extends GameAction {
 		defaultBindings.put( Input.Keys.NUM_4,          SPDAction.QUICKSLOT_4 );
 		defaultBindings.put( Input.Keys.NUM_5,          SPDAction.QUICKSLOT_5 );
 		defaultBindings.put( Input.Keys.NUM_6,          SPDAction.QUICKSLOT_6 );
+		defaultBindings.put( Input.Keys.GRAVE,         SPDAction.QUICKSLOT_SWAP_SET ); // ` key: swap quickslot set
 
 		defaultBindings.put( Input.Keys.F1,             SPDAction.BAG_1 );
 		defaultBindings.put( Input.Keys.F2,             SPDAction.BAG_2 );

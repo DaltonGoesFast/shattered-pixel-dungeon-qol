@@ -512,6 +512,11 @@ public class Item implements Bundlable {
 
 	public Emitter emitter() { return null; }
 	
+	/** True if this item has a custom note (specific or type) attached. */
+	public boolean hasNote() {
+		return Notes.findCustomRecord(customNoteID) != null || Notes.findCustomRecord(getClass()) != null;
+	}
+
 	public String info() {
 
 		if (Dungeon.hero != null) {
