@@ -1,3 +1,11 @@
+QoL mod of SPD
+
+Current Features:
+Press Tilde key to swap to 2nd quickslot hotbar
+Boss style HP bar for currently targeted Enemies
+Tile selection indicator 
+Inventory Icon to denote items with a custom note
+
 # Shattered Pixel Dungeon
 
 [Shattered Pixel Dungeon](https://shatteredpixel.com/shatteredpd/) is an open-source traditional roguelike dungeon crawler with randomized levels and enemies, and hundreds of items to collect and use. It's based on the [source code of Pixel Dungeon](https://github.com/00-Evan/pixel-dungeon-gradle), by [Watabou](https://watabou.itch.io/).
