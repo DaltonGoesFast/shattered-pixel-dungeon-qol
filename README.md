@@ -1,10 +1,15 @@
 QoL mod of SPD
 
 Current Features:
+
 Press Tilde key to swap to 2nd quickslot hotbar
+
 Boss style HP bar for currently targeted Enemies
+
 Tile selection indicator 
+
 Inventory Icon to denote items with a custom note
+
 
 # Shattered Pixel Dungeon
 
