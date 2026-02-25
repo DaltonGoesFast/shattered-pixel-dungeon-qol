@@ -1,5 +1,7 @@
 QoL mod of SPD
 
+**Collaborating?** See [CONTRIBUTING.md](CONTRIBUTING.md) for git branching and the [streaming setup guide](docs/streaming-setup-guide.md) to emulate the live stream environment.
+
 Current Features:
 
 Press Tilde key to swap to 2nd quickslot hotbar
