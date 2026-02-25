@@ -20,12 +20,8 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 POINTS_FILE = os.path.join(SCRIPT_DIR, "viewer_points.txt")
 SPAWN_RESULT_FILE = os.path.join(SCRIPT_DIR, "spawn_result.txt")
 DONATION_RESULT_FILE = os.path.join(SCRIPT_DIR, "donation_result.txt")
+CONFIG_FILE = os.path.join(SCRIPT_DIR, "points_config.json")
 GAME_DATA_URL = "http://127.0.0.1:5000/api/game-data"
-
-# --- Costs (edit to tune) ---
-COST_PER_GOLD = 2
-COST_PER_CURSE = 200
-COST_PER_GAS = 75
 
 NATIVE_DEPTH = {
     "rat": 1, "albino": 1, "snake": 1, "gnoll": 2, "crab": 3, "slime": 4,
@@ -34,14 +30,48 @@ NATIVE_DEPTH = {
     "ghoul": 14, "elemental": 16, "warlock": 16, "monk": 17, "golem": 18,
     "succubus": 19, "eye": 21, "scorpio": 23,
 }
-COST_PER_MONSTER = {
-    "rat": 5, "albino": 10, "snake": 10, "gnoll": 10, "crab": 15,
-    "slime": 15, "swarm": 15, "thief": 20, "skeleton": 20, "bat": 30,
-    "brute": 30, "shaman": 35, "spinner": 25, "dm100": 20, "guard": 25,
-    "necromancer": 25, "ghoul": 40, "elemental": 40, "warlock": 45,
-    "monk": 50, "golem": 50, "succubus": 60, "eye": 70, "scorpio": 80,
-}
-DEFAULT_COST = 100
+
+
+def load_config():
+    """Load costs from points_config.json. Falls back to defaults if missing/invalid."""
+    defaults = {
+        "cost_per_gold": 2,
+        "cost_per_curse": 200,
+        "cost_per_gas": 75,
+        "default_monster_cost": 100,
+        "cost_per_monster": {
+            "rat": 5, "albino": 10, "snake": 10, "gnoll": 10, "crab": 15,
+            "slime": 15, "swarm": 15, "thief": 20, "skeleton": 20, "bat": 30,
+            "brute": 30, "shaman": 35, "spinner": 25, "dm100": 20, "guard": 25,
+            "necromancer": 25, "ghoul": 40, "elemental": 40, "warlock": 45,
+            "monk": 50, "golem": 50, "succubus": 60, "eye": 70, "scorpio": 80,
+        },
+    }
+    if not os.path.exists(CONFIG_FILE):
+        return defaults
+    try:
+        with open(CONFIG_FILE, encoding="utf-8") as f:
+            cfg = json.load(f)
+        monsters = dict(defaults["cost_per_monster"])
+        for k, v in (cfg.get("cost_per_monster") or {}).items():
+            try:
+                monsters[k] = int(v)
+            except (ValueError, TypeError):
+                pass
+        return {
+            "cost_per_gold": int(cfg.get("cost_per_gold", defaults["cost_per_gold"])),
+            "cost_per_curse": int(cfg.get("cost_per_curse", defaults["cost_per_curse"])),
+            "cost_per_gas": int(cfg.get("cost_per_gas", defaults["cost_per_gas"])),
+            "default_monster_cost": int(cfg.get("default_monster_cost", defaults["default_monster_cost"])),
+            "cost_per_monster": monsters,
+        }
+    except Exception:
+        return defaults
+
+
+def get_config():
+    """Cached config (reloads each command to allow live edits)."""
+    return load_config()
 VALID_MONSTERS = frozenset([
     "rat", "albino", "snake", "gnoll", "crab", "slime", "swarm", "thief",
     "skeleton", "bat", "brute", "shaman", "spinner", "dm100", "guard",
@@ -93,7 +123,8 @@ def get_current_depth():
 
 
 def compute_spawn_cost(monster: str) -> int:
-    base = COST_PER_MONSTER.get(monster, DEFAULT_COST)
+    cfg = get_config()
+    base = cfg["cost_per_monster"].get(monster, cfg["default_monster_cost"])
     depth = get_current_depth()
     native = NATIVE_DEPTH.get(monster)
     if depth is not None and native is not None and depth > native:
@@ -156,7 +187,7 @@ def cmd_gold(args):
         return SPAWN_RESULT_FILE, "Usage: !gold <amount> (e.g. !gold 10). Amount must be 1-100."
     username = args[1]
 
-    cost = amount * COST_PER_GOLD
+    cost = amount * get_config()["cost_per_gold"]
     data = read_points()
     key = username.lower()
     pts, last = data.get(key, (0, 0))
@@ -195,7 +226,7 @@ def cmd_curse(args):
     if slot not in VALID_SLOTS:
         return SPAWN_RESULT_FILE, f"Unknown slot \"{args[0]}\". Options: {SLOT_HELP}"
 
-    cost = COST_PER_CURSE
+    cost = get_config()["cost_per_curse"]
     data = read_points()
     key = username.lower()
     pts, last = data.get(key, (0, 0))
@@ -231,7 +262,7 @@ def cmd_gas(args):
         return SPAWN_RESULT_FILE, "Usage: !gas (spawns random gas near you)"
     username = args[0]
 
-    cost = COST_PER_GAS
+    cost = get_config()["cost_per_gas"]
     data = read_points()
     key = username.lower()
     pts, last = data.get(key, (0, 0))

@@ -1,0 +1,32 @@
+{
+  "cost_per_gold": 2,
+  "cost_per_curse": 200,
+  "cost_per_gas": 75,
+  "default_monster_cost": 100,
+  "cost_per_monster": {
+    "rat": 5,
+    "albino": 10,
+    "snake": 10,
+    "gnoll": 10,
+    "crab": 15,
+    "slime": 15,
+    "swarm": 15,
+    "thief": 20,
+    "skeleton": 20,
+    "bat": 30,
+    "brute": 30,
+    "shaman": 35,
+    "spinner": 25,
+    "dm100": 20,
+    "guard": 25,
+    "necromancer": 25,
+    "ghoul": 40,
+    "elemental": 40,
+    "warlock": 45,
+    "monk": 50,
+    "golem": 50,
+    "succubus": 60,
+    "eye": 70,
+    "scorpio": 80
+  }
+}

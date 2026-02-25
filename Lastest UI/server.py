@@ -21,6 +21,7 @@ SAVE_DIRECTORY = r"C:\Users\dalto\AppData\Roaming\.shatteredpixel\Shattered Pixe
 UPDATE_INTERVAL = 1.0  # Check for updates every second
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DOUBLE_POINTS_END_FILE = os.path.join(SCRIPT_DIR, "double_points_end.txt")
+POINTS_CONFIG_FILE = os.path.join(SCRIPT_DIR, "points_config.json")
 DOUBLE_POINTS_COUNTDOWN_FILE = os.path.join(SCRIPT_DIR, "double_points_countdown.txt")
 
 # Game WebSocket: receive live stream from game and serve via HTTP /api/game-data and game_summary.json
@@ -281,6 +282,62 @@ def index():
 def double_points_countdown_page():
     """Serve 2x points countdown for OBS Browser Source (avoids CORS when using file://)"""
     return send_from_directory('.', 'double-points-countdown.html')
+
+
+@app.route('/points-config')
+def points_config_page():
+    """Serve points config editor (streamer only - open in browser to edit costs)"""
+    return send_from_directory('.', 'points-config.html')
+
+
+@app.route('/api/points-config', methods=['GET', 'POST', 'OPTIONS'])
+def points_config_api():
+    """Get or save points config (costs for spawn, gold, curse, gas)."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    if request.method == 'GET':
+        try:
+            if os.path.exists(POINTS_CONFIG_FILE):
+                with open(POINTS_CONFIG_FILE, encoding='utf-8') as f:
+                    data = json.load(f)
+            else:
+                data = {
+                    "cost_per_gold": 2,
+                    "cost_per_curse": 200,
+                    "cost_per_gas": 75,
+                    "default_monster_cost": 100,
+                    "cost_per_monster": {
+                        "rat": 5, "albino": 10, "snake": 10, "gnoll": 10, "crab": 15,
+                        "slime": 15, "swarm": 15, "thief": 20, "skeleton": 20, "bat": 30,
+                        "brute": 30, "shaman": 35, "spinner": 25, "dm100": 20, "guard": 25,
+                        "necromancer": 25, "ghoul": 40, "elemental": 40, "warlock": 45,
+                        "monk": 50, "golem": 50, "succubus": 60, "eye": 70, "scorpio": 80,
+                    },
+                }
+            return jsonify(data)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    # POST - save
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        # Validate and sanitize
+        cfg = {
+            "cost_per_gold": max(1, int(data.get("cost_per_gold", 2))),
+            "cost_per_curse": max(1, int(data.get("cost_per_curse", 200))),
+            "cost_per_gas": max(1, int(data.get("cost_per_gas", 75))),
+            "default_monster_cost": max(1, int(data.get("default_monster_cost", 100))),
+            "cost_per_monster": {},
+        }
+        for k, v in (data.get("cost_per_monster") or {}).items():
+            try:
+                cfg["cost_per_monster"][str(k)] = max(0, int(v))
+            except (ValueError, TypeError):
+                pass
+        with open(POINTS_CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/fonts/<path:filename>')

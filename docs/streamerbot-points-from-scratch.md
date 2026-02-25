@@ -60,11 +60,8 @@ The file is created automatically when the first action runs.
 - **Points per passive tick:** `1` (change `POINTS_PER_TICK` in Action 1b)
 - **Chat cooldown:** `30` seconds (change `COOLDOWN_SEC` in Action 1; `0` = no cooldown)
 - **Passive cooldown:** `60` seconds (change `COOLDOWN_SEC` in Action 1b; shares `lastEarn` with chat)
-- **Spawn costs:** Edit `COST_PER_MONSTER` in `points_command.py`
-- **Gold cost:** 2 points per gold (edit `COST_PER_GOLD` in `points_command.py`)
-- **Curse cost:** 200 points per curse (edit `COST_PER_CURSE` in `points_command.py`)
-- **Gas cost:** 75 points per gas (edit `COST_PER_GAS` in `points_command.py`)
-- **Donation rate:** 1 point per $0.01 (edit `points_command.py` to change; Super Chat uses Frankfurter API for conversion)
+- **Points costs:** Edit `points_config.json` or open **http://localhost:5000/points-config** in your browser (overlay server must be running)
+- **Donation rate:** 1 point per $0.01 (Super Chat uses Frankfurter API for conversion; not in points config)
 - **Top farder 2x:** Set `TOP_FARDER_FILE` to the path of the text file (default: `OBS files\textread\leader.txt`). Expected format: `Top Farder: USERNAME - 45`. That user always earns 2x points.
 
 ---
@@ -490,7 +487,7 @@ public class CPHInline
 
 The `points_command.py` script checks points, attempts the spawn, and **only deducts points if the spawn succeeds**. If there's no free space (hero surrounded), points are not wasted.
 
-**Edit costs:** Open `points_command.py` and edit the `COST_PER_MONSTER` dict at the top. Example: `"rat": 25, "eye": 200`. Any monster not listed uses `DEFAULT_COST` (100).
+**Edit costs:** Open http://localhost:5000/points-config or edit `points_config.json`. Example: `"rat": 25, "eye": 200`. Any monster not listed uses `DEFAULT_COST` (100).
 
 **Half price out-of-biome:** Monsters cost **half** when spawned beyond their native area (e.g. sewer mobs in prison+). The script fetches current depth from the overlay server; if the server is unavailable, full price is charged.
 
@@ -524,7 +521,7 @@ The `points_command.py` script checks points, attempts the spawn, and **only ded
    - **True branch:** Twitch/YouTube Message: `%userName% dropped %rawInput% gold!`
    - **False branch:** Twitch/YouTube Message: `%spawnResult%` (shows error)
 
-**Cost:** 2 points per gold (5 gold = 10 pts, 10 gold = 20 pts). Edit `COST_PER_GOLD` in `points_command.py` to change.
+**Cost:** 2 points per gold (5 gold = 10 pts, 10 gold = 20 pts). Edit via points config.
 
 **Troubleshooting (504 timeout / %output1% shows literally):**
 - **Use the File Bridge:** Add the C# step that reads `spawn_result.txt` and sets `%spawnResult%`. Branch on `%spawnResult%` instead of `%output1%`.
@@ -587,7 +584,7 @@ public class CPHInline
    - **True branch:** Twitch/YouTube Message: `%userName% cursed your %curseItemName%!`
    - **False branch:** Twitch/YouTube Message: `%spawnResult%` (shows error)
 
-**Cost:** 200 points per curse (edit `COST_PER_CURSE` in `points_command.py`).
+**Cost:** 200 points per curse (edit via points config).
 
 **Add to the same blocking queue** as spawn, gold, and earn actions.
 
@@ -648,7 +645,7 @@ public class CPHInline
    - **True branch:** Twitch/YouTube Message: `%userName% spewed %gasName%!`
    - **False branch:** Twitch/YouTube Message: `%spawnResult%` (shows error)
 
-**Cost:** 75 points (edit `COST_PER_GAS` in `points_command.py`).
+**Cost:** 75 points (edit via points config).
 
 **Add to the same blocking queue** as spawn, gold, curse, and earn actions.
 
@@ -835,7 +832,7 @@ public class CPHInline
 | **!gas** | `!gas` | 75 pts | Spawn random gas (Chaotic Censer +3). Toxic, confusion, regrowth, storm clouds, smoke, stench, inferno, blizzard, or corrosive gas. |
 | **!doublepoints** | `!doublepoints <minutes>` | — | **Streamer only.** 2× points for N minutes (max 120). `!doublepoints 5` for 5 min. |
 
-**Spawn costs (base):** rat 5, albino/snake/gnoll 10, crab/slime/swarm 15, thief/skeleton/dm100 20, guard/necromancer/spinner 25, bat/brute 30, shaman 35, ghoul/elemental 40, warlock 45, monk/golem 50, succubus 60, eye 70, scorpio 80. Unknown monsters default to 100. Edit `COST_PER_MONSTER` in `points_command.py` to change.
+**Spawn costs (base):** rat 5, albino/snake/gnoll 10, crab/slime/swarm 15, thief/skeleton/dm100 20, guard/necromancer/spinner 25, bat/brute 30, shaman 35, ghoul/elemental 40, warlock 45, monk/golem 50, succubus 60, eye 70, scorpio 80. Unknown monsters default to 100. Edit `points_config.json` or use the config UI to change.
 
 ---
 
@@ -864,7 +861,7 @@ public class CPHInline
 - **Passive earn** only adds to users already in the file—they must send at least one message first. Enable **Live Update** under Platform → Twitch → Settings for Present Viewers to work.
 - **Message Received** fires on every chat message. Ensure the Earn action does not also fire on bot messages or your own messages if you want to exclude them (add a conditional if needed).
 - For `!spawn`, the Command Triggered must pass `input1` (the text after the command). Use `%rawInput%` or `%input1%` depending on your Streamer.bot version.
-- Edit `POINTS_PER_MESSAGE`, `POINTS_PER_TICK`, and `COOLDOWN_SEC` (in Action 1 for chat, Action 1b for passive) in the C# code, and `COST_PER_MONSTER` in `points_command.py`, to tune the economy.
+- Edit `POINTS_PER_MESSAGE`, `POINTS_PER_TICK`, and `COOLDOWN_SEC` (in Action 1 for chat, Action 1b for passive) in the C# code. Edit points costs via http://localhost:5000/points-config or `points_config.json`.
 - **Double points** persists until the duration ends. To clear it when the stream starts, add `File.WriteAllText(DOUBLE_FILE, "0");` to the Reset Points action.
 - **Top farder 2x:** The earn actions read from `TOP_FARDER_FILE` (default: `OBS files\textread\leader.txt`). Expected format: `Top Farder: USERNAME - 45`. Change the path if your fard counter writes to a different file.
 - **Super Chat / Cheer:** Uses `points_command.py` (superchat/cheer subcommands). Currency conversion via Frankfurter (free, no key). Add these actions to the same blocking queue as earn/spend. Anonymous cheers are skipped.
@@ -882,10 +879,12 @@ Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also g
 
 COMMANDS:
 - !points — Check your balance
-- !spawn <monster> — Spawn a monster (5–80 pts, varies by type). Half price when spawned beyond its native area (e.g. sewer mobs in prison+). Examples: !spawn rat, !spawn bat, !spawn scorpio
+- !spawn <monster> — Spawn a monster (cost varies). Half price when spawned beyond its native area (e.g. sewer mobs in prison+). Examples: !spawn rat, !spawn bat, !spawn scorpio
 - !gold <amount> — Drop gold near the hero (2 pts per gold, 1–100). Example: !gold 25
 - !curse <slot> — Curse equipped item (200 pts). Slots: weapon, armor, ring, artifact, misc
 - !gas — Spawn random gas (75 pts). Toxic, confusion, storm clouds, inferno, and more!
 
-Monsters: rat, albino, snake, gnoll, crab, slime, swarm, thief, skeleton, bat, brute, shaman, spinner, dm100, guard, necromancer, ghoul, elemental, warlock, monk, golem, succubus, eye, scorpio
+Monster costs (base): rat 5 | albino/snake/gnoll 10 | crab/slime/swarm 15 | thief/skeleton/dm100 20 | guard/necromancer/spinner 25 | bat/brute 30 | shaman 35 | ghoul/elemental 40 | warlock 45 | monk/golem 50 | succubus 60 | eye 70 | scorpio 80
+
+Prices can be changed at any time by the streamer but are correct for the most part.
 ```

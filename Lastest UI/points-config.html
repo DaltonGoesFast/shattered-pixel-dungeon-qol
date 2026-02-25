@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Points Config</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 680px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      background: #1a1a2e;
+      color: #eee;
+    }
+    h1 { color: #7f5af0; margin-bottom: 0.5rem; }
+    .sub { color: #94a1b2; font-size: 0.9rem; margin-bottom: 1.5rem; }
+    section {
+      background: #16213e;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+    }
+    section h2 { font-size: 1rem; color: #7f5af0; margin: 0 0 0.75rem 0; }
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 0.5rem;
+    }
+    .row:last-child { margin-bottom: 0; }
+    label { min-width: 140px; }
+    input[type="number"] {
+      width: 80px;
+      padding: 0.4rem 0.5rem;
+      border: 1px solid #4a5568;
+      border-radius: 4px;
+      background: #0f0f1a;
+      color: #eee;
+      font-size: 1rem;
+    }
+    .monsters {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 0.75rem 1rem;
+    }
+    .monsters .row {
+      margin-bottom: 0;
+      gap: 0.5rem;
+      min-width: 0;
+    }
+    .monsters label {
+      min-width: 0;
+      flex-shrink: 0;
+      font-size: 0.9rem;
+      white-space: nowrap;
+    }
+    .monsters input {
+      width: 56px;
+      flex-shrink: 0;
+    }
+    button {
+      background: #7f5af0;
+      color: white;
+      border: none;
+      padding: 0.6rem 1.25rem;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+      margin-top: 0.5rem;
+    }
+    button:hover { background: #9d7bff; }
+    .msg {
+      margin-top: 1rem;
+      padding: 0.5rem;
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+    .msg.ok { background: #065f46; color: #6ee7b7; }
+    .msg.err { background: #7f1d1d; color: #fca5a5; }
+  </style>
+</head>
+<body>
+  <h1>Points Config</h1>
+  <p class="sub">Edit costs for !spawn, !gold, !curse, !gas. Changes apply immediately.</p>
+
+  <section>
+    <h2>General costs</h2>
+    <div class="row">
+      <label for="cost_per_gold">Gold (per 1):</label>
+      <input type="number" id="cost_per_gold" min="1" value="2">
+    </div>
+    <div class="row">
+      <label for="cost_per_curse">Curse:</label>
+      <input type="number" id="cost_per_curse" min="1" value="200">
+    </div>
+    <div class="row">
+      <label for="cost_per_gas">Gas:</label>
+      <input type="number" id="cost_per_gas" min="1" value="75">
+    </div>
+    <div class="row">
+      <label for="default_monster_cost">Default monster:</label>
+      <input type="number" id="default_monster_cost" min="1" value="100">
+    </div>
+  </section>
+
+  <section>
+    <h2>Monster costs (per spawn)</h2>
+    <p class="sub" style="margin-bottom: 0.75rem;">Half price when spawned beyond native biome.</p>
+    <div class="monsters" id="monsters"></div>
+  </section>
+
+  <button id="save">Save</button>
+  <div id="msg"></div>
+
+  <script>
+    const MONSTERS = [
+      'rat', 'albino', 'snake', 'gnoll', 'crab', 'slime', 'swarm', 'thief',
+      'skeleton', 'bat', 'brute', 'shaman', 'spinner', 'dm100', 'guard',
+      'necromancer', 'ghoul', 'elemental', 'warlock', 'monk', 'golem',
+      'succubus', 'eye', 'scorpio'
+    ];
+
+    function showMsg(text, ok) {
+      const el = document.getElementById('msg');
+      el.textContent = text;
+      el.className = 'msg ' + (ok ? 'ok' : 'err');
+      el.style.display = 'block';
+    }
+
+    function load() {
+      fetch('/api/points-config')
+        .then(r => r.json())
+        .then(data => {
+          document.getElementById('cost_per_gold').value = data.cost_per_gold ?? 2;
+          document.getElementById('cost_per_curse').value = data.cost_per_curse ?? 200;
+          document.getElementById('cost_per_gas').value = data.cost_per_gas ?? 75;
+          document.getElementById('default_monster_cost').value = data.default_monster_cost ?? 100;
+          const monsters = data.cost_per_monster || {};
+          const container = document.getElementById('monsters');
+          container.innerHTML = '';
+          MONSTERS.forEach(m => {
+            const div = document.createElement('div');
+            div.className = 'row';
+            div.innerHTML = `<label>${m}:</label><input type="number" data-monster="${m}" min="0" value="${monsters[m] ?? ''}">`;
+            container.appendChild(div);
+          });
+        })
+        .catch(e => showMsg('Failed to load: ' + e.message, false));
+    }
+
+    function save() {
+      const defaultCost = parseInt(document.getElementById('default_monster_cost').value, 10) || 100;
+      const costPerMonster = {};
+      document.querySelectorAll('#monsters input[data-monster]').forEach(inp => {
+        const v = parseInt(inp.value, 10);
+        costPerMonster[inp.dataset.monster] = (!isNaN(v) && v >= 0) ? v : defaultCost;
+      });
+      const payload = {
+        cost_per_gold: parseInt(document.getElementById('cost_per_gold').value, 10) || 2,
+        cost_per_curse: parseInt(document.getElementById('cost_per_curse').value, 10) || 200,
+        cost_per_gas: parseInt(document.getElementById('cost_per_gas').value, 10) || 75,
+        default_monster_cost: parseInt(document.getElementById('default_monster_cost').value, 10) || 100,
+        cost_per_monster: costPerMonster,
+      };
+      fetch('/api/points-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.error) throw new Error(data.error);
+          showMsg('Saved!', true);
+        })
+        .catch(e => showMsg('Save failed: ' + e.message, false));
+    }
+
+    document.getElementById('save').addEventListener('click', save);
+    load();
+  </script>
+</body>
+</html>
