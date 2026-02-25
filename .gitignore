@@ -18,3 +18,24 @@ local.properties
 #intellij project files
 *.iml
 *.idea
+
+# Lastest UI generated/runtime
+Lastest UI/game_summary.txt
+Lastest UI/game_summary.json
+Lastest UI/last_seed.txt
+Lastest UI/viewer_points.txt
+Lastest UI/hero_inspection.txt
+Lastest UI/config.txt
+Lastest UI/double_points_end.txt
+Lastest UI/spawn_result.txt
+Lastest UI/__pycache__/
+Lastest UI/*.log
+Lastest UI/*.zip
+Lastest UI/old_*.txt
+
+# Lastest UI backups
+Lastest UI/backup/
+Lastest UI/backup_20251201/
+
+# Copied game save data (if present)
+Lastest UI/Shattered Pixel Dungeon/

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SPD → OBS Scene Switcher</title>
+  <style>
+    body { font-family: ui-sans-serif, sans-serif; font-size: 13px; margin: 12px; background: #1a1a1a; color: #e0e0e0; max-width: 480px; }
+    h1 { font-size: 1.1em; margin-bottom: 6px; }
+    .row { margin: 8px 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    label { display: flex; align-items: center; gap: 6px; }
+    input[type="number"], input[type="text"] { width: 80px; padding: 4px; background: #2a2a2a; border: 1px solid #444; color: #e0e0e0; }
+    input[type="text"].wide { width: 140px; }
+    .status { font-size: 12px; color: #888; }
+    .status.ok { color: #6b6; }
+    .status.err { color: #c66; }
+    #log { font-size: 11px; max-height: 120px; overflow: auto; background: #0d0d0d; padding: 6px; border: 1px solid #333; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <h1>SPD → OBS Scene Switcher</h1>
+  <p>Connect to the game WebSocket and OBS WebSocket. When the game <code>ui.scene</code> changes (e.g. title → game), OBS switches to the scene you set below.</p>
+  <div class="row">
+    <label>Game port <input type="number" id="gamePort" value="5001"></label>
+    <label>OBS port <input type="number" id="obsPort" value="4455"></label>
+  </div>
+  <div class="row">
+    <label>Scene when <strong>in menu</strong> (title, start, hero_select, etc.) <input type="text" id="sceneMenu" class="wide" value="Title" placeholder="e.g. Title"></label>
+  </div>
+  <div class="row">
+    <label>Scene when <strong>in gameplay</strong> (game, interlevel, alchemy, etc.) <input type="text" id="sceneGame" class="wide" value="Gameplay" placeholder="e.g. Gameplay"></label>
+  </div>
+  <div class="row">
+    <span class="status" id="gameStatus">Game: disconnected</span>
+    <span class="status" id="obsStatus">OBS: disconnected</span>
+  </div>
+  <div id="log"></div>
+
+  <script>
+    (function () {
+      const gamePortEl = document.getElementById('gamePort');
+      const obsPortEl = document.getElementById('obsPort');
+      const sceneMenuEl = document.getElementById('sceneMenu');
+      const sceneGameEl = document.getElementById('sceneGame');
+      const gameStatusEl = document.getElementById('gameStatus');
+      const obsStatusEl = document.getElementById('obsStatus');
+      const logEl = document.getElementById('log');
+
+      let gameWs = null;
+      let obsWs = null;
+      let obsIdentified = false;
+      let lastScene = null;
+
+      function log(msg, isErr) {
+        const line = document.createElement('div');
+        line.style.color = isErr ? '#c66' : '#888';
+        line.textContent = new Date().toLocaleTimeString() + ' ' + msg;
+        logEl.appendChild(line);
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+
+      function setGameStatus(msg, ok) {
+        gameStatusEl.textContent = 'Game: ' + msg;
+        gameStatusEl.className = 'status ' + (ok ? 'ok' : ok === false ? 'err' : '');
+      }
+      function setObsStatus(msg, ok) {
+        obsStatusEl.textContent = 'OBS: ' + msg;
+        obsStatusEl.className = 'status ' + (ok ? 'ok' : ok === false ? 'err' : '');
+      }
+
+      function obsSendRequest(requestType, requestData) {
+        if (!obsWs || obsWs.readyState !== WebSocket.OPEN || !obsIdentified) return;
+        const msg = {
+          op: 6,
+          d: {
+            requestType: requestType,
+            requestId: 'spd-' + Date.now() + '-' + Math.random().toString(36).slice(2),
+            requestData: requestData || {}
+          }
+        };
+        obsWs.send(JSON.stringify(msg));
+      }
+
+      function setObsScene(sceneName) {
+        obsSendRequest('SetCurrentProgramScene', { sceneName: sceneName });
+        log('OBS scene → ' + sceneName);
+      }
+
+      function onGameScene(sceneId) {
+        if (sceneId === lastScene) return;
+        lastScene = sceneId;
+        const isGameplay = ['game', 'interlevel', 'alchemy', 'journal', 'surface', 'amulet'].indexOf(sceneId) >= 0;
+        const sceneName = isGameplay ? sceneGameEl.value.trim() : sceneMenuEl.value.trim();
+        if (!sceneName) return;
+        setObsScene(sceneName);
+      }
+
+      function connectGame() {
+        if (gameWs && gameWs.readyState === WebSocket.OPEN) return;
+        const port = parseInt(gamePortEl.value, 10) || 5001;
+        setGameStatus('connecting…');
+        gameWs = new WebSocket('ws://127.0.0.1:' + port);
+        gameWs.onopen = function () {
+          setGameStatus('connected', true);
+          log('Game WS connected');
+        };
+        gameWs.onclose = function () {
+          setGameStatus('disconnected', false);
+          gameWs = null;
+        };
+        gameWs.onerror = function () { setGameStatus('error', false); };
+        gameWs.onmessage = function (ev) {
+          try {
+            const data = JSON.parse(ev.data);
+            if (data.ui && data.ui.scene) onGameScene(data.ui.scene);
+          } catch (e) {}
+        };
+      }
+
+      function connectObs() {
+        if (obsWs && obsWs.readyState === WebSocket.OPEN) return;
+        const port = parseInt(obsPortEl.value, 10) || 4455;
+        obsIdentified = false;
+        setObsStatus('connecting…');
+        obsWs = new WebSocket('ws://127.0.0.1:' + port);
+        obsWs.onopen = function () {
+          setObsStatus('identifying…');
+          log('OBS WS connected');
+        };
+        obsWs.onclose = function () {
+          setObsStatus('disconnected', false);
+          obsIdentified = false;
+          obsWs = null;
+        };
+        obsWs.onerror = function () { setObsStatus('error', false); };
+        obsWs.onmessage = function (ev) {
+          try {
+            const msg = JSON.parse(ev.data);
+            const op = msg.op;
+            const d = msg.d || {};
+            if (op === 0) {
+              // Hello – send Identify (no auth)
+              obsWs.send(JSON.stringify({
+                op: 1,
+                d: {
+                  rpcVersion: 1,
+                  eventSubscriptions: 0
+                }
+              }));
+            } else if (op === 2) {
+              // Identified
+              obsIdentified = true;
+              setObsStatus('connected', true);
+              log('OBS identified');
+              if (lastScene !== null) onGameScene(lastScene);
+            } else if (op === 7 && d.requestStatus === false) {
+              log('OBS request failed: ' + (d.comment || 'unknown'), true);
+            }
+          } catch (e) {}
+        };
+      }
+
+      gamePortEl.addEventListener('change', function () { if (gameWs) { gameWs.close(); connectGame(); } });
+      obsPortEl.addEventListener('change', function () { if (obsWs) { obsWs.close(); connectObs(); } });
+      connectGame();
+      connectObs();
+
+      setInterval(function () {
+        if ((!gameWs || gameWs.readyState !== WebSocket.OPEN) && gamePortEl.value) connectGame();
+        if ((!obsWs || obsWs.readyState !== WebSocket.OPEN) && obsPortEl.value) connectObs();
+      }, 5000);
+    })();
+  </script>
+</body>
+</html>

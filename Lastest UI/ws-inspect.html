@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SPD WebSocket JSON Inspector</title>
+  <style>
+    body { font-family: ui-monospace, monospace; font-size: 13px; margin: 12px; background: #1a1a1a; color: #e0e0e0; }
+    h1 { font-size: 1.1em; margin-bottom: 6px; }
+    .bar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+    input[type="number"] { width: 64px; padding: 4px; background: #2a2a2a; border: 1px solid #444; color: #e0e0e0; }
+    button { padding: 6px 12px; cursor: pointer; background: #333; border: 1px solid #555; color: #e0e0e0; }
+    button:hover { background: #444; }
+    button.connected { background: #1a4d1a; border-color: #2a6a2a; }
+    .status { color: #888; }
+    .status.connected { color: #6b6; }
+    .status.error { color: #c66; }
+    #lastMsg { color: #888; margin-left: 8px; }
+    #lastMsg.stale { color: #c66; }
+    .warn { margin: 8px 0; padding: 8px; background: #2a1a1a; border: 1px solid #c66; color: #f99; font-size: 12px; }
+    .warn:empty { display: none; }
+    #out { white-space: pre-wrap; word-break: break-all; max-height: 70vh; overflow: auto; border: 1px solid #333; padding: 10px; background: #0d0d0d; font-size: 12px; }
+    .tree { margin: 4px 0 4px 16px; }
+    .key { color: #7af; }
+    .str { color: #9c9; }
+    .num { color: #fa7; }
+    .bool { color: #c9c; }
+    .null { color: #666; }
+    summary { cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>SPD WebSocket JSON Inspector</h1>
+  <p>1) In the game: Settings → enable <strong>WebSocket streaming</strong>, set port (default 5001). 2) <strong>Start the game</strong> (so it binds the port). 3) Then click <strong>Connect</strong> here. The game sends a snapshot every second—if you only get one message, another app is likely using the port.</p>
+  <div class="bar">
+    <label>Port <input type="number" id="port" value="5001" min="1" max="65535"></label>
+    <button id="btn">Connect</button>
+    <span class="status" id="status">Disconnected</span>
+    <span class="status" id="lastMsg"></span>
+    <span class="status" id="sourceHint"></span>
+  </div>
+  <div id="warn" class="warn"></div>
+  <div class="bar">
+    <label><input type="radio" name="view" value="tree" checked> Tree</label>
+    <label><input type="radio" name="view" value="raw"> Raw JSON</label>
+  </div>
+  <div id="out">Connect to see data.</div>
+
+  <script>
+    const portEl = document.getElementById('port');
+    const btn = document.getElementById('btn');
+    const statusEl = document.getElementById('status');
+    const lastMsgEl = document.getElementById('lastMsg');
+    const sourceHintEl = document.getElementById('sourceHint');
+    const warnEl = document.getElementById('warn');
+    const out = document.getElementById('out');
+    let ws = null;
+    let lastData = null;
+    let lastMessageTime = 0;
+    let staleCheckInterval = null;
+
+    function setStatus(msg, cls) {
+      statusEl.textContent = msg;
+      statusEl.className = 'status ' + (cls || '');
+    }
+
+    function renderTree(obj, depth = 0) {
+      if (obj === null) return '<span class="null">null</span>';
+      if (typeof obj === 'boolean') return '<span class="bool">' + obj + '</span>';
+      if (typeof obj === 'number') return '<span class="num">' + obj + '</span>';
+      if (typeof obj === 'string') return '<span class="str">"' + escapeHtml(obj) + '"</span>';
+      if (Array.isArray(obj)) {
+        const len = obj.length;
+        if (len === 0) return '[]';
+        return '<details open><summary>[ ' + len + ' ]</summary><div class="tree">' +
+          obj.map((v, i) => '<div>' + renderTree(v, depth + 1) + '</div>').join('') +
+          '</div></details>';
+      }
+      const keys = Object.keys(obj);
+      if (keys.length === 0) return '{}';
+      return '<details open><summary>{ ' + keys.length + ' keys }</summary><div class="tree">' +
+        keys.map(k => '<div><span class="key">' + escapeHtml(k) + '</span>: ' + renderTree(obj[k], depth + 1) + '</div>').join('') +
+        '</div></details>';
+    }
+
+    function escapeHtml(s) {
+      const div = document.createElement('div');
+      div.textContent = s;
+      return div.innerHTML;
+    }
+
+    function showData(data) {
+      lastData = data;
+      const view = document.querySelector('input[name="view"]:checked').value;
+      if (view === 'raw') {
+        out.textContent = JSON.stringify(data, null, 2);
+      } else {
+        out.innerHTML = renderTree(data);
+      }
+    }
+
+    function updateLastMessageUI() {
+      if (!lastMessageTime) {
+        lastMsgEl.textContent = '';
+        lastMsgEl.classList.remove('stale');
+        sourceHintEl.textContent = '';
+        warnEl.textContent = '';
+        return;
+      }
+      const sec = Math.floor((Date.now() - lastMessageTime) / 1000);
+      lastMsgEl.textContent = 'Last message: ' + sec + 's ago';
+      lastMsgEl.classList.toggle('stale', sec > 3);
+      const isSpd = lastData && lastData.source === 'shattered-pixel-dungeon';
+      if (isSpd) {
+        sourceHintEl.textContent = 'SPD game';
+        sourceHintEl.style.color = '#6b6';
+      } else {
+        sourceHintEl.textContent = '';
+      }
+      if (sec > 3) {
+        warnEl.textContent = 'No updates for ' + sec + 's. Start the game first (with streaming enabled), then Connect. If the game is already running, another app may be using this port—close it or use a different port in game Settings. Run the game from a terminal to see if it says "WebSocket server started" or "Could not start... port in use".';
+      } else {
+        warnEl.textContent = '';
+      }
+    }
+
+    function onMessage(ev) {
+      lastMessageTime = Date.now();
+      try {
+        const data = JSON.parse(ev.data);
+        showData(data);
+        if (data.source !== 'shattered-pixel-dungeon') {
+          warnEl.textContent = 'This message is not from SPD (no source field). Another app may be using this port. Close it, then start the game and connect again.';
+        }
+      } catch (e) {
+        out.textContent = 'Invalid JSON: ' + ev.data.slice(0, 200);
+      }
+    }
+
+    function connect() {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.close();
+        return;
+      }
+      const port = parseInt(portEl.value, 10) || 5001;
+      const url = 'ws://127.0.0.1:' + port;
+      setStatus('Connecting…');
+      try {
+        ws = new WebSocket(url);
+        ws.onopen = () => {
+          setStatus('Connected', 'connected');
+          btn.textContent = 'Disconnect';
+          btn.classList.add('connected');
+          lastMessageTime = 0;
+          lastMsgEl.textContent = 'Waiting for first message…';
+          lastMsgEl.classList.remove('stale');
+          staleCheckInterval = setInterval(updateLastMessageUI, 1000);
+        };
+        ws.onclose = () => {
+          setStatus('Disconnected');
+          btn.textContent = 'Connect';
+          btn.classList.remove('connected');
+          lastMsgEl.textContent = '';
+          lastMsgEl.classList.remove('stale');
+          sourceHintEl.textContent = '';
+          warnEl.textContent = '';
+          if (staleCheckInterval) clearInterval(staleCheckInterval);
+          staleCheckInterval = null;
+          lastMessageTime = 0;
+          ws = null;
+        };
+        ws.onerror = () => setStatus('Error', 'error');
+        ws.onmessage = onMessage;
+      } catch (e) {
+        setStatus('Error: ' + e.message, 'error');
+      }
+    }
+
+    btn.addEventListener('click', connect);
+    document.querySelectorAll('input[name="view"]').forEach(r => {
+      r.addEventListener('change', () => {
+        if (lastData) showData(lastData);
+      });
+    });
+  </script>
+</body>
+</html>
