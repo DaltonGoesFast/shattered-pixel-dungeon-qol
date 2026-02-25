@@ -9,6 +9,7 @@ Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also g
 | Command | Description |
 |---------|-------------|
 | **!points** | Check your balance |
+| **!toppoints** / **!leaderboard** | Top 3 point holders |
 | **!spawn** \<monster\> | Spawn a monster (cost varies). Half price when spawned beyond its native area (e.g. sewer mobs in prison+). Examples: `!spawn rat`, `!spawn bat`, `!spawn scorpio` |
 | **!gold** \<amount\> | Drop gold near the hero (2 pts per gold, 1–100). Example: `!gold 25` |
 | **!curse** \<slot\> | Curse equipped item (200 pts). Slots: weapon, armor, ring, artifact, misc |

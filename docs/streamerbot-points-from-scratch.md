@@ -19,20 +19,21 @@ Before implementing, ensure:
 1. Action 1 (Earn on message) — gets users into the file
 2. Action 1c (First Words) — optional, add to your existing action
 3. Action 2 (!points) — viewers can check balance
-4. Action 3 (!spawn) — spend points to spawn
-5. Action 3b (!gold) — spend points to drop gold near hero
-6. Action 3c (!curse) — spend points to curse equipped item
-7. Action 3d (!gas) — spend points to spawn random gas
-8. Action 1b (Passive earn) — optional, for viewers already in file
-9. Action 4 (!doublepoints) — optional, 2x points for N minutes
-10. Action 4b (Super Chat / Cheer) — optional, 1 pt per $0.01
-11. Action 5 (Reset) — optional, clear points each stream
+4. Action 2b (!toppoints) — show top 3 point holders
+5. Action 3 (!spawn) — spend points to spawn
+6. Action 3b (!gold) — spend points to drop gold near hero
+7. Action 3c (!curse) — spend points to curse equipped item
+8. Action 3d (!gas) — spend points to spawn random gas
+9. Action 1b (Passive earn) — optional, for viewers already in file
+10. Action 4 (!doublepoints) — optional, 2x points for N minutes
+11. Action 4b (Super Chat / Cheer) — optional, 1 pt per $0.01
+12. Action 5 (Reset) — optional, clear points each stream
 
 ---
 
 ## YouTube Support
 
-- **Commands (!spawn, !gold, !curse, !gas, !points):** When creating the command, enable **YouTube Message** as a source (in addition to or instead of Twitch Message).
+- **Commands (!spawn, !gold, !curse, !gas, !points, !toppoints):** When creating the command, enable **YouTube Message** as a source (in addition to or instead of Twitch Message).
 - **Earn Points (message):** Add **Message Received** from YouTube → Triggers to the same action, or create a duplicate action with the YouTube trigger.
 - **Earn Points (passive):** Add **Present Viewers** from YouTube → Triggers (YouTube uses chat-activity threshold; no live viewer list).
 - **Response messages:** Use conditionals: `if ("%commandSource%" Equals "youtube")` → YouTube Message; `if ("%commandSource%" Equals "twitch")` → Twitch Message. Or duplicate the message sub-action for each platform.
@@ -469,6 +470,68 @@ public class CPHInline
 
 ---
 
+## Action 2b: Top Points (!toppoints)
+
+**Trigger:** Command Triggered → create command `!toppoints` (or `!leaderboard`)
+
+**Sub-Actions (in order):**
+
+1. **Execute C# Code** (Inline):
+
+```csharp
+using System;
+using System.Collections.Generic;
+using System.IO;
+
+public class CPHInline
+{
+    const string FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt";
+
+    public bool Execute()
+    {
+        try
+        {
+            var list = new List<Tuple<string, int>>();
+            if (File.Exists(FILE))
+            {
+                foreach (string line in File.ReadAllLines(FILE))
+                {
+                    string[] parts = line.Split('|');
+                    if (parts.Length >= 2)
+                    {
+                        string name = parts[0].Trim();
+                        int p;
+                        if (int.TryParse(parts[1].Trim(), out p) && !string.IsNullOrEmpty(name))
+                            list.Add(new Tuple<string, int>(name, p));
+                    }
+                }
+            }
+            list.Sort((a, b) => b.Item2.CompareTo(a.Item2));
+            string msg;
+            if (list.Count == 0)
+                msg = "Nobody has points yet. Chat to earn!";
+            else
+            {
+                var parts = new List<string>();
+                int take = Math.Min(3, list.Count);
+                for (int i = 0; i < take; i++)
+                    parts.Add((i + 1) + ". " + list[i].Item1 + " (" + list[i].Item2 + " pts)");
+                msg = string.Join(" | ", parts);
+            }
+            CPH.SetArgument("topPointsResult", msg);
+            return true;
+        }
+        catch (Exception ex) { CPH.SetArgument("topPointsResult", "Error: " + ex.Message); return true; }
+    }
+}
+```
+
+2. **Response message:** Twitch/YouTube Message: `%topPointsResult%`
+
+**Example output:** `1. ViewerA (450 pts) | 2. ViewerB (320 pts) | 3. ViewerC (180 pts)`
+
+---
+
 ## Action 3: Spawn Monster (with points)
 
 **Trigger:** Command Triggered → `!spawn`
@@ -826,6 +889,7 @@ public class CPHInline
 | Command | Usage | Cost | Description |
 |---------|-------|------|-------------|
 | **!points** | `!points` | Free | Check your point balance. |
+| **!toppoints** | `!toppoints` | Free | Show top 3 point holders. |
 | **!spawn** | `!spawn <monster>` | Varies by monster (5–80 pts) | Spawn a monster near the hero. Half price when spawned beyond its native biome. Valid monsters: rat, albino, snake, gnoll, crab, slime, swarm, thief, skeleton, bat, brute, shaman, spinner, dm100, guard, necromancer, ghoul, elemental, warlock, monk, golem, succubus, eye, scorpio. |
 | **!gold** | `!gold <amount>` | 2 pts per gold | Drop gold near the hero. Amount 1–100 required (e.g. `!gold 10` = 20 pts). |
 | **!curse** | `!curse <slot>` | 200 pts | Curse an equipped item. Slots: **weapon**, **armor**, **ring**, **artifact**, **misc** (or trinket/middle). |
@@ -844,6 +908,7 @@ public class CPHInline
 | Earn Points (passive) | Present Viewers | +1 per tick (60s cooldown; 2x double points; 2x if top farder) |
 | First Words Bonus     | (add to your First Words action) | +5 on first chat (2x double points; 2x if top farder) |
 | Check Points| !points           | Show viewer their balance                    |
+| Top Points  | !toppoints        | Show top 3 point holders in chat              |
 | Spawn Monster| !spawn           | Deduct points (cost varies by monster)       |
 | Drop Gold    | !gold <amount>  | Spend points to drop gold (2 pts/gold, amount required) |
 | Curse Item   | !curse <slot>  | Spend points to curse weapon, armor, ring, artifact, or misc (200 pts) |
@@ -879,9 +944,10 @@ Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also g
 
 COMMANDS:
 - !points — Check your balance
-- !spawn <monster> — Spawn a monster (cost varies). Half price when spawned beyond its native area (e.g. sewer mobs in prison+). Examples: !spawn rat, !spawn bat, !spawn scorpio
-- !gold <amount> — Drop gold near the hero (2 pts per gold, 1–100). Example: !gold 25
-- !curse <slot> — Curse equipped item (200 pts). Slots: weapon, armor, ring, artifact, misc
+- !toppoints / !leaderboard — Top 3 point holders
+- !spawn (monster) — Spawn a monster (cost varies). Half price when spawned beyond its native area (e.g. sewer mobs in prison+). Examples: !spawn rat, !spawn bat, !spawn scorpio
+- !gold (amount) — Drop gold near the hero (2 pts per gold, 1–100). Example: !gold 25
+- !curse (slot) — Curse equipped item (200 pts). Slots: weapon, armor, ring, artifact, misc
 - !gas — Spawn random gas (75 pts). Toxic, confusion, storm clouds, inferno, and more!
 
 Monster costs (base): rat 5 | albino/snake/gnoll 10 | crab/slime/swarm 15 | thief/skeleton/dm100 20 | guard/necromancer/spinner 25 | bat/brute 30 | shaman 35 | ghoul/elemental 40 | warlock 45 | monk/golem 50 | succubus 60 | eye 70 | scorpio 80
