@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    @font-face {
+      font-family: 'PixelFont';
+      src: url('/fonts/pixel_font.ttf') format('truetype');
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'PixelFont', monospace;
+      font-size: 48px;
+      font-weight: bold;
+      -webkit-font-smoothing: none;
+      color: #ffd700;
+      text-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    #timer { display: none; }
+    #timer.active { display: block; }
+  </style>
+</head>
+<body>
+  <div id="timer"></div>
+  <script>
+    const url = "http://127.0.0.1:5000/api/double-points-remaining";
+    const el = document.getElementById("timer");
+    function update() {
+      fetch(url).then(r => r.json()).then(d => {
+        if (d.active && d.display) {
+          el.textContent = "2x points: " + d.display;
+          el.classList.add("active");
+        } else {
+          el.classList.remove("active");
+        }
+      }).catch(() => el.classList.remove("active"));
+    }
+    update();
+    setInterval(update, 1000);
+  </script>
+</body>
+</html>

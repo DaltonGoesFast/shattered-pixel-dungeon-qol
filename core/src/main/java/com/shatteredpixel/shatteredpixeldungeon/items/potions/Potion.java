@@ -154,6 +154,16 @@ public class Potion extends Item {
 	public static void clearColors() {
 		handler = null;
 	}
+
+	/** Returns the color/rune label for the given potion class, or null if not in a game. */
+	public static String labelFor( Class<? extends Potion> cls ) {
+		return handler != null ? handler.label( cls ) : null;
+	}
+
+	/** Returns whether the given potion class is identified in the current run. */
+	public static boolean isKnownInCurrentRun( Class<? extends Potion> cls ) {
+		return handler != null && handler.isKnown( cls );
+	}
 	
 	public static void save( Bundle bundle ) {
 		handler.save( bundle );

@@ -40,6 +40,7 @@ import com.shatteredpixel.shatteredpixeldungeon.windows.WndStory;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndTitledMessage;
 import com.watabou.input.GameAction;
 import com.watabou.noosa.BitmapText;
+import com.watabou.noosa.ColorBlock;
 import com.watabou.noosa.Game;
 import com.watabou.noosa.Image;
 import com.watabou.noosa.NinePatch;
@@ -50,6 +51,8 @@ import com.watabou.utils.DeviceCompat;
 public class MenuPane extends Component {
 
 	private Image bg;
+	/** Solid black box behind depth/challenges for OBS chroma-key masking */
+	private ColorBlock obsMaskDepthChallenges;
 
 	private Image depthIcon;
 	private BitmapText depthText;
@@ -78,10 +81,13 @@ public class MenuPane extends Component {
 		bg = new Image(Assets.Interfaces.MENU, 1, 0, 31, 21);
 		add(bg);
 
+		obsMaskDepthChallenges = new ColorBlock(1, 1, 0xFF000000);
+		add(obsMaskDepthChallenges);
+
 		versionOverflowBG = new NinePatch(bg.texture, 1, 22, 6, 8, 3, 0, 2, 0);
 		add(versionOverflowBG);
 
-		version = new BitmapText( "v" + Game.version , PixelScene.pixelFont);
+		version = new BitmapText( "v" + Game.version + (Game.version.endsWith("-QoL") ? "" : "-QoL") , PixelScene.pixelFont);
 		version.hardlight( 0xCACFC2 );
 		add(version);
 
@@ -207,8 +213,20 @@ public class MenuPane extends Component {
 			challengeButton.setRect(challengeIcon.x, challengeIcon.y, challengeIcon.width(), challengeIcon.height() + challengeText.height());
 		}
 
+		// OBS mask: solid black behind depth/challenges for chroma-key
+		float maskLeft = (challengeIcon != null) ? challengeIcon.x - 1 : depthIcon.x - 1;
+		float maskRight = btnJournal.left() + 1;
+		float maskBottom = depthIcon.y + depthIcon.height() + depthText.height() + 1;
+		obsMaskDepthChallenges.x = maskLeft;
+		obsMaskDepthChallenges.y = y;
+		obsMaskDepthChallenges.size(maskRight - maskLeft, maskBottom - y);
+
 		danger.setPos( x + WIDTH - danger.width(), y + bg.height + 1 );
-		danger.setSize( camera.width - danger.width(), danger.height());
+		float rightEdge = camera.width;
+		if (Game.scene() instanceof PixelScene) {
+			rightEdge = camera.width - ((PixelScene) Game.scene()).getCommonInsets().right;
+		}
+		danger.setSize( rightEdge - danger.left(), danger.height());
 	}
 
 	public void pickup(Item item, int cell) {

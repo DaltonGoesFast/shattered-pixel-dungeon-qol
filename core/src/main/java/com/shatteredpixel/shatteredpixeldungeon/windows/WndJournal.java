@@ -104,6 +104,11 @@ public class WndJournal extends WndTabbed {
 	public static int last_index = 0;
 
 	private static WndJournal INSTANCE = null;
+
+	/** Used by streaming/overlay to detect if the journal window is open. */
+	public static boolean isOpen() {
+		return INSTANCE != null;
+	}
 	
 	public WndJournal(){
 
@@ -212,6 +217,14 @@ public class WndJournal extends WndTabbed {
 		select(last_index);
 
 		INSTANCE = this;
+	}
+
+	@Override
+	public void hide() {
+		super.hide();
+		if (INSTANCE == this) {
+			INSTANCE = null;
+		}
 	}
 
 	@Override

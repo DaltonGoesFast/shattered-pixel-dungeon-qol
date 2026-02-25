@@ -121,6 +121,8 @@ public class SPDSettings extends GameSettings {
 	//Interface
 
 	public static final String KEY_UI_SIZE 	    = "full_ui";
+	public static final String KEY_UI_MARGIN_X   = "ui_margin_x";
+	public static final String KEY_UI_MARGIN_Y   = "ui_margin_y";
 	public static final String KEY_SCALE		= "scale";
 	public static final String KEY_QUICK_SWAP	= "quickslot_swapper";
 	public static final String KEY_FLIPTOOLBAR	= "flipped_ui";
@@ -148,6 +150,22 @@ public class SPDSettings extends GameSettings {
 			}
 		}
 		return size;
+	}
+
+	/** Extra horizontal margin (virtual pixels) added to left and right; pulls UI toward center. 0 = default. */
+	public static void uiMarginX( int value ) {
+		put( KEY_UI_MARGIN_X, Math.max( 0, Math.min( 24, value ) ) );
+	}
+	public static int uiMarginX() {
+		return getInt( KEY_UI_MARGIN_X, 0, 0, 24 );
+	}
+
+	/** Extra vertical margin (virtual pixels) added to top and bottom; pulls UI toward center. 0 = default. */
+	public static void uiMarginY( int value ) {
+		put( KEY_UI_MARGIN_Y, Math.max( 0, Math.min( 24, value ) ) );
+	}
+	public static int uiMarginY() {
+		return getInt( KEY_UI_MARGIN_Y, 0, 0, 24 );
 	}
 
 	public static void scale( int value ) {
@@ -463,5 +481,25 @@ public class SPDSettings extends GameSettings {
 
 	public static int fulLScreenMonitor(){
 		return getInt( KEY_FULLSCREEN_MONITOR, 0 );
+	}
+
+	//WebSocket streaming (desktop only; for OBS, Streamer.bot, etc.)
+	public static final String KEY_STREAMING_ENABLED = "streaming_enabled";
+	public static final String KEY_STREAMING_PORT    = "streaming_port";
+
+	public static void streamingEnabled( boolean value ) {
+		put( KEY_STREAMING_ENABLED, value );
+	}
+
+	public static boolean streamingEnabled() {
+		return getBoolean( KEY_STREAMING_ENABLED, false );
+	}
+
+	public static void streamingPort( int value ) {
+		put( KEY_STREAMING_PORT, value );
+	}
+
+	public static int streamingPort() {
+		return getInt( KEY_STREAMING_PORT, 5001, 5000, 5010 );
 	}
 }

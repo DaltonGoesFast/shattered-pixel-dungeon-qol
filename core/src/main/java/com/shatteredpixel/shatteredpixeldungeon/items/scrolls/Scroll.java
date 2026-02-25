@@ -109,6 +109,16 @@ public abstract class Scroll extends Item {
 	public static void clearLabels(){
 		handler = null;
 	}
+
+	/** Returns the rune label for the given scroll class, or null if not in a game. */
+	public static String labelFor( Class<? extends Scroll> cls ) {
+		return handler != null ? handler.label( cls ) : null;
+	}
+
+	/** Returns whether the given scroll class is identified in the current run. */
+	public static boolean isKnownInCurrentRun( Class<? extends Scroll> cls ) {
+		return handler != null && handler.isKnown( cls );
+	}
 	
 	public static void save( Bundle bundle ) {
 		handler.save( bundle );

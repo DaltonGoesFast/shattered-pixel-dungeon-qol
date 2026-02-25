@@ -23,6 +23,7 @@ package com.shatteredpixel.shatteredpixeldungeon.items.trinkets;
 
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blizzard;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
@@ -52,6 +53,7 @@ import com.watabou.utils.Bundle;
 import com.watabou.utils.PathFinder;
 import com.watabou.utils.Random;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 
 public class ChaoticCenser extends Trinket {
@@ -85,6 +87,84 @@ public class ChaoticCenser extends Trinket {
 		} else {
 			return 300 / (level + 1);
 		}
+	}
+
+	/** Spawn random gas for chat command. Uses level 3 distribution (40/40/20). Returns gas name on success, null on failure. */
+	public static String spawnGasForChat() {
+		int level = 3; // level +3 = best distribution
+		Class<? extends Blob> gasToSpawn;
+		float gasQuantity;
+		switch (Random.chances(GAS_CAT_CHANCES[level])) {
+			case 0: default:
+				do {
+					gasToSpawn = Random.element(COMMON_GASSES.keySet());
+				} while (!Regeneration.regenOn() && gasToSpawn == Regrowth.class);
+				gasQuantity = COMMON_GASSES.get(gasToSpawn);
+				break;
+			case 1:
+				gasToSpawn = Random.element(UNCOMMON_GASSES.keySet());
+				gasQuantity = UNCOMMON_GASSES.get(gasToSpawn);
+				break;
+			case 2:
+				gasToSpawn = Random.element(RARE_GASSES.keySet());
+				gasQuantity = RARE_GASSES.get(gasToSpawn);
+				break;
+		}
+
+		HashMap<Integer, Float> candidateCells = new HashMap<>();
+		PathFinder.buildDistanceMap(Dungeon.hero.pos, BArray.not(Dungeon.level.solid, null), 6);
+
+		for (int i = 0; i < Dungeon.level.length(); i++) {
+			if (Dungeon.level.heroFOV[i] && PathFinder.distance[i] < Integer.MAX_VALUE) {
+				if (PathFinder.distance[i] >= 2 && PathFinder.distance[i] <= 6) {
+					candidateCells.put(i, 1f); // equal weight by default
+				}
+			}
+		}
+
+		// Prefer cells near an enemy if one exists
+		ArrayList<Char> enemies = new ArrayList<>();
+		for (Char ch : Actor.chars()) {
+			if (ch != Dungeon.hero && ch.alignment == Char.Alignment.ENEMY && ch.isActive()
+					&& Dungeon.level.heroFOV[ch.pos]
+					&& Dungeon.level.trueDistance(ch.pos, Dungeon.hero.pos) <= 6) {
+				if (!(ch instanceof Mob) || ((Mob) ch).state != ((Mob) ch).PASSIVE) {
+					enemies.add(ch);
+				}
+			}
+		}
+		if (!enemies.isEmpty()) {
+			Char target = Random.element(enemies);
+			int targetpos = target.pos;
+			float closest = 100;
+			for (int cell : candidateCells.keySet()) {
+				float dist = Dungeon.level.distance(cell, targetpos);
+				if (dist < closest) closest = dist;
+			}
+			for (int cell : candidateCells.keySet()) {
+				float dist = Dungeon.level.distance(cell, targetpos);
+				if (dist - closest == 0) {
+					candidateCells.put(cell, 8f);
+				} else if (dist - closest <= 1) {
+					candidateCells.put(cell, 1f);
+				} else {
+					candidateCells.put(cell, 0f);
+				}
+			}
+		}
+
+		if (candidateCells.isEmpty()) return null;
+		Integer targetCell = Random.chances(candidateCells);
+		if (targetCell == null) return null;
+
+		GameScene.add(Blob.seed(targetCell, (int) gasQuantity, gasToSpawn));
+		if (gasToSpawn == CorrosiveGas.class) {
+			((CorrosiveGas) Dungeon.level.blobs.get(CorrosiveGas.class)).setStrength(2 + Dungeon.scalingDepth() / 5, ChaoticCenser.class);
+		}
+		MagicMissile.boltFromChar(Dungeon.hero.sprite.parent, MISSILE_VFX.get(gasToSpawn), Dungeon.hero.sprite, targetCell, null);
+		Sample.INSTANCE.play(Assets.Sounds.GAS);
+
+		return Messages.get(gasToSpawn, "name");
 	}
 
 	public static class CenserGasTracker extends Buff {

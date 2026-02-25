@@ -19,6 +19,9 @@ CORS(app)
 # Configuration
 SAVE_DIRECTORY = r"C:\Users\dalto\AppData\Roaming\.shatteredpixel\Shattered Pixel Dungeon QoL"
 UPDATE_INTERVAL = 1.0  # Check for updates every second
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DOUBLE_POINTS_END_FILE = os.path.join(SCRIPT_DIR, "double_points_end.txt")
+DOUBLE_POINTS_COUNTDOWN_FILE = os.path.join(SCRIPT_DIR, "double_points_countdown.txt")
 
 # Game WebSocket: receive live stream from game and serve via HTTP /api/game-data and game_summary.json
 GAME_WS_URL = "ws://127.0.0.1:5001"   # Game streaming port (default in game Settings; change if you set a different port)
@@ -54,7 +57,7 @@ game_ws_received_count = 0
 game_ws_app = None
 pending_spawns = {}  # request_id -> {"event": Event, "success": bool}
 spawn_lock = threading.Lock()
-SPAWN_RESULT_TIMEOUT = 5.0  # seconds to wait for game to report spawn result
+SPAWN_RESULT_TIMEOUT = 10.0  # seconds to wait for game to report spawn/gold result
 SPAWN_WHITELIST = frozenset([
     'rat', 'albino', 'snake', 'gnoll', 'crab', 'slime', 'swarm', 'thief',
     'skeleton', 'bat', 'brute', 'shaman', 'spinner', 'dm100', 'guard',
@@ -117,16 +120,20 @@ def _game_ws_on_message(ws, message):
     global current_game_data, last_ws_update_time, last_item_info_open, game_ws_received_count
     try:
         data = json.loads(message)
-        # Handle spawn result (game reports success/failure)
-        if data.get('type') == 'spawn_result':
+        # Handle spawn/gold result (game reports success/failure)
+        if data.get('type') in ('spawn_result', 'gold_result', 'curse_result', 'gas_result'):
             rid = data.get('request_id')
             ok = data.get('success', False)
             if rid:
                 with spawn_lock:
                     if rid in pending_spawns:
                         pending_spawns[rid]['success'] = ok
+                        if data.get('type') == 'curse_result' and data.get('item_name'):
+                            pending_spawns[rid]['item_name'] = data.get('item_name')
+                        if data.get('type') == 'gas_result' and data.get('gas_name'):
+                            pending_spawns[rid]['gas_name'] = data.get('gas_name')
                         pending_spawns[rid]['event'].set()
-            print(f"Game spawn_result: request_id={rid} success={ok}")
+            print(f"Game {data.get('type')}: request_id={rid} success={ok}")
             return
         if data.get('source') != 'shattered-pixel-dungeon':
             return
@@ -158,6 +165,34 @@ def _game_ws_on_message(ws, message):
             last_item_info_open = item_info_open
     except Exception as e:
         print(f"Game WS message error: {e}")
+
+
+def double_points_countdown_thread():
+    """Write 2x points countdown to file every second for OBS Text source."""
+    while True:
+        try:
+            display = ""
+            if os.path.exists(DOUBLE_POINTS_END_FILE):
+                try:
+                    with open(DOUBLE_POINTS_END_FILE, "r", encoding="utf-8") as f:
+                        raw = f.read().strip()
+                    end_ts = int(raw) if raw else 0
+                except (ValueError, OSError):
+                    end_ts = 0
+            else:
+                end_ts = 0
+            now = int(time.time())
+            if end_ts > now:
+                secs = end_ts - now
+                mins, secs = divmod(secs, 60)
+                display = f"2x points: {mins}:{secs:02d}"
+            with open(DOUBLE_POINTS_COUNTDOWN_FILE, "w", encoding="utf-8") as f:
+                f.write(display)
+                f.flush()
+                os.fsync(f.fileno())
+        except Exception as e:
+            print(f"Double points countdown error: {e}")
+        time.sleep(1.0)
 
 
 def obs_relay_thread():
@@ -240,6 +275,18 @@ def game_ws_thread():
 def index():
     """Serve the main overlay page"""
     return send_from_directory('.', 'index.html')
+
+
+@app.route('/double-points-countdown')
+def double_points_countdown_page():
+    """Serve 2x points countdown for OBS Browser Source (avoids CORS when using file://)"""
+    return send_from_directory('.', 'double-points-countdown.html')
+
+
+@app.route('/fonts/<path:filename>')
+def serve_font(filename):
+    """Serve font files for OBS countdown (pixel font from game)"""
+    return send_from_directory('fonts', filename)
 
 @app.route('/game_summary.txt')
 def serve_summary():
@@ -343,6 +390,171 @@ def spawn_command():
         return jsonify({'ok': False, 'error': str(e)}), 400
 
 
+@app.route('/api/gold-command', methods=['POST', 'OPTIONS'])
+def gold_command():
+    """Receive gold drop command from Streamer.bot; forward to game via WebSocket."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        if not data and request.form:
+            data = request.form.to_dict()
+        amount = data.get('amount', 5)
+        try:
+            amount = int(amount) if amount is not None else 5
+        except (TypeError, ValueError):
+            amount = 5
+        amount = max(1, min(100, amount))
+        username = (data.get('username') or '').strip() or None
+        if not game_ws_app:
+            return jsonify({'ok': False, 'error': 'Game not connected'}), 503
+        request_id = str(uuid.uuid4())
+        ev = threading.Event()
+        with spawn_lock:
+            pending_spawns[request_id] = {'event': ev, 'success': False}
+        try:
+            payload = {'command': 'gold', 'amount': amount, 'request_id': request_id}
+            if username:
+                payload['username'] = username
+            print(f"Gold send to game: amount={amount} request_id={request_id} (waiting up to {SPAWN_RESULT_TIMEOUT}s for response)")
+            game_ws_app.send(json.dumps(payload))
+        except Exception as e:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': str(e)}), 503
+        if ev.wait(timeout=SPAWN_RESULT_TIMEOUT):
+            with spawn_lock:
+                success = pending_spawns.pop(request_id, {}).get('success', False)
+        else:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': 'Gold drop timed out'}), 504
+        if success:
+            print(f"Gold OK: {amount} for {username}")
+            return jsonify({'ok': True, 'amount': amount})
+        return jsonify({'ok': False, 'error': 'No space to drop gold (hero surrounded)'}), 200
+    except Exception as e:
+        print(f"Gold 400 exception: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 400
+
+
+@app.route('/api/gas-command', methods=['POST', 'OPTIONS'])
+def gas_command():
+    """Receive gas command from Streamer.bot; forward to game via WebSocket."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        if not data and request.form:
+            data = request.form.to_dict()
+        username = (data.get('username') or '').strip() or None
+        if not game_ws_app:
+            return jsonify({'ok': False, 'error': 'Game not connected'}), 503
+        request_id = str(uuid.uuid4())
+        ev = threading.Event()
+        with spawn_lock:
+            pending_spawns[request_id] = {'event': ev, 'success': False}
+        try:
+            payload = {'command': 'gas', 'request_id': request_id}
+            if username:
+                payload['username'] = username
+            print(f"Gas send to game: request_id={request_id}")
+            game_ws_app.send(json.dumps(payload))
+        except Exception as e:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': str(e)}), 503
+        if ev.wait(timeout=SPAWN_RESULT_TIMEOUT):
+            with spawn_lock:
+                pending = pending_spawns.pop(request_id, {})
+                success = pending.get('success', False)
+                gas_name = pending.get('gas_name', '')
+        else:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': 'Gas command timed out'}), 504
+        if success:
+            print(f"Gas OK: {gas_name} for {username}")
+            return jsonify({'ok': True, 'gas_name': gas_name})
+        return jsonify({'ok': False, 'error': 'No valid cell to spawn gas (need visible tiles 2-6 from hero)'}), 200
+    except Exception as e:
+        print(f"Gas 400 exception: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 400
+
+
+@app.route('/api/curse-command', methods=['POST', 'OPTIONS'])
+def curse_command():
+    """Receive curse command from Streamer.bot; forward to game via WebSocket."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        if not data and request.form:
+            data = request.form.to_dict()
+        slot = (data.get('slot') or '').strip().lower()
+        username = (data.get('username') or '').strip() or None
+        if not slot:
+            return jsonify({'ok': False, 'error': 'Missing slot'}), 400
+        valid_slots = {'weapon', 'armor', 'ring', 'artifact', 'misc'}
+        if slot not in valid_slots:
+            return jsonify({'ok': False, 'error': f'Invalid slot. Options: weapon, armor, ring, artifact, misc (middle slot)'}), 400
+        if not game_ws_app:
+            return jsonify({'ok': False, 'error': 'Game not connected'}), 503
+        request_id = str(uuid.uuid4())
+        ev = threading.Event()
+        with spawn_lock:
+            pending_spawns[request_id] = {'event': ev, 'success': False}
+        try:
+            payload = {'command': 'curse', 'slot': slot, 'request_id': request_id}
+            if username:
+                payload['username'] = username
+            print(f"Curse send to game: slot={slot} request_id={request_id}")
+            game_ws_app.send(json.dumps(payload))
+        except Exception as e:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': str(e)}), 503
+        if ev.wait(timeout=SPAWN_RESULT_TIMEOUT):
+            with spawn_lock:
+                pending = pending_spawns.pop(request_id, {})
+                success = pending.get('success', False)
+                item_name = pending.get('item_name', '')
+        else:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': 'Curse timed out'}), 504
+        if success:
+            print(f"Curse OK: {slot} ({item_name}) for {username}")
+            return jsonify({'ok': True, 'slot': slot, 'item_name': item_name})
+        return jsonify({'ok': False, 'error': f'No item in {slot} slot or already cursed'}), 200
+    except Exception as e:
+        print(f"Curse 400 exception: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 400
+
+
+@app.route('/api/double-points-remaining')
+def double_points_remaining():
+    """Return 2x points countdown for OBS Browser Source."""
+    try:
+        end_ts = 0
+        if os.path.exists(DOUBLE_POINTS_END_FILE):
+            try:
+                with open(DOUBLE_POINTS_END_FILE, "r", encoding="utf-8") as f:
+                    raw = f.read().strip()
+                end_ts = int(raw) if raw else 0
+            except (ValueError, OSError):
+                pass
+        now = int(time.time())
+        if end_ts <= now:
+            return jsonify({"active": False, "seconds_left": 0, "display": ""})
+        secs = end_ts - now
+        mins, secs = divmod(secs, 60)
+        display = f"{mins}:{secs:02d}"
+        return jsonify({"active": True, "seconds_left": end_ts - now, "display": display})
+    except Exception as e:
+        return jsonify({"active": False, "error": str(e)}), 500
+
+
 @app.route('/api/status')
 def get_status():
     """Check if the server is running and has data"""
@@ -367,6 +579,8 @@ if __name__ == '__main__':
     # Start OBS relay when enabled (sends item_info_open / item_info_closed to Advanced Scene Switcher)
     if USE_OBS_ITEM_INFO_RELAY and websocket:
         threading.Thread(target=obs_relay_thread, daemon=True).start()
+    # Double points countdown for OBS (writes to double_points_countdown.txt every second)
+    threading.Thread(target=double_points_countdown_thread, daemon=True).start()
     
     # Load initial data
     game_info = parser.get_current_game_info()

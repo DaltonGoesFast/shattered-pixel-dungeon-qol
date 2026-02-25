@@ -84,6 +84,16 @@ public class Ring extends KindofMisc {
 	public static void clearGems(){
 		handler = null;
 	}
+
+	/** Returns the gem label for the given ring class, or null if not in a game. */
+	public static String labelFor( Class<? extends Ring> cls ) {
+		return handler != null ? handler.label( cls ) : null;
+	}
+
+	/** Returns whether the given ring class is identified in the current run. */
+	public static boolean isKnownInCurrentRun( Class<? extends Ring> cls ) {
+		return handler != null && handler.isKnown( cls );
+	}
 	
 	public static void save( Bundle bundle ) {
 		handler.save( bundle );

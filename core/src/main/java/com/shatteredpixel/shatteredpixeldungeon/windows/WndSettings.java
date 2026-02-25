@@ -365,6 +365,8 @@ public class WndSettings extends WndTabbed {
 		ColorBlock sep1;
 		OptionSlider optUIMode;
 		OptionSlider optUIScale;
+		OptionSlider optUIMarginX;
+		OptionSlider optUIMarginY;
 		RedButton btnToolbarSettings;
 		CheckBox chkFlipTags;
 		ColorBlock sep2;
@@ -418,6 +420,38 @@ public class WndSettings extends WndTabbed {
 				optUIScale.setSelectedValue(PixelScene.defaultZoom);
 				add(optUIScale);
 			}
+
+			optUIMarginX = new OptionSlider(Messages.get(this, "ui_margin_x"),
+					"0",
+					"24",
+					0,
+					24 ) {
+				@Override
+				protected void onChange() {
+					if (getSelectedValue() != SPDSettings.uiMarginX()) {
+						SPDSettings.uiMarginX(getSelectedValue());
+						ShatteredPixelDungeon.seamlessResetScene();
+					}
+				}
+			};
+			optUIMarginX.setSelectedValue(SPDSettings.uiMarginX());
+			add(optUIMarginX);
+
+			optUIMarginY = new OptionSlider(Messages.get(this, "ui_margin_y"),
+					"0",
+					"24",
+					0,
+					24 ) {
+				@Override
+				protected void onChange() {
+					if (getSelectedValue() != SPDSettings.uiMarginY()) {
+						SPDSettings.uiMarginY(getSelectedValue());
+						ShatteredPixelDungeon.seamlessResetScene();
+					}
+				}
+			};
+			optUIMarginY.setSelectedValue(SPDSettings.uiMarginY());
+			add(optUIMarginY);
 
 			if (SPDSettings.interfaceSize() == 0) {
 				btnToolbarSettings = new RedButton(Messages.get(this, "toolbar_settings"), 9){
@@ -629,6 +663,21 @@ public class WndSettings extends WndTabbed {
 				}
 			}
 
+			if (optUIMarginX != null && optUIMarginY != null && width > 200) {
+				optUIMarginX.setRect(0, height + GAP, width/2-1, SLIDER_HEIGHT);
+				optUIMarginY.setRect(width/2+1, height + GAP, width/2-1, SLIDER_HEIGHT);
+				height = optUIMarginY.bottom();
+			} else {
+				if (optUIMarginX != null) {
+					optUIMarginX.setRect(0, height + GAP, width, SLIDER_HEIGHT);
+					height = optUIMarginX.bottom();
+				}
+				if (optUIMarginY != null) {
+					optUIMarginY.setRect(0, height + GAP, width, SLIDER_HEIGHT);
+					height = optUIMarginY.bottom();
+				}
+			}
+
 			if (btnToolbarSettings != null) {
 				btnToolbarSettings.setRect(0, height + GAP, width, BTN_HEIGHT);
 				height = btnToolbarSettings.bottom();
@@ -784,6 +833,9 @@ public class WndSettings extends WndTabbed {
 		CheckBox chkUpdates;
 		CheckBox chkBetas;
 		CheckBox chkWifi;
+		ColorBlock sepStreaming;
+		CheckBox chkStreaming;
+		OptionSlider optStreamingPort;
 
 		@Override
 		protected void createChildren() {
@@ -842,6 +894,28 @@ public class WndSettings extends WndTabbed {
 				chkWifi.checked(SPDSettings.WiFi());
 				add(chkWifi);
 			}
+
+			if (DeviceCompat.isDesktop()) {
+				sepStreaming = new ColorBlock(1, 1, 0xFF000000);
+				add(sepStreaming);
+				chkStreaming = new CheckBox(Messages.get(this, "streaming_enable")) {
+					@Override
+					protected void onClick() {
+						super.onClick();
+						SPDSettings.streamingEnabled(checked());
+					}
+				};
+				chkStreaming.checked(SPDSettings.streamingEnabled());
+				add(chkStreaming);
+				optStreamingPort = new OptionSlider(Messages.get(this, "streaming_port"), "5000", "5010", 5000, 5010) {
+					@Override
+					protected void onChange() {
+						SPDSettings.streamingPort(getSelectedValue());
+					}
+				};
+				optStreamingPort.setSelectedValue(SPDSettings.streamingPort());
+				add(optStreamingPort);
+			}
 		}
 
 		@Override
@@ -872,6 +946,16 @@ public class WndSettings extends WndTabbed {
 			if (chkWifi != null){
 				chkWifi.setRect(0, pos + GAP, width, BTN_HEIGHT);
 				pos = chkWifi.bottom();
+			}
+
+			if (chkStreaming != null) {
+				sepStreaming.size(width, 1);
+				sepStreaming.y = pos + GAP;
+				pos = sepStreaming.y + 1;
+				chkStreaming.setRect(0, pos + GAP, width, BTN_HEIGHT);
+				pos = chkStreaming.bottom();
+				optStreamingPort.setRect(0, pos + GAP, width, SLIDER_HEIGHT);
+				pos = optStreamingPort.bottom();
 			}
 
 			height = pos;

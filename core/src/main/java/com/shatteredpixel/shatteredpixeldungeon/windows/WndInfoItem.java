@@ -38,6 +38,11 @@ public class WndInfoItem extends Window {
 	//only one WndInfoItem can appear at a time
 	private static WndInfoItem INSTANCE;
 
+	/** Used by streaming/overlay to detect if an item inspect/use window is open. */
+	public static boolean isOpen() {
+		return INSTANCE != null;
+	}
+
 	public WndInfoItem( Heap heap ) {
 
 		super();

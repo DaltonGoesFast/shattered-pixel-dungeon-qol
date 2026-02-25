@@ -690,7 +690,6 @@ public class PrisonBossLevel extends Level {
 			//so distance to tengu starts at 3-6 tiles and scales up to 7-8 as fill increases
 		} while (((PathFinder.distance[heroPos] < Math.ceil(7*fill))
 				|| (PathFinder.distance[heroPos] > Math.ceil(4 + 4*fill))));
-		System.out.println(tries);
 
 		PathFinder.setMapSize(width(), height());
 		

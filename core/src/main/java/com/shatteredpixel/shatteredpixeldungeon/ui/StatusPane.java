@@ -37,6 +37,7 @@ import com.shatteredpixel.shatteredpixeldungeon.windows.WndKeyBindings;
 import com.watabou.input.GameAction;
 import com.watabou.noosa.BitmapText;
 import com.watabou.noosa.Camera;
+import com.watabou.noosa.ColorBlock;
 import com.watabou.noosa.Game;
 import com.watabou.noosa.Image;
 import com.watabou.noosa.NinePatch;
@@ -48,6 +49,8 @@ import com.watabou.utils.GameMath;
 public class StatusPane extends Component {
 
 	private NinePatch bg;
+	/** Solid black box behind HP bar and buffs for OBS chroma-key masking */
+	private ColorBlock obsMaskHpBuffs;
 	private Image avatar;
 	private Button heroInfo;
 	public static float talentBlink;
@@ -93,6 +96,9 @@ public class StatusPane extends Component {
 		String asset = Assets.Interfaces.STATUS;
 
 		this.large = large;
+
+		obsMaskHpBuffs = new ColorBlock(1, 1, 0xFF000000);
+		add(obsMaskHpBuffs);
 
 		if (large)  bg = new NinePatch( asset, 0, 64, 41, 39, 33, 0, 4, 0 );
 		else        bg = new NinePatch( asset, 0,  0, 82, 38, 32, 0, 5, 0 );
@@ -277,6 +283,23 @@ public class StatusPane extends Component {
 			busy.y = y + 37;
 		}
 
+		// OBS mask: solid black behind HP bar, buffs, and turn wheel for chroma-key
+		if (large) {
+			// Extend right past turn wheel (~half the arc radius)
+			float maskRight = busy.x + busy.width() + 9;
+			obsMaskHpBuffs.x = hp.x;
+			obsMaskHpBuffs.y = y;
+			obsMaskHpBuffs.size(maskRight - hp.x, height);
+		} else {
+			// Extend left/down to cover turn wheel at bottom-left
+			float maskLeft = Math.min(hp.x, busy.x);
+			float maskRight = buffs.left() + buffs.width();
+			float maskBottom = Math.max(buffs.top() + buffs.height(), busy.y + busy.height());
+			obsMaskHpBuffs.x = maskLeft;
+			obsMaskHpBuffs.y = y;
+			obsMaskHpBuffs.size(maskRight - maskLeft, maskBottom - y);
+		}
+
 		counter.point(busy.center());
 	}
 	
@@ -383,6 +406,7 @@ public class StatusPane extends Component {
 	public void alpha( float value ){
 		value = GameMath.gate(0, value, 1f);
 		bg.alpha(value);
+		obsMaskHpBuffs.alpha(value);
 		heroPaneCutout.alpha(value);
 		hpCutout.alpha(value);
 		avatar.alpha(value);

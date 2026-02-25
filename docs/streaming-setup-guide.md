@@ -8,7 +8,7 @@ This guide helps you emulate the full streaming setup so you can test and verify
 
 | Component | Purpose |
 |-----------|---------|
-| **Python 3.8+** | Runs the overlay server and `spawn_with_points.py` |
+| **Python 3.8+** | Runs the overlay server and `points_command.py` |
 | **Shattered Pixel Dungeon QoL** | The game (this mod) with streaming enabled |
 | **Streamer.bot** | Connects chat to actions (optional for basic testing) |
 | **OBS Studio** | Displays the overlay; optional for API testing |
@@ -63,7 +63,7 @@ curl http://localhost:5000/game_summary.json
 ### Spawn (via Python)
 ```bash
 cd "Lastest UI"
-python spawn_with_points.py rat YourUsername
+python points_command.py spawn rat YourUsername
 ```
 - Requires: overlay server running, game running with streaming, `viewer_points.txt` with enough points.
 - Creates `viewer_points.txt` if missing. Add a line manually: `yourusername|100|0` to give yourself points.
@@ -72,7 +72,7 @@ python spawn_with_points.py rat YourUsername
 ```bash
 curl -X POST http://localhost:5000/api/spawn-command -H "Content-Type: application/json" -d "{\"monster\": \"rat\", \"username\": \"test\"}"
 ```
-- This bypasses the points check (points are enforced in `spawn_with_points.py`, not the server). Use for testing spawn delivery only.
+- This bypasses the points check (points are enforced in `points_command.py`, not the server). Use for testing spawn delivery only.
 
 ---
 
@@ -86,7 +86,7 @@ For full chat integration:
 
 **Paths to update** (if your project lives elsewhere):
 - All `FILE`, `DOUBLE_FILE`, `TOP_FARDER_FILE` in the C# code
-- `spawn_with_points.py` uses `SCRIPT_DIR` (same folder as the script) for `viewer_points.txt`
+- `points_command.py` uses `SCRIPT_DIR` (same folder as the script) for `viewer_points.txt`
 
 ---
 
@@ -96,7 +96,7 @@ For full chat integration:
 |------|------------|----------|
 | Server starts | `python server.py` | No errors, "Server URL" printed |
 | Game data | `curl http://localhost:5000/api/game-data` | JSON with `stats`, `hero`, etc. or 404 if no game |
-| Spawn script | Create `viewer_points.txt` with `testuser|50|0`, run `python spawn_with_points.py rat testuser` | `ok` in `spawn_result.txt` if game is running and has space |
+| Spawn script | Create `viewer_points.txt` with `testuser|50|0`, run `python points_command.py spawn rat testuser` | `ok` in `spawn_result.txt` if game is running and has space |
 | Half-price | Be in prison (depth 6+), spawn rat | Cost should be 2–3 (half of 5) |
 
 ---

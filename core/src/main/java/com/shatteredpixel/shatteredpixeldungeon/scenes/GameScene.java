@@ -441,13 +441,14 @@ public class GameScene extends PixelScene {
 		add(menu);
 
 		float extraRight = uiCamera.width - (menuBarMaxLeft + MenuPane.WIDTH);
-		if (extraRight > 0){
-			SkinnedBlock bar = new SkinnedBlock(extraRight, 20, TextureCache.createSolid(0x88000000));
+		float barWidth = Math.max(0, extraRight - insets.right);
+		if (barWidth > 0){
+			SkinnedBlock bar = new SkinnedBlock(barWidth, 20, TextureCache.createSolid(0x88000000));
 			bar.x = uiCamera.width - extraRight;
 			bar.camera = uiCamera;
 			add(bar);
 
-			PointerArea blocker = new PointerArea(uiCamera.width - extraRight, 0, extraRight, 20);
+			PointerArea blocker = new PointerArea(uiCamera.width - extraRight, 0, barWidth, 20);
 			blocker.camera = uiCamera;
 			add(blocker);
 		}
@@ -462,11 +463,13 @@ public class GameScene extends PixelScene {
 		add(status);
 
 		if (uiSize < 2 && largeInsetTop != 0) {
-			SkinnedBlock bar = new SkinnedBlock(uiCamera.width, largeInsetTop, TextureCache.createSolid(0x88000000));
+			float topBarWidth = uiCamera.width - insets.left - insets.right;
+			SkinnedBlock bar = new SkinnedBlock(topBarWidth, largeInsetTop, TextureCache.createSolid(0x88000000));
 			bar.camera = uiCamera;
+			bar.x = insets.left;
 			add(bar);
 
-			PointerArea blocker = new PointerArea(0, 0, uiCamera.width, largeInsetTop);
+			PointerArea blocker = new PointerArea(insets.left, 0, topBarWidth, largeInsetTop);
 			blocker.camera = uiCamera;
 			add(blocker);
 		}
@@ -518,23 +521,30 @@ public class GameScene extends PixelScene {
 			inventory.setPos(uiCamera.width - inventory.width() - insets.right, uiCamera.height - inventory.height() - insets.bottom);
 			add(inventory);
 
-			toolbar.setRect( insets.left, uiCamera.height - toolbar.height() - inventory.height() - insets.bottom, uiCamera.width - insets.right, toolbar.height() );
+			toolbar.setRect( insets.left, uiCamera.height - toolbar.height() - inventory.height() - insets.bottom, uiCamera.width - insets.left - insets.right, toolbar.height() );
 		} else {
-			toolbar.setRect( insets.left, uiCamera.height - toolbar.height() - insets.bottom, uiCamera.width - insets.right, toolbar.height() );
+			toolbar.setRect( insets.left, uiCamera.height - toolbar.height() - insets.bottom, uiCamera.width - insets.left - insets.right, toolbar.height() );
 		}
 
 		if (insets.bottom > 0){
-			SkinnedBlock bar = new SkinnedBlock(uiCamera.width, insets.bottom, TextureCache.createSolid(0x88000000));
+			float bottomBarWidth = uiCamera.width - insets.left - insets.right;
+			SkinnedBlock bar = new SkinnedBlock(bottomBarWidth, insets.bottom, TextureCache.createSolid(0x88000000));
 			bar.camera = uiCamera;
+			bar.x = insets.left;
 			bar.y = uiCamera.height - insets.bottom;
 			add(bar);
 
-			PointerArea blocker = new PointerArea(0, uiCamera.height - insets.bottom, uiCamera.width, insets.bottom);
+			PointerArea blocker = new PointerArea(insets.left, uiCamera.height - insets.bottom, bottomBarWidth, insets.bottom);
 			blocker.camera = uiCamera;
 			add(blocker);
 		}
 
 		layoutTags();
+		// Re-run after one frame so log/tags and toolbar/inventory stay in sync with margins
+		ShatteredPixelDungeon.runOnRenderThread(() -> {
+			layoutToolbarAndInventory();
+			layoutTags();
+		});
 
 		switch (InterlevelScene.mode) {
 			case RESURRECT:
@@ -951,6 +961,19 @@ public class GameScene extends PixelScene {
 	private boolean tagAction    = false;
 	private boolean tagResume    = false;
 
+	/** Re-applies toolbar and inventory bounds from current common insets (keeps them in sync with margins). */
+	public static void layoutToolbarAndInventory() {
+		if (scene == null) return;
+		RectF insets = scene.getCommonInsets();
+		float toolbarY = uiCamera.height - scene.toolbar.height() - insets.bottom;
+		if (scene.inventory != null && scene.inventory.visible) {
+			toolbarY -= scene.inventory.height();
+			scene.inventory.setPos(uiCamera.width - scene.inventory.width() - insets.right, uiCamera.height - scene.inventory.height() - insets.bottom);
+		}
+		float w = uiCamera.width - insets.left - insets.right;
+		scene.toolbar.setRect(insets.left, toolbarY, w, scene.toolbar.height());
+	}
+
 	public static void layoutTags() {
 
 		updateTags = false;
@@ -966,33 +989,38 @@ public class GameScene extends PixelScene {
 		}
 		//Camera.main.panTo(Dungeon.hero.sprite.center(), 5f);
 
-		//adjust spacing for elements based on display cutouts
-		// We use ALL here as some elements can be a fair but up the side of the screen
-		RectF insets = Game.platform.getSafeInsets( PlatformSupport.INSET_ALL );
-		insets = insets.scale(1f / uiCamera.zoom);
+		//adjust spacing for elements based on display cutouts and user UI margin (same as rest of game UI)
+		RectF insets = scene.getCommonInsets();
+		int uiSize = SPDSettings.interfaceSize();
 
 		boolean tagsOnLeft = SPDSettings.flipTags();
 		float tagWidth = Tag.SIZE + (tagsOnLeft ? insets.left : insets.right);
 		float tagLeft = tagsOnLeft ? 0 : uiCamera.width - tagWidth;
 
-		float y = SPDSettings.interfaceSize() == 0 ? scene.toolbar.top()-2 : scene.status.top()-2;
-		if (SPDSettings.interfaceSize() == 0){
+		// Compute log Y from the same formulas used for status/toolbar in create(), so we stay in sync with margins
+		final float statusHeight = 39;
+		float toolbarY = uiCamera.height - scene.toolbar.height() - (scene.inventory != null && scene.inventory.visible ? scene.inventory.height() : 0) - insets.bottom;
+		float statusY = uiCamera.height - statusHeight - insets.bottom;
+		float logY = uiSize == 0 ? (toolbarY - 2) : (statusY - 2);
+
+		if (uiSize == 0){
 			if (tagsOnLeft) {
-				scene.log.setRect(tagWidth, y, uiCamera.width - tagWidth - insets.right, 0);
+				scene.log.setRect(tagWidth, logY, uiCamera.width - tagWidth - insets.right, 0);
 			} else {
-				scene.log.setRect(insets.left, y, uiCamera.width - tagWidth - insets.left, 0);
+				scene.log.setRect(insets.left, logY, uiCamera.width - tagWidth - insets.left, 0);
 			}
 		} else {
 			if (tagsOnLeft) {
-				scene.log.setRect(tagWidth, y, 160 - tagWidth, 0);
+				scene.log.setRect(tagWidth, logY, 160 - tagWidth, 0);
 			} else {
-				scene.log.setRect(insets.left, y, 160 - insets.left, 0);
+				scene.log.setRect(insets.left, logY, 160 - insets.left, 0);
 			}
 		}
 
-		float pos = scene.toolbar.top();
-		if (tagsOnLeft && SPDSettings.interfaceSize() > 0){
-			pos = scene.status.top();
+		// Tag strip position from same formulas (toolbar top or status top when tags on left and full UI)
+		float pos = toolbarY;
+		if (tagsOnLeft && uiSize > 0) {
+			pos = statusY;
 		}
 
 		if (scene.tagAttack){
@@ -1400,12 +1428,14 @@ public class GameScene extends PixelScene {
 
 	public static void toggleInvPane(){
 		if (scene != null && scene.inventory != null){
+			RectF insets = scene.getCommonInsets();
 			if (scene.inventory.visible){
 				scene.inventory.visible = scene.inventory.active = invVisible = false;
-				scene.toolbar.setPos(scene.toolbar.left(), uiCamera.height-scene.toolbar.height());
+				scene.toolbar.setPos(scene.toolbar.left(), uiCamera.height - scene.toolbar.height() - insets.bottom);
 			} else {
 				scene.inventory.visible = scene.inventory.active = invVisible = true;
-				scene.toolbar.setPos(scene.toolbar.left(), scene.inventory.top()-scene.toolbar.height());
+				scene.inventory.setPos(uiCamera.width - scene.inventory.width() - insets.right, uiCamera.height - scene.inventory.height() - insets.bottom);
+				scene.toolbar.setPos(scene.toolbar.left(), scene.inventory.top() - scene.toolbar.height());
 			}
 			layoutTags();
 		}

@@ -33,4 +33,4 @@ If you're running this on a different machine, update these paths:
 
 - **server.py:** `SAVE_DIRECTORY` (SPD save file location)
 - **docs/streamerbot-points-from-scratch.md:** All `FILE`, `DOUBLE_FILE`, `TOP_FARDER_FILE` paths in the C# code
-- **spawn_with_points.py:** Uses `SCRIPT_DIR` for points file; fetches depth from `http://127.0.0.1:5000/api/game-data`
+- **points_command.py:** Uses `SCRIPT_DIR` for points file; fetches depth from `http://127.0.0.1:5000/api/game-data`

@@ -119,11 +119,16 @@ public class DesktopLauncher {
 		if (Game.version == null) {
 			Game.version = System.getProperty("Specification-Version");
 		}
-		
+		if (Game.version == null) {
+			Game.version = "0.0.0";
+		}
+
+		String implVer = DesktopLauncher.class.getPackage().getImplementationVersion();
+		if (implVer == null) implVer = System.getProperty("Implementation-Version");
 		try {
-			Game.versionCode = Integer.parseInt(DesktopLauncher.class.getPackage().getImplementationVersion());
+			Game.versionCode = implVer != null ? Integer.parseInt(implVer) : 0;
 		} catch (NumberFormatException e) {
-			Game.versionCode = Integer.parseInt(System.getProperty("Implementation-Version"));
+			Game.versionCode = 0;
 		}
 
 		if (UpdateImpl.supportsUpdates()){
@@ -144,7 +149,11 @@ public class DesktopLauncher {
 		if (vendor == null) {
 			vendor = System.getProperty("Implementation-Title");
 		}
-		vendor = vendor.split("\\.")[1];
+		if (vendor != null) {
+			vendor = vendor.split("\\.")[1];
+		} else {
+			vendor = "shatteredpixel";
+		}
 
 		String basePath = "";
 		Files.FileType baseFileType = null;
@@ -189,6 +198,9 @@ public class DesktopLauncher {
 		config.setWindowIcon("icons/icon_16.png", "icons/icon_32.png", "icons/icon_48.png",
 				"icons/icon_64.png", "icons/icon_128.png", "icons/icon_256.png");
 
+		if (SPDSettings.streamingEnabled()) {
+			StreamingBootstrapper.start(SPDSettings.streamingPort());
+		}
 		new Lwjgl3Application(new ShatteredPixelDungeon(new DesktopPlatformSupport()), config);
 	}
 }

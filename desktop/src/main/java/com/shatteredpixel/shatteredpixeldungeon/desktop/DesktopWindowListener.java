@@ -51,7 +51,19 @@ public class DesktopWindowListener implements Lwjgl3WindowListener {
 			Music.INSTANCE.resume();
 		}
 	}
-	public boolean closeRequested () { return true; }
+	public boolean closeRequested () {
+		StreamingBootstrapper.stop();
+		// Exit after delay so gradle :desktop:run finishes. Use in-game Save & Quit to save before closing.
+		Thread exitThread = new Thread(() -> {
+			try {
+				Thread.sleep(2500);
+			} catch (InterruptedException ignored) {}
+			Runtime.getRuntime().halt(0);
+		}, "DesktopRunExit");
+		exitThread.setDaemon(true);
+		exitThread.start();
+		return true;
+	}
 	public void filesDropped ( String[] strings ) { }
 	public void refreshRequested () { }
 }
