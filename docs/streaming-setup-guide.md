@@ -17,7 +17,7 @@ This guide helps you emulate the full streaming setup so you can test and verify
 
 ## 1. Overlay Server
 
-The server provides `/api/game-data`, `/api/spawn-command`, and serves the overlay.
+The server provides `/api/game-data`, `/api/spawn-command`, `/api/gold-command`, `/api/curse-command`, `/api/gas-command`, `/api/scroll-command`, and serves the overlay.
 
 ```bash
 cd "Lastest UI"
@@ -60,10 +60,11 @@ curl http://localhost:5000/api/game-data
 curl http://localhost:5000/game_summary.json
 ```
 
-### Spawn (via Python)
+### Spawn / Scroll (via Python)
 ```bash
 cd "Lastest UI"
 python points_command.py spawn rat YourUsername
+python points_command.py scroll YourUsername
 ```
 - Requires: overlay server running, game running with streaming, `viewer_points.txt` with enough points.
 - Creates `viewer_points.txt` if missing. Add a line manually: `yourusername|100|0` to give yourself points.
@@ -81,7 +82,7 @@ curl -X POST http://localhost:5000/api/spawn-command -H "Content-Type: applicati
 For full chat integration:
 
 1. **Streamer.bot** — Connect to Twitch or YouTube.
-2. **OBS** — Add Browser Source: `http://localhost:5000`
+2. **OBS** — Add Browser Source: `http://localhost:5000/overlay`
 3. **Points system** — Follow [streamerbot-points-from-scratch.md](streamerbot-points-from-scratch.md) to create the actions.
 
 **Paths to update** (if your project lives elsewhere):

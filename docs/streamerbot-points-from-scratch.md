@@ -24,16 +24,17 @@ Before implementing, ensure:
 6. Action 3b (!gold) — spend points to drop gold near hero
 7. Action 3c (!curse) — spend points to curse equipped item
 8. Action 3d (!gas) — spend points to spawn random gas
-9. Action 1b (Passive earn) — optional, for viewers already in file
-10. Action 4 (!doublepoints) — optional, 2x points for N minutes
-11. Action 4b (Super Chat / Cheer) — optional, 1 pt per $0.01
-12. Action 5 (Reset) — optional, clear points each stream
+9. Action 3e (!scroll) — spend points to use a random scroll (like +10 Unstable Spellbook)
+10. Action 1b (Passive earn) — optional, for viewers already in file
+11. Action 4 (!doublepoints) — optional, 2x points for N minutes
+12. Action 4b (Super Chat / Cheer) — optional, 1 pt per $0.01
+13. Action 5 (Reset) — optional, clear points each stream
 
 ---
 
 ## YouTube Support
 
-- **Commands (!spawn, !gold, !curse, !gas, !points, !toppoints):** When creating the command, enable **YouTube Message** as a source (in addition to or instead of Twitch Message).
+- **Commands (!spawn, !gold, !curse, !gas, !scroll, !points, !toppoints):** When creating the command, enable **YouTube Message** as a source (in addition to or instead of Twitch Message).
 - **Earn Points (message):** Add **Message Received** from YouTube → Triggers to the same action, or create a duplicate action with the YouTube trigger.
 - **Earn Points (passive):** Add **Present Viewers** from YouTube → Triggers (YouTube uses chat-activity threshold; no live viewer list).
 - **Response messages:** Use conditionals: `if ("%commandSource%" Equals "youtube")` → YouTube Message; `if ("%commandSource%" Equals "twitch")` → Twitch Message. Or duplicate the message sub-action for each platform.
@@ -43,6 +44,8 @@ The `userName` variable works for both platforms.
 ---
 
 ## File Location
+
+**Path quoting:** If your project path contains spaces (e.g. `My Games`), the script path in Run a Program **Arguments** must be in quotes: `"C:\...\points_command.py"`. Otherwise the command will fail.
 
 Points are stored in (update the path in all C# code if your project is elsewhere):
 ```
@@ -59,9 +62,10 @@ The file is created automatically when the first action runs.
 
 - **Points per message:** `1` (change `POINTS_PER_MESSAGE` in Action 1)
 - **Points per passive tick:** `1` (change `POINTS_PER_TICK` in Action 1b)
+- **Bot exclusion:** `daltongoesslow` never earns points (change `BOT_USER` in Action 1 and 1b)
 - **Chat cooldown:** `30` seconds (change `COOLDOWN_SEC` in Action 1; `0` = no cooldown)
 - **Passive cooldown:** `60` seconds (change `COOLDOWN_SEC` in Action 1b; shares `lastEarn` with chat)
-- **Points costs:** Edit `points_config.json` or open **http://localhost:5000/points-config** in your browser (overlay server must be running)
+- **Points costs:** Edit `points_config.json` or open **http://localhost:5000** in your browser (main control page; overlay server must be running)
 - **Donation rate:** 1 point per $0.01 (Super Chat uses Frankfurter API for conversion; not in points config)
 - **Top farder 2x:** Set `TOP_FARDER_FILE` to the path of the text file (default: `OBS files\textread\leader.txt`). Expected format: `Top Farder: USERNAME - 45`. That user always earns 2x points.
 
@@ -73,32 +77,41 @@ The file is created automatically when the first action runs.
 
 **Sub-Action:** Execute C# Code (Inline)
 
-Uses plain-text format (no JSON) to avoid System.Core dependency.
+Uses plain-text format (no JSON) to avoid System.Core dependency. Uses a lock file (`viewer_points.txt.lock`) so Earn Points and Python (superchat, spawn, etc.) don't overwrite each other.
 
 ```csharp
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 
 public class CPHInline
 {
     const string FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt";
+    const string LOCK_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt.lock";
     const string DOUBLE_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\double_points_end.txt";
     const string TOP_FARDER_FILE = @"C:\Users\dalto\Documents\OBS files\textread\leader.txt";  // Format: "Top Farder: USERNAME - 45"
     const int POINTS_PER_MESSAGE = 1;
     const int COOLDOWN_SEC = 30;  // 0 = no cooldown
 
+    const string BOT_USER = "daltongoesslow";  // Bot never earns points (case-insensitive)
+
     public bool Execute()
     {
         string user = CPH.TryGetArg("userName", out string u) ? u : null;
         if (string.IsNullOrEmpty(user)) return false;
+        if (user.Equals(BOT_USER, StringComparison.OrdinalIgnoreCase)) return false;
 
         try
         {
-            string key = user.ToLowerInvariant();
-            long unixNow = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds;
+            if (!AcquirePointsLock()) return false;
 
-            var data = ReadAll();
+            try
+            {
+                string key = user.ToLowerInvariant();
+                long unixNow = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds;
+
+                var data = ReadAll();
             int pts = 0;
             long lastEarn = 0;
             if (data.ContainsKey(key))
@@ -113,11 +126,33 @@ public class CPHInline
             int mult = (IsDoublePointsActive(unixNow) ? 2 : 1) * (IsTopFarder(key) ? 2 : 1);
             int toAdd = POINTS_PER_MESSAGE * mult;
             pts += toAdd;
-            data[key] = new Tuple<int, long>(pts, unixNow);
-            WriteAll(data);
-            return true;
+                data[key] = new Tuple<int, long>(pts, unixNow);
+                WriteAll(data);
+                return true;
+            }
+            finally { ReleasePointsLock(); }
         }
         catch (Exception ex) { CPH.LogInfo("Earn points: " + ex.Message); return false; }
+    }
+
+    bool AcquirePointsLock()
+    {
+        for (int i = 0; i < 200; i++)  // 10 sec at 50ms
+        {
+            try
+            {
+                using (var fs = new FileStream(LOCK_FILE, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                    fs.WriteByte(0);
+                return true;
+            }
+            catch (IOException) { Thread.Sleep(50); }
+        }
+        return false;
+    }
+
+    void ReleasePointsLock()
+    {
+        try { if (File.Exists(LOCK_FILE)) File.Delete(LOCK_FILE); } catch { }
     }
 
     Dictionary<string, Tuple<int, long>> ReadAll()
@@ -207,12 +242,14 @@ public class CPHInline
     const string TOP_FARDER_FILE = @"C:\Users\dalto\Documents\OBS files\textread\leader.txt";  // Format: "Top Farder: USERNAME - 45"
     const int POINTS_PER_TICK = 1;
     const int COOLDOWN_SEC = 60;  // 0 = no cooldown (shares lastEarn with message earn)
+    const string BOT_USER = "daltongoesslow";  // Bot never earns points (case-insensitive)
 
     public bool Execute()
     {
         string user = CPH.TryGetArg("userName", out string u) ? u : null;
         if (string.IsNullOrEmpty(user)) CPH.TryGetArg("presentUserName", out user);
         if (string.IsNullOrEmpty(user)) return false;
+        if (user.Equals(BOT_USER, StringComparison.OrdinalIgnoreCase)) return false;
 
         try
         {
@@ -604,6 +641,7 @@ The `points_command.py` script checks points, attempts the spawn, and **only ded
    - **Target:** `python`
    - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" curse %rawInput% %userName%`
    - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait maximum:** `10` seconds
    - **Note:** `%rawInput%` = slot (weapon, armor, ring, artifact, misc). `%userName%` = who ran the command.
 
 2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%` and `%curseItemName%` (item name on success):
@@ -667,6 +705,7 @@ public class CPHInline
    - **Target:** `python`
    - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" gas %userName%`
    - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait maximum:** `10` seconds
 
 2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%` and `%gasName%`:
 
@@ -713,6 +752,75 @@ public class CPHInline
 **Add to the same blocking queue** as spawn, gold, curse, and earn actions.
 
 **Fails when:** No valid cell 2–6 tiles from hero in field of view.
+
+---
+
+## Action 3e: Random Scroll (with points)
+
+**Trigger:** Command Triggered → `!scroll`
+
+**Usage:** `!scroll` — uses a random scroll like activating a +10 Unstable Spellbook. Picks from the full scroll pool (excluding transmutation), 50% chance for exotic version. Identify, Remove Curse, and Magic Mapping are half as likely.
+
+**Sub-Actions (in order):**
+
+1. **Run a Program**
+   - **Target:** `python`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" scroll %userName%`
+   - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait maximum:** `10` seconds *(required — otherwise C# runs before the script writes the result file)*
+
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%` and `%scrollName%`:
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string RESULT_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spawn_result.txt";
+
+    public bool Execute()
+    {
+        string result = "No result file - is overlay server running?";
+        string itemName = "";
+        try
+        {
+            if (File.Exists(RESULT_FILE))
+            {
+                result = File.ReadAllText(RESULT_FILE).Trim();
+                File.Delete(RESULT_FILE);
+                int pipe = result.IndexOf('|');
+                if (pipe >= 0)
+                {
+                    itemName = result.Substring(pipe + 1).Trim();
+                    result = result.Substring(0, pipe).Trim();
+                }
+            }
+        }
+        catch (Exception ex) { result = ex.Message; }
+        CPH.SetArgument("spawnResult", result);
+        CPH.SetArgument("scrollName", itemName);
+        return true;
+    }
+}
+```
+
+3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
+   - **True branch:** Twitch/YouTube Message: `%userName% used a random scroll: %scrollName%!`
+   - **False branch:** Twitch/YouTube Message: `%spawnResult%` (shows error)
+
+**Cost:** 100 points (edit via points config).
+
+**Add to the same blocking queue** as spawn, gold, curse, gas, and earn actions.
+
+**Fails when:** Not in an active run, hero dead, magic immune, or blinded.
+
+**Troubleshooting ("No result file - is overlay server running?"):**
+- **Quotations:** The script path in Arguments **must be in quotes** (e.g. `"C:\...\points_command.py"`) — paths with spaces (like `My Games`) break without them.
+- **Add Wait maximum:** The Run a Program step must have **Wait maximum: 10 seconds**. Without it, Streamer.bot runs the C# step before Python finishes writing `spawn_result.txt`.
+- **Overlay running:** Ensure `python server.py` is running in `Lastest UI`.
+- **Game connected:** The game must be running with streaming enabled (port 5001). Overlay console shows "Game WebSocket: waiting for game..." when disconnected.
+- **Test manually:** From project root: `python "Lastest UI\points_command.py" scroll YourUsername`. From `Lastest UI` folder: `python points_command.py scroll YourUsername`. Should write `ok|ScrollName` or an error to `spawn_result.txt`.
 
 ---
 
@@ -894,6 +1002,7 @@ public class CPHInline
 | **!gold** | `!gold <amount>` | 2 pts per gold | Drop gold near the hero. Amount 1–100 required (e.g. `!gold 10` = 20 pts). |
 | **!curse** | `!curse <slot>` | 200 pts | Curse an equipped item. Slots: **weapon**, **armor**, **ring**, **artifact**, **misc** (or trinket/middle). |
 | **!gas** | `!gas` | 75 pts | Spawn random gas (Chaotic Censer +3). Toxic, confusion, regrowth, storm clouds, smoke, stench, inferno, blizzard, or corrosive gas. |
+| **!scroll** | `!scroll` | 100 pts | Use a random scroll (like +10 Unstable Spellbook). 50% chance for exotic version. |
 | **!doublepoints** | `!doublepoints <minutes>` | — | **Streamer only.** 2× points for N minutes (max 120). `!doublepoints 5` for 5 min. |
 
 **Spawn costs (base):** rat 5, albino/snake/gnoll 10, crab/slime/swarm 15, thief/skeleton/dm100 20, guard/necromancer/spinner 25, bat/brute 30, shaman 35, ghoul/elemental 40, warlock 45, monk/golem 50, succubus 60, eye 70, scorpio 80. Unknown monsters default to 100. Edit `points_config.json` or use the config UI to change.
@@ -913,6 +1022,7 @@ public class CPHInline
 | Drop Gold    | !gold <amount>  | Spend points to drop gold (2 pts/gold, amount required) |
 | Curse Item   | !curse <slot>  | Spend points to curse weapon, armor, ring, artifact, or misc (200 pts) |
 | Spawn Gas    | !gas           | Spend points to spawn random gas (Chaotic Censer +3, 75 pts) |
+| Random Scroll | !scroll        | Spend points to use a random scroll (like +10 Unstable Spellbook, 100 pts) |
 | Super Chat Points | YouTube Super Chat | 1 pt per $0.01 (currency converted via Frankfurter API) |
 | Cheer Points | Twitch Cheer | 1 pt per bit (100 bits = $1 = 100 pts) |
 | Double Points | !doublepoints (streamer only) | 2x points for N minutes: `!doublepoints 5` |
@@ -949,6 +1059,7 @@ COMMANDS:
 - !gold (amount) — Drop gold near the hero (2 pts per gold, 1–100). Example: !gold 25
 - !curse (slot) — Curse equipped item (200 pts). Slots: weapon, armor, ring, artifact, misc
 - !gas — Spawn random gas (75 pts). Toxic, confusion, storm clouds, inferno, and more!
+- !scroll — Use a random scroll (100 pts). Like +10 Unstable Spellbook — 50% chance for exotic version!
 
 Monster costs (base): rat 5 | albino/snake/gnoll 10 | crab/slime/swarm 15 | thief/skeleton/dm100 20 | guard/necromancer/spinner 25 | bat/brute 30 | shaman 35 | ghoul/elemental 40 | warlock 45 | monk/golem 50 | succubus 60 | eye 70 | scorpio 80
 
