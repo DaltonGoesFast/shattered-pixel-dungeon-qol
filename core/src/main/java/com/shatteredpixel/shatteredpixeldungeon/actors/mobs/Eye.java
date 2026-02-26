@@ -27,6 +27,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.AscensionChallenge;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Invisibility;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SpawnScaled;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Light;
 import com.shatteredpixel.shatteredpixeldungeon.effects.CellEmitter;
 import com.shatteredpixel.shatteredpixeldungeon.effects.particles.PurpleParticle;
@@ -201,6 +202,14 @@ public class Eye extends Mob {
 					dmg *= 0.5f;
 					if (ch instanceof YogDzewa){
 						dmg *= 0.5f;
+					}
+				}
+
+				if (buff(SpawnScaled.class) != null) {
+					if (ch == Dungeon.hero) {
+						dmg = Math.round(Dungeon.hero.HT * 0.75f);
+					} else {
+						dmg = Math.round(dmg * buff(SpawnScaled.class).damageFactor());
 					}
 				}
 

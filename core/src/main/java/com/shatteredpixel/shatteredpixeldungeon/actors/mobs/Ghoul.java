@@ -26,6 +26,8 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.SacrificialFire;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ChatSpawned;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SpawnScaled;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.abilities.duelist.Challenge;
 import com.shatteredpixel.shatteredpixeldungeon.effects.FloatingText;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Pushing;
@@ -126,6 +128,17 @@ public class Ghoul extends Mob {
 				}
 				
 				child.pos = Random.element( candidates );
+
+				// Inherit spawn scaling from parent (e.g. chat-spawned ghoul on early floor)
+				SpawnScaled parentScale = buff(SpawnScaled.class);
+				if (parentScale != null) {
+					child.HT = this.HT;
+					child.HP = this.HT;
+					SpawnScaled.affect(child, parentScale.scale);
+				}
+				if (buff(ChatSpawned.class) != null) {
+					Buff.affect(child, ChatSpawned.class);
+				}
 
 				GameScene.add( child );
 				Dungeon.level.occupyCell(child);

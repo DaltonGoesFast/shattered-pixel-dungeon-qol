@@ -32,7 +32,7 @@ Quick reference for what each part of the project does.
 
 ### Runtime files (auto-created, in .gitignore)
 
-`viewer_points.txt`, `spawn_result.txt`, `game_summary.txt`, `game_summary.json`, `double_points_end.txt`, `donation_result.txt`, etc. — created when the system runs. Safe to delete; they regenerate.
+`viewer_points.txt`, `spawn_result.txt`, `game_summary.txt`, `game_summary.json`, `double_points_end.txt`, `donation_result.txt`, `spend_disabled.txt`, etc. — created when the system runs. Safe to delete; they regenerate.
 
 ### Optional / dev tools
 

@@ -44,7 +44,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.MindVision;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.MonkEnergy;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Preparation;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Sleep;
-import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SpawnScaled;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ChatSpawned;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SoulMark;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Terror;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
@@ -830,7 +830,23 @@ public abstract class Mob extends Char {
 	
 	@Override
 	public void destroy() {
-		
+		// Capture chat-spawned region EXP before super.destroy() detaches buffs in onRemove
+		int chatSpawnedExp = -1;
+		if (alignment == Alignment.ENEMY && buff(ChatSpawned.class) != null) {
+			int baseExp = Dungeon.hero != null && Dungeon.hero.lvl <= maxLvl ? EXP : 0;
+			if (baseExp > 0) {
+				int region = (Dungeon.depth - 1) / 5;  // 0=sewers, 1=prison, 2=caves, 3=city, 4=demon
+				switch (region) {
+					case 0: chatSpawnedExp = 2; break;   // sewers
+					case 1: chatSpawnedExp = 5; break;   // prison (skeleton)
+					case 2: chatSpawnedExp = 8; break;   // caves (brute)
+					case 3: chatSpawnedExp = 11; break;  // city (warlock)
+					case 4: chatSpawnedExp = 12; break;  // demon halls (succubus)
+					default: chatSpawnedExp = 2; break;
+				}
+			}
+		}
+
 		super.destroy();
 		
 		Dungeon.level.mobs.remove( this );
@@ -851,10 +867,7 @@ public abstract class Mob extends Char {
 
 				AscensionChallenge.processEnemyKill(this);
 				
-				int exp = Dungeon.hero.lvl <= maxLvl ? EXP : 0;
-				if (buff(SpawnScaled.class) != null) {
-					exp = Math.max(0, Math.round(exp * buff(SpawnScaled.class).damageFactor()));
-				}
+				int exp = chatSpawnedExp >= 0 ? chatSpawnedExp : (Dungeon.hero.lvl <= maxLvl ? EXP : 0);
 
 				//during ascent, under-levelled enemies grant 10 xp each until level 30
 				// after this enemy kills which reduce the amulet curse still grant 10 effective xp

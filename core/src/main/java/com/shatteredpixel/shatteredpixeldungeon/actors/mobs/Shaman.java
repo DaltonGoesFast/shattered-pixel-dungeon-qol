@@ -30,6 +30,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Hex;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Invisibility;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Vulnerable;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SpawnScaled;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Weakness;
 import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
@@ -124,6 +125,9 @@ public abstract class Shaman extends Mob {
 			
 			int dmg = Random.NormalIntRange( 6, 15 );
 			dmg = Math.round(dmg * AscensionChallenge.statModifier(this));
+			if (buff(SpawnScaled.class) != null) {
+				dmg = Math.round(dmg * buff(SpawnScaled.class).damageFactor());
+			}
 			enemy.damage( dmg, new EarthenBolt() );
 			
 			if (!enemy.isAlive() && enemy == Dungeon.hero) {

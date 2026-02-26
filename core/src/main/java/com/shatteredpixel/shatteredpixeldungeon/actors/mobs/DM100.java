@@ -26,6 +26,7 @@ import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.AscensionChallenge;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Invisibility;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SpawnScaled;
 import com.shatteredpixel.shatteredpixeldungeon.effects.particles.SparkParticle;
 import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
 import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
@@ -97,6 +98,9 @@ public class DM100 extends Mob implements Callback {
 			if (hit( this, enemy, true )) {
 				int dmg = Random.NormalIntRange(3, 10);
 				dmg = Math.round(dmg * AscensionChallenge.statModifier(this));
+				if (buff(SpawnScaled.class) != null) {
+					dmg = Math.round(dmg * buff(SpawnScaled.class).damageFactor());
+				}
 				enemy.damage( dmg, new LightningBolt() );
 
 				if (enemy.sprite.visible) {

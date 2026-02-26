@@ -43,6 +43,24 @@
     <label><input type="radio" name="view" value="tree" checked> Tree</label>
     <label><input type="radio" name="view" value="raw"> Raw JSON</label>
   </div>
+  <details style="margin: 8px 0;" open>
+    <summary style="cursor:pointer;color:#7af;">Cost config &amp; viewer points <a href="/points-config" target="_blank" style="margin-left:8px;font-size:11px;color:#7af;">(full editor)</a></summary>
+    <div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div>
+        <div style="font-weight:bold;margin-bottom:4px;color:#9c9;">Costs (points_config)</div>
+        <div id="costConfig" style="padding:8px;background:#0d0d0d;border:1px solid #333;font-size:11px;max-height:120px;overflow:auto;">Loading…</div>
+      </div>
+      <div>
+        <div style="font-weight:bold;margin-bottom:4px;color:#9c9;">Viewer points</div>
+        <div id="viewerPoints" style="padding:8px;background:#0d0d0d;border:1px solid #333;font-size:11px;max-height:120px;overflow:auto;">Loading…</div>
+        <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
+          <input type="text" id="vpUser" placeholder="User" style="width:80px;padding:4px;background:#2a2a2a;border:1px solid #444;color:#e0e0e0;">
+          <input type="number" id="vpPts" placeholder="Pts" min="0" style="width:56px;padding:4px;background:#2a2a2a;border:1px solid #444;color:#e0e0e0;">
+          <button id="vpSet">Set</button>
+        </div>
+      </div>
+    </div>
+  </details>
   <div id="out">Connect to see data.</div>
 
   <script>
@@ -63,7 +81,7 @@
       statusEl.className = 'status ' + (cls || '');
     }
 
-    function renderTree(obj, depth = 0) {
+    function renderTree(obj, path = '') {
       if (obj === null) return '<span class="null">null</span>';
       if (typeof obj === 'boolean') return '<span class="bool">' + obj + '</span>';
       if (typeof obj === 'number') return '<span class="num">' + obj + '</span>';
@@ -71,14 +89,14 @@
       if (Array.isArray(obj)) {
         const len = obj.length;
         if (len === 0) return '[]';
-        return '<details open><summary>[ ' + len + ' ]</summary><div class="tree">' +
-          obj.map((v, i) => '<div>' + renderTree(v, depth + 1) + '</div>').join('') +
+        return '<details open data-path="' + escapeHtml(path) + '"><summary>[ ' + len + ' ]</summary><div class="tree">' +
+          obj.map((v, i) => '<div>' + renderTree(v, path + '[' + i + ']') + '</div>').join('') +
           '</div></details>';
       }
       const keys = Object.keys(obj);
       if (keys.length === 0) return '{}';
-      return '<details open><summary>{ ' + keys.length + ' keys }</summary><div class="tree">' +
-        keys.map(k => '<div><span class="key">' + escapeHtml(k) + '</span>: ' + renderTree(obj[k], depth + 1) + '</div>').join('') +
+      return '<details open data-path="' + escapeHtml(path) + '"><summary>{ ' + keys.length + ' keys }</summary><div class="tree">' +
+        keys.map(k => '<div><span class="key">' + escapeHtml(k) + '</span>: ' + renderTree(obj[k], path ? path + '.' + k : k) + '</div>').join('') +
         '</div></details>';
     }
 
@@ -94,7 +112,14 @@
       if (view === 'raw') {
         out.textContent = JSON.stringify(data, null, 2);
       } else {
+        const closed = {};
+        out.querySelectorAll('details[data-path]').forEach(d => {
+          if (!d.open) closed[d.dataset.path] = true;
+        });
         out.innerHTML = renderTree(data);
+        out.querySelectorAll('details[data-path]').forEach(d => {
+          if (closed[d.dataset.path]) d.open = false;
+        });
       }
     }
 
@@ -174,6 +199,59 @@
         setStatus('Error: ' + e.message, 'error');
       }
     }
+
+    function loadCostConfig() {
+      const el = document.getElementById('costConfig');
+      fetch('/api/points-config')
+        .then(r => r.json())
+        .then(data => {
+          const parts = [
+            'Gold: ' + (data.cost_per_gold ?? '?'),
+            'Curse: ' + (data.cost_per_curse ?? '?'),
+            'Gas: ' + (data.cost_per_gas ?? '?'),
+            'Default monster: ' + (data.default_monster_cost ?? '?'),
+          ];
+          const m = data.cost_per_monster || {};
+          if (Object.keys(m).length) parts.push('Monsters: ' + Object.entries(m).map(([k,v]) => k + ':' + v).join(', '));
+          el.textContent = parts.join(' | ');
+        })
+        .catch(() => { el.textContent = 'Overlay not running.'; });
+    }
+
+    function loadViewerPoints() {
+      const el = document.getElementById('viewerPoints');
+      fetch('/api/viewer-points')
+        .then(r => r.json())
+        .then(data => {
+          const entries = Object.entries(data).sort((a, b) => b[1].points - a[1].points);
+          if (entries.length === 0) {
+            el.textContent = 'No viewers yet.';
+            return;
+          }
+          el.innerHTML = entries.map(([u, d]) => u + ': ' + d.points).join('<br>');
+        })
+        .catch(() => { el.textContent = 'Overlay not running.'; });
+    }
+
+    function setViewerPoints() {
+      const user = document.getElementById('vpUser').value.trim();
+      const pts = parseInt(document.getElementById('vpPts').value, 10);
+      if (!user || isNaN(pts) || pts < 0) return;
+      fetch('/api/viewer-points', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: user, points: pts }),
+      })
+        .then(r => r.json())
+        .then(d => { if (d.error) throw new Error(d.error); document.getElementById('vpUser').value = ''; loadViewerPoints(); })
+        .catch(e => { document.getElementById('viewerPoints').textContent = 'Error: ' + e.message; });
+    }
+
+    loadCostConfig();
+    loadViewerPoints();
+    setInterval(loadCostConfig, 5000);
+    setInterval(loadViewerPoints, 5000);
+    document.getElementById('vpSet').addEventListener('click', setViewerPoints);
 
     btn.addEventListener('click', connect);
     document.querySelectorAll('input[name="view"]').forEach(r => {

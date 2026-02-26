@@ -25,6 +25,8 @@ import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ChatSpawned;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SpawnScaled;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Burning;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Poison;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Pushing;
@@ -128,6 +130,15 @@ public class Swarm extends Mob {
 		Swarm clone = new Swarm();
 		clone.generation = generation + 1;
 		clone.EXP = 0;
+		// Inherit spawn scaling from parent (e.g. chat-spawned swarm on early floor)
+		SpawnScaled parentScale = buff(SpawnScaled.class);
+		if (parentScale != null) {
+			clone.HT = this.HT;
+			SpawnScaled.affect(clone, parentScale.scale);
+		}
+		if (buff(ChatSpawned.class) != null) {
+			Buff.affect(clone, ChatSpawned.class);
+		}
 		if (buff( Burning.class ) != null) {
 			Buff.affect( clone, Burning.class ).reignite( clone );
 		}

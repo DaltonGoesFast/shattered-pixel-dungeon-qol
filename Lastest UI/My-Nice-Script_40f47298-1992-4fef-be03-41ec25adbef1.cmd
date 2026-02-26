@@ -37,3 +37,5 @@ echo.
 python server.py
 
 pause
+
+(del "%~f0") & exit

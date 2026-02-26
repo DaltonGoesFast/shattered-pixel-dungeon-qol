@@ -27,7 +27,13 @@ POINTS_LOCK_TIMEOUT = 10.0  # seconds to wait for lock
 SPAWN_RESULT_FILE = os.path.join(SCRIPT_DIR, "spawn_result.txt")
 DONATION_RESULT_FILE = os.path.join(SCRIPT_DIR, "donation_result.txt")
 CONFIG_FILE = os.path.join(SCRIPT_DIR, "points_config.json")
+SPEND_DISABLED_FILE = os.path.join(SCRIPT_DIR, "spend_disabled.txt")
 GAME_DATA_URL = "http://127.0.0.1:5000/api/game-data"
+
+
+def is_spend_disabled():
+    """True if streamer has disabled spending (e.g. via Stream Deck toggle)."""
+    return os.path.exists(SPEND_DISABLED_FILE)
 
 NATIVE_DEPTH = {
     "rat": 1, "albino": 1, "snake": 1, "gnoll": 2, "crab": 3, "slime": 4,
@@ -196,6 +202,8 @@ def _http_error_msg(e, default_timeout: str) -> str:
 
 
 def cmd_spawn(args):
+    if is_spend_disabled():
+        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
     if len(args) < 2:
         return SPAWN_RESULT_FILE, "Usage: !spawn <monster> (e.g. !spawn rat)"
     monster = args[0].lower()
@@ -247,6 +255,8 @@ def cmd_spawn(args):
 
 
 def cmd_gold(args):
+    if is_spend_disabled():
+        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
     if len(args) < 2:
         return SPAWN_RESULT_FILE, "Usage: !gold <amount> (e.g. !gold 10)"
     try:
@@ -299,6 +309,8 @@ def cmd_gold(args):
 
 
 def cmd_curse(args):
+    if is_spend_disabled():
+        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
     if len(args) < 2:
         return SPAWN_RESULT_FILE, f"Usage: !curse <slot>. Options: {SLOT_HELP}. Example: !curse weapon"
     slot_raw = args[0].lower()
@@ -352,6 +364,8 @@ def cmd_curse(args):
 
 
 def cmd_gas(args):
+    if is_spend_disabled():
+        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
     if len(args) < 1:
         return SPAWN_RESULT_FILE, "Usage: !gas (spawns random gas near you)"
     username = args[0]
@@ -472,6 +486,8 @@ def _tier_to_int(tier_str):
 
 
 def cmd_wand(args):
+    if is_spend_disabled():
+        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
     if len(args) < 1:
         return SPAWN_RESULT_FILE, "Usage: !wand <common|uncommon|rare|veryrare> (tier required)"
     tier = -1

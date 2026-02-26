@@ -28,8 +28,9 @@ Before implementing, ensure:
 10. Action 3f (!wand) — spend points to trigger a random cursed wand effect (cost varies by rarity)
 11. Action 1b (Passive earn) — optional, for viewers already in file
 12. Action 4 (!doublepoints) — optional, 2x points for N minutes
-13. Action 4b (Super Chat / Cheer) — optional, 1 pt per $0.01
-14. Action 5 (Reset) — optional, clear points each stream
+13. Action 4a (Spend OFF / Spend ON) — optional, Stream Deck switch to disable/enable spend commands
+14. Action 4b (Super Chat / Cheer) — optional, 1 pt per $0.01
+15. Action 5 (Reset) — optional, clear points each stream
 
 ---
 
@@ -1005,6 +1006,59 @@ public class CPHInline
 **OBS countdown timer:** Add a **Browser source** → URL = `http://127.0.0.1:5000/double-points-countdown`. Shows gold "2x points: M:SS" when active, hides when inactive. Requires the overlay server running on port 5000.
 
 **If it doesn't update after restarting OBS:** The page now uses no-cache headers and auto-reloads after 5 failed fetches (e.g. if the server wasn't ready). Also enable **"Refresh browser when scene becomes active"** in the Browser Source properties — it refreshes when you switch to that scene.
+
+---
+
+## Action 4a: Spend OFF / Spend ON (Stream Deck switch)
+
+**Purpose:** Two separate actions for Stream Deck "action switches" — when the switch is ON, trigger Spend ON (enable spending); when OFF, trigger Spend OFF (disable spending). Users can still earn points; they just can't spend them when disabled.
+
+### Spend OFF action
+
+**Trigger:** Hotkey (Stream Deck switch → OFF state)
+
+**Sub-Action:** Execute C# Code (Inline) — creates the disable flag file. Keep spend actions enabled so they still run and return the "Spending is currently disabled" message to chat.
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spend_disabled.txt";
+
+    public bool Execute()
+    {
+        File.WriteAllText(FILE, "1");
+        return true;
+    }
+}
+```
+
+### Spend ON action
+
+**Trigger:** Hotkey (Stream Deck switch → ON state)
+
+**Sub-Action:** Execute C# Code (Inline) — removes the disable flag.
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spend_disabled.txt";
+
+    public bool Execute()
+    {
+        if (File.Exists(FILE))
+            File.Delete(FILE);
+        return true;
+    }
+}
+```
+
+**Stream Deck setup:** Create an "Action Switch" or similar. Assign Spend ON to the ON state and Spend OFF to the OFF state. When the switch is ON, spending is enabled; when OFF, spending is disabled.
 
 ---
 

@@ -27,6 +27,8 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Adrenaline;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ChatSpawned;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SpawnScaled;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Beam;
 import com.shatteredpixel.shatteredpixeldungeon.effects.FloatingText;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Pushing;
@@ -240,6 +242,17 @@ public class Necromancer extends Mob {
 
 		mySkeleton = new NecroSkeleton();
 		mySkeleton.pos = summoningPos;
+		// Inherit spawn scaling from necromancer (e.g. chat-spawned on early floor)
+		SpawnScaled parentScale = buff(SpawnScaled.class);
+		if (parentScale != null) {
+			int newHT = Math.max(1, Math.round(mySkeleton.HT * parentScale.scale));
+			mySkeleton.HT = newHT;
+			mySkeleton.HP = newHT;
+			SpawnScaled.affect(mySkeleton, parentScale.scale);
+		}
+		if (buff(ChatSpawned.class) != null) {
+			Buff.affect(mySkeleton, ChatSpawned.class);
+		}
 		GameScene.add( mySkeleton );
 		Dungeon.level.occupyCell( mySkeleton );
 		((NecromancerSprite)sprite).finishSummoning();
