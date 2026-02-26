@@ -16,6 +16,10 @@ Spend points to mess with the run! Earn points by chatting (1 per message, 30s c
 
 **!gas** — Spawn random gas (75 pts). Toxic, confusion, storm clouds, inferno, and more!
 
+**!scroll** — Use a random scroll (100 pts). Like +10 Unstable Spellbook — 50% chance for exotic version!
+
+**!wand** (tier) — Trigger a cursed wand effect. Tier required: common (50 pts), uncommon (100 pts), rare (200 pts), or veryrare (400 pts). Burn, freeze, teleport, gas, sheep, and more!
+
 ---
 
 **Monster costs (base):**
