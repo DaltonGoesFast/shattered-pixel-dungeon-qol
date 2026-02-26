@@ -3,16 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Points Config</title>
+  <title>SPD Overlay Control</title>
   <style>
     * { box-sizing: border-box; }
     body {
       font-family: system-ui, -apple-system, sans-serif;
-      max-width: 680px;
+      max-width: 1300px;
       margin: 2rem auto;
       padding: 0 1rem;
       background: #1a1a2e;
       color: #eee;
+    }
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 550px;
+      gap: 1.5rem;
+      align-items: start;
+    }
+    .col-right {
+      position: sticky;
+      top: 1rem;
+    }
+    @media (max-width: 768px) {
+      .main-grid { grid-template-columns: 1fr; }
+      .col-right { position: static; }
     }
     h1 { color: #7f5af0; margin-bottom: 0.5rem; }
     .sub { color: #94a1b2; font-size: 0.9rem; margin-bottom: 1.5rem; }
@@ -31,8 +45,7 @@
     }
     .row:last-child { margin-bottom: 0; }
     label { min-width: 140px; }
-    input[type="number"] {
-      width: 80px;
+    input[type="number"], input[type="text"] {
       padding: 0.4rem 0.5rem;
       border: 1px solid #4a5568;
       border-radius: 4px;
@@ -40,6 +53,7 @@
       color: #eee;
       font-size: 1rem;
     }
+    input[type="number"] { width: 80px; }
     .monsters {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -79,12 +93,32 @@
     }
     .msg.ok { background: #065f46; color: #6ee7b7; }
     .msg.err { background: #7f1d1d; color: #fca5a5; }
+    .search-bar {
+      display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem;
+      background: #0f0f1a; border: 1px solid #4a5568; border-radius: 6px; padding: 0.4rem 0.75rem;
+    }
+    .search-bar input[type="text"] { flex: 1; min-width: 0; border: none; background: transparent; }
+    .search-bar input[type="text"]:focus { outline: none; }
+    .ws-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+    .ws-status { color: #94a1b2; font-size: 0.9rem; }
+    .ws-status.connected { color: #6ee7b7; }
+    .ws-status.error { color: #fca5a5; }
+    #wsOut { white-space: pre-wrap; word-break: break-all; max-height: 400px; overflow: auto; border: 1px solid #4a5568; padding: 10px; background: #0f0f1a; font-size: 12px; font-family: ui-monospace, monospace; border-radius: 4px; }
+    .tree { margin: 4px 0 4px 16px; }
+    .key { color: #7af; }
+    .str { color: #9c9; }
+    .num { color: #fa7; }
+    .bool { color: #c9c; }
+    .null { color: #666; }
+    summary { cursor: pointer; }
   </style>
 </head>
 <body>
-  <h1>Points Config</h1>
-  <p class="sub">Edit costs for !spawn, !gold, !curse, !gas. Changes apply immediately.</p>
+  <h1>SPD Overlay Control</h1>
+  <p class="sub">Edit costs, viewer points, and inspect game data. <a href="/overlay" target="_blank" style="color:#7f5af0;">OBS overlay</a></p>
 
+  <div class="main-grid">
+  <div class="col-left">
   <section>
     <h2>General costs</h2>
     <div class="row">
@@ -100,6 +134,26 @@
       <input type="number" id="cost_per_gas" min="1" value="75">
     </div>
     <div class="row">
+      <label for="cost_per_scroll">Random scroll:</label>
+      <input type="number" id="cost_per_scroll" min="1" value="100">
+    </div>
+    <div class="row">
+      <label for="cost_per_wand_common">Wand (common):</label>
+      <input type="number" id="cost_per_wand_common" min="1" value="50">
+    </div>
+    <div class="row">
+      <label for="cost_per_wand_uncommon">Wand (uncommon):</label>
+      <input type="number" id="cost_per_wand_uncommon" min="1" value="100">
+    </div>
+    <div class="row">
+      <label for="cost_per_wand_rare">Wand (rare):</label>
+      <input type="number" id="cost_per_wand_rare" min="1" value="200">
+    </div>
+    <div class="row">
+      <label for="cost_per_wand_veryrare">Wand (very rare):</label>
+      <input type="number" id="cost_per_wand_veryrare" min="1" value="400">
+    </div>
+    <div class="row">
       <label for="default_monster_cost">Default monster:</label>
       <input type="number" id="default_monster_cost" min="1" value="100">
     </div>
@@ -111,8 +165,40 @@
     <div class="monsters" id="monsters"></div>
   </section>
 
-  <button id="save">Save</button>
+  <button id="save">Save costs</button>
+  <button id="refresh" style="margin-left:8px;background:#444;">Refresh</button>
   <div id="msg"></div>
+
+  <section>
+    <h2>Game data (WebSocket)</h2>
+    <p class="sub" style="margin-bottom: 0.75rem;">Connect to game on port 5001. Enable WebSocket streaming in game Settings.</p>
+    <div class="ws-bar">
+      <label>Port <input type="number" id="wsPort" value="5001" min="1" max="65535" style="width:64px;"></label>
+      <button id="wsBtn">Connect</button>
+      <span class="ws-status" id="wsStatus">Disconnected</span>
+      <span class="ws-status" id="wsLast"></span>
+    </div>
+    <div class="ws-bar">
+      <label><input type="radio" name="wsView" value="tree" checked> Tree</label>
+      <label><input type="radio" name="wsView" value="raw"> Raw JSON</label>
+    </div>
+    <div id="wsOut">Connect to see game data.</div>
+  </section>
+  </div>
+
+  <div class="col-right">
+  <section>
+    <h2>Viewer points</h2>
+    <p class="sub" style="margin-bottom: 0.75rem;">Search to filter, or type a new username + points to add. Used by !spawn, !gold, !curse, !gas, !scroll, !wand.</p>
+    <div class="search-bar">
+      <input type="text" id="vp_search" placeholder="Search users or type new username…" autocomplete="off">
+      <input type="number" id="new_points" placeholder="Pts" min="0" value="100" style="width: 64px;">
+      <button id="add_user">Add / Set</button>
+    </div>
+    <div id="viewer_points_list" style="max-height: 70vh; overflow-y: auto;"></div>
+  </section>
+  </div>
+  </div>
 
   <script>
     const MONSTERS = [
@@ -136,6 +222,11 @@
           document.getElementById('cost_per_gold').value = data.cost_per_gold ?? 2;
           document.getElementById('cost_per_curse').value = data.cost_per_curse ?? 200;
           document.getElementById('cost_per_gas').value = data.cost_per_gas ?? 75;
+          document.getElementById('cost_per_scroll').value = data.cost_per_scroll ?? 100;
+          document.getElementById('cost_per_wand_common').value = data.cost_per_wand_common ?? 50;
+          document.getElementById('cost_per_wand_uncommon').value = data.cost_per_wand_uncommon ?? 100;
+          document.getElementById('cost_per_wand_rare').value = data.cost_per_wand_rare ?? 200;
+          document.getElementById('cost_per_wand_veryrare').value = data.cost_per_wand_veryrare ?? 400;
           document.getElementById('default_monster_cost').value = data.default_monster_cost ?? 100;
           const monsters = data.cost_per_monster || {};
           const container = document.getElementById('monsters');
@@ -161,6 +252,11 @@
         cost_per_gold: parseInt(document.getElementById('cost_per_gold').value, 10) || 2,
         cost_per_curse: parseInt(document.getElementById('cost_per_curse').value, 10) || 200,
         cost_per_gas: parseInt(document.getElementById('cost_per_gas').value, 10) || 75,
+        cost_per_scroll: parseInt(document.getElementById('cost_per_scroll').value, 10) || 100,
+        cost_per_wand_common: parseInt(document.getElementById('cost_per_wand_common').value, 10) || 50,
+        cost_per_wand_uncommon: parseInt(document.getElementById('cost_per_wand_uncommon').value, 10) || 100,
+        cost_per_wand_rare: parseInt(document.getElementById('cost_per_wand_rare').value, 10) || 200,
+        cost_per_wand_veryrare: parseInt(document.getElementById('cost_per_wand_veryrare').value, 10) || 400,
         default_monster_cost: parseInt(document.getElementById('default_monster_cost').value, 10) || 100,
         cost_per_monster: costPerMonster,
       };
@@ -177,8 +273,158 @@
         .catch(e => showMsg('Save failed: ' + e.message, false));
     }
 
+    let viewerPointsData = [];
+    function filterViewerPoints() {
+      const q = (document.getElementById('vp_search').value || '').trim().toLowerCase();
+      const rows = document.querySelectorAll('#viewer_points_list tbody tr');
+      rows.forEach(tr => {
+        const user = (tr.dataset.user || '').toLowerCase();
+        tr.style.display = (!q || user.includes(q)) ? '' : 'none';
+      });
+    }
+    function loadViewerPoints() {
+      fetch('/api/viewer-points')
+        .then(r => r.json())
+        .then(data => {
+          viewerPointsData = Object.entries(data).sort((a, b) => b[1].points - a[1].points);
+          const container = document.getElementById('viewer_points_list');
+          if (viewerPointsData.length === 0) {
+            container.innerHTML = '<p style="color:#94a1b2;font-size:0.9rem;">No viewers yet. Type a username above and click Add / Set.</p>';
+            return;
+          }
+          container.innerHTML = '<table style="width:100%;border-collapse:collapse;"><thead><tr><th style="text-align:left;padding:4px 8px;">User</th><th style="text-align:right;padding:4px 8px;min-width:85px;">Points</th><th></th></tr></thead><tbody>' +
+            viewerPointsData.map(([u, d]) => `<tr data-user="${escapeHtml(u)}"><td style="padding:4px 8px;">${escapeHtml(u)}</td><td style="padding:4px 8px;"><input type="number" class="edit-pts" value="${d.points}" min="0" style="width:85px;padding:2px 4px;"></td><td style="padding:4px 8px;"><button class="save-row" style="padding:2px 8px;font-size:0.85rem;">Save</button> <button class="del-row" style="padding:2px 8px;font-size:0.85rem;background:#7f1d1d;">Del</button></td></tr>`).join('') +
+            '</tbody></table>';
+          filterViewerPoints();
+          container.querySelectorAll('.save-row').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const tr = btn.closest('tr');
+              const user = tr.dataset.user;
+              const pts = parseInt(tr.querySelector('.edit-pts').value, 10);
+              if (isNaN(pts) || pts < 0) { showMsg('Invalid points', false); return; }
+              fetch('/api/viewer-points', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, points: pts }) })
+                .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg(user + ' updated', true); loadViewerPoints(); })
+                .catch(e => showMsg('Failed: ' + e.message, false));
+            });
+          });
+          container.querySelectorAll('.del-row').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const user = btn.closest('tr').dataset.user;
+              if (!confirm('Remove ' + user + '?')) return;
+              fetch('/api/viewer-points/' + encodeURIComponent(user), { method: 'DELETE' })
+                .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg(user + ' removed', true); loadViewerPoints(); })
+                .catch(e => showMsg('Failed: ' + e.message, false));
+            });
+          });
+        })
+        .catch(e => { document.getElementById('viewer_points_list').innerHTML = '<p style="color:#fca5a5;">Failed to load: ' + escapeHtml(e.message) + '</p>'; });
+    }
+
+    function escapeHtml(s) {
+      const div = document.createElement('div');
+      div.textContent = s;
+      return div.innerHTML;
+    }
+
+    function addViewerUser() {
+      const username = document.getElementById('vp_search').value.trim();
+      const points = parseInt(document.getElementById('new_points').value, 10);
+      if (!username) {
+        showMsg('Enter a username', false);
+        return;
+      }
+      if (isNaN(points) || points < 0) {
+        showMsg('Enter valid points', false);
+        return;
+      }
+      fetch('/api/viewer-points', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, points }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.error) throw new Error(data.error);
+          showMsg(`${username} set to ${data.points} points`, true);
+          document.getElementById('vp_search').value = '';
+          loadViewerPoints();
+        })
+        .catch(e => showMsg('Failed: ' + e.message, false));
+    }
+
     document.getElementById('save').addEventListener('click', save);
+    document.getElementById('refresh').addEventListener('click', () => { load(); loadViewerPoints(); showMsg('Refreshed', true); });
+    document.getElementById('add_user').addEventListener('click', addViewerUser);
+    document.getElementById('vp_search').addEventListener('input', filterViewerPoints);
+    document.getElementById('vp_search').addEventListener('keydown', e => { if (e.key === 'Enter') addViewerUser(); });
     load();
+    loadViewerPoints();
+
+    // WebSocket inspector
+    let ws = null, wsLastData = null, wsLastTime = 0, wsStaleInterval = null;
+    function wsRenderTree(obj, path = '') {
+      if (obj === null) return '<span class="null">null</span>';
+      if (typeof obj === 'boolean') return '<span class="bool">' + obj + '</span>';
+      if (typeof obj === 'number') return '<span class="num">' + obj + '</span>';
+      if (typeof obj === 'string') return '<span class="str">"' + escapeHtml(obj) + '"</span>';
+      if (Array.isArray(obj)) {
+        if (obj.length === 0) return '[]';
+        return '<details open data-path="' + escapeHtml(path) + '"><summary>[ ' + obj.length + ' ]</summary><div class="tree">' +
+          obj.map((v, i) => '<div>' + wsRenderTree(v, path + '[' + i + ']') + '</div>').join('') + '</div></details>';
+      }
+      const keys = Object.keys(obj);
+      if (keys.length === 0) return '{}';
+      return '<details open data-path="' + escapeHtml(path) + '"><summary>{ ' + keys.length + ' keys }</summary><div class="tree">' +
+        keys.map(k => '<div><span class="key">' + escapeHtml(k) + '</span>: ' + wsRenderTree(obj[k], path ? path + '.' + k : k) + '</div>').join('') + '</div></details>';
+    }
+    function wsShowData(data) {
+      wsLastData = data;
+      const view = document.querySelector('input[name="wsView"]:checked').value;
+      const out = document.getElementById('wsOut');
+      if (view === 'raw') {
+        out.textContent = JSON.stringify(data, null, 2);
+      } else {
+        const closed = {};
+        out.querySelectorAll('details[data-path]').forEach(d => { if (!d.open) closed[d.dataset.path] = true; });
+        out.innerHTML = wsRenderTree(data);
+        out.querySelectorAll('details[data-path]').forEach(d => { if (closed[d.dataset.path]) d.open = false; });
+      }
+    }
+    function wsConnect() {
+      if (ws && ws.readyState === WebSocket.OPEN) { ws.close(); return; }
+      const port = parseInt(document.getElementById('wsPort').value, 10) || 5001;
+      document.getElementById('wsStatus').textContent = 'Connecting…';
+      document.getElementById('wsStatus').className = 'ws-status';
+      try {
+        ws = new WebSocket('ws://127.0.0.1:' + port);
+        ws.onopen = () => {
+          document.getElementById('wsStatus').textContent = 'Connected';
+          document.getElementById('wsStatus').className = 'ws-status connected';
+          document.getElementById('wsBtn').textContent = 'Disconnect';
+          wsLastTime = 0;
+          wsStaleInterval = setInterval(() => {
+            const sec = Math.floor((Date.now() - wsLastTime) / 1000);
+            document.getElementById('wsLast').textContent = sec ? sec + 's ago' : '';
+            document.getElementById('wsLast').className = 'ws-status' + (sec > 3 ? ' error' : '');
+          }, 1000);
+        };
+        ws.onclose = () => {
+          document.getElementById('wsStatus').textContent = 'Disconnected';
+          document.getElementById('wsStatus').className = 'ws-status';
+          document.getElementById('wsBtn').textContent = 'Connect';
+          document.getElementById('wsLast').textContent = '';
+          if (wsStaleInterval) clearInterval(wsStaleInterval);
+          ws = null;
+        };
+        ws.onerror = () => { document.getElementById('wsStatus').textContent = 'Error'; document.getElementById('wsStatus').className = 'ws-status error'; };
+        ws.onmessage = (ev) => {
+          wsLastTime = Date.now();
+          try { wsShowData(JSON.parse(ev.data)); } catch (e) { document.getElementById('wsOut').textContent = 'Invalid JSON'; }
+        };
+      } catch (e) { document.getElementById('wsStatus').textContent = 'Error: ' + e.message; document.getElementById('wsStatus').className = 'ws-status error'; }
+    }
+    document.getElementById('wsBtn').addEventListener('click', wsConnect);
+    document.querySelectorAll('input[name="wsView"]').forEach(r => r.addEventListener('change', () => { if (wsLastData) wsShowData(wsLastData); }));
   </script>
 </body>
 </html>

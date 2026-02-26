@@ -25,16 +25,17 @@ Before implementing, ensure:
 7. Action 3c (!curse) — spend points to curse equipped item
 8. Action 3d (!gas) — spend points to spawn random gas
 9. Action 3e (!scroll) — spend points to use a random scroll (like +10 Unstable Spellbook)
-10. Action 1b (Passive earn) — optional, for viewers already in file
-11. Action 4 (!doublepoints) — optional, 2x points for N minutes
-12. Action 4b (Super Chat / Cheer) — optional, 1 pt per $0.01
-13. Action 5 (Reset) — optional, clear points each stream
+10. Action 3f (!wand) — spend points to trigger a random cursed wand effect (cost varies by rarity)
+11. Action 1b (Passive earn) — optional, for viewers already in file
+12. Action 4 (!doublepoints) — optional, 2x points for N minutes
+13. Action 4b (Super Chat / Cheer) — optional, 1 pt per $0.01
+14. Action 5 (Reset) — optional, clear points each stream
 
 ---
 
 ## YouTube Support
 
-- **Commands (!spawn, !gold, !curse, !gas, !scroll, !points, !toppoints):** When creating the command, enable **YouTube Message** as a source (in addition to or instead of Twitch Message).
+- **Commands (!spawn, !gold, !curse, !gas, !scroll, !wand, !points, !toppoints):** When creating the command, enable **YouTube Message** as a source (in addition to or instead of Twitch Message).
 - **Earn Points (message):** Add **Message Received** from YouTube → Triggers to the same action, or create a duplicate action with the YouTube trigger.
 - **Earn Points (passive):** Add **Present Viewers** from YouTube → Triggers (YouTube uses chat-activity threshold; no live viewer list).
 - **Response messages:** Use conditionals: `if ("%commandSource%" Equals "youtube")` → YouTube Message; `if ("%commandSource%" Equals "twitch")` → Twitch Message. Or duplicate the message sub-action for each platform.
@@ -824,6 +825,80 @@ public class CPHInline
 
 ---
 
+## Action 3f: Cursed Wand Effect (with points)
+
+**Trigger:** Command Triggered → `!wand`
+
+**Usage:** `!wand <tier>` — tier is required. Triggers a cursed wand effect from that rarity.
+- `!wand common` — common only (50 pts)
+- `!wand uncommon` — uncommon only (100 pts)
+- `!wand rare` — rare only (200 pts)
+- `!wand veryrare` — very rare only (400 pts)
+
+If they type just `!wand`, they get: "Specify a tier: !wand common, !wand uncommon, !wand rare, or !wand veryrare"
+
+Excludes: AbortRetryFail, Explosion, FireBall, ForestFire.
+
+**Sub-Actions (in order):**
+
+1. **Run a Program**
+   - **Target:** `python` (or full path to `python.exe`)
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" wand %rawInput% %userName%`
+   - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait maximum:** `10` seconds *(required — otherwise C# runs before the script writes the result file)*
+
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%` and `%wandEffectName%`:
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string RESULT_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spawn_result.txt";
+
+    public bool Execute()
+    {
+        string result = "No result file - is overlay server running?";
+        string itemName = "";
+        try
+        {
+            if (File.Exists(RESULT_FILE))
+            {
+                result = File.ReadAllText(RESULT_FILE).Trim();
+                File.Delete(RESULT_FILE);
+                int pipe = result.IndexOf('|');
+                if (pipe >= 0)
+                {
+                    itemName = result.Substring(pipe + 1).Trim();
+                    result = result.Substring(0, pipe).Trim();
+                }
+            }
+        }
+        catch (Exception ex) { result = ex.Message; }
+        CPH.SetArgument("spawnResult", result);
+        CPH.SetArgument("wandEffectName", itemName);
+        return true;
+    }
+}
+```
+
+3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
+   - **True branch:** Twitch/YouTube Message: `%userName% triggered a cursed wand effect: %wandEffectName%!`
+   - **False branch:** Twitch/YouTube Message: `%spawnResult%` (shows error)
+
+**Cost:** 50 (common) / 100 (uncommon) / 200 (rare) / 400 (very rare). Edit via points config.
+
+**Add to the same blocking queue** as spawn, gold, curse, gas, scroll, and earn actions.
+
+**Fails when:** Not in an active run, hero dead, or no valid target cell (need visible tiles 2–6 from hero).
+
+**Troubleshooting:** Same as scroll — quotations on script path, Wait maximum 10 seconds, overlay running, game connected.
+
+**Test manually:** `python points_command.py wand common YourUsername` (tier required).
+
+---
+
 ## Action 3 (alternative): File Bridge (when %output1% is empty)
 
 Use this if **Run a Program** does not capture `%output1%`. The Python script writes its result to a file; C# reads it and sets `%spawnResult%`. No HTTP in C# (avoids assembly errors).
@@ -1003,6 +1078,7 @@ public class CPHInline
 | **!curse** | `!curse <slot>` | 200 pts | Curse an equipped item. Slots: **weapon**, **armor**, **ring**, **artifact**, **misc** (or trinket/middle). |
 | **!gas** | `!gas` | 75 pts | Spawn random gas (Chaotic Censer +3). Toxic, confusion, regrowth, storm clouds, smoke, stench, inferno, blizzard, or corrosive gas. |
 | **!scroll** | `!scroll` | 100 pts | Use a random scroll (like +10 Unstable Spellbook). 50% chance for exotic version. |
+| **!wand** | `!wand common` (tier required) | 50–400 pts | Trigger a cursed wand effect. Tier required: common, uncommon, rare, or veryrare. |
 | **!doublepoints** | `!doublepoints <minutes>` | — | **Streamer only.** 2× points for N minutes (max 120). `!doublepoints 5` for 5 min. |
 
 **Spawn costs (base):** rat 5, albino/snake/gnoll 10, crab/slime/swarm 15, thief/skeleton/dm100 20, guard/necromancer/spinner 25, bat/brute 30, shaman 35, ghoul/elemental 40, warlock 45, monk/golem 50, succubus 60, eye 70, scorpio 80. Unknown monsters default to 100. Edit `points_config.json` or use the config UI to change.
@@ -1023,6 +1099,7 @@ public class CPHInline
 | Curse Item   | !curse <slot>  | Spend points to curse weapon, armor, ring, artifact, or misc (200 pts) |
 | Spawn Gas    | !gas           | Spend points to spawn random gas (Chaotic Censer +3, 75 pts) |
 | Random Scroll | !scroll        | Spend points to use a random scroll (like +10 Unstable Spellbook, 100 pts) |
+| Cursed Wand   | !wand          | Spend points to trigger a random cursed wand effect (50–400 pts by rarity) |
 | Super Chat Points | YouTube Super Chat | 1 pt per $0.01 (currency converted via Frankfurter API) |
 | Cheer Points | Twitch Cheer | 1 pt per bit (100 bits = $1 = 100 pts) |
 | Double Points | !doublepoints (streamer only) | 2x points for N minutes: `!doublepoints 5` |
@@ -1060,6 +1137,7 @@ COMMANDS:
 - !curse (slot) — Curse equipped item (200 pts). Slots: weapon, armor, ring, artifact, misc
 - !gas — Spawn random gas (75 pts). Toxic, confusion, storm clouds, inferno, and more!
 - !scroll — Use a random scroll (100 pts). Like +10 Unstable Spellbook — 50% chance for exotic version!
+- !wand (tier) — Trigger a cursed wand effect. Tier required: common, uncommon, rare, or veryrare. Burn, freeze, teleport, gas, sheep, and more!
 
 Monster costs (base): rat 5 | albino/snake/gnoll 10 | crab/slime/swarm 15 | thief/skeleton/dm100 20 | guard/necromancer/spinner 25 | bat/brute 30 | shaman 35 | ghoul/elemental 40 | warlock 45 | monk/golem 50 | succubus 60 | eye 70 | scorpio 80
 

@@ -188,6 +188,42 @@ public class CursedWand {
 		}
 	}
 
+	/** Chat command: pick random valid effect excluding given classes. Returns effect and rarity (0=common, 1=uncommon, 2=rare, 3=very_rare).
+	 * If tier >= 0, picks only from that tier; otherwise random by EFFECT_CAT_CHANCES. */
+	public static CursedEffect randomValidEffectExcluding(Item origin, Char user, Ballistica bolt, boolean positiveOnly,
+			java.util.Set<Class<? extends CursedEffect>> excluded, int[] outRarity, int tier) {
+		int rarity;
+		CursedEffect effect;
+		for (int t = 0; t < 30; t++) {
+			if (tier >= 0 && tier <= 3) {
+				rarity = tier;
+			} else {
+				rarity = Random.chances(EFFECT_CAT_CHANCES);
+			}
+			switch (rarity) {
+				case 0: default:
+					effect = randomValidCommonEffect(origin, user, bolt, positiveOnly);
+					break;
+				case 1:
+					effect = randomValidUncommonEffect(origin, user, bolt, positiveOnly);
+					break;
+				case 2:
+					effect = randomValidRareEffect(origin, user, bolt, positiveOnly);
+					break;
+				case 3:
+					effect = randomValidVeryRareEffect(origin, user, bolt, positiveOnly);
+					break;
+			}
+			if (excluded == null || !excluded.contains(effect.getClass())) {
+				if (outRarity != null && outRarity.length > 0) outRarity[0] = rarity;
+				return effect;
+			}
+		}
+		effect = randomValidCommonEffect(origin, user, bolt, positiveOnly);
+		if (outRarity != null && outRarity.length > 0) outRarity[0] = 0;
+		return effect;
+	}
+
 	//**********************
 	//*** Common Effects ***
 	//**********************

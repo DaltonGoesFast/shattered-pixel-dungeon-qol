@@ -1,7 +1,12 @@
 {
-  "cost_per_gold": 2,
+  "cost_per_gold": 5,
   "cost_per_curse": 200,
   "cost_per_gas": 75,
+  "cost_per_scroll": 100,
+  "cost_per_wand_common": 75,
+  "cost_per_wand_uncommon": 100,
+  "cost_per_wand_rare": 200,
+  "cost_per_wand_veryrare": 400,
   "default_monster_cost": 100,
   "cost_per_monster": {
     "rat": 5,

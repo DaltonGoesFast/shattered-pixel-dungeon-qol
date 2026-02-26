@@ -17,7 +17,7 @@ This guide helps you emulate the full streaming setup so you can test and verify
 
 ## 1. Overlay Server
 
-The server provides `/api/game-data`, `/api/spawn-command`, `/api/gold-command`, `/api/curse-command`, `/api/gas-command`, `/api/scroll-command`, and serves the overlay.
+The server provides `/api/game-data`, `/api/spawn-command`, `/api/gold-command`, `/api/curse-command`, `/api/gas-command`, `/api/scroll-command`, `/api/wand-command`, and serves the overlay.
 
 ```bash
 cd "Lastest UI"

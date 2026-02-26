@@ -6,6 +6,8 @@ Usage:
   gold:     python points_command.py gold <amount> <username>
   curse:    python points_command.py curse <slot> <username>
   gas:      python points_command.py gas <username>
+  scroll:   python points_command.py scroll <username>
+  wand:     python points_command.py wand <common|uncommon|rare|veryrare> <username>  (tier required)
   superchat: python points_command.py superchat <microAmount> <currencyCode> <username>
   cheer:    python points_command.py cheer <bits> <username>
 
@@ -15,9 +17,13 @@ import sys
 import urllib.request
 import json
 import os
+import time
+from contextlib import contextmanager
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 POINTS_FILE = os.path.join(SCRIPT_DIR, "viewer_points.txt")
+POINTS_LOCK_FILE = POINTS_FILE + ".lock"
+POINTS_LOCK_TIMEOUT = 10.0  # seconds to wait for lock
 SPAWN_RESULT_FILE = os.path.join(SCRIPT_DIR, "spawn_result.txt")
 DONATION_RESULT_FILE = os.path.join(SCRIPT_DIR, "donation_result.txt")
 CONFIG_FILE = os.path.join(SCRIPT_DIR, "points_config.json")
@@ -27,7 +33,7 @@ NATIVE_DEPTH = {
     "rat": 1, "albino": 1, "snake": 1, "gnoll": 2, "crab": 3, "slime": 4,
     "swarm": 3, "thief": 4, "skeleton": 6, "dm100": 7, "guard": 7,
     "necromancer": 8, "bat": 9, "brute": 11, "shaman": 11, "spinner": 12,
-    "ghoul": 14, "elemental": 16, "warlock": 16, "monk": 17, "golem": 18,
+    "ghoul": 914, "elemental": 16, "warlock": 16, "monk": 17, "golem": 18,
     "succubus": 19, "eye": 21, "scorpio": 23,
 }
 
@@ -35,15 +41,20 @@ NATIVE_DEPTH = {
 def load_config():
     """Load costs from points_config.json. Falls back to defaults if missing/invalid."""
     defaults = {
-        "cost_per_gold": 2,
+        "cost_per_gold": 5,
         "cost_per_curse": 200,
         "cost_per_gas": 75,
+        "cost_per_scroll": 100,
+        "cost_per_wand_common": 50,
+        "cost_per_wand_uncommon": 100,
+        "cost_per_wand_rare": 200,
+        "cost_per_wand_veryrare": 400,
         "default_monster_cost": 100,
         "cost_per_monster": {
             "rat": 5, "albino": 10, "snake": 10, "gnoll": 10, "crab": 15,
             "slime": 15, "swarm": 15, "thief": 20, "skeleton": 20, "bat": 30,
             "brute": 30, "shaman": 35, "spinner": 25, "dm100": 20, "guard": 25,
-            "necromancer": 25, "ghoul": 40, "elemental": 40, "warlock": 45,
+            "necromancer": 25, "ghoul": 940, "elemental": 40, "warlock": 45,
             "monk": 50, "golem": 50, "succubus": 60, "eye": 70, "scorpio": 80,
         },
     }
@@ -62,6 +73,11 @@ def load_config():
             "cost_per_gold": int(cfg.get("cost_per_gold", defaults["cost_per_gold"])),
             "cost_per_curse": int(cfg.get("cost_per_curse", defaults["cost_per_curse"])),
             "cost_per_gas": int(cfg.get("cost_per_gas", defaults["cost_per_gas"])),
+            "cost_per_scroll": int(cfg.get("cost_per_scroll", defaults["cost_per_scroll"])),
+            "cost_per_wand_common": int(cfg.get("cost_per_wand_common", defaults["cost_per_wand_common"])),
+            "cost_per_wand_uncommon": int(cfg.get("cost_per_wand_uncommon", defaults["cost_per_wand_uncommon"])),
+            "cost_per_wand_rare": int(cfg.get("cost_per_wand_rare", defaults["cost_per_wand_rare"])),
+            "cost_per_wand_veryrare": int(cfg.get("cost_per_wand_veryrare", defaults["cost_per_wand_veryrare"])),
             "default_monster_cost": int(cfg.get("default_monster_cost", defaults["default_monster_cost"])),
             "cost_per_monster": monsters,
         }
@@ -88,6 +104,43 @@ FALLBACK_RATES = {
     "JPY": 0.0067, "MXN": 0.058, "BRL": 0.20, "INR": 0.012,
     "KRW": 0.00075, "CHF": 1.13, "PLN": 0.25, "SEK": 0.095,
 }
+
+
+def _acquire_points_lock():
+    """Acquire exclusive lock on points file. Returns lock fd or None. Caller must call _release_points_lock."""
+    start = time.monotonic()
+    while (time.monotonic() - start) < POINTS_LOCK_TIMEOUT:
+        try:
+            fd = os.open(POINTS_LOCK_FILE, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, str(os.getpid()).encode())
+            return fd
+        except FileExistsError:
+            time.sleep(0.05)
+    return None
+
+
+def _release_points_lock(fd):
+    if fd is not None:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        try:
+            os.remove(POINTS_LOCK_FILE)
+        except OSError:
+            pass
+
+
+@contextmanager
+def points_lock():
+    """Context manager for exclusive access to viewer_points.txt. Use for any read-modify-write."""
+    fd = _acquire_points_lock()
+    if fd is None:
+        raise TimeoutError("Could not acquire points file lock (another process may be using it)")
+    try:
+        yield
+    finally:
+        _release_points_lock(fd)
 
 
 def read_points():
@@ -151,31 +204,46 @@ def cmd_spawn(args):
         return SPAWN_RESULT_FILE, f"Unknown monster: {monster}"
 
     cost = compute_spawn_cost(monster)
-    data = read_points()
     key = username.lower()
-    pts, last = data.get(key, (0, 0))
-    if pts < cost:
-        return SPAWN_RESULT_FILE, f"Not enough points! Need {cost}, you have {pts}."
-
-    url = "http://127.0.0.1:5000/api/spawn-command"
-    payload = {"monster": monster, "username": username}
-    req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-    req.add_header("Content-Type", "application/json")
-
     try:
-        with urllib.request.urlopen(req, timeout=8) as resp:
-            body = json.loads(resp.read().decode())
-            if not body.get("ok"):
-                return SPAWN_RESULT_FILE, body.get("error", "Spawn failed")
-    except urllib.error.HTTPError as e:
-        return SPAWN_RESULT_FILE, e.read().decode()
-    except Exception as e:
-        return SPAWN_RESULT_FILE, str(e)
+        with points_lock():
+            data = read_points()
+            pts, last = data.get(key, (0, 0))
+            if pts < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost}, you have {pts}."
 
-    pts -= cost
-    data[key] = (pts, last)
-    write_points(data)
-    return SPAWN_RESULT_FILE, "ok"
+            url = "http://127.0.0.1:5000/api/spawn-command"
+            payload = {"monster": monster, "username": username}
+            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+            req.add_header("Content-Type", "application/json")
+
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    raw = resp.read().decode("utf-8", errors="replace")
+                    if not raw.strip():
+                        return SPAWN_RESULT_FILE, "Spawn failed (empty response from server)"
+                    try:
+                        body = json.loads(raw)
+                    except json.JSONDecodeError:
+                        return SPAWN_RESULT_FILE, "Spawn failed (server error). Is the overlay running?"
+                    if not body.get("ok"):
+                        return SPAWN_RESULT_FILE, body.get("error", "Spawn failed")
+            except urllib.error.HTTPError as e:
+                return SPAWN_RESULT_FILE, _http_error_msg(
+                    e, "Spawn timed out. Is the game running and in an active run (not title screen)?"
+                )
+            except urllib.error.URLError as e:
+                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
+            except Exception as e:
+                msg = str(e).strip() if e else ""
+                return SPAWN_RESULT_FILE, "Spawn failed. " + (msg if msg else "Check overlay server and try again.")
+
+            pts -= cost
+            data[key] = (pts, last)
+            write_points(data)
+            return SPAWN_RESULT_FILE, "ok"
+    except TimeoutError:
+        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
 
 def cmd_gold(args):
@@ -188,33 +256,46 @@ def cmd_gold(args):
     username = args[1]
 
     cost = amount * get_config()["cost_per_gold"]
-    data = read_points()
     key = username.lower()
-    pts, last = data.get(key, (0, 0))
-    if pts < cost:
-        return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} for {amount} gold, you have {pts}."
-
-    url = "http://127.0.0.1:5000/api/gold-command"
-    payload = {"amount": amount, "username": username}
-    req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-    req.add_header("Content-Type", "application/json")
-
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            body = json.loads(resp.read().decode())
-            if not body.get("ok"):
-                return SPAWN_RESULT_FILE, body.get("error", "Gold drop failed")
-    except urllib.error.HTTPError as e:
-        return SPAWN_RESULT_FILE, _http_error_msg(
-            e, "Gold drop timed out. Is the game running and in an active run (not title screen)?"
-        )
-    except Exception as e:
-        return SPAWN_RESULT_FILE, str(e)
+        with points_lock():
+            data = read_points()
+            pts, last = data.get(key, (0, 0))
+            if pts < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} for {amount} gold, you have {pts}."
 
-    pts -= cost
-    data[key] = (pts, last)
-    write_points(data)
-    return SPAWN_RESULT_FILE, "ok"
+            url = "http://127.0.0.1:5000/api/gold-command"
+            payload = {"amount": amount, "username": username}
+            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+            req.add_header("Content-Type", "application/json")
+
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    raw = resp.read().decode("utf-8", errors="replace")
+                    if not raw.strip():
+                        return SPAWN_RESULT_FILE, "Gold drop failed (empty response from server)"
+                    try:
+                        body = json.loads(raw)
+                    except json.JSONDecodeError:
+                        return SPAWN_RESULT_FILE, "Gold drop failed (server error). Is the overlay running?"
+                    if not body.get("ok"):
+                        return SPAWN_RESULT_FILE, body.get("error", "Gold drop failed")
+            except urllib.error.HTTPError as e:
+                return SPAWN_RESULT_FILE, _http_error_msg(
+                    e, "Gold drop timed out. Is the game running and in an active run (not title screen)?"
+                )
+            except urllib.error.URLError as e:
+                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
+            except Exception as e:
+                msg = str(e).strip() if e else ""
+                return SPAWN_RESULT_FILE, "Gold drop failed. " + (msg if msg else "Check overlay server and try again.")
+
+            pts -= cost
+            data[key] = (pts, last)
+            write_points(data)
+            return SPAWN_RESULT_FILE, "ok"
+    except TimeoutError:
+        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
 
 def cmd_curse(args):
@@ -227,34 +308,47 @@ def cmd_curse(args):
         return SPAWN_RESULT_FILE, f"Unknown slot \"{args[0]}\". Options: {SLOT_HELP}"
 
     cost = get_config()["cost_per_curse"]
-    data = read_points()
     key = username.lower()
-    pts, last = data.get(key, (0, 0))
-    if pts < cost:
-        return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to curse, you have {pts}."
-
-    url = "http://127.0.0.1:5000/api/curse-command"
-    payload = {"slot": slot, "username": username}
-    req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-    req.add_header("Content-Type", "application/json")
-
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            body = json.loads(resp.read().decode())
-            if not body.get("ok"):
-                return SPAWN_RESULT_FILE, body.get("error", "Curse failed")
-    except urllib.error.HTTPError as e:
-        return SPAWN_RESULT_FILE, _http_error_msg(
-            e, "Curse timed out. Is the game running and in an active run?"
-        )
-    except Exception as e:
-        return SPAWN_RESULT_FILE, str(e)
+        with points_lock():
+            data = read_points()
+            pts, last = data.get(key, (0, 0))
+            if pts < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to curse, you have {pts}."
 
-    pts -= cost
-    data[key] = (pts, last)
-    write_points(data)
-    item_name = body.get("item_name", slot)
-    return SPAWN_RESULT_FILE, f"ok|{item_name}"
+            url = "http://127.0.0.1:5000/api/curse-command"
+            payload = {"slot": slot, "username": username}
+            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+            req.add_header("Content-Type", "application/json")
+
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    raw = resp.read().decode("utf-8", errors="replace")
+                    if not raw.strip():
+                        return SPAWN_RESULT_FILE, "Curse failed (empty response from server)"
+                    try:
+                        body = json.loads(raw)
+                    except json.JSONDecodeError:
+                        return SPAWN_RESULT_FILE, "Curse failed (server error). Is the overlay running?"
+                    if not body.get("ok"):
+                        return SPAWN_RESULT_FILE, body.get("error", "Curse failed")
+            except urllib.error.HTTPError as e:
+                return SPAWN_RESULT_FILE, _http_error_msg(
+                    e, "Curse timed out. Is the game running and in an active run?"
+                )
+            except urllib.error.URLError as e:
+                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
+            except Exception as e:
+                msg = str(e).strip() if e else ""
+                return SPAWN_RESULT_FILE, "Curse failed. " + (msg if msg else "Check overlay server and try again.")
+
+            pts -= cost
+            data[key] = (pts, last)
+            write_points(data)
+            item_name = body.get("item_name", slot)
+            return SPAWN_RESULT_FILE, f"ok|{item_name}"
+    except TimeoutError:
+        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
 
 def cmd_gas(args):
@@ -263,34 +357,187 @@ def cmd_gas(args):
     username = args[0]
 
     cost = get_config()["cost_per_gas"]
-    data = read_points()
     key = username.lower()
-    pts, last = data.get(key, (0, 0))
-    if pts < cost:
-        return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to spew gas, you have {pts}."
-
-    url = "http://127.0.0.1:5000/api/gas-command"
-    payload = {"username": username}
-    req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-    req.add_header("Content-Type", "application/json")
-
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            body = json.loads(resp.read().decode())
-            if not body.get("ok"):
-                return SPAWN_RESULT_FILE, body.get("error", "Gas spawn failed")
-    except urllib.error.HTTPError as e:
-        return SPAWN_RESULT_FILE, _http_error_msg(
-            e, "Gas command timed out. Is the game running and in an active run?"
-        )
-    except Exception as e:
-        return SPAWN_RESULT_FILE, str(e)
+        with points_lock():
+            data = read_points()
+            pts, last = data.get(key, (0, 0))
+            if pts < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to spew gas, you have {pts}."
 
-    pts -= cost
-    data[key] = (pts, last)
-    write_points(data)
-    gas_name = body.get("gas_name", "gas")
-    return SPAWN_RESULT_FILE, f"ok|{gas_name}"
+            url = "http://127.0.0.1:5000/api/gas-command"
+            payload = {"username": username}
+            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+            req.add_header("Content-Type", "application/json")
+
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    raw = resp.read().decode("utf-8", errors="replace")
+                    if not raw.strip():
+                        return SPAWN_RESULT_FILE, "Gas spawn failed (empty response from server)"
+                    try:
+                        body = json.loads(raw)
+                    except json.JSONDecodeError:
+                        return SPAWN_RESULT_FILE, "Gas spawn failed (server error). Is the overlay running?"
+                    if not body.get("ok"):
+                        return SPAWN_RESULT_FILE, body.get("error", "Gas spawn failed")
+            except urllib.error.HTTPError as e:
+                return SPAWN_RESULT_FILE, _http_error_msg(
+                    e, "Gas command timed out. Is the game running and in an active run?"
+                )
+            except urllib.error.URLError as e:
+                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
+            except Exception as e:
+                msg = str(e).strip() if e else ""
+                return SPAWN_RESULT_FILE, "Gas spawn failed. " + (msg if msg else "Check overlay server and try again.")
+
+            pts -= cost
+            data[key] = (pts, last)
+            write_points(data)
+            gas_name = body.get("gas_name", "gas")
+            return SPAWN_RESULT_FILE, f"ok|{gas_name}"
+    except TimeoutError:
+        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+
+
+def cmd_scroll(args):
+    if len(args) < 1:
+        return SPAWN_RESULT_FILE, "Usage: !scroll (uses a random scroll like +10 Unstable Spellbook)"
+    username = args[0]
+
+    cost = get_config()["cost_per_scroll"]
+    key = username.lower()
+    try:
+        with points_lock():
+            data = read_points()
+            pts, last = data.get(key, (0, 0))
+            if pts < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} for random scroll, you have {pts}."
+
+            url = "http://127.0.0.1:5000/api/scroll-command"
+            payload = {"username": username}
+            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+            req.add_header("Content-Type", "application/json")
+
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    raw = resp.read().decode("utf-8", errors="replace")
+                    if not raw.strip():
+                        return SPAWN_RESULT_FILE, "Scroll command failed (empty response from server)"
+                    try:
+                        body = json.loads(raw)
+                    except json.JSONDecodeError:
+                        return SPAWN_RESULT_FILE, "Scroll command failed (server error). Is the overlay running?"
+                    if not body.get("ok"):
+                        return SPAWN_RESULT_FILE, body.get("error", "Scroll command failed")
+            except urllib.error.HTTPError as e:
+                return SPAWN_RESULT_FILE, _http_error_msg(
+                    e, "Scroll command timed out. Is the game running and in an active run?"
+                )
+            except urllib.error.URLError as e:
+                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
+            except Exception as e:
+                msg = str(e).strip() if e else ""
+                return SPAWN_RESULT_FILE, "Scroll command failed. " + (msg if msg else "Check overlay server and try again.")
+
+            pts -= cost
+            data[key] = (pts, last)
+            write_points(data)
+            scroll_name = body.get("scroll_name", "scroll")
+            return SPAWN_RESULT_FILE, f"ok|{scroll_name}"
+    except TimeoutError:
+        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+
+
+WAND_TIERS = frozenset(["common", "uncommon", "rare", "veryrare", "very_rare"])
+
+
+def _wand_cost_for_rarity(cfg, rarity):
+    """Rarity: 0=common, 1=uncommon, 2=rare, 3=very_rare."""
+    costs = [
+        cfg.get("cost_per_wand_common", 50),
+        cfg.get("cost_per_wand_uncommon", 100),
+        cfg.get("cost_per_wand_rare", 200),
+        cfg.get("cost_per_wand_veryrare", 400),
+    ]
+    return costs[min(rarity, 3)]
+
+
+def _tier_to_int(tier_str):
+    """Convert tier string to 0-3. Returns -1 for random/invalid."""
+    if not tier_str:
+        return -1
+    m = {"common": 0, "uncommon": 1, "rare": 2, "veryrare": 3, "very_rare": 3}
+    return m.get(tier_str.lower().strip(), -1)
+
+
+def cmd_wand(args):
+    if len(args) < 1:
+        return SPAWN_RESULT_FILE, "Usage: !wand <common|uncommon|rare|veryrare> (tier required)"
+    tier = -1
+    if len(args) >= 2 and args[0].lower().strip() in WAND_TIERS:
+        tier = _tier_to_int(args[0])
+        username = args[1]
+    else:
+        username = args[0]
+        return SPAWN_RESULT_FILE, "Specify a tier: !wand common, !wand uncommon, !wand rare, or !wand veryrare"
+
+    cfg = get_config()
+    if tier >= 0:
+        cost = _wand_cost_for_rarity(cfg, tier)
+        cost_check = cost
+    else:
+        cost_check = max(
+            cfg.get("cost_per_wand_common", 50),
+            cfg.get("cost_per_wand_uncommon", 100),
+            cfg.get("cost_per_wand_rare", 200),
+            cfg.get("cost_per_wand_veryrare", 400),
+        )
+    key = username.lower()
+    try:
+        with points_lock():
+            data = read_points()
+            pts, last = data.get(key, (0, 0))
+            if pts < cost_check:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost_check}, you have {pts}."
+
+            url = "http://127.0.0.1:5000/api/wand-command"
+            payload = {"username": username}
+            if tier >= 0:
+                payload["tier"] = tier
+            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+            req.add_header("Content-Type", "application/json")
+
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    raw = resp.read().decode("utf-8", errors="replace")
+                    if not raw.strip():
+                        return SPAWN_RESULT_FILE, "Wand command failed (empty response from server)"
+                    try:
+                        body = json.loads(raw)
+                    except json.JSONDecodeError:
+                        return SPAWN_RESULT_FILE, "Wand command failed (server error). Is the overlay running?"
+                    if not body.get("ok"):
+                        return SPAWN_RESULT_FILE, body.get("error", "Wand command failed")
+            except urllib.error.HTTPError as e:
+                return SPAWN_RESULT_FILE, _http_error_msg(
+                    e, "Wand command timed out. Is the game running and in an active run?"
+                )
+            except urllib.error.URLError as e:
+                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
+            except Exception as e:
+                msg = str(e).strip() if e else ""
+                return SPAWN_RESULT_FILE, "Wand command failed. " + (msg if msg else "Check overlay server and try again.")
+
+            rarity = body.get("rarity", 0)
+            cost = _wand_cost_for_rarity(cfg, rarity)
+            pts -= cost
+            data[key] = (pts, last)
+            write_points(data)
+            effect_name = body.get("effect_name", "effect")
+            return SPAWN_RESULT_FILE, f"ok|{effect_name}"
+    except TimeoutError:
+        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
 
 def fetch_usd_rate(currency_code: str) -> float:
@@ -321,18 +568,22 @@ def cmd_superchat(args):
         return DONATION_RESULT_FILE, "skip|0"
 
     key = username.lower()
-    data = read_points()
-    pts, last = data.get(key, (0, 0))
     amount_in_currency = micro_amount / 1_000_000
     rate = fetch_usd_rate(currency)
     amount_usd = amount_in_currency * rate
     to_add = max(0, int(round(amount_usd * 100)))
     if to_add <= 0:
         return DONATION_RESULT_FILE, "ok|0"
-    pts += to_add
-    data[key] = (pts, last)
-    write_points(data)
-    return DONATION_RESULT_FILE, f"ok|{to_add}"
+    try:
+        with points_lock():
+            data = read_points()
+            pts, last = data.get(key, (0, 0))
+            pts += to_add
+            data[key] = (pts, last)
+            write_points(data)
+        return DONATION_RESULT_FILE, f"ok|{to_add}"
+    except TimeoutError:
+        return DONATION_RESULT_FILE, "Points file busy. Please try again in a moment."
 
 
 def cmd_cheer(args):
@@ -347,15 +598,19 @@ def cmd_cheer(args):
         return DONATION_RESULT_FILE, "skip|0"
 
     key = username.lower()
-    data = read_points()
-    pts, last = data.get(key, (0, 0))
     to_add = bits
     if to_add <= 0:
         return DONATION_RESULT_FILE, "ok|0"
-    pts += to_add
-    data[key] = (pts, last)
-    write_points(data)
-    return DONATION_RESULT_FILE, f"ok|{to_add}"
+    try:
+        with points_lock():
+            data = read_points()
+            pts, last = data.get(key, (0, 0))
+            pts += to_add
+            data[key] = (pts, last)
+            write_points(data)
+        return DONATION_RESULT_FILE, f"ok|{to_add}"
+    except TimeoutError:
+        return DONATION_RESULT_FILE, "Points file busy. Please try again in a moment."
 
 
 COMMANDS = {
@@ -363,6 +618,8 @@ COMMANDS = {
     "gold": cmd_gold,
     "curse": cmd_curse,
     "gas": cmd_gas,
+    "scroll": cmd_scroll,
+    "wand": cmd_wand,
     "superchat": cmd_superchat,
     "cheer": cmd_cheer,
 }
@@ -372,7 +629,7 @@ def main():
     args = [a.strip() for a in sys.argv[1:] if a.strip()]
     if len(args) < 1:
         with open(SPAWN_RESULT_FILE, "w", encoding="utf-8") as f:
-            f.write("Usage: points_command.py <spawn|gold|curse|gas|superchat|cheer> [args...]")
+            f.write("Usage: points_command.py <spawn|gold|curse|gas|scroll|wand|superchat|cheer> [args...]")
         sys.exit(0)
 
     cmd = args[0].lower()

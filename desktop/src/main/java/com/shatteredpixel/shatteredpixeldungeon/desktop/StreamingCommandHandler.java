@@ -50,6 +50,8 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Succubus;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Swarm;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Thief;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Warlock;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ChatSpawned;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SpawnScaled;
 import com.shatteredpixel.shatteredpixeldungeon.items.EquipableItem;
 import com.shatteredpixel.shatteredpixeldungeon.items.Gold;
@@ -58,17 +60,32 @@ import com.shatteredpixel.shatteredpixeldungeon.items.KindOfWeapon;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.Weapon;
 import com.shatteredpixel.shatteredpixeldungeon.items.trinkets.ChaoticCenser;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.CursedWand;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfMagicMissile;
+import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.MagesStaff;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.MissileWeapon;
+import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
+import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
+import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.Scroll;
+import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfIdentify;
+import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfMagicMapping;
+import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfRemoveCurse;
+import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfTransmutation;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfTeleportation;
+import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.exotic.ExoticScroll;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
+import com.watabou.utils.BArray;
+import com.watabou.utils.Callback;
 import com.watabou.utils.PathFinder;
 import com.watabou.utils.Random;
 import com.watabou.utils.Reflection;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.Map;
 
@@ -95,29 +112,43 @@ public final class StreamingCommandHandler {
 		NATIVE_DEPTH.put("succubus", 19); NATIVE_DEPTH.put("eye", 21);    NATIVE_DEPTH.put("scorpio", 23);
 	}
 
-	/** Called from main thread via Gdx.app.postRunnable. Returns true if spawn succeeded, false if no valid space. */
-	public static boolean handleSpawn(String monsterName, String username) {
-		if (Dungeon.hero == null || Dungeon.level == null) return false;
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene)) return false;
-		if (!Dungeon.hero.isAlive()) return false;
+	/** Called from main thread via Gdx.app.postRunnable. Returns null on success, error message on failure. */
+	public static String handleSpawn(String monsterName, String username) {
+		if (Dungeon.hero == null || Dungeon.level == null)
+			return "Not in an active run (title/menu)";
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+			return "Not in an active run (title/menu)";
+		if (!Dungeon.hero.isAlive())
+			return "Hero is dead";
 
 		Class<? extends Mob> mobClass = "elemental".equals(monsterName)
 				? Elemental.random()
 				: mobClassForName(monsterName);
-		if (mobClass == null) return false;
+		if (mobClass == null)
+			return "Unknown monster";
 
 		Mob mob = Reflection.newInstance(mobClass);
-		if (mob == null) return false;
+		if (mob == null)
+			return "Failed to create monster";
 
-		// Scale down HP, damage, and armor when spawning a late-game monster in an earlier area
+		Buff.affect(mob, ChatSpawned.class);
+
+		// Scale down HP, damage, and armor only when spawning a monster from a LATER biome in an EARLIER biome.
+		// If the monster is in its native biome (e.g. crab on floor 1 = both sewers), never scale down.
 		Integer nativeDepth = NATIVE_DEPTH.get(monsterName);
 		if (nativeDepth != null && Dungeon.depth < nativeDepth) {
-			float scale = Math.max(MIN_HP_SCALE, (float) Dungeon.depth / nativeDepth);
-			int newHT = Math.max(1, Math.round(mob.HT * scale));
-			int newHP = Math.max(1, Math.round(mob.HP * scale));
-			mob.HT = newHT;
-			mob.HP = newHP;
-			SpawnScaled.affect(mob, scale);
+			int currentRegion = (Dungeon.depth - 1) / 5;  // 0=sewers, 1=prison, 2=caves, 3=city, 4=demon
+			int nativeRegion = (nativeDepth - 1) / 5;
+			if (currentRegion < nativeRegion) {
+				// Different biome (e.g. skeleton in sewers) — scale down
+				float scale = Math.max(MIN_HP_SCALE, (float) Dungeon.depth / nativeDepth);
+				int newHT = Math.max(1, Math.round(mob.HT * scale));
+				int newHP = Math.max(1, Math.round(mob.HP * scale));
+				mob.HT = newHT;
+				mob.HP = newHP;
+				SpawnScaled.affect(mob, scale);
+			}
+			// Same biome (e.g. crab on floor 1, both sewers) — no scaling
 		}
 
 		int heroPos = Dungeon.hero.pos;
@@ -136,7 +167,8 @@ public final class StreamingCommandHandler {
 			if (Char.hasProp(mob, Char.Property.LARGE) && !Dungeon.level.openSpace[p]) continue;
 			candidates.add(p);
 		}
-		if (candidates.isEmpty()) return false;
+		if (candidates.isEmpty())
+			return "No space to spawn (hero surrounded or no valid tiles)";
 
 		int cell = Random.element(candidates);
 		if (mob.state != mob.PASSIVE) {
@@ -149,15 +181,19 @@ public final class StreamingCommandHandler {
 
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		GLog.p(Messages.get(StreamingCommandHandler.class, "chat_spawned"), chatter, monsterName);
-		return true;
+		return null;
 	}
 
-	/** Drop gold near the hero. Returns true if dropped successfully. */
-	public static boolean handleDropGold(int amount, String username) {
-		if (Dungeon.hero == null || Dungeon.level == null) return false;
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene)) return false;
-		if (!Dungeon.hero.isAlive()) return false;
-		if (amount < 1 || amount > 100) return false;
+	/** Drop gold near the hero. Returns null on success, error message on failure. */
+	public static String handleDropGold(int amount, String username) {
+		if (Dungeon.hero == null || Dungeon.level == null)
+			return "Not in an active run (title/menu)";
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+			return "Not in an active run (title/menu)";
+		if (!Dungeon.hero.isAlive())
+			return "Hero is dead";
+		if (amount < 1 || amount > 100)
+			return "Invalid amount";
 
 		int heroPos = Dungeon.hero.pos;
 		boolean[] spawnPassable = new boolean[Dungeon.level.length()];
@@ -174,25 +210,29 @@ public final class StreamingCommandHandler {
 			if (!Dungeon.level.passable[p] && !Dungeon.level.avoid[p]) continue;
 			candidates.add(p);
 		}
-		if (candidates.isEmpty()) return false;
+		if (candidates.isEmpty())
+			return "No space to drop gold (hero surrounded)";
 
 		int cell = Random.element(candidates);
 		Dungeon.level.drop(new Gold(amount), cell).sprite.drop();
 
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		GLog.h(Messages.get(StreamingCommandHandler.class, "chat_gold_dropped"), chatter, amount);
-		return true;
+		return null;
 	}
 
-	/** Curse an equipped item in the given slot. Returns item name on success, null on failure. */
+	/** Curse an equipped item in the given slot. Returns item name on success, error message on failure. */
 	public static String handleCurse(String slot, String username) {
-		if (Dungeon.hero == null || Dungeon.level == null) return null;
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene)) return null;
-		if (!Dungeon.hero.isAlive()) return null;
+		if (Dungeon.hero == null || Dungeon.level == null)
+			return "ERR:Not in an active run (title/menu)";
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+			return "ERR:Not in an active run (title/menu)";
+		if (!Dungeon.hero.isAlive())
+			return "ERR:Hero is dead";
 
 		Item item = null;
 		String slotName = null;
-		if (slot == null) return null;
+		if (slot == null) return "ERR:Missing slot";
 		switch (slot.toLowerCase()) {
 			case "weapon":
 				KindOfWeapon wep = Dungeon.hero.belongings.weapon();
@@ -217,11 +257,13 @@ public final class StreamingCommandHandler {
 				slotName = "misc";
 				break;
 			default:
-				return null;
+				return "ERR:Invalid slot";
 		}
 
-		if (item == null) return null;
-		if (item.cursed && item.cursedKnown) return null;
+		if (item == null)
+			return "ERR:No item in " + slotName + " slot";
+		if (item.cursed && item.cursedKnown)
+			return "ERR:Item in " + slotName + " is already cursed";
 
 		item.cursed = item.cursedKnown = true;
 		if (item instanceof Weapon) {
@@ -240,18 +282,128 @@ public final class StreamingCommandHandler {
 		return itemName;
 	}
 
-	/** Spawn random gas (Chaotic Censer at level +3). Returns gas name on success, null on failure. */
+	/** Spawn random gas (Chaotic Censer at level +3). Returns gas name on success, error message on failure. */
 	public static String handleSpawnGas(String username) {
-		if (Dungeon.hero == null || Dungeon.level == null) return null;
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene)) return null;
-		if (!Dungeon.hero.isAlive()) return null;
+		if (Dungeon.hero == null || Dungeon.level == null)
+			return "ERR:Not in an active run (title/menu)";
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+			return "ERR:Not in an active run (title/menu)";
+		if (!Dungeon.hero.isAlive())
+			return "ERR:Hero is dead";
 
 		String gasName = ChaoticCenser.spawnGasForChat();
-		if (gasName == null) return null;
+		if (gasName == null)
+			return "ERR:No valid cell to spawn gas (need visible tiles 2-6 from hero)";
 
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		GLog.w(Messages.get(StreamingCommandHandler.class, "chat_gas"), chatter, Messages.titleCase(gasName));
 		return gasName;
+	}
+
+	/** Cursed wand effect classes excluded from chat (AbortRetryFail, Explosion, FireBall, ForestFire). */
+	private static final HashSet<Class<? extends CursedWand.CursedEffect>> WAND_EXCLUDED = new HashSet<>();
+	static {
+		WAND_EXCLUDED.add(CursedWand.AbortRetryFail.class);
+		WAND_EXCLUDED.add(CursedWand.Explosion.class);
+		WAND_EXCLUDED.add(CursedWand.FireBall.class);
+		WAND_EXCLUDED.add(CursedWand.ForestFire.class);
+	}
+
+	/** Callback for async cursed wand result. */
+	public interface CursedWandResultCallback {
+		void onResult(boolean success, String effectName, int rarity, String error);
+	}
+
+	/** Trigger a cursed wand effect (excluding AbortRetryFail, Explosion, FireBall, ForestFire). Async.
+	 * @param tier -1 for random, 0=common, 1=uncommon, 2=rare, 3=very_rare */
+	public static void handleCursedWand(String username, int tier, CursedWandResultCallback callback) {
+		if (Dungeon.hero == null || Dungeon.level == null) {
+			callback.onResult(false, null, 0, "Not in an active run (title/menu)");
+			return;
+		}
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene)) {
+			callback.onResult(false, null, 0, "Not in an active run (title/menu)");
+			return;
+		}
+		if (!Dungeon.hero.isAlive()) {
+			callback.onResult(false, null, 0, "Hero is dead");
+			return;
+		}
+
+		// Find target cell 2-6 tiles from hero (like gas)
+		PathFinder.buildDistanceMap(Dungeon.hero.pos, BArray.not(Dungeon.level.solid, null), 6);
+		ArrayList<Integer> candidates = new ArrayList<>();
+		for (int i = 0; i < Dungeon.level.length(); i++) {
+			if (Dungeon.level.heroFOV[i] && PathFinder.distance[i] != Integer.MAX_VALUE) {
+				if (PathFinder.distance[i] >= 2 && PathFinder.distance[i] <= 6) {
+					candidates.add(i);
+				}
+			}
+		}
+		if (candidates.isEmpty()) {
+			callback.onResult(false, null, 0, "No valid target cell (need visible tiles 2-6 from hero)");
+			return;
+		}
+
+		int targetCell = Random.element(candidates);
+		Wand wand = new WandOfMagicMissile();
+		wand.level(Dungeon.scalingDepth() / 5);
+		Ballistica bolt = new Ballistica(Dungeon.hero.pos, targetCell, Ballistica.MAGIC_BOLT);
+		boolean positiveOnly = Random.Float() < com.shatteredpixel.shatteredpixeldungeon.items.trinkets.WondrousResin.positiveCurseEffectChance();
+
+		int[] outRarity = new int[1];
+		CursedWand.CursedEffect effect = CursedWand.randomValidEffectExcluding(
+				wand, Dungeon.hero, bolt, positiveOnly, WAND_EXCLUDED, outRarity, tier);
+
+		String effectName = effect.getClass().getSimpleName();
+		int rarity = outRarity[0];
+
+		effect.FX(wand, Dungeon.hero, bolt, new Callback() {
+			@Override
+			public void call() {
+				effect.effect(wand, Dungeon.hero, bolt, positiveOnly);
+				String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
+				GLog.w(Messages.get(StreamingCommandHandler.class, "chat_wand"), chatter, effectName);
+				callback.onResult(true, effectName, rarity, null);
+			}
+		});
+	}
+
+	/** Use a random scroll like +10 Unstable Spellbook. Returns scroll name on success, error message on failure. */
+	public static String handleRandomScroll(String username) {
+		if (Dungeon.hero == null || Dungeon.level == null)
+			return "ERR:Not in an active run (title/menu)";
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+			return "ERR:Not in an active run (title/menu)";
+		if (!Dungeon.hero.isAlive())
+			return "ERR:Hero is dead";
+		if (Dungeon.hero.buff(com.shatteredpixel.shatteredpixeldungeon.actors.buffs.MagicImmune.class) != null)
+			return "ERR:Magic immune";
+		if (Dungeon.hero.buff(com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Blindness.class) != null)
+			return "ERR:Blinded";
+
+		Scroll scroll;
+		do {
+			scroll = (Scroll) Generator.randomUsingDefaults(Generator.Category.SCROLL);
+		} while (scroll == null
+				|| ((scroll instanceof ScrollOfIdentify || scroll instanceof ScrollOfRemoveCurse
+						|| scroll instanceof ScrollOfMagicMapping) && Random.Int(2) == 0)
+				|| (scroll instanceof ScrollOfTransmutation));
+
+		// 50% chance for exotic version (like +10 spellbook empowered option)
+		if (ExoticScroll.regToExo.containsKey(scroll.getClass()) && Random.Int(2) == 0) {
+			scroll = (Scroll) Reflection.newInstance(ExoticScroll.regToExo.get(scroll.getClass()));
+		}
+
+		scroll.anonymize();
+		scroll.talentChance = 0;
+		scroll.execute(Dungeon.hero, Scroll.AC_READ);
+		Talent.onArtifactUsed(Dungeon.hero);
+
+		String scrollName = scroll.trueName();
+		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
+		GLog.p(Messages.get(StreamingCommandHandler.class, "chat_scroll"), chatter, scrollName);
+		return scrollName;
 	}
 
 	/** Phase 2: full monster list. Returns null for unknown. */

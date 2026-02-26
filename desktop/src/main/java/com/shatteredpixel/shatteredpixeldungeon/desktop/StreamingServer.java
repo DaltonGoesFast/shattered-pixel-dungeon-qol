@@ -73,12 +73,14 @@ public class StreamingServer extends WebSocketServer {
 				if (monster == null || monster.isEmpty()) return;
 				String monsterFinal = monster.trim().toLowerCase();
 				Gdx.app.postRunnable(() -> {
-					boolean ok = StreamingCommandHandler.handleSpawn(monsterFinal, usernameFinal);
+					String err = StreamingCommandHandler.handleSpawn(monsterFinal, usernameFinal);
+					boolean ok = (err == null);
 					if (requestId != null && !requestId.isEmpty()) {
 						JsonObject resp = new JsonObject();
 						resp.addProperty("type", "spawn_result");
 						resp.addProperty("request_id", requestId);
 						resp.addProperty("success", ok);
+						if (err != null) resp.addProperty("error", err);
 						conn.send(resp.toString());
 					}
 				});
@@ -86,25 +88,30 @@ public class StreamingServer extends WebSocketServer {
 				int amount = obj.has("amount") ? obj.get("amount").getAsInt() : 5;
 				int amountFinal = Math.max(1, Math.min(100, amount));
 				Gdx.app.postRunnable(() -> {
-					boolean ok = StreamingCommandHandler.handleDropGold(amountFinal, usernameFinal);
+					String err = StreamingCommandHandler.handleDropGold(amountFinal, usernameFinal);
+					boolean ok = (err == null);
 					if (requestId != null && !requestId.isEmpty()) {
 						JsonObject resp = new JsonObject();
 						resp.addProperty("type", "gold_result");
 						resp.addProperty("request_id", requestId);
 						resp.addProperty("success", ok);
+						if (err != null) resp.addProperty("error", err);
 						conn.send(resp.toString());
 					}
 				});
 			} else if ("gas".equals(cmd)) {
 				Gdx.app.postRunnable(() -> {
-					String gasName = StreamingCommandHandler.handleSpawnGas(usernameFinal);
-					boolean ok = gasName != null;
+					String result = StreamingCommandHandler.handleSpawnGas(usernameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String gasName = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
 					if (requestId != null && !requestId.isEmpty()) {
 						JsonObject resp = new JsonObject();
 						resp.addProperty("type", "gas_result");
 						resp.addProperty("request_id", requestId);
 						resp.addProperty("success", ok);
 						if (gasName != null) resp.addProperty("gas_name", gasName);
+						if (err != null) resp.addProperty("error", err);
 						conn.send(resp.toString());
 					}
 				});
@@ -113,16 +120,58 @@ public class StreamingServer extends WebSocketServer {
 				if (slot == null || slot.isEmpty()) return;
 				String slotFinal = slot.trim().toLowerCase();
 				Gdx.app.postRunnable(() -> {
-					String itemName = StreamingCommandHandler.handleCurse(slotFinal, usernameFinal);
-					boolean ok = itemName != null;
+					String result = StreamingCommandHandler.handleCurse(slotFinal, usernameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String itemName = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
 					if (requestId != null && !requestId.isEmpty()) {
 						JsonObject resp = new JsonObject();
 						resp.addProperty("type", "curse_result");
 						resp.addProperty("request_id", requestId);
 						resp.addProperty("success", ok);
 						if (itemName != null) resp.addProperty("item_name", itemName);
+						if (err != null) resp.addProperty("error", err);
 						conn.send(resp.toString());
 					}
+				});
+			} else if ("scroll".equals(cmd)) {
+				Gdx.app.postRunnable(() -> {
+					String result = StreamingCommandHandler.handleRandomScroll(usernameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String scrollName = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "scroll_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (scrollName != null) resp.addProperty("scroll_name", scrollName);
+						if (err != null) resp.addProperty("error", err);
+						conn.send(resp.toString());
+					}
+				});
+			} else if ("wand".equals(cmd)) {
+				int tier = -1;
+				if (obj.has("tier")) {
+					try {
+						tier = obj.get("tier").getAsInt();
+						if (tier < 0 || tier > 3) tier = -1;
+					} catch (Exception ignored) {}
+				}
+				final int tierFinal = tier;
+				Gdx.app.postRunnable(() -> {
+					StreamingCommandHandler.handleCursedWand(usernameFinal, tierFinal, (ok, effectName, rarity, err) -> {
+						if (requestId != null && !requestId.isEmpty()) {
+							JsonObject resp = new JsonObject();
+							resp.addProperty("type", "wand_result");
+							resp.addProperty("request_id", requestId);
+							resp.addProperty("success", ok);
+							if (effectName != null) resp.addProperty("effect_name", effectName);
+							resp.addProperty("rarity", rarity);
+							if (err != null) resp.addProperty("error", err);
+							conn.send(resp.toString());
+						}
+					});
 				});
 			}
 		} catch (Exception ignored) {}

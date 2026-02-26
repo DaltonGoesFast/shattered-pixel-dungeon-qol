@@ -21,7 +21,7 @@ Quick reference for what each part of the project does.
 |------|---------|
 | `server.py` | Main overlay server. HTTP API + game WebSocket relay. Run with `python server.py` or `start.bat`. |
 | `spd_parser.py` | Save parser. Used by server for game data. |
-| `points_command.py` | Unified script: spawn, gold, curse, gas, scroll, superchat, cheer |
+| `points_command.py` | Unified script: spawn, gold, curse, gas, scroll, wand, superchat, cheer |
 | `points_config.json` | Costs config (edit here or via http://localhost:5000/points-config) |
 | `index.html` | OBS overlay dashboard |
 | `double-points-countdown.html` | OBS 2× points countdown |
