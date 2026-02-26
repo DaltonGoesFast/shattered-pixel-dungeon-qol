@@ -305,7 +305,11 @@ def overlay():
 @app.route('/double-points-countdown')
 def double_points_countdown_page():
     """Serve 2x points countdown for OBS Browser Source (avoids CORS when using file://)"""
-    return send_from_directory('.', 'double-points-countdown.html')
+    resp = send_from_directory('.', 'double-points-countdown.html')
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
 
 
 @app.route('/points-config')
@@ -838,6 +842,7 @@ def wand_command():
 @app.route('/api/double-points-remaining')
 def double_points_remaining():
     """Return 2x points countdown for OBS Browser Source."""
+    resp_headers = {'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0'}
     try:
         end_ts = 0
         if os.path.exists(DOUBLE_POINTS_END_FILE):
@@ -849,13 +854,13 @@ def double_points_remaining():
                 pass
         now = int(time.time())
         if end_ts <= now:
-            return jsonify({"active": False, "seconds_left": 0, "display": ""})
+            return jsonify({"active": False, "seconds_left": 0, "display": ""}), 200, resp_headers
         secs = end_ts - now
         mins, secs = divmod(secs, 60)
         display = f"{mins}:{secs:02d}"
-        return jsonify({"active": True, "seconds_left": end_ts - now, "display": display})
+        return jsonify({"active": True, "seconds_left": end_ts - now, "display": display}), 200, resp_headers
     except Exception as e:
-        return jsonify({"active": False, "error": str(e)}), 500
+        return jsonify({"active": False, "error": str(e)}), 500, resp_headers
 
 
 @app.route('/api/status')

@@ -2,6 +2,9 @@
 <html>
 <head>
   <meta charset="utf-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <style>
     @font-face {
       font-family: 'PixelFont';
@@ -30,18 +33,25 @@
   <script>
     const url = "http://127.0.0.1:5000/api/double-points-remaining";
     const el = document.getElementById("timer");
+    let failCount = 0;
     function update() {
-      fetch(url).then(r => r.json()).then(d => {
+      fetch(url, { cache: "no-store" }).then(r => r.json()).then(d => {
+        failCount = 0;
         if (d.active && d.display) {
           el.textContent = "2x points: " + d.display;
           el.classList.add("active");
         } else {
           el.classList.remove("active");
         }
-      }).catch(() => el.classList.remove("active"));
+      }).catch(() => {
+        el.classList.remove("active");
+        failCount++;
+        if (failCount >= 5) location.reload();
+      });
     }
     update();
     setInterval(update, 1000);
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") update(); });
   </script>
 </body>
 </html>
