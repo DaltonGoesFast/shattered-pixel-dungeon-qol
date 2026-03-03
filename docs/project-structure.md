@@ -38,13 +38,14 @@ Quick reference for what each part of the project does.
 
 | File | Purpose |
 |------|---------|
-| `inspect_hero.py` | CLI: inspect hero from save |
-| `inspect_depth.py` | CLI: inspect depth from save |
-| `inspect_save.py` | CLI: inspect save keys |
+| `tools/inspect_hero.py` | CLI: inspect hero from save — run `python tools/inspect_hero.py` from Lastest UI |
+| `tools/inspect_depth.py` | CLI: inspect depth from save |
+| `tools/inspect_save.py` | CLI: inspect save keys |
 | `spawn_post.py` | CLI: spawn without points (testing) |
 | `get_game_seed.py` | CLI: get current game seed |
 | `ws-inspect.html` | WebSocket inspector |
 | `obs-scene-switcher.html` | OBS scene switcher |
+| `streamerbot/` | Streamer.bot exports (My-Nice-Script_*.cmd), batch helpers (open-ws-inspect.bat) |
 
 ### Can remove if not needed
 

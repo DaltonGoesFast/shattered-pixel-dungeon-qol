@@ -43,6 +43,8 @@ If you want to use the game data in another project, you can:
 - `index.html`: The clean, dark-themed dashboard frontend.
 - `game_summary.txt`: The human-readable text output of your current game.
 - `game_summary.json`: The machine-readable JSON output for external projects.
+- `tools/`: CLI utilities — `inspect_hero.py`, `inspect_depth.py`, `inspect_save.py` (run from this folder: `python tools/inspect_hero.py`).
+- `streamerbot/`: Streamer.bot exports and batch helpers (e.g. `open-ws-inspect.bat`).
 
 ## Backups
 Your previous work and graphical overlay components are available in the `backup` and `backup_20251201` folders.

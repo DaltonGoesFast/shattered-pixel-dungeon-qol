@@ -1,6 +1,8 @@
-# Chat Commands
+# Chat Commands (Twitch Panel)
 
 Spend points to mess with the run! Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also give points.
+
+For a plain-text block (YouTube description, etc.), see [user-facing-summary.md](user-facing-summary.md).
 
 ---
 
@@ -12,11 +14,15 @@ Spend points to mess with the run! Earn points by chatting (1 per message, 30s c
 
 **!gold** (amount) — Drop gold near the hero (2 pts per gold, 1–100). Example: !gold 25
 
-**!curse** (slot) — Curse equipped item (200 pts). Slots: weapon, armor, ring, artifact, misc
+**!curse** — Curse a random equipped item (200 pts)
 
 **!gas** — Spawn random gas (75 pts). Toxic, confusion, storm clouds, inferno, and more!
 
 **!scroll** — Use a random scroll (100 pts). Like +10 Unstable Spellbook — 50% chance for exotic version!
+
+**!buff** — Apply a random buff (75 pts). Haste, Healing, Barrier, Invisibility, and more!
+
+**!debuff** — Apply a random debuff (50 pts). Blindness, Slow, Roots, Daze, and more!
 
 **!wand** (tier) — Trigger a cursed wand effect. Tier required: common (50 pts), uncommon (100 pts), rare (200 pts), or veryrare (400 pts). Burn, freeze, teleport, gas, sheep, and more!
 

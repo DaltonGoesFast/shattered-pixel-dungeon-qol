@@ -70,6 +70,9 @@ public abstract class Scroll extends Item {
 	
 	protected static final float TIME_TO_READ	= 1f;
 
+	/** When true (e.g. from !scroll chat command), scrolls that can kill the hero will leave at least 1 HP. */
+	public static boolean chatScrollNoKill = false;
+
 	private static final LinkedHashMap<String, Integer> runes = new LinkedHashMap<String, Integer>() {
 		{
 			put("KAUNAN",ItemSpriteSheet.SCROLL_KAUNAN);

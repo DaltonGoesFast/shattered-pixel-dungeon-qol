@@ -124,7 +124,7 @@ def _game_ws_on_message(ws, message):
     try:
         data = json.loads(message)
         # Handle spawn/gold result (game reports success/failure)
-        if data.get('type') in ('spawn_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result'):
+        if data.get('type') in ('spawn_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result'):
             rid = data.get('request_id')
             ok = data.get('success', False)
             if rid:
@@ -150,6 +150,14 @@ def _game_ws_on_message(ws, message):
                         if data.get('type') == 'wand_result' and data.get('rarity') is not None:
                             pending_spawns[rid]['rarity'] = data.get('rarity')
                         if data.get('type') == 'wand_result' and data.get('error'):
+                            pending_spawns[rid]['error'] = data.get('error')
+                        if data.get('type') == 'buff_result' and data.get('buff_name'):
+                            pending_spawns[rid]['buff_name'] = data.get('buff_name')
+                        if data.get('type') == 'buff_result' and data.get('error'):
+                            pending_spawns[rid]['error'] = data.get('error')
+                        if data.get('type') == 'debuff_result' and data.get('debuff_name'):
+                            pending_spawns[rid]['debuff_name'] = data.get('debuff_name')
+                        if data.get('type') == 'debuff_result' and data.get('error'):
                             pending_spawns[rid]['error'] = data.get('error')
                         pending_spawns[rid]['event'].set()
             print(f"Game {data.get('type')}: request_id={rid} success={ok}")
@@ -787,6 +795,98 @@ def scroll_command():
         return jsonify({'ok': False, 'error': err}), 200
     except Exception as e:
         print(f"Scroll 400 exception: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 400
+
+
+@app.route('/api/buff-command', methods=['POST', 'OPTIONS'])
+def buff_command():
+    """Receive buff command from Streamer.bot; forward to game via WebSocket."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        if not data and request.form:
+            data = request.form.to_dict()
+        username = (data.get('username') or '').strip() or None
+        if not game_ws_app:
+            return jsonify({'ok': False, 'error': 'Game not connected'}), 503
+        request_id = str(uuid.uuid4())
+        ev = threading.Event()
+        with spawn_lock:
+            pending_spawns[request_id] = {'event': ev, 'success': False}
+        try:
+            payload = {'command': 'buff', 'request_id': request_id}
+            if username:
+                payload['username'] = username
+            print(f"Buff send to game: request_id={request_id}")
+            game_ws_app.send(json.dumps(payload))
+        except Exception as e:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': str(e)}), 503
+        if ev.wait(timeout=SPAWN_RESULT_TIMEOUT):
+            with spawn_lock:
+                pending = pending_spawns.pop(request_id, {})
+                success = pending.get('success', False)
+                buff_name = pending.get('buff_name', '')
+                buff_error = pending.get('error')
+        else:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': 'Buff command timed out'}), 504
+        if success:
+            print(f"Buff OK: {buff_name} for {username}")
+            return jsonify({'ok': True, 'buff_name': buff_name})
+        err = buff_error or 'Could not apply random buff'
+        return jsonify({'ok': False, 'error': err}), 200
+    except Exception as e:
+        print(f"Buff 400 exception: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 400
+
+
+@app.route('/api/debuff-command', methods=['POST', 'OPTIONS'])
+def debuff_command():
+    """Receive debuff command from Streamer.bot; forward to game via WebSocket."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        if not data and request.form:
+            data = request.form.to_dict()
+        username = (data.get('username') or '').strip() or None
+        if not game_ws_app:
+            return jsonify({'ok': False, 'error': 'Game not connected'}), 503
+        request_id = str(uuid.uuid4())
+        ev = threading.Event()
+        with spawn_lock:
+            pending_spawns[request_id] = {'event': ev, 'success': False}
+        try:
+            payload = {'command': 'debuff', 'request_id': request_id}
+            if username:
+                payload['username'] = username
+            print(f"Debuff send to game: request_id={request_id}")
+            game_ws_app.send(json.dumps(payload))
+        except Exception as e:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': str(e)}), 503
+        if ev.wait(timeout=SPAWN_RESULT_TIMEOUT):
+            with spawn_lock:
+                pending = pending_spawns.pop(request_id, {})
+                success = pending.get('success', False)
+                debuff_name = pending.get('debuff_name', '')
+                debuff_error = pending.get('error')
+        else:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': 'Debuff command timed out'}), 504
+        if success:
+            print(f"Debuff OK: {debuff_name} for {username}")
+            return jsonify({'ok': True, 'debuff_name': debuff_name})
+        err = debuff_error or 'Could not apply random debuff'
+        return jsonify({'ok': False, 'error': err}), 200
+    except Exception as e:
+        print(f"Debuff 400 exception: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 400
 
 

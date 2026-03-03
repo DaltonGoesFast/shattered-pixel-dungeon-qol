@@ -173,6 +173,38 @@ public class StreamingServer extends WebSocketServer {
 						}
 					});
 				});
+			} else if ("buff".equals(cmd)) {
+				Gdx.app.postRunnable(() -> {
+					String result = StreamingCommandHandler.handleChatBuff(usernameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String buffName = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "buff_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (buffName != null) resp.addProperty("buff_name", buffName);
+						if (err != null) resp.addProperty("error", err);
+						conn.send(resp.toString());
+					}
+				});
+			} else if ("debuff".equals(cmd)) {
+				Gdx.app.postRunnable(() -> {
+					String result = StreamingCommandHandler.handleChatDebuff(usernameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String debuffName = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "debuff_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (debuffName != null) resp.addProperty("debuff_name", debuffName);
+						if (err != null) resp.addProperty("error", err);
+						conn.send(resp.toString());
+					}
+				});
 			}
 		} catch (Exception ignored) {}
 	}

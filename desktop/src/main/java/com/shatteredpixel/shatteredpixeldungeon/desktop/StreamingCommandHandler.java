@@ -50,9 +50,25 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Succubus;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Swarm;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Thief;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Warlock;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Adrenaline;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Barrier;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Blindness;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ChatSpawned;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Cripple;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Daze;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Haste;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Healing;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Invisibility;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Levitation;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.MindVision;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Paralysis;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Recharging;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Roots;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Slow;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SpawnScaled;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Vulnerable;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Weakness;
 import com.shatteredpixel.shatteredpixeldungeon.items.EquipableItem;
 import com.shatteredpixel.shatteredpixeldungeon.items.Gold;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
@@ -132,6 +148,25 @@ public final class StreamingCommandHandler {
 			return "Failed to create monster";
 
 		Buff.affect(mob, ChatSpawned.class);
+
+		// Paralysis when spawning a monster outside its native biome. Max 3 turns (Halls), then 2 (City), 1 (Caves), 0 (Prison).
+		// Reduced by 1 when spawning in the Prison.
+		// Use affect+spend (not prolong) so we SET duration; prolong would extend existing and stack across duplicate spawns.
+		Integer nativeDepthForParalysis = NATIVE_DEPTH.get(monsterName);
+		if (nativeDepthForParalysis != null) {
+			int nativeRegion = (nativeDepthForParalysis - 1) / 5;  // 0=sewers, 1=prison, 2=caves, 3=city, 4=halls
+			int currentRegion = (Dungeon.depth - 1) / 5;
+			if (currentRegion < nativeRegion) {
+				int turns = Math.max(0, nativeRegion - 1);  // Halls=3, City=2, Caves=1, Prison=0
+				if (currentRegion == 1) turns = Math.max(0, turns - 1);  // reduce by 1 in prison
+				if (turns > 0) {
+					Buff.detach(mob, Paralysis.class);
+					// Pass turns-1: FlavourBuff.visualcooldown adds +1 for display, so we subtract to match
+					float duration = Math.max(1f, turns - 1f);
+					Buff.affect(mob, Paralysis.class, duration);
+				}
+			}
+		}
 
 		// Scale down HP, damage, and armor only when spawning a monster from a LATER biome in an EARLIER biome.
 		// If the monster is in its native biome (e.g. crab on floor 1 = both sewers), never scale down.
@@ -397,13 +432,112 @@ public final class StreamingCommandHandler {
 
 		scroll.anonymize();
 		scroll.talentChance = 0;
-		scroll.execute(Dungeon.hero, Scroll.AC_READ);
+		Scroll.chatScrollNoKill = true;
+		try {
+			scroll.execute(Dungeon.hero, Scroll.AC_READ);
+		} finally {
+			Scroll.chatScrollNoKill = false;
+		}
+		Dungeon.hero.spend(-1f);  // Chat scroll: no turn cost
 		Talent.onArtifactUsed(Dungeon.hero);
 
 		String scrollName = scroll.trueName();
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		GLog.p(Messages.get(StreamingCommandHandler.class, "chat_scroll"), chatter, scrollName);
 		return scrollName;
+	}
+
+	/** Buffs for chat !buff (random choice). Excludes Paralysis, Burning, Poison, Awareness. */
+	private static final Class<? extends Buff>[] CHAT_BUFFS = new Class[]{
+			Haste.class, Adrenaline.class, Invisibility.class, Levitation.class,
+			Barrier.class, Healing.class, Recharging.class, MindVision.class
+	};
+
+	/** Debuffs for chat !debuff (random choice). Excludes Paralysis, Burning, Poison. */
+	private static final Class<? extends Buff>[] CHAT_DEBUFFS = new Class[]{
+			Blindness.class, Weakness.class, Slow.class, Cripple.class,
+			Roots.class, Daze.class, Vulnerable.class
+	};
+
+	/** Apply a random buff to the hero. Returns buff name on success, ERR:... on failure. */
+	public static String handleChatBuff(String username) {
+		if (Dungeon.hero == null || Dungeon.level == null)
+			return "ERR:Not in an active run (title/menu)";
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+			return "ERR:Not in an active run (title/menu)";
+		if (!Dungeon.hero.isAlive())
+			return "ERR:Hero is dead";
+
+		Class<? extends Buff> buffClass = Random.element(CHAT_BUFFS);
+		String buffName = Messages.titleCase(buffClass.getSimpleName());
+
+		if (buffClass == Healing.class) {
+			int totalHeal = Math.max(1, Math.round(Dungeon.hero.HT * 0.1f));
+			int perTick = Math.max(1, totalHeal / 10);
+			Healing h = Buff.affect(Dungeon.hero, Healing.class);
+			h.setHeal(totalHeal, 0, perTick);
+		} else if (buffClass == Barrier.class) {
+			int shield = Math.max(1, Math.round(Dungeon.hero.HT * 0.1f));
+			Barrier b = Buff.affect(Dungeon.hero, Barrier.class);
+			b.setShield(shield);
+		} else if (buffClass == Haste.class) {
+			Buff.affect(Dungeon.hero, Haste.class, Haste.DURATION);
+		} else if (buffClass == Adrenaline.class) {
+			Buff.affect(Dungeon.hero, Adrenaline.class, Adrenaline.DURATION);
+		} else if (buffClass == Invisibility.class) {
+			Buff.affect(Dungeon.hero, Invisibility.class, Invisibility.DURATION);
+		} else if (buffClass == Levitation.class) {
+			Buff.affect(Dungeon.hero, Levitation.class, Levitation.DURATION);
+		} else if (buffClass == Recharging.class) {
+			Buff.affect(Dungeon.hero, Recharging.class, 8f);
+		} else if (buffClass == MindVision.class) {
+			Buff.affect(Dungeon.hero, MindVision.class, MindVision.DURATION);
+		}
+
+		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
+		GLog.p(Messages.get(StreamingCommandHandler.class, "chat_buff"), chatter, buffName);
+		return buffName;
+	}
+
+	/** Apply a random debuff to the hero. Returns debuff name on success, ERR:... on failure. */
+	public static String handleChatDebuff(String username) {
+		if (Dungeon.hero == null || Dungeon.level == null)
+			return "ERR:Not in an active run (title/menu)";
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+			return "ERR:Not in an active run (title/menu)";
+		if (!Dungeon.hero.isAlive())
+			return "ERR:Hero is dead";
+
+		Class<? extends Buff> debuffClass;
+		ArrayList<Class<? extends Buff>> pool = new ArrayList<>(java.util.Arrays.asList(CHAT_DEBUFFS));
+		do {
+			if (pool.isEmpty())
+				return "ERR:No debuff could be applied (e.g. Roots fails when flying)";
+			debuffClass = Random.element(pool);
+			pool.remove(debuffClass);
+		} while (debuffClass == Roots.class && Dungeon.hero.flying);
+
+		String debuffName = Messages.titleCase(debuffClass.getSimpleName());
+
+		if (debuffClass == Blindness.class) {
+			Buff.affect(Dungeon.hero, Blindness.class, Blindness.DURATION);
+		} else if (debuffClass == Weakness.class) {
+			Buff.affect(Dungeon.hero, Weakness.class, Weakness.DURATION);
+		} else if (debuffClass == Slow.class) {
+			Buff.affect(Dungeon.hero, Slow.class, Slow.DURATION);
+		} else if (debuffClass == Cripple.class) {
+			Buff.affect(Dungeon.hero, Cripple.class, Cripple.DURATION);
+		} else if (debuffClass == Roots.class) {
+			Buff.affect(Dungeon.hero, Roots.class, Roots.DURATION);
+		} else if (debuffClass == Daze.class) {
+			Buff.affect(Dungeon.hero, Daze.class, Daze.DURATION);
+		} else if (debuffClass == Vulnerable.class) {
+			Buff.affect(Dungeon.hero, Vulnerable.class, Vulnerable.DURATION);
+		}
+
+		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
+		GLog.n(Messages.get(StreamingCommandHandler.class, "chat_debuff"), chatter, debuffName);
+		return debuffName;
 	}
 
 	/** Phase 2: full monster list. Returns null for unknown. */

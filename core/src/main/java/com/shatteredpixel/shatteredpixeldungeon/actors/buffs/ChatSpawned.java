@@ -25,8 +25,12 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.BuffIndicator;
 
 /**
  * Applied to mobs spawned via chat. Used to give region-based EXP on kill.
+ * Also shows a black giant-champion-style aura (visual only, no gameplay effects).
  */
 public class ChatSpawned extends Buff {
+
+	private static final int AURA_COLOR = 0x555555;  // dark gray, more visible than 0x111111
+	private static final int AURA_RAYS = 5;          // same as Giant champion
 
 	{
 		type = buffType.NEUTRAL;
@@ -37,5 +41,11 @@ public class ChatSpawned extends Buff {
 	@Override
 	public int icon() {
 		return BuffIndicator.NONE;
+	}
+
+	@Override
+	public void fx(boolean on) {
+		if (on) target.sprite.aura(AURA_COLOR, AURA_RAYS);
+		else target.sprite.clearAura();
 	}
 }
