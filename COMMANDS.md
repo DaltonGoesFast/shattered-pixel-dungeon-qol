@@ -11,11 +11,14 @@ Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also g
 | **!points** | Check your balance |
 | **!toppoints** / **!leaderboard** | Top 3 point holders |
 | **!spawn** \<monster\> | Spawn a monster (cost varies). Half price when spawned beyond its native area (e.g. sewer mobs in prison+). Examples: `!spawn rat`, `!spawn bat`, `!spawn scorpio` |
-| **!gold** \<amount\> | Drop gold near the hero (2 pts per gold, 1–100). Example: `!gold 25` |
-| **!curse** \<slot\> | Curse equipped item (200 pts). Slots: weapon, armor, ring, artifact, misc |
-| **!gas** | Spawn random gas (75 pts). Toxic, confusion, storm clouds, inferno, and more! |
+| **!gold** \<amount\> | Drop gold near the hero (pts per gold configurable, amount 1–100). Example: `!gold 25` |
+| **!curse** | Curse a **random** equipped item (200 pts). No slot needed — picks weapon, armor, ring, artifact, or misc at random. |
+| **!gas** | Spawn random gas (75 pts). Toxic, confusion, storm clouds, inferno, blizzard, and more! |
 | **!scroll** | Use a random scroll (100 pts). Like +10 Unstable Spellbook — 50% chance for exotic version! |
-| **!wand** \<tier\> | Trigger a cursed wand effect. Tier required: common (50 pts), uncommon (100 pts), rare (200 pts), or veryrare (400 pts). Burn, freeze, teleport, gas, sheep, and more! |
+| **!buff** | Apply a random buff (75 pts). Haste, Healing, Barrier, Invisibility, Levitation, and more! |
+| **!debuff** | Apply a random debuff (50 pts). Blindness, Slow, Roots, Daze, Weakness, and more! |
+| **!wand** \<tier\> | Trigger a cursed wand effect. **Tier required:** common (50 pts), uncommon (100 pts), rare (200 pts), or veryrare (400 pts). Burn, freeze, teleport, gas, sheep, and more! |
+| **!doublepoints** \<minutes\> | **Streamer only.** 2× points for N minutes (max 120). Example: `!doublepoints 5` |
 
 ---
 
@@ -39,4 +42,4 @@ Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also g
 
 ---
 
-*Prices can be changed at any time by the streamer but are correct for the most part.*
+*Costs are configurable by the streamer (points config / overlay).*
