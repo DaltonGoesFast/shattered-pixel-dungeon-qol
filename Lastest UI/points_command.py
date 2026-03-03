@@ -4,9 +4,11 @@ Unified points command script for Streamer.bot.
 Usage:
   spawn:    python points_command.py spawn <monster> <username>
   gold:     python points_command.py gold <amount> <username>
-  curse:    python points_command.py curse <slot> <username>
+  curse:    python points_command.py curse <username>  (picks random slot)
   gas:      python points_command.py gas <username>
   scroll:   python points_command.py scroll <username>
+  buff:     python points_command.py buff <username>
+  debuff:   python points_command.py debuff <username>
   wand:     python points_command.py wand <common|uncommon|rare|veryrare> <username>  (tier required)
   superchat: python points_command.py superchat <microAmount> <currencyCode> <username>
   cheer:    python points_command.py cheer <bits> <username>
@@ -18,6 +20,8 @@ import urllib.request
 import json
 import os
 import time
+import random
+import datetime
 from contextlib import contextmanager
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -51,6 +55,8 @@ def load_config():
         "cost_per_curse": 200,
         "cost_per_gas": 75,
         "cost_per_scroll": 100,
+        "cost_per_buff": 75,
+        "cost_per_debuff": 50,
         "cost_per_wand_common": 50,
         "cost_per_wand_uncommon": 100,
         "cost_per_wand_rare": 200,
@@ -80,6 +86,8 @@ def load_config():
             "cost_per_curse": int(cfg.get("cost_per_curse", defaults["cost_per_curse"])),
             "cost_per_gas": int(cfg.get("cost_per_gas", defaults["cost_per_gas"])),
             "cost_per_scroll": int(cfg.get("cost_per_scroll", defaults["cost_per_scroll"])),
+            "cost_per_buff": int(cfg.get("cost_per_buff", defaults["cost_per_buff"])),
+            "cost_per_debuff": int(cfg.get("cost_per_debuff", defaults["cost_per_debuff"])),
             "cost_per_wand_common": int(cfg.get("cost_per_wand_common", defaults["cost_per_wand_common"])),
             "cost_per_wand_uncommon": int(cfg.get("cost_per_wand_uncommon", defaults["cost_per_wand_uncommon"])),
             "cost_per_wand_rare": int(cfg.get("cost_per_wand_rare", defaults["cost_per_wand_rare"])),
@@ -260,9 +268,11 @@ def cmd_gold(args):
     if len(args) < 2:
         return SPAWN_RESULT_FILE, "Usage: !gold <amount> (e.g. !gold 10)"
     try:
-        amount = max(1, min(100, int(args[0])))
+        amount = int(args[0])
     except ValueError:
         return SPAWN_RESULT_FILE, "Usage: !gold <amount> (e.g. !gold 10). Amount must be 1-100."
+    if amount < 1 or amount > 100:
+        return SPAWN_RESULT_FILE, "Amount must be 1-100. Example: !gold 10"
     username = args[1]
 
     cost = amount * get_config()["cost_per_gold"]
@@ -303,21 +313,25 @@ def cmd_gold(args):
             pts -= cost
             data[key] = (pts, last)
             write_points(data)
-            return SPAWN_RESULT_FILE, "ok"
+            return SPAWN_RESULT_FILE, f"ok|{amount}"
     except TimeoutError:
         return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+
+
+def _curse_error_retryable(err):
+    """True if curse failed due to empty slot or already cursed — try another slot."""
+    if not err:
+        return False
+    err_lower = err.lower()
+    return "no item in" in err_lower or "already cursed" in err_lower
 
 
 def cmd_curse(args):
     if is_spend_disabled():
         return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
-    if len(args) < 2:
-        return SPAWN_RESULT_FILE, f"Usage: !curse <slot>. Options: {SLOT_HELP}. Example: !curse weapon"
-    slot_raw = args[0].lower()
-    slot = SLOT_ALIASES.get(slot_raw, slot_raw)
-    username = args[1]
-    if slot not in VALID_SLOTS:
-        return SPAWN_RESULT_FILE, f"Unknown slot \"{args[0]}\". Options: {SLOT_HELP}"
+    if len(args) < 1:
+        return SPAWN_RESULT_FILE, "Usage: !curse (curses a random equipped item)"
+    username = args[0]
 
     cost = get_config()["cost_per_curse"]
     key = username.lower()
@@ -329,36 +343,45 @@ def cmd_curse(args):
                 return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to curse, you have {pts}."
 
             url = "http://127.0.0.1:5000/api/curse-command"
-            payload = {"slot": slot, "username": username}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-            req.add_header("Content-Type", "application/json")
+            slots_left = list(VALID_SLOTS)
+            last_error = None
 
-            try:
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    raw = resp.read().decode("utf-8", errors="replace")
-                    if not raw.strip():
-                        return SPAWN_RESULT_FILE, "Curse failed (empty response from server)"
-                    try:
-                        body = json.loads(raw)
-                    except json.JSONDecodeError:
-                        return SPAWN_RESULT_FILE, "Curse failed (server error). Is the overlay running?"
-                    if not body.get("ok"):
-                        return SPAWN_RESULT_FILE, body.get("error", "Curse failed")
-            except urllib.error.HTTPError as e:
-                return SPAWN_RESULT_FILE, _http_error_msg(
-                    e, "Curse timed out. Is the game running and in an active run?"
-                )
-            except urllib.error.URLError as e:
-                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
-            except Exception as e:
-                msg = str(e).strip() if e else ""
-                return SPAWN_RESULT_FILE, "Curse failed. " + (msg if msg else "Check overlay server and try again.")
+            while slots_left:
+                slot = random.choice(slots_left)
+                payload = {"slot": slot, "username": username}
+                req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+                req.add_header("Content-Type", "application/json")
 
-            pts -= cost
-            data[key] = (pts, last)
-            write_points(data)
-            item_name = body.get("item_name", slot)
-            return SPAWN_RESULT_FILE, f"ok|{item_name}"
+                try:
+                    with urllib.request.urlopen(req, timeout=15) as resp:
+                        raw = resp.read().decode("utf-8", errors="replace")
+                        if not raw.strip():
+                            return SPAWN_RESULT_FILE, "Curse failed (empty response from server)"
+                        try:
+                            body = json.loads(raw)
+                        except json.JSONDecodeError:
+                            return SPAWN_RESULT_FILE, "Curse failed (server error). Is the overlay running?"
+                        if body.get("ok"):
+                            pts -= cost
+                            data[key] = (pts, last)
+                            write_points(data)
+                            item_name = body.get("item_name", slot)
+                            return SPAWN_RESULT_FILE, f"ok|{item_name}"
+                        last_error = body.get("error", "Curse failed")
+                        if not _curse_error_retryable(last_error):
+                            return SPAWN_RESULT_FILE, last_error
+                        slots_left.remove(slot)
+                except urllib.error.HTTPError as e:
+                    return SPAWN_RESULT_FILE, _http_error_msg(
+                        e, "Curse timed out. Is the game running and in an active run?"
+                    )
+                except urllib.error.URLError as e:
+                    return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
+                except Exception as e:
+                    msg = str(e).strip() if e else ""
+                    return SPAWN_RESULT_FILE, "Curse failed. " + (msg if msg else "Check overlay server and try again.")
+
+            return SPAWN_RESULT_FILE, last_error or "No curseable item in any slot (all empty or already cursed)"
     except TimeoutError:
         return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
@@ -459,6 +482,108 @@ def cmd_scroll(args):
             write_points(data)
             scroll_name = body.get("scroll_name", "scroll")
             return SPAWN_RESULT_FILE, f"ok|{scroll_name}"
+    except TimeoutError:
+        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+
+
+def cmd_buff(args):
+    if is_spend_disabled():
+        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
+    if len(args) < 1:
+        return SPAWN_RESULT_FILE, "Usage: !buff (gives a random buff)"
+    username = args[0]
+
+    cost = get_config()["cost_per_buff"]
+    key = username.lower()
+    try:
+        with points_lock():
+            data = read_points()
+            pts, last = data.get(key, (0, 0))
+            if pts < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} for random buff, you have {pts}."
+
+            url = "http://127.0.0.1:5000/api/buff-command"
+            payload = {"username": username}
+            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+            req.add_header("Content-Type", "application/json")
+
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    raw = resp.read().decode("utf-8", errors="replace")
+                    if not raw.strip():
+                        return SPAWN_RESULT_FILE, "Buff command failed (empty response from server)"
+                    try:
+                        body = json.loads(raw)
+                    except json.JSONDecodeError:
+                        return SPAWN_RESULT_FILE, "Buff command failed (server error). Is the overlay running?"
+                    if not body.get("ok"):
+                        return SPAWN_RESULT_FILE, body.get("error", "Buff command failed")
+            except urllib.error.HTTPError as e:
+                return SPAWN_RESULT_FILE, _http_error_msg(
+                    e, "Buff command timed out. Is the game running and in an active run?"
+                )
+            except urllib.error.URLError as e:
+                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
+            except Exception as e:
+                msg = str(e).strip() if e else ""
+                return SPAWN_RESULT_FILE, "Buff command failed. " + (msg if msg else "Check overlay server and try again.")
+
+            pts -= cost
+            data[key] = (pts, last)
+            write_points(data)
+            buff_name = body.get("buff_name", "buff")
+            return SPAWN_RESULT_FILE, f"ok|{buff_name}"
+    except TimeoutError:
+        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+
+
+def cmd_debuff(args):
+    if is_spend_disabled():
+        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
+    if len(args) < 1:
+        return SPAWN_RESULT_FILE, "Usage: !debuff (gives a random debuff)"
+    username = args[0]
+
+    cost = get_config()["cost_per_debuff"]
+    key = username.lower()
+    try:
+        with points_lock():
+            data = read_points()
+            pts, last = data.get(key, (0, 0))
+            if pts < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} for random debuff, you have {pts}."
+
+            url = "http://127.0.0.1:5000/api/debuff-command"
+            payload = {"username": username}
+            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+            req.add_header("Content-Type", "application/json")
+
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    raw = resp.read().decode("utf-8", errors="replace")
+                    if not raw.strip():
+                        return SPAWN_RESULT_FILE, "Debuff command failed (empty response from server)"
+                    try:
+                        body = json.loads(raw)
+                    except json.JSONDecodeError:
+                        return SPAWN_RESULT_FILE, "Debuff command failed (server error). Is the overlay running?"
+                    if not body.get("ok"):
+                        return SPAWN_RESULT_FILE, body.get("error", "Debuff command failed")
+            except urllib.error.HTTPError as e:
+                return SPAWN_RESULT_FILE, _http_error_msg(
+                    e, "Debuff command timed out. Is the game running and in an active run?"
+                )
+            except urllib.error.URLError as e:
+                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
+            except Exception as e:
+                msg = str(e).strip() if e else ""
+                return SPAWN_RESULT_FILE, "Debuff command failed. " + (msg if msg else "Check overlay server and try again.")
+
+            pts -= cost
+            data[key] = (pts, last)
+            write_points(data)
+            debuff_name = body.get("debuff_name", "debuff")
+            return SPAWN_RESULT_FILE, f"ok|{debuff_name}"
     except TimeoutError:
         return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
@@ -572,14 +697,18 @@ def fetch_usd_rate(currency_code: str) -> float:
 
 
 def cmd_superchat(args):
-    if len(args) < 4:
+    # args: [microAmount, currencyCode, userName] from Streamer.bot Super Chat trigger
+    if os.environ.get("DEBUG_SUPERCHAT") or os.path.exists(os.path.join(SCRIPT_DIR, "superchat_debug.txt")):
+        with open(os.path.join(SCRIPT_DIR, "superchat_debug.log"), "a", encoding="utf-8") as f:
+            f.write(f"{datetime.datetime.now().isoformat()} args={args!r} len={len(args)}\n")
+    if len(args) < 3:
         return DONATION_RESULT_FILE, "invalid|0"
     try:
-        micro_amount = int(args[1])
-        currency = args[2].upper()[:3] or "USD"
+        micro_amount = int(args[0])
+        currency = (args[1] or "USD").upper()[:3]
     except (ValueError, IndexError):
         return DONATION_RESULT_FILE, "invalid|0"
-    username = args[3]
+    username = args[2]
     if not username or username.lower() == "anonymous":
         return DONATION_RESULT_FILE, "skip|0"
 
@@ -635,6 +764,8 @@ COMMANDS = {
     "curse": cmd_curse,
     "gas": cmd_gas,
     "scroll": cmd_scroll,
+    "buff": cmd_buff,
+    "debuff": cmd_debuff,
     "wand": cmd_wand,
     "superchat": cmd_superchat,
     "cheer": cmd_cheer,
@@ -645,7 +776,7 @@ def main():
     args = [a.strip() for a in sys.argv[1:] if a.strip()]
     if len(args) < 1:
         with open(SPAWN_RESULT_FILE, "w", encoding="utf-8") as f:
-            f.write("Usage: points_command.py <spawn|gold|curse|gas|scroll|wand|superchat|cheer> [args...]")
+            f.write("Usage: points_command.py <spawn|gold|curse|gas|scroll|buff|debuff|wand|superchat|cheer> [args...]")
         sys.exit(0)
 
     cmd = args[0].lower()

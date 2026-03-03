@@ -25,7 +25,9 @@ Before implementing, ensure:
 7. Action 3c (!curse) — spend points to curse equipped item
 8. Action 3d (!gas) — spend points to spawn random gas
 9. Action 3e (!scroll) — spend points to use a random scroll (like +10 Unstable Spellbook)
-10. Action 3f (!wand) — spend points to trigger a random cursed wand effect (cost varies by rarity)
+10. Action 3e1 (!buff) — spend points to apply a random buff (Haste, Healing, Barrier, etc.)
+11. Action 3e2 (!debuff) — spend points to apply a random debuff (Blindness, Slow, Roots, etc.)
+12. Action 3f (!wand) — spend points to trigger a random cursed wand effect (cost varies by rarity)
 11. Action 1b (Passive earn) — optional, for viewers already in file
 12. Action 4 (!doublepoints) — optional, 2x points for N minutes
 13. Action 4a (Spend OFF / Spend ON) — optional, Stream Deck switch to disable/enable spend commands
@@ -36,12 +38,48 @@ Before implementing, ensure:
 
 ## YouTube Support
 
-- **Commands (!spawn, !gold, !curse, !gas, !scroll, !wand, !points, !toppoints):** When creating the command, enable **YouTube Message** as a source (in addition to or instead of Twitch Message).
+- **Commands (!spawn, !gold, !curse, !gas, !scroll, !buff, !debuff, !wand, !points, !toppoints):** When creating the command, enable **both Twitch and YouTube** as sources so one action handles both platforms.
 - **Earn Points (message):** Add **Message Received** from YouTube → Triggers to the same action, or create a duplicate action with the YouTube trigger.
 - **Earn Points (passive):** Add **Present Viewers** from YouTube → Triggers (YouTube uses chat-activity threshold; no live viewer list).
-- **Response messages:** Use conditionals: `if ("%commandSource%" Equals "youtube")` → YouTube Message; `if ("%commandSource%" Equals "twitch")` → Twitch Message. Or duplicate the message sub-action for each platform.
+- **Response messages:** Use the **commandSource pattern** below so a single action sends to the correct chat.
 
 The `userName` variable works for both platforms.
+
+---
+
+## Response Messages: commandSource Pattern (Twitch + YouTube)
+
+Use **one action per command** that works for both Twitch and YouTube. After checking the result (e.g. `%spawnResult%`), nest **platform checks** so the message goes to the correct chat:
+
+**Structure for each spend command:**
+```
+1. Run a Program (points_command.py ...)
+2. Execute C# Code (reads spawn_result.txt, sets %spawnResult% and any extra vars)
+3. Conditional: if ("%spawnResult%" Equals "ok")
+   - True branch (success):
+     - if ("%commandSource%" Equals (Ignore Case) "youtube") → True: YouTube Message (success text)
+     - if ("%commandSource%" Equals (Ignore Case) "twitch")  → True: Twitch Message (success text)
+     - Leave False Result EMPTY for both platform checks
+   - False branch (error):
+     - if ("%commandSource%" Equals (Ignore Case) "youtube") → True: YouTube Message (%spawnResult%)
+     - if ("%commandSource%" Equals (Ignore Case) "twitch")  → True: Twitch Message (%spawnResult%)
+     - Leave False Result EMPTY for both platform checks
+```
+
+**Important:** The **False Result** of each `commandSource` conditional must have **no sub-actions**. Only the **True Result** sends a message.
+
+**Quick reference — success messages by command:**
+
+| Command | Success Message |
+|---------|-----------------|
+| !spawn | `%userName% spawned a %rawInput%!` |
+| !gold | `%userName% dropped %goldAmount% gold!` |
+| !curse | `%userName% cursed your %curseItemName%!` |
+| !gas | `%userName% spewed %gasName%!` |
+| !scroll | `%userName% used a random scroll: %scrollName%!` |
+| !buff | `%userName% gave you %buffName%!` |
+| !debuff | `%userName% afflicted you with %debuffName%!` |
+| !wand | `%userName% triggered a cursed wand effect: %wandEffectName%!` |
 
 ---
 
@@ -449,7 +487,7 @@ Edit `FIRST_WORDS_BONUS` to change the amount (default 5).
 
 ## Action 2: Check Points (!points)
 
-**Trigger:** Command Triggered → create command `!points`
+**Trigger:** Command Triggered → create command `!points` (enable **both Twitch and YouTube** as sources)
 
 **Sub-Actions (in order):**
 
@@ -503,15 +541,16 @@ public class CPHInline
 }
 ```
 
-2. **Response message:** Use `%commandSource%` to branch:
-   - If `youtube` → YouTube Message: `%userName%, you have %userPoints% points. Spawn costs vary by monster (5–80).`
-   - If `twitch` → Twitch Message: same text
+2. **Response message:** Use commandSource pattern:
+   - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName%, you have %userPoints% points. Spawn costs vary by monster (5–80).`
+   - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: same text
+   - Leave **False Result** empty for both.
 
 ---
 
 ## Action 2b: Top Points (!toppoints)
 
-**Trigger:** Command Triggered → create command `!toppoints` (or `!leaderboard`)
+**Trigger:** Command Triggered → create command `!toppoints` (or `!leaderboard`) (enable **both Twitch and YouTube** as sources)
 
 **Sub-Actions (in order):**
 
@@ -565,7 +604,10 @@ public class CPHInline
 }
 ```
 
-2. **Response message:** Twitch/YouTube Message: `%topPointsResult%`
+2. **Response message:** Use commandSource pattern:
+   - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%topPointsResult%`
+   - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%topPointsResult%`
+   - Leave **False Result** empty for both.
 
 **Example output:** `1. ViewerA (450 pts) | 2. ViewerB (320 pts) | 3. ViewerC (180 pts)`
 
@@ -573,19 +615,54 @@ public class CPHInline
 
 ## Action 3: Spawn Monster (with points)
 
-**Trigger:** Command Triggered → `!spawn`
+**Trigger:** Command Triggered → `!spawn` (enable **both Twitch and YouTube** as sources)
 
 **Sub-Actions (in order):**
 
 1. **Run a Program**
    - **Target:** `python` (or full path to `python.exe`)
    - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" spawn %rawInput% %userName%`
+   - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
    - **Wait maximum:** `10` seconds
    - **Note:** Use `%rawInput%` for the monster name (text after `!spawn`). If that's empty, try `%input1%` depending on your Streamer.bot version.
 
-2. **Conditional:** `if ("%output1%" Equals "ok")`
-   - **True branch:** Branch by `%commandSource%` → YouTube Message or Twitch Message: `Spawned!`
-   - **False branch:** Branch by `%commandSource%` → YouTube Message or Twitch Message: `%output1%` (shows error: no points, no space, etc.)
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`:
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string RESULT_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spawn_result.txt";
+
+    public bool Execute()
+    {
+        string result = "Spawn failed (no result file - is overlay server running?)";
+        try
+        {
+            if (File.Exists(RESULT_FILE))
+            {
+                result = File.ReadAllText(RESULT_FILE).Trim();
+                File.Delete(RESULT_FILE);
+            }
+        }
+        catch (Exception ex) { result = ex.Message; }
+        CPH.SetArgument("spawnResult", result);
+        return true;
+    }
+}
+```
+
+3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
+   - **True branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% spawned a %rawInput%!`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% spawned a %rawInput%!`
+     - Leave **False Result** empty for both.
+   - **False branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+     - Leave **False Result** empty for both.
 
 The `points_command.py` script checks points, attempts the spawn, and **only deducts points if the spawn succeeds**. If there's no free space (hero surrounded), points are not wasted.
 
@@ -604,47 +681,89 @@ The `points_command.py` script checks points, attempts the spawn, and **only ded
 
 ## Action 3b: Drop Gold (with points)
 
-**Trigger:** Command Triggered → `!gold`
+**Trigger:** Command Triggered → `!gold` (enable **both Twitch and YouTube** as sources)
 
-**Usage:** `!gold <amount>` (e.g. `!gold 10`). Amount 1–100 required.
+**Usage:** `!gold <amount>` (e.g. `!gold 10`). Amount 1–100 required. Invalid amounts (0, negative, >100) are rejected.
 
 **Sub-Actions (in order):**
 
 1. **Run a Program**
    - **Target:** `python` (or full path to `python.exe`)
    - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" gold %rawInput% %userName%`
+   - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
    - **Wait maximum:** `10` seconds
    - **Note:** `%rawInput%` = amount (required). `%userName%` = who ran the command.
 
-2. **Execute C# Code** (reads result from file — use this; `%output1%` often doesn't work):
-   - Same C# as Action 3 File Bridge — reads `spawn_result.txt` and sets `%spawnResult%`
+2. **Execute C# Code** (Inline) — reads `spawn_result.txt`, sets `%spawnResult%` and `%goldAmount%`:
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string RESULT_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spawn_result.txt";
+
+    public bool Execute()
+    {
+        string result = "Gold failed (no result file - is overlay server running?)";
+        string goldAmount = "";
+        try
+        {
+            if (File.Exists(RESULT_FILE))
+            {
+                result = File.ReadAllText(RESULT_FILE).Trim();
+                File.Delete(RESULT_FILE);
+                if (string.IsNullOrEmpty(result)) result = "Gold failed (empty response)";
+                int pipe = result.IndexOf('|');
+                if (pipe >= 0)
+                {
+                    goldAmount = result.Substring(pipe + 1).Trim();
+                    result = result.Substring(0, pipe).Trim();
+                }
+            }
+        }
+        catch (Exception ex) { result = ex.Message ?? "Gold failed"; }
+        CPH.SetArgument("spawnResult", result);
+        CPH.SetArgument("goldAmount", goldAmount);
+        return true;
+    }
+}
+```
 
 3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
-   - **True branch:** Twitch/YouTube Message: `%userName% dropped %rawInput% gold!`
-   - **False branch:** Twitch/YouTube Message: `%spawnResult%` (shows error)
+   - **True branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% dropped %goldAmount% gold!`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% dropped %goldAmount% gold!`
+     - Leave **False Result** empty for both.
+   - **False branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+     - Leave **False Result** empty for both.
 
-**Cost:** 2 points per gold (5 gold = 10 pts, 10 gold = 20 pts). Edit via points config.
+**Cost:** 5 points per gold by default (edit via points config). Amount 1–100; invalid amounts are rejected with a clear error.
 
-**Troubleshooting (504 timeout / %output1% shows literally):**
-- **Use the File Bridge:** Add the C# step that reads `spawn_result.txt` and sets `%spawnResult%`. Branch on `%spawnResult%` instead of `%output1%`.
+**Troubleshooting (504 timeout / "unknown error"):**
+- **Use the gold C# above** — it reads `spawn_result.txt`, sets `%spawnResult%` and `%goldAmount%`, and uses fallbacks so you never get empty/unknown errors.
+- **Set Working Directory** — the Run a Program step must have Working Directory = `Lastest UI` so the script finds its files.
 - **504 timeout:** The game didn't respond in time. Ensure the game is running, in an active run (not title screen), and streaming is enabled. Does `!spawn` work? If spawn works, gold should too.
 
 ---
 
 ## Action 3c: Curse Item (with points)
 
-**Trigger:** Command Triggered → `!curse`
+**Trigger:** Command Triggered → `!curse` (enable **both Twitch and YouTube** as sources)
 
-**Usage:** `!curse <slot>` (e.g. `!curse weapon`). Slots: **weapon**, **armor**, **ring**, **artifact**, **misc** (middle equipment slot). Aliases: `trinket` or `middle` → misc.
+**Usage:** `!curse` — curses a **random** equipped item (weapon, armor, ring, artifact, or misc). No slot needed.
 
 **Sub-Actions (in order):**
 
 1. **Run a Program**
    - **Target:** `python`
-   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" curse %rawInput% %userName%`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" curse %userName%`
    - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
    - **Wait maximum:** `10` seconds
-   - **Note:** `%rawInput%` = slot (weapon, armor, ring, artifact, misc). `%userName%` = who ran the command.
+   - **Note:** No slot argument — the script picks a random equipped slot (weapon, armor, ring, artifact, misc).
 
 2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%` and `%curseItemName%` (item name on success):
 
@@ -677,27 +796,32 @@ public class CPHInline
         catch (Exception ex) { result = ex.Message; }
         CPH.SetArgument("spawnResult", result);
         CPH.SetArgument("curseItemName", itemName);
-        CPH.SetArgument("gasName", itemName);  // same field used for gas command
         return true;
     }
 }
 ```
 
 3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
-   - **True branch:** Twitch/YouTube Message: `%userName% cursed your %curseItemName%!`
-   - **False branch:** Twitch/YouTube Message: `%spawnResult%` (shows error)
+   - **True branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% cursed your %curseItemName%!`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% cursed your %curseItemName%!`
+     - Leave **False Result** empty for both.
+   - **False branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+     - Leave **False Result** empty for both.
 
 **Cost:** 200 points per curse (edit via points config).
 
 **Add to the same blocking queue** as spawn, gold, and earn actions.
 
-**Fails when:** No item in that slot, or item is already cursed.
+**Fails when:** No curseable item in any slot — the script tries each slot (random order) and retries if a slot is empty or already cursed. Only fails if all 5 slots are empty or already cursed.
 
 ---
 
 ## Action 3d: Spawn Random Gas (with points)
 
-**Trigger:** Command Triggered → `!gas`
+**Trigger:** Command Triggered → `!gas` (enable **both Twitch and YouTube** as sources)
 
 **Usage:** `!gas` — spawns random gas (Chaotic Censer at level +3). Toxic, confusion, regrowth, storm clouds, smoke, stench, inferno, blizzard, or corrosive gas.
 
@@ -746,8 +870,14 @@ public class CPHInline
 ```
 
 3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
-   - **True branch:** Twitch/YouTube Message: `%userName% spewed %gasName%!`
-   - **False branch:** Twitch/YouTube Message: `%spawnResult%` (shows error)
+   - **True branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% spewed %gasName%!`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% spewed %gasName%!`
+     - Leave **False Result** empty for both.
+   - **False branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+     - Leave **False Result** empty for both.
 
 **Cost:** 75 points (edit via points config).
 
@@ -759,7 +889,7 @@ public class CPHInline
 
 ## Action 3e: Random Scroll (with points)
 
-**Trigger:** Command Triggered → `!scroll`
+**Trigger:** Command Triggered → `!scroll` (enable **both Twitch and YouTube** as sources)
 
 **Usage:** `!scroll` — uses a random scroll like activating a +10 Unstable Spellbook. Picks from the full scroll pool (excluding transmutation), 50% chance for exotic version. Identify, Remove Curse, and Magic Mapping are half as likely.
 
@@ -808,14 +938,154 @@ public class CPHInline
 ```
 
 3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
-   - **True branch:** Twitch/YouTube Message: `%userName% used a random scroll: %scrollName%!`
-   - **False branch:** Twitch/YouTube Message: `%spawnResult%` (shows error)
+   - **True branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% used a random scroll: %scrollName%!`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% used a random scroll: %scrollName%!`
+     - Leave **False Result** empty for both.
+   - **False branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+     - Leave **False Result** empty for both.
 
 **Cost:** 100 points (edit via points config).
 
 **Add to the same blocking queue** as spawn, gold, curse, gas, and earn actions.
 
 **Fails when:** Not in an active run, hero dead, magic immune, or blinded.
+
+---
+
+## Action 3e1: Random Buff (with points)
+
+**Trigger:** Command Triggered → `!buff` (enable **both Twitch and YouTube** as sources)
+
+**Usage:** `!buff` — applies a random buff to the hero. Picks from: Haste, Adrenaline, Invisibility, Levitation, Barrier (10% HP shield), Healing (10% HP over 10 turns), Recharging, MindVision. Excludes Paralysis, Burning, Poison, Awareness.
+
+**Sub-Actions (in order):**
+
+1. **Run a Program**
+   - **Target:** `python`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" buff %userName%`
+   - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait maximum:** `10` seconds
+
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%` and `%buffName%`:
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string RESULT_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spawn_result.txt";
+
+    public bool Execute()
+    {
+        string result = "No result file - is overlay server running?";
+        string itemName = "";
+        try
+        {
+            if (File.Exists(RESULT_FILE))
+            {
+                result = File.ReadAllText(RESULT_FILE).Trim();
+                File.Delete(RESULT_FILE);
+                int pipe = result.IndexOf('|');
+                if (pipe >= 0)
+                {
+                    itemName = result.Substring(pipe + 1).Trim();
+                    result = result.Substring(0, pipe).Trim();
+                }
+            }
+        }
+        catch (Exception ex) { result = ex.Message; }
+        CPH.SetArgument("spawnResult", result);
+        CPH.SetArgument("buffName", itemName);
+        return true;
+    }
+}
+```
+
+3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
+   - **True branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% gave you %buffName%!`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% gave you %buffName%!`
+     - Leave **False Result** empty for both.
+   - **False branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+     - Leave **False Result** empty for both.
+
+**Cost:** 75 points (edit via points config).
+
+**Add to the same blocking queue** as spawn, gold, curse, gas, scroll, and earn actions.
+
+---
+
+## Action 3e2: Random Debuff (with points)
+
+**Trigger:** Command Triggered → `!debuff` (enable **both Twitch and YouTube** as sources)
+
+**Usage:** `!debuff` — applies a random debuff to the hero. Picks from: Blindness, Weakness, Slow, Cripple, Roots, Daze, Vulnerable. Excludes Paralysis, Burning, Poison. Roots is skipped if the hero is flying.
+
+**Sub-Actions (in order):**
+
+1. **Run a Program**
+   - **Target:** `python`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" debuff %userName%`
+   - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait maximum:** `10` seconds
+
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%` and `%debuffName%`:
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string RESULT_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spawn_result.txt";
+
+    public bool Execute()
+    {
+        string result = "No result file - is overlay server running?";
+        string itemName = "";
+        try
+        {
+            if (File.Exists(RESULT_FILE))
+            {
+                result = File.ReadAllText(RESULT_FILE).Trim();
+                File.Delete(RESULT_FILE);
+                int pipe = result.IndexOf('|');
+                if (pipe >= 0)
+                {
+                    itemName = result.Substring(pipe + 1).Trim();
+                    result = result.Substring(0, pipe).Trim();
+                }
+            }
+        }
+        catch (Exception ex) { result = ex.Message; }
+        CPH.SetArgument("spawnResult", result);
+        CPH.SetArgument("debuffName", itemName);
+        return true;
+    }
+}
+```
+
+3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
+   - **True branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% afflicted you with %debuffName%!`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% afflicted you with %debuffName%!`
+     - Leave **False Result** empty for both.
+   - **False branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+     - Leave **False Result** empty for both.
+
+**Cost:** 50 points (edit via points config).
+
+**Add to the same blocking queue** as spawn, gold, curse, gas, scroll, buff, and earn actions.
+
+---
 
 **Troubleshooting ("No result file - is overlay server running?"):**
 - **Quotations:** The script path in Arguments **must be in quotes** (e.g. `"C:\...\points_command.py"`) — paths with spaces (like `My Games`) break without them.
@@ -828,7 +1098,7 @@ public class CPHInline
 
 ## Action 3f: Cursed Wand Effect (with points)
 
-**Trigger:** Command Triggered → `!wand`
+**Trigger:** Command Triggered → `!wand` (enable **both Twitch and YouTube** as sources)
 
 **Usage:** `!wand <tier>` — tier is required. Triggers a cursed wand effect from that rarity.
 - `!wand common` — common only (50 pts)
@@ -885,8 +1155,14 @@ public class CPHInline
 ```
 
 3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
-   - **True branch:** Twitch/YouTube Message: `%userName% triggered a cursed wand effect: %wandEffectName%!`
-   - **False branch:** Twitch/YouTube Message: `%spawnResult%` (shows error)
+   - **True branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% triggered a cursed wand effect: %wandEffectName%!`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% triggered a cursed wand effect: %wandEffectName%!`
+     - Leave **False Result** empty for both.
+   - **False branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+     - Leave **False Result** empty for both.
 
 **Cost:** 50 (common) / 100 (uncommon) / 200 (rare) / 400 (very rare). Edit via points config.
 
@@ -940,9 +1216,9 @@ public class CPHInline
 }
 ```
 
-3. **If** `%spawnResult%` Equals `ok`
-   - **True:** Twitch/YouTube Message: `%userName% has spawned %rawInput%`
-   - **False:** Twitch/YouTube Message: `%spawnResult%`
+3. **Conditional:** `if ("%spawnResult%" Equals "ok")` — use the commandSource pattern (see above):
+   - **True:** `if (commandSource == youtube)` → YouTube Message; `if (commandSource == twitch)` → Twitch Message: `%userName% spawned a %rawInput%!`
+   - **False:** `if (commandSource == youtube)` → YouTube Message; `if (commandSource == twitch)` → Twitch Message: `%spawnResult%`
 
 **Note:** The `points_command.py` script writes to `spawn_result.txt` (or `donation_result.txt` for Super Chat/Cheer).
 
@@ -1068,16 +1344,25 @@ public class CPHInline
 
 **Add both actions to your points queue** (same blocking queue as earn/spend) to avoid race conditions.
 
-### YouTube Super Chat
+### YouTube Super Chat (Setup from Scratch)
 
-**Trigger:** YouTube → Triggers → Super Chat
+1. **Create a new action** (e.g. "Super Chat Points").
+2. **Add trigger:** YouTube → Triggers → **Super Chat**.
+3. **Add sub-action:** Run Program
+   - **Program:** `python` (or full path to `python.exe`, e.g. `C:\Python313\python.exe`)
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" superchat %microAmount% %currencyCode% %userName%`
+   - **Working directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+4. **Add this action to your points queue** (same queue as earn/spend).
 
-**Sub-Action:** Run Program
-- **Program:** `python` (or full path to `python.exe`)
-- **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" superchat %microAmount% %currencyCode% %userName%`
-- **Working directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+**Streamer.bot Super Chat variables:** `%microAmount%` (e.g. 1000000 = $1), `%currencyCode%` (e.g. USD), `%userName%` (login) or `%user%` (display name). If `%userName%` is empty for real Super Chats, try `%user%` instead in the Arguments.
 
 **Optional:** Add a C# step to read `donation_result.txt` (format: `ok|150` = 150 points earned). Split by `|`, use second part for a thank-you message: `Thanks for the super chat! You earned %points% points!`
+
+#### Troubleshooting: Test Trigger works, real Super Chats don't
+
+- **YouTube platform:** Ensure YouTube is connected in Streamer.bot (Settings → Platforms → YouTube). Reconnect if needed.
+- **Variable names:** If `%userName%` is empty for real events, change the last argument to `%user%` (display name).
+- **Debug logging:** Create an empty file `superchat_debug.txt` in `Lastest UI`. The next Super Chat will append a log line to `superchat_debug.log` with the exact args received. Remove the file when done debugging.
 
 ### Twitch Cheer
 
@@ -1131,9 +1416,11 @@ public class CPHInline
 | **!toppoints** | `!toppoints` | Free | Show top 3 point holders. |
 | **!spawn** | `!spawn <monster>` | Varies by monster (5–80 pts) | Spawn a monster near the hero. Half price when spawned beyond its native biome. Valid monsters: rat, albino, snake, gnoll, crab, slime, swarm, thief, skeleton, bat, brute, shaman, spinner, dm100, guard, necromancer, ghoul, elemental, warlock, monk, golem, succubus, eye, scorpio. |
 | **!gold** | `!gold <amount>` | 2 pts per gold | Drop gold near the hero. Amount 1–100 required (e.g. `!gold 10` = 20 pts). |
-| **!curse** | `!curse <slot>` | 200 pts | Curse an equipped item. Slots: **weapon**, **armor**, **ring**, **artifact**, **misc** (or trinket/middle). |
+| **!curse** | `!curse` | 200 pts | Curse a **random** equipped item (weapon, armor, ring, artifact, or misc). |
 | **!gas** | `!gas` | 75 pts | Spawn random gas (Chaotic Censer +3). Toxic, confusion, regrowth, storm clouds, smoke, stench, inferno, blizzard, or corrosive gas. |
 | **!scroll** | `!scroll` | 100 pts | Use a random scroll (like +10 Unstable Spellbook). 50% chance for exotic version. |
+| **!buff** | `!buff` | 75 pts | Apply a random buff (Haste, Healing, Barrier, Invisibility, etc.). Healing = 10% HP over 10 turns; Barrier = 10% HP shield. |
+| **!debuff** | `!debuff` | 50 pts | Apply a random debuff (Blindness, Slow, Roots, Daze, etc.). Excludes Paralysis, Burning, Poison. |
 | **!wand** | `!wand common` (tier required) | 50–400 pts | Trigger a cursed wand effect. Tier required: common, uncommon, rare, or veryrare. |
 | **!doublepoints** | `!doublepoints <minutes>` | — | **Streamer only.** 2× points for N minutes (max 120). `!doublepoints 5` for 5 min. |
 
@@ -1152,9 +1439,11 @@ public class CPHInline
 | Top Points  | !toppoints        | Show top 3 point holders in chat              |
 | Spawn Monster| !spawn           | Deduct points (cost varies by monster)       |
 | Drop Gold    | !gold <amount>  | Spend points to drop gold (2 pts/gold, amount required) |
-| Curse Item   | !curse <slot>  | Spend points to curse weapon, armor, ring, artifact, or misc (200 pts) |
+| Curse Item   | !curse         | Spend points to curse a random equipped item (200 pts) |
 | Spawn Gas    | !gas           | Spend points to spawn random gas (Chaotic Censer +3, 75 pts) |
 | Random Scroll | !scroll        | Spend points to use a random scroll (like +10 Unstable Spellbook, 100 pts) |
+| Random Buff   | !buff          | Spend points to apply a random buff (75 pts, e.g. Haste, Healing, Barrier) |
+| Random Debuff | !debuff        | Spend points to apply a random debuff (50 pts, e.g. Blindness, Slow, Roots) |
 | Cursed Wand   | !wand          | Spend points to trigger a random cursed wand effect (50–400 pts by rarity) |
 | Super Chat Points | YouTube Super Chat | 1 pt per $0.01 (currency converted via Frankfurter API) |
 | Cheer Points | Twitch Cheer | 1 pt per bit (100 bits = $1 = 100 pts) |
@@ -1176,26 +1465,8 @@ public class CPHInline
 
 ---
 
-## User-Facing Summary (paste in YouTube description / Twitch panels)
+## User-Facing Summary
 
-Copy the block below for your channel description or About panel:
-
-```
-CHAT COMMANDS — Spend points to mess with the run!
-
-Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also give points!
-
-COMMANDS:
-- !points — Check your balance
-- !toppoints / !leaderboard — Top 3 point holders
-- !spawn (monster) — Spawn a monster (cost varies). Half price when spawned beyond its native area (e.g. sewer mobs in prison+). Examples: !spawn rat, !spawn bat, !spawn scorpio
-- !gold (amount) — Drop gold near the hero (2 pts per gold, 1–100). Example: !gold 25
-- !curse (slot) — Curse equipped item (200 pts). Slots: weapon, armor, ring, artifact, misc
-- !gas — Spawn random gas (75 pts). Toxic, confusion, storm clouds, inferno, and more!
-- !scroll — Use a random scroll (100 pts). Like +10 Unstable Spellbook — 50% chance for exotic version!
-- !wand (tier) — Trigger a cursed wand effect. Tier required: common, uncommon, rare, or veryrare. Burn, freeze, teleport, gas, sheep, and more!
-
-Monster costs (base): rat 5 | albino/snake/gnoll 10 | crab/slime/swarm 15 | thief/skeleton/dm100 20 | guard/necromancer/spinner 25 | bat/brute 30 | shaman 35 | ghoul/elemental 40 | warlock 45 | monk/golem 50 | succubus 60 | eye 70 | scorpio 80
-
-Prices can be changed at any time by the streamer but are correct for the most part.
-```
+- **[youtube-description.md](youtube-description.md)** — Full YouTube description (channel assets, stream commands, Discord, chat commands)
+- **[user-facing-summary.md](user-facing-summary.md)** — Chat commands only (copy-paste block)
+- **[twitch-panel.md](twitch-panel.md)** — Formatted version for Twitch panels
