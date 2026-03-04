@@ -1,5 +1,7 @@
 @echo off
-cd /d "%~dp0"
+REM ====== EDIT THIS PATH to your Lastest UI folder (used when plugin runs from temp folder) ======
+set "OVERLAY_DIR=C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI"
+cd /d "%OVERLAY_DIR%"
 
 echo ================================================
 echo   SPD Overlay Server
@@ -11,7 +13,7 @@ if errorlevel 1 (
     echo ERROR: Python is not installed or not in PATH
     echo Please install Python from https://www.python.org/
     pause
-    exit /b 1
+    (del "%~f0") & exit /b 1
 )
 
 echo.
@@ -37,5 +39,4 @@ echo.
 python server.py
 
 pause
-
 (del "%~f0") & exit

@@ -124,7 +124,7 @@ def _game_ws_on_message(ws, message):
     try:
         data = json.loads(message)
         # Handle spawn/gold result (game reports success/failure)
-        if data.get('type') in ('spawn_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result'):
+        if data.get('type') in ('spawn_result', 'champion_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result', 'trap_result', 'transmute_result'):
             rid = data.get('request_id')
             ok = data.get('success', False)
             if rid:
@@ -133,6 +133,10 @@ def _game_ws_on_message(ws, message):
                         pending_spawns[rid]['success'] = ok
                         if data.get('type') in ('spawn_result', 'gold_result') and data.get('error'):
                             pending_spawns[rid]['error'] = data.get('error')
+                        if data.get('type') == 'champion_result' and data.get('error'):
+                            pending_spawns[rid]['error'] = data.get('error')
+                        if data.get('type') == 'champion_result' and data.get('monster'):
+                            pending_spawns[rid]['monster'] = data.get('monster')
                         if data.get('type') == 'curse_result' and data.get('item_name'):
                             pending_spawns[rid]['item_name'] = data.get('item_name')
                         if data.get('type') == 'curse_result' and data.get('error'):
@@ -158,6 +162,14 @@ def _game_ws_on_message(ws, message):
                         if data.get('type') == 'debuff_result' and data.get('debuff_name'):
                             pending_spawns[rid]['debuff_name'] = data.get('debuff_name')
                         if data.get('type') == 'debuff_result' and data.get('error'):
+                            pending_spawns[rid]['error'] = data.get('error')
+                        if data.get('type') == 'trap_result' and data.get('trap_name'):
+                            pending_spawns[rid]['trap_name'] = data.get('trap_name')
+                        if data.get('type') == 'trap_result' and data.get('error'):
+                            pending_spawns[rid]['error'] = data.get('error')
+                        if data.get('type') == 'transmute_result' and data.get('item_name'):
+                            pending_spawns[rid]['item_name'] = data.get('item_name')
+                        if data.get('type') == 'transmute_result' and data.get('error'):
                             pending_spawns[rid]['error'] = data.get('error')
                         pending_spawns[rid]['event'].set()
             print(f"Game {data.get('type')}: request_id={rid} success={ok}")
@@ -326,6 +338,12 @@ def points_config_page():
     return send_from_directory('.', 'points-config.html')
 
 
+@app.route('/ws-inspect')
+def ws_inspect_page():
+    """WebSocket JSON inspector (game data + cost config + viewer points)"""
+    return send_from_directory('.', 'ws-inspect.html')
+
+
 @app.route('/api/points-config', methods=['GET', 'POST', 'OPTIONS'])
 def points_config_api():
     """Get or save points config (costs for spawn, gold, curse, gas)."""
@@ -338,10 +356,14 @@ def points_config_api():
                     data = json.load(f)
             else:
                 data = {
-                    "cost_per_gold": 2,
+                    "cost_per_gold": 5,
                     "cost_per_curse": 200,
                     "cost_per_gas": 75,
                     "cost_per_scroll": 100,
+                    "cost_per_trap": 50,
+                    "cost_per_transmute": 150,
+                    "cost_per_buff": 75,
+                    "cost_per_debuff": 50,
                     "cost_per_wand_common": 50,
                     "cost_per_wand_uncommon": 100,
                     "cost_per_wand_rare": 200,
@@ -363,10 +385,14 @@ def points_config_api():
         data = request.get_json(force=True, silent=True) or {}
         # Validate and sanitize
         cfg = {
-            "cost_per_gold": max(1, int(data.get("cost_per_gold", 2))),
+            "cost_per_gold": max(1, int(data.get("cost_per_gold", 5))),
             "cost_per_curse": max(1, int(data.get("cost_per_curse", 200))),
             "cost_per_gas": max(1, int(data.get("cost_per_gas", 75))),
             "cost_per_scroll": max(1, int(data.get("cost_per_scroll", 100))),
+            "cost_per_trap": max(1, int(data.get("cost_per_trap", 50))),
+            "cost_per_transmute": max(1, int(data.get("cost_per_transmute", 150))),
+            "cost_per_buff": max(1, int(data.get("cost_per_buff", 75))),
+            "cost_per_debuff": max(1, int(data.get("cost_per_debuff", 50))),
             "cost_per_wand_common": max(1, int(data.get("cost_per_wand_common", 50))),
             "cost_per_wand_uncommon": max(1, int(data.get("cost_per_wand_uncommon", 100))),
             "cost_per_wand_rare": max(1, int(data.get("cost_per_wand_rare", 200))),
@@ -410,27 +436,32 @@ def _release_viewer_points_lock():
 
 @app.route('/api/viewer-points', methods=['GET', 'POST', 'OPTIONS'])
 def viewer_points_api():
-    """Get or update viewer points (username -> {points, last})."""
+    """Get or update viewer points (username -> {points, last}). Uses same lock file as C# and Python."""
     if request.method == 'OPTIONS':
         return '', 204
     if request.method == 'GET':
-        data = {}
-        if os.path.exists(VIEWER_POINTS_FILE):
-            try:
-                with open(VIEWER_POINTS_FILE, encoding='utf-8') as f:
-                    for line in f:
-                        parts = line.strip().split('|')
-                        if len(parts) >= 3:
-                            try:
-                                data[parts[0].lower()] = {
-                                    'points': int(parts[1]),
-                                    'last': int(parts[2]),
-                                }
-                            except ValueError:
-                                pass
-            except Exception as e:
-                return jsonify({"error": str(e)}), 500
-        return jsonify(data)
+        if not _acquire_viewer_points_lock():
+            return jsonify({"error": "Points file busy"}), 503
+        try:
+            data = {}
+            if os.path.exists(VIEWER_POINTS_FILE):
+                try:
+                    with open(VIEWER_POINTS_FILE, encoding='utf-8') as f:
+                        for line in f:
+                            parts = line.strip().split('|')
+                            if len(parts) >= 3:
+                                try:
+                                    data[parts[0].lower()] = {
+                                        'points': int(parts[1]),
+                                        'last': int(parts[2]),
+                                    }
+                                except ValueError:
+                                    pass
+                except Exception as e:
+                    return jsonify({"error": str(e)}), 500
+            return jsonify(data)
+        finally:
+            _release_viewer_points_lock()
     # POST - add or update a user's points
     try:
         body = request.get_json(force=True, silent=True) or {}
@@ -600,6 +631,62 @@ def spawn_command():
         return jsonify({'ok': False, 'error': err}), 200
     except Exception as e:
         print(f"Spawn 400 exception: {e} (data: {request.get_data(as_text=True)[:200]})")
+        return jsonify({'ok': False, 'error': str(e)}), 400
+
+
+@app.route('/api/champion-command', methods=['POST', 'OPTIONS'])
+def champion_command():
+    """Receive champion spawn command from Streamer.bot; forward to game via WebSocket. Cost is 2× base (no zone discount); overlay handles cost."""
+    global last_spawn_time
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        if not data and request.form:
+            data = request.form.to_dict()
+        monster = (data.get('monster') or '').strip().lower()
+        username = (data.get('username') or '').strip() or None
+        if not monster:
+            return jsonify({'ok': False, 'error': 'Missing monster'}), 400
+        if monster not in SPAWN_WHITELIST:
+            return jsonify({'ok': False, 'error': f'Unknown monster: {monster}'}), 400
+        if not game_ws_app:
+            return jsonify({'ok': False, 'error': 'Game not connected'}), 503
+        elapsed = time.time() - last_spawn_time
+        if elapsed < SPAWN_COOLDOWN_SEC:
+            return jsonify({
+                'ok': False, 'error': 'Cooldown active',
+                'retry_after': int(SPAWN_COOLDOWN_SEC - elapsed)
+            }), 429
+        request_id = str(uuid.uuid4())
+        ev = threading.Event()
+        with spawn_lock:
+            pending_spawns[request_id] = {'event': ev, 'success': False}
+        try:
+            payload = {'command': 'champion', 'monster': monster, 'request_id': request_id}
+            if username:
+                payload['username'] = username
+            game_ws_app.send(json.dumps(payload))
+        except Exception as e:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': str(e)}), 503
+        if ev.wait(timeout=SPAWN_RESULT_TIMEOUT):
+            with spawn_lock:
+                popped = pending_spawns.pop(request_id, {})
+                success = popped.get('success', False)
+                champion_error = popped.get('error')
+                champion_monster = popped.get('monster', monster)
+        else:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': 'Champion spawn timed out'}), 504
+        last_spawn_time = time.time()
+        if success:
+            return jsonify({'ok': True, 'monster': champion_monster})
+        err = champion_error or 'No space to spawn (hero surrounded or no valid tiles)'
+        return jsonify({'ok': False, 'error': err}), 200
+    except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 400
 
 
@@ -795,6 +882,98 @@ def scroll_command():
         return jsonify({'ok': False, 'error': err}), 200
     except Exception as e:
         print(f"Scroll 400 exception: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 400
+
+
+@app.route('/api/trap-command', methods=['POST', 'OPTIONS'])
+def trap_command():
+    """Receive trap command from Streamer.bot; forward to game via WebSocket."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        if not data and request.form:
+            data = request.form.to_dict()
+        username = (data.get('username') or '').strip() or None
+        if not game_ws_app:
+            return jsonify({'ok': False, 'error': 'Game not connected'}), 503
+        request_id = str(uuid.uuid4())
+        ev = threading.Event()
+        with spawn_lock:
+            pending_spawns[request_id] = {'event': ev, 'success': False}
+        try:
+            payload = {'command': 'trap', 'request_id': request_id}
+            if username:
+                payload['username'] = username
+            print(f"Trap send to game: request_id={request_id}")
+            game_ws_app.send(json.dumps(payload))
+        except Exception as e:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': str(e)}), 503
+        if ev.wait(timeout=SPAWN_RESULT_TIMEOUT):
+            with spawn_lock:
+                pending = pending_spawns.pop(request_id, {})
+                success = pending.get('success', False)
+                trap_name = pending.get('trap_name', '')
+                trap_error = pending.get('error')
+        else:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': 'Trap command timed out'}), 504
+        if success:
+            print(f"Trap OK: {trap_name} for {username}")
+            return jsonify({'ok': True, 'trap_name': trap_name})
+        err = trap_error or 'No space to place trap'
+        return jsonify({'ok': False, 'error': err}), 200
+    except Exception as e:
+        print(f"Trap 400 exception: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 400
+
+
+@app.route('/api/transmute-command', methods=['POST', 'OPTIONS'])
+def transmute_command():
+    """Receive transmute command from Streamer.bot; forward to game via WebSocket."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        if not data and request.form:
+            data = request.form.to_dict()
+        username = (data.get('username') or '').strip() or None
+        if not game_ws_app:
+            return jsonify({'ok': False, 'error': 'Game not connected'}), 503
+        request_id = str(uuid.uuid4())
+        ev = threading.Event()
+        with spawn_lock:
+            pending_spawns[request_id] = {'event': ev, 'success': False}
+        try:
+            payload = {'command': 'transmute', 'request_id': request_id}
+            if username:
+                payload['username'] = username
+            print(f"Transmute send to game: request_id={request_id}")
+            game_ws_app.send(json.dumps(payload))
+        except Exception as e:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': str(e)}), 503
+        if ev.wait(timeout=SPAWN_RESULT_TIMEOUT):
+            with spawn_lock:
+                pending = pending_spawns.pop(request_id, {})
+                success = pending.get('success', False)
+                item_name = pending.get('item_name', '')
+                transmute_error = pending.get('error')
+        else:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': 'Transmute command timed out'}), 504
+        if success:
+            print(f"Transmute OK: {item_name} for {username}")
+            return jsonify({'ok': True, 'item_name': item_name})
+        err = transmute_error or 'No transmutable item'
+        return jsonify({'ok': False, 'error': err}), 200
+    except Exception as e:
+        print(f"Transmute 400 exception: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 400
 
 

@@ -8,7 +8,7 @@
     * { box-sizing: border-box; }
     body {
       font-family: system-ui, -apple-system, sans-serif;
-      max-width: 1300px;
+      max-width: 1600px;
       margin: 2rem auto;
       padding: 0 1rem;
       background: #1a1a2e;
@@ -16,17 +16,22 @@
     }
     .main-grid {
       display: grid;
-      grid-template-columns: 1fr 550px;
+      grid-template-columns: minmax(0, 1fr) minmax(320px, 1fr) minmax(360px, 1fr);
       gap: 1.5rem;
       align-items: start;
     }
+    .col-center,
     .col-right {
       position: sticky;
       top: 1rem;
     }
+    @media (max-width: 1200px) {
+      .main-grid { grid-template-columns: 1fr 1fr; }
+      .col-right { grid-column: 1 / -1; }
+    }
     @media (max-width: 768px) {
       .main-grid { grid-template-columns: 1fr; }
-      .col-right { position: static; }
+      .col-center, .col-right { position: static; }
     }
     h1 { color: #7f5af0; margin-bottom: 0.5rem; }
     .sub { color: #94a1b2; font-size: 0.9rem; margin-bottom: 1.5rem; }
@@ -63,16 +68,20 @@
       margin-bottom: 0;
       gap: 0.5rem;
       min-width: 0;
+      display: grid;
+      grid-template-columns: 1fr 56px;
+      align-items: center;
     }
     .monsters label {
       min-width: 0;
-      flex-shrink: 0;
       font-size: 0.9rem;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .monsters input {
       width: 56px;
-      flex-shrink: 0;
+      box-sizing: border-box;
     }
     button {
       background: #7f5af0;
@@ -123,7 +132,7 @@
     <h2>General costs</h2>
     <div class="row">
       <label for="cost_per_gold">Gold (per 1):</label>
-      <input type="number" id="cost_per_gold" min="1" value="2">
+      <input type="number" id="cost_per_gold" min="1" value="5">
     </div>
     <div class="row">
       <label for="cost_per_curse">Curse:</label>
@@ -136,6 +145,22 @@
     <div class="row">
       <label for="cost_per_scroll">Random scroll:</label>
       <input type="number" id="cost_per_scroll" min="1" value="100">
+    </div>
+    <div class="row">
+      <label for="cost_per_trap">Trap:</label>
+      <input type="number" id="cost_per_trap" min="1" value="50">
+    </div>
+    <div class="row">
+      <label for="cost_per_transmute">Transmute:</label>
+      <input type="number" id="cost_per_transmute" min="1" value="150">
+    </div>
+    <div class="row">
+      <label for="cost_per_buff">Random buff:</label>
+      <input type="number" id="cost_per_buff" min="1" value="75">
+    </div>
+    <div class="row">
+      <label for="cost_per_debuff">Random debuff:</label>
+      <input type="number" id="cost_per_debuff" min="1" value="50">
     </div>
     <div class="row">
       <label for="cost_per_wand_common">Wand (common):</label>
@@ -161,14 +186,29 @@
 
   <section>
     <h2>Monster costs (per spawn)</h2>
-    <p class="sub" style="margin-bottom: 0.75rem;">Half price when spawned beyond native biome.</p>
+    <p class="sub" style="margin-bottom: 0.75rem;">Half price when spawned beyond native biome. Champion: 2× base cost (no discount).</p>
     <div class="monsters" id="monsters"></div>
   </section>
 
   <button id="save">Save costs</button>
   <button id="refresh" style="margin-left:8px;background:#444;">Refresh</button>
   <div id="msg"></div>
+  </div>
 
+  <div class="col-center">
+  <section>
+    <h2>Viewer points <span id="vpUpdated" style="margin-left:6px;font-weight:normal;color:#94a1b2;font-size:0.85rem;">—</span></h2>
+    <p class="sub" style="margin-bottom: 0.75rem;">Search to filter, or type a new username + points to add. Auto-refreshes every 3s. Used by !spawn, !champion, !gold, !curse, !gas, !scroll, !trap, !transmute, !wand.</p>
+    <div class="search-bar">
+      <input type="text" id="vp_search" placeholder="Search users or type new username…" autocomplete="off">
+      <input type="number" id="new_points" placeholder="Pts" min="0" value="100" style="width: 64px;">
+      <button id="add_user">Add / Set</button>
+    </div>
+    <div id="viewer_points_list" style="max-height: 70vh; overflow-y: auto;"></div>
+  </section>
+  </div>
+
+  <div class="col-right">
   <section>
     <h2>Game data (WebSocket)</h2>
     <p class="sub" style="margin-bottom: 0.75rem;">Connect to game on port 5001. Enable WebSocket streaming in game Settings.</p>
@@ -183,19 +223,6 @@
       <label><input type="radio" name="wsView" value="raw"> Raw JSON</label>
     </div>
     <div id="wsOut">Connect to see game data.</div>
-  </section>
-  </div>
-
-  <div class="col-right">
-  <section>
-    <h2>Viewer points</h2>
-    <p class="sub" style="margin-bottom: 0.75rem;">Search to filter, or type a new username + points to add. Used by !spawn, !gold, !curse, !gas, !scroll, !wand.</p>
-    <div class="search-bar">
-      <input type="text" id="vp_search" placeholder="Search users or type new username…" autocomplete="off">
-      <input type="number" id="new_points" placeholder="Pts" min="0" value="100" style="width: 64px;">
-      <button id="add_user">Add / Set</button>
-    </div>
-    <div id="viewer_points_list" style="max-height: 70vh; overflow-y: auto;"></div>
   </section>
   </div>
   </div>
@@ -219,10 +246,14 @@
       fetch('/api/points-config')
         .then(r => r.json())
         .then(data => {
-          document.getElementById('cost_per_gold').value = data.cost_per_gold ?? 2;
+          document.getElementById('cost_per_gold').value = data.cost_per_gold ?? 5;
           document.getElementById('cost_per_curse').value = data.cost_per_curse ?? 200;
           document.getElementById('cost_per_gas').value = data.cost_per_gas ?? 75;
           document.getElementById('cost_per_scroll').value = data.cost_per_scroll ?? 100;
+          document.getElementById('cost_per_trap').value = data.cost_per_trap ?? 50;
+          document.getElementById('cost_per_transmute').value = data.cost_per_transmute ?? 150;
+          document.getElementById('cost_per_buff').value = data.cost_per_buff ?? 75;
+          document.getElementById('cost_per_debuff').value = data.cost_per_debuff ?? 50;
           document.getElementById('cost_per_wand_common').value = data.cost_per_wand_common ?? 50;
           document.getElementById('cost_per_wand_uncommon').value = data.cost_per_wand_uncommon ?? 100;
           document.getElementById('cost_per_wand_rare').value = data.cost_per_wand_rare ?? 200;
@@ -249,10 +280,14 @@
         costPerMonster[inp.dataset.monster] = (!isNaN(v) && v >= 0) ? v : defaultCost;
       });
       const payload = {
-        cost_per_gold: parseInt(document.getElementById('cost_per_gold').value, 10) || 2,
+        cost_per_gold: parseInt(document.getElementById('cost_per_gold').value, 10) || 5,
         cost_per_curse: parseInt(document.getElementById('cost_per_curse').value, 10) || 200,
         cost_per_gas: parseInt(document.getElementById('cost_per_gas').value, 10) || 75,
         cost_per_scroll: parseInt(document.getElementById('cost_per_scroll').value, 10) || 100,
+        cost_per_trap: parseInt(document.getElementById('cost_per_trap').value, 10) || 50,
+        cost_per_transmute: parseInt(document.getElementById('cost_per_transmute').value, 10) || 150,
+        cost_per_buff: parseInt(document.getElementById('cost_per_buff').value, 10) || 75,
+        cost_per_debuff: parseInt(document.getElementById('cost_per_debuff').value, 10) || 50,
         cost_per_wand_common: parseInt(document.getElementById('cost_per_wand_common').value, 10) || 50,
         cost_per_wand_uncommon: parseInt(document.getElementById('cost_per_wand_uncommon').value, 10) || 100,
         cost_per_wand_rare: parseInt(document.getElementById('cost_per_wand_rare').value, 10) || 200,
@@ -288,6 +323,9 @@
         .then(data => {
           viewerPointsData = Object.entries(data).sort((a, b) => b[1].points - a[1].points);
           const container = document.getElementById('viewer_points_list');
+          const updatedEl = document.getElementById('vpUpdated');
+          if (updatedEl) { updatedEl.textContent = '(updated just now)'; }
+          vpLastUpdate = Date.now();
           if (viewerPointsData.length === 0) {
             container.innerHTML = '<p style="color:#94a1b2;font-size:0.9rem;">No viewers yet. Type a username above and click Add / Set.</p>';
             return;
@@ -317,7 +355,18 @@
             });
           });
         })
-        .catch(e => { document.getElementById('viewer_points_list').innerHTML = '<p style="color:#fca5a5;">Failed to load: ' + escapeHtml(e.message) + '</p>'; });
+        .catch(e => {
+          document.getElementById('viewer_points_list').innerHTML = '<p style="color:#fca5a5;">Failed to load: ' + escapeHtml(e.message) + '</p>';
+          const u = document.getElementById('vpUpdated'); if (u) u.textContent = '(offline)';
+        });
+    }
+
+    let vpLastUpdate = 0;
+    function updateVpUpdatedLabel() {
+      const el = document.getElementById('vpUpdated');
+      if (!el || !vpLastUpdate) return;
+      const sec = Math.floor((Date.now() - vpLastUpdate) / 1000);
+      el.textContent = '(' + sec + 's ago)';
     }
 
     function escapeHtml(s) {
@@ -359,6 +408,8 @@
     document.getElementById('vp_search').addEventListener('keydown', e => { if (e.key === 'Enter') addViewerUser(); });
     load();
     loadViewerPoints();
+    setInterval(loadViewerPoints, 10000);
+    setInterval(updateVpUpdatedLabel, 1000);
 
     // WebSocket inspector
     let ws = null, wsLastData = null, wsLastTime = 0, wsStaleInterval = null;

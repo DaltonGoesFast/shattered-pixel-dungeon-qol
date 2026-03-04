@@ -54,6 +54,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Adrenaline;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Barrier;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Blindness;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ChampionEnemy;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ChatSpawned;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Cripple;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Daze;
@@ -90,7 +91,44 @@ import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfMagicMappi
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfRemoveCurse;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfTransmutation;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfTeleportation;
+import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfTransmutation;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.exotic.ExoticScroll;
+import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
+import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.AlarmTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.BlazingTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.BurningTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ChillingTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ConfusionTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.CorrosionTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.CursingTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.DisarmingTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.DisintegrationTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.DistortionTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ExplosiveTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.FlashingTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.FlockTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.FrostTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GatewayTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GeyserTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GnollRockfallTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GrimTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GuardianTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.GrippingTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.OozeTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.PitfallTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.PoisonDartTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.RockfallTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ShockingTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.StormTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.SummoningTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.TeleportationTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.TenguDartTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ToxicTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.Trap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.WarpingTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.WeakeningTrap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.traps.WornDartTrap;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
@@ -219,6 +257,96 @@ public final class StreamingCommandHandler {
 		return null;
 	}
 
+	@SuppressWarnings("unchecked")
+	private static final Class<? extends ChampionEnemy>[] CHAMPION_TYPES = new Class[]{
+			ChampionEnemy.Blazing.class, ChampionEnemy.Projecting.class, ChampionEnemy.AntiMagic.class,
+			ChampionEnemy.Giant.class, ChampionEnemy.Blessed.class, ChampionEnemy.Growing.class
+	};
+
+	/** Spawn a champion version of the given monster. Same placement/scaling as handleSpawn; cost is 2× base (handled by overlay). */
+	public static String handleSpawnChampion(String monsterName, String username) {
+		if (Dungeon.hero == null || Dungeon.level == null)
+			return "Not in an active run (title/menu)";
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+			return "Not in an active run (title/menu)";
+		if (!Dungeon.hero.isAlive())
+			return "Hero is dead";
+
+		Class<? extends Mob> mobClass = "elemental".equals(monsterName)
+				? Elemental.random()
+				: mobClassForName(monsterName);
+		if (mobClass == null)
+			return "Unknown monster";
+
+		Mob mob = Reflection.newInstance(mobClass);
+		if (mob == null)
+			return "Failed to create monster";
+
+		Buff.affect(mob, ChatSpawned.class);
+		Buff.affect(mob, Random.element(CHAMPION_TYPES));
+
+		Integer nativeDepthForParalysis = NATIVE_DEPTH.get(monsterName);
+		if (nativeDepthForParalysis != null) {
+			int nativeRegion = (nativeDepthForParalysis - 1) / 5;
+			int currentRegion = (Dungeon.depth - 1) / 5;
+			if (currentRegion < nativeRegion) {
+				int turns = Math.max(0, nativeRegion - 1);
+				if (currentRegion == 1) turns = Math.max(0, turns - 1);
+				if (turns > 0) {
+					Buff.detach(mob, Paralysis.class);
+					float duration = Math.max(1f, turns - 1f);
+					Buff.affect(mob, Paralysis.class, duration);
+				}
+			}
+		}
+
+		Integer nativeDepth = NATIVE_DEPTH.get(monsterName);
+		if (nativeDepth != null && Dungeon.depth < nativeDepth) {
+			int currentRegion = (Dungeon.depth - 1) / 5;
+			int nativeRegion = (nativeDepth - 1) / 5;
+			if (currentRegion < nativeRegion) {
+				float scale = Math.max(MIN_HP_SCALE, (float) Dungeon.depth / nativeDepth);
+				int newHT = Math.max(1, Math.round(mob.HT * scale));
+				int newHP = Math.max(1, Math.round(mob.HP * scale));
+				mob.HT = newHT;
+				mob.HP = newHP;
+				SpawnScaled.affect(mob, scale);
+			}
+		}
+
+		int heroPos = Dungeon.hero.pos;
+		boolean[] spawnPassable = new boolean[Dungeon.level.length()];
+		for (int i = 0; i < spawnPassable.length; i++) {
+			spawnPassable[i] = Dungeon.level.passable[i] || Dungeon.level.avoid[i];
+		}
+		PathFinder.buildDistanceMap(heroPos, spawnPassable, SPAWN_RADIUS);
+
+		ArrayList<Integer> candidates = new ArrayList<>();
+		for (int p = 0; p < Dungeon.level.length(); p++) {
+			int d = PathFinder.distance[p];
+			if (d < 1 || d > SPAWN_RADIUS) continue;
+			if (Actor.findChar(p) != null) continue;
+			if (!Dungeon.level.passable[p] && !Dungeon.level.avoid[p]) continue;
+			if (Char.hasProp(mob, Char.Property.LARGE) && !Dungeon.level.openSpace[p]) continue;
+			candidates.add(p);
+		}
+		if (candidates.isEmpty())
+			return "No space to spawn (hero surrounded or no valid tiles)";
+
+		int cell = Random.element(candidates);
+		if (mob.state != mob.PASSIVE) {
+			mob.state = mob.WANDERING;
+		}
+		mob.pos = cell;
+		GameScene.add(mob, SPAWN_DELAY);
+		ScrollOfTeleportation.appear(mob, cell);
+		Dungeon.level.occupyCell(mob);
+
+		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
+		GLog.p(Messages.get(StreamingCommandHandler.class, "chat_champion_spawned"), chatter, monsterName);
+		return null;
+	}
+
 	/** Drop gold near the hero. Returns null on success, error message on failure. */
 	public static String handleDropGold(int amount, String username) {
 		if (Dungeon.hero == null || Dungeon.level == null)
@@ -254,6 +382,102 @@ public final class StreamingCommandHandler {
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		GLog.h(Messages.get(StreamingCommandHandler.class, "chat_gold_dropped"), chatter, amount);
 		return null;
+	}
+
+	// All traps that can be chosen for chat spawn. Remove classes from TRAP_BLACKLIST to allow them.
+	// Full list (33): Alarm, Blazing, Burning, Chilling, Confusion, Corrosion, Cursing, Disarming,
+	// Disintegration, Distortion, Explosive, Flashing, Flock, Frost, Gateway, Geyser, GnollRockfall,
+	// Grim, Guardian, Gripping, Ooze, Pitfall, PoisonDart, Rockfall, Shocking, Storm, Summoning,
+	// Teleportation, TenguDart, Toxic, Warping, Weakening, WornDart.
+	@SuppressWarnings("unchecked")
+	private static final Class<? extends Trap>[] CHAT_TRAP_POOL = new Class[]{
+			AlarmTrap.class, BlazingTrap.class, BurningTrap.class, ChillingTrap.class, ConfusionTrap.class,
+			CorrosionTrap.class, CursingTrap.class, DisarmingTrap.class, DisintegrationTrap.class, DistortionTrap.class,
+			ExplosiveTrap.class, FlashingTrap.class, FlockTrap.class, FrostTrap.class, GatewayTrap.class,
+			GeyserTrap.class, GnollRockfallTrap.class, GrimTrap.class, GuardianTrap.class, GrippingTrap.class,
+			OozeTrap.class, PitfallTrap.class, PoisonDartTrap.class, RockfallTrap.class, ShockingTrap.class,
+			StormTrap.class, SummoningTrap.class, TeleportationTrap.class, TenguDartTrap.class, ToxicTrap.class,
+			WarpingTrap.class, WeakeningTrap.class, WornDartTrap.class
+	};
+
+	/** Default blacklist: instant death, drop to next depth, or very high damage. Add/remove as desired. */
+	private static final HashSet<Class<? extends Trap>> TRAP_BLACKLIST = new HashSet<>();
+	static {
+		TRAP_BLACKLIST.add(GrimTrap.class);           // instant death
+		TRAP_BLACKLIST.add(DisintegrationTrap.class); // instant death
+		TRAP_BLACKLIST.add(PitfallTrap.class);       // drop to next depth
+		TRAP_BLACKLIST.add(ExplosiveTrap.class);     // high damage
+		TRAP_BLACKLIST.add(RockfallTrap.class);      // AOE damage
+		TRAP_BLACKLIST.add(GnollRockfallTrap.class);// AOE damage
+	}
+
+	/** Spawn a random (non-blacklisted) trap near the hero, same placement logic as gold. Returns trap name on success, error message on failure. */
+	public static String handleSpawnTrap(String username) {
+		if (Dungeon.hero == null || Dungeon.level == null)
+			return "ERR:Not in an active run (title/menu)";
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+			return "ERR:Not in an active run (title/menu)";
+		if (!Dungeon.hero.isAlive())
+			return "ERR:Hero is dead";
+
+		ArrayList<Class<? extends Trap>> allowed = new ArrayList<>();
+		for (Class<? extends Trap> c : CHAT_TRAP_POOL) {
+			if (!TRAP_BLACKLIST.contains(c)) allowed.add(c);
+		}
+		if (allowed.isEmpty())
+			return "ERR:All traps are blacklisted";
+
+		int heroPos = Dungeon.hero.pos;
+		boolean[] spawnPassable = new boolean[Dungeon.level.length()];
+		for (int i = 0; i < spawnPassable.length; i++) {
+			spawnPassable[i] = Dungeon.level.passable[i] || Dungeon.level.avoid[i];
+		}
+		PathFinder.buildDistanceMap(heroPos, spawnPassable, SPAWN_RADIUS);
+
+		ArrayList<Integer> candidates = new ArrayList<>();
+		for (int p = 0; p < Dungeon.level.length(); p++) {
+			int d = PathFinder.distance[p];
+			if (d < 1 || d > SPAWN_RADIUS) continue;
+			if (Actor.findChar(p) != null) continue;
+			if (!Dungeon.level.passable[p] && !Dungeon.level.avoid[p]) continue;
+			if (Dungeon.level.traps.get(p) != null) continue;
+			candidates.add(p);
+		}
+		if (candidates.isEmpty())
+			return "ERR:No space to place trap (hero surrounded or no valid tiles)";
+
+		int cell = Random.element(candidates);
+		Class<? extends Trap> trapClass = Random.element(allowed);
+		Trap trap = Reflection.newInstance(trapClass);
+		trap.reveal();
+
+		Level.set(cell, Terrain.TRAP);
+		Dungeon.level.setTrap(trap, cell);
+
+		String trapName = trap.name();
+		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
+		GLog.w(Messages.get(StreamingCommandHandler.class, "chat_trap"), chatter, trapName);
+		return trapName;
+	}
+
+	/** Transmute a random transmutable item (bag or equipped). Returns new item name on success, error on failure. */
+	public static String handleTransmute(String username) {
+		if (Dungeon.hero == null || Dungeon.level == null)
+			return "ERR:Not in an active run (title/menu)";
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+			return "ERR:Not in an active run (title/menu)";
+		if (!Dungeon.hero.isAlive())
+			return "ERR:Hero is dead";
+
+		ScrollOfTransmutation.TransmuteResult tr = ScrollOfTransmutation.transmuteOneRandom(Dungeon.hero);
+		if (tr == null)
+			return "ERR:No transmutable item (need at least one weapon, armor, ring, artifact, potion, scroll, wand, seed, runestone, or trinket)";
+
+		String resultName = tr.result.name();
+		String originalName = tr.originalName;
+		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
+		GLog.p(Messages.get(StreamingCommandHandler.class, "chat_transmuted"), chatter, originalName, resultName);
+		return resultName;
 	}
 
 	/** Curse an equipped item in the given slot. Returns item name on success, error message on failure. */

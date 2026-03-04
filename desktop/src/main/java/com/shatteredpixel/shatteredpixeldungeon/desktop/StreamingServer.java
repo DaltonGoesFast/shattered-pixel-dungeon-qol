@@ -84,6 +84,23 @@ public class StreamingServer extends WebSocketServer {
 						conn.send(resp.toString());
 					}
 				});
+			} else if ("champion".equals(cmd)) {
+				String monster = obj.has("monster") ? obj.get("monster").getAsString() : null;
+				if (monster == null || monster.isEmpty()) return;
+				String monsterFinal = monster.trim().toLowerCase();
+				Gdx.app.postRunnable(() -> {
+					String err = StreamingCommandHandler.handleSpawnChampion(monsterFinal, usernameFinal);
+					boolean ok = (err == null);
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "champion_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (err != null) resp.addProperty("error", err);
+						if (ok) resp.addProperty("monster", monsterFinal);
+						conn.send(resp.toString());
+					}
+				});
 			} else if ("gold".equals(cmd)) {
 				int amount = obj.has("amount") ? obj.get("amount").getAsInt() : 5;
 				int amountFinal = Math.max(1, Math.min(100, amount));
@@ -201,6 +218,38 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("request_id", requestId);
 						resp.addProperty("success", ok);
 						if (debuffName != null) resp.addProperty("debuff_name", debuffName);
+						if (err != null) resp.addProperty("error", err);
+						conn.send(resp.toString());
+					}
+				});
+			} else if ("trap".equals(cmd)) {
+				Gdx.app.postRunnable(() -> {
+					String result = StreamingCommandHandler.handleSpawnTrap(usernameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String trapName = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "trap_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (trapName != null) resp.addProperty("trap_name", trapName);
+						if (err != null) resp.addProperty("error", err);
+						conn.send(resp.toString());
+					}
+				});
+			} else if ("transmute".equals(cmd)) {
+				Gdx.app.postRunnable(() -> {
+					String result = StreamingCommandHandler.handleTransmute(usernameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String itemName = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "transmute_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (itemName != null) resp.addProperty("item_name", itemName);
 						if (err != null) resp.addProperty("error", err);
 						conn.send(resp.toString());
 					}

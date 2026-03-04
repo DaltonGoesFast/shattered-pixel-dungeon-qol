@@ -3,10 +3,13 @@
 Unified points command script for Streamer.bot.
 Usage:
   spawn:    python points_command.py spawn <monster> <username>
+  champion: python points_command.py champion <monster> <username>  (2× base cost, random champion type)
   gold:     python points_command.py gold <amount> <username>
   curse:    python points_command.py curse <username>  (picks random slot)
   gas:      python points_command.py gas <username>
   scroll:   python points_command.py scroll <username>
+  trap:     python points_command.py trap <username>
+  transmute: python points_command.py transmute <username>
   buff:     python points_command.py buff <username>
   debuff:   python points_command.py debuff <username>
   wand:     python points_command.py wand <common|uncommon|rare|veryrare> <username>  (tier required)
@@ -33,11 +36,29 @@ DONATION_RESULT_FILE = os.path.join(SCRIPT_DIR, "donation_result.txt")
 CONFIG_FILE = os.path.join(SCRIPT_DIR, "points_config.json")
 SPEND_DISABLED_FILE = os.path.join(SCRIPT_DIR, "spend_disabled.txt")
 GAME_DATA_URL = "http://127.0.0.1:5000/api/game-data"
+DOUBLE_POINTS_END_FILE = os.path.join(SCRIPT_DIR, "double_points_end.txt")
 
 
 def is_spend_disabled():
     """True if streamer has disabled spending (e.g. via Stream Deck toggle)."""
     return os.path.exists(SPEND_DISABLED_FILE)
+
+
+def is_double_points_active():
+    """True if !doublepoints is currently active (2x period not yet ended)."""
+    try:
+        if not os.path.exists(DOUBLE_POINTS_END_FILE):
+            return False
+        with open(DOUBLE_POINTS_END_FILE, encoding="utf-8") as f:
+            s = f.read().strip()
+        if not s or s == "0":
+            return False
+        end_time = int(s)
+        if end_time <= 0:
+            return False
+        return int(time.time()) < end_time
+    except (ValueError, OSError):
+        return False
 
 NATIVE_DEPTH = {
     "rat": 1, "albino": 1, "snake": 1, "gnoll": 2, "crab": 3, "slime": 4,
@@ -55,6 +76,8 @@ def load_config():
         "cost_per_curse": 200,
         "cost_per_gas": 75,
         "cost_per_scroll": 100,
+        "cost_per_trap": 50,
+        "cost_per_transmute": 150,
         "cost_per_buff": 75,
         "cost_per_debuff": 50,
         "cost_per_wand_common": 50,
@@ -66,7 +89,7 @@ def load_config():
             "rat": 5, "albino": 10, "snake": 10, "gnoll": 10, "crab": 15,
             "slime": 15, "swarm": 15, "thief": 20, "skeleton": 20, "bat": 30,
             "brute": 30, "shaman": 35, "spinner": 25, "dm100": 20, "guard": 25,
-            "necromancer": 25, "ghoul": 940, "elemental": 40, "warlock": 45,
+            "necromancer": 25, "ghoul": 40, "elemental": 40, "warlock": 45,
             "monk": 50, "golem": 50, "succubus": 60, "eye": 70, "scorpio": 80,
         },
     }
@@ -86,6 +109,8 @@ def load_config():
             "cost_per_curse": int(cfg.get("cost_per_curse", defaults["cost_per_curse"])),
             "cost_per_gas": int(cfg.get("cost_per_gas", defaults["cost_per_gas"])),
             "cost_per_scroll": int(cfg.get("cost_per_scroll", defaults["cost_per_scroll"])),
+            "cost_per_trap": int(cfg.get("cost_per_trap", defaults["cost_per_trap"])),
+            "cost_per_transmute": int(cfg.get("cost_per_transmute", defaults["cost_per_transmute"])),
             "cost_per_buff": int(cfg.get("cost_per_buff", defaults["cost_per_buff"])),
             "cost_per_debuff": int(cfg.get("cost_per_debuff", defaults["cost_per_debuff"])),
             "cost_per_wand_common": int(cfg.get("cost_per_wand_common", defaults["cost_per_wand_common"])),
@@ -199,6 +224,13 @@ def compute_spawn_cost(monster: str) -> int:
     return base
 
 
+def compute_champion_cost(monster: str) -> int:
+    """2× base cost, no early-zone discount."""
+    cfg = get_config()
+    base = cfg["cost_per_monster"].get(monster, cfg["default_monster_cost"])
+    return 2 * base
+
+
 def _http_error_msg(e, default_timeout: str) -> str:
     if e.code == 504:
         return default_timeout
@@ -258,6 +290,59 @@ def cmd_spawn(args):
             data[key] = (pts, last)
             write_points(data)
             return SPAWN_RESULT_FILE, "ok"
+    except TimeoutError:
+        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+
+
+def cmd_champion(args):
+    if is_spend_disabled():
+        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
+    if len(args) < 2:
+        return SPAWN_RESULT_FILE, "Usage: !champion <monster> (e.g. !champion rat). Costs 2× base spawn cost, no zone discount."
+    monster = args[0].lower()
+    username = args[1]
+    if monster not in VALID_MONSTERS:
+        return SPAWN_RESULT_FILE, f"Unknown monster: {monster}"
+
+    cost = compute_champion_cost(monster)
+    key = username.lower()
+    try:
+        with points_lock():
+            data = read_points()
+            pts, last = data.get(key, (0, 0))
+            if pts < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} for champion {monster}, you have {pts}."
+
+            url = "http://127.0.0.1:5000/api/champion-command"
+            payload = {"monster": monster, "username": username}
+            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+            req.add_header("Content-Type", "application/json")
+
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    raw = resp.read().decode("utf-8", errors="replace")
+                    if not raw.strip():
+                        return SPAWN_RESULT_FILE, "Champion spawn failed (empty response from server)"
+                    try:
+                        body = json.loads(raw)
+                    except json.JSONDecodeError:
+                        return SPAWN_RESULT_FILE, "Champion spawn failed (server error). Is the overlay running?"
+                    if not body.get("ok"):
+                        return SPAWN_RESULT_FILE, body.get("error", "Champion spawn failed")
+            except urllib.error.HTTPError as e:
+                return SPAWN_RESULT_FILE, _http_error_msg(
+                    e, "Champion spawn timed out. Is the game running and in an active run?"
+                )
+            except urllib.error.URLError as e:
+                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
+            except Exception as e:
+                msg = str(e).strip() if e else ""
+                return SPAWN_RESULT_FILE, "Champion spawn failed. " + (msg if msg else "Check overlay server and try again.")
+
+            pts -= cost
+            data[key] = (pts, last)
+            write_points(data)
+            return SPAWN_RESULT_FILE, "ok|" + body.get("monster", monster)
     except TimeoutError:
         return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
@@ -482,6 +567,108 @@ def cmd_scroll(args):
             write_points(data)
             scroll_name = body.get("scroll_name", "scroll")
             return SPAWN_RESULT_FILE, f"ok|{scroll_name}"
+    except TimeoutError:
+        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+
+
+def cmd_trap(args):
+    if is_spend_disabled():
+        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
+    if len(args) < 1:
+        return SPAWN_RESULT_FILE, "Usage: !trap (places a random visible trap near you)"
+    username = args[0]
+
+    cost = get_config()["cost_per_trap"]
+    key = username.lower()
+    try:
+        with points_lock():
+            data = read_points()
+            pts, last = data.get(key, (0, 0))
+            if pts < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to place a trap, you have {pts}."
+
+            url = "http://127.0.0.1:5000/api/trap-command"
+            payload = {"username": username}
+            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+            req.add_header("Content-Type", "application/json")
+
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    raw = resp.read().decode("utf-8", errors="replace")
+                    if not raw.strip():
+                        return SPAWN_RESULT_FILE, "Trap command failed (empty response from server)"
+                    try:
+                        body = json.loads(raw)
+                    except json.JSONDecodeError:
+                        return SPAWN_RESULT_FILE, "Trap command failed (server error). Is the overlay running?"
+                    if not body.get("ok"):
+                        return SPAWN_RESULT_FILE, body.get("error", "Trap command failed")
+            except urllib.error.HTTPError as e:
+                return SPAWN_RESULT_FILE, _http_error_msg(
+                    e, "Trap command timed out. Is the game running and in an active run?"
+                )
+            except urllib.error.URLError as e:
+                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
+            except Exception as e:
+                msg = str(e).strip() if e else ""
+                return SPAWN_RESULT_FILE, "Trap command failed. " + (msg if msg else "Check overlay server and try again.")
+
+            pts -= cost
+            data[key] = (pts, last)
+            write_points(data)
+            trap_name = body.get("trap_name", "trap")
+            return SPAWN_RESULT_FILE, f"ok|{trap_name}"
+    except TimeoutError:
+        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+
+
+def cmd_transmute(args):
+    if is_spend_disabled():
+        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
+    if len(args) < 1:
+        return SPAWN_RESULT_FILE, "Usage: !transmute (transmutes a random transmutable item from bag or equipped)"
+    username = args[0]
+
+    cost = get_config()["cost_per_transmute"]
+    key = username.lower()
+    try:
+        with points_lock():
+            data = read_points()
+            pts, last = data.get(key, (0, 0))
+            if pts < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to transmute, you have {pts}."
+
+            url = "http://127.0.0.1:5000/api/transmute-command"
+            payload = {"username": username}
+            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+            req.add_header("Content-Type", "application/json")
+
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    raw = resp.read().decode("utf-8", errors="replace")
+                    if not raw.strip():
+                        return SPAWN_RESULT_FILE, "Transmute command failed (empty response from server)"
+                    try:
+                        body = json.loads(raw)
+                    except json.JSONDecodeError:
+                        return SPAWN_RESULT_FILE, "Transmute command failed (server error). Is the overlay running?"
+                    if not body.get("ok"):
+                        return SPAWN_RESULT_FILE, body.get("error", "Transmute command failed")
+            except urllib.error.HTTPError as e:
+                return SPAWN_RESULT_FILE, _http_error_msg(
+                    e, "Transmute command timed out. Is the game running and in an active run?"
+                )
+            except urllib.error.URLError as e:
+                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
+            except Exception as e:
+                msg = str(e).strip() if e else ""
+                return SPAWN_RESULT_FILE, "Transmute command failed. " + (msg if msg else "Check overlay server and try again.")
+
+            pts -= cost
+            data[key] = (pts, last)
+            write_points(data)
+            item_name = body.get("item_name", "item")
+            return SPAWN_RESULT_FILE, f"ok|{item_name}"
     except TimeoutError:
         return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
@@ -719,6 +906,8 @@ def cmd_superchat(args):
     to_add = max(0, int(round(amount_usd * 100)))
     if to_add <= 0:
         return DONATION_RESULT_FILE, "ok|0"
+    if is_double_points_active():
+        to_add *= 2
     try:
         with points_lock():
             data = read_points()
@@ -746,6 +935,8 @@ def cmd_cheer(args):
     to_add = bits
     if to_add <= 0:
         return DONATION_RESULT_FILE, "ok|0"
+    if is_double_points_active():
+        to_add *= 2
     try:
         with points_lock():
             data = read_points()
@@ -760,10 +951,13 @@ def cmd_cheer(args):
 
 COMMANDS = {
     "spawn": cmd_spawn,
+    "champion": cmd_champion,
     "gold": cmd_gold,
     "curse": cmd_curse,
     "gas": cmd_gas,
     "scroll": cmd_scroll,
+    "trap": cmd_trap,
+    "transmute": cmd_transmute,
     "buff": cmd_buff,
     "debuff": cmd_debuff,
     "wand": cmd_wand,
@@ -776,7 +970,7 @@ def main():
     args = [a.strip() for a in sys.argv[1:] if a.strip()]
     if len(args) < 1:
         with open(SPAWN_RESULT_FILE, "w", encoding="utf-8") as f:
-            f.write("Usage: points_command.py <spawn|gold|curse|gas|scroll|buff|debuff|wand|superchat|cheer> [args...]")
+            f.write("Usage: points_command.py <spawn|champion|gold|curse|gas|scroll|trap|transmute|buff|debuff|wand|superchat|cheer> [args...]")
         sys.exit(0)
 
     cmd = args[0].lower()

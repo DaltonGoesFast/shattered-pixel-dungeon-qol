@@ -51,7 +51,7 @@
         <div id="costConfig" style="padding:8px;background:#0d0d0d;border:1px solid #333;font-size:11px;max-height:120px;overflow:auto;">Loading…</div>
       </div>
       <div>
-        <div style="font-weight:bold;margin-bottom:4px;color:#9c9;">Viewer points</div>
+        <div style="font-weight:bold;margin-bottom:4px;color:#9c9;">Viewer points <span id="vpUpdated" style="margin-left:6px;font-weight:normal;color:#9a9;font-size:11px;">—</span></div>
         <div id="viewerPoints" style="padding:8px;background:#0d0d0d;border:1px solid #333;font-size:11px;max-height:120px;overflow:auto;">Loading…</div>
         <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
           <input type="text" id="vpUser" placeholder="User" style="width:80px;padding:4px;background:#2a2a2a;border:1px solid #444;color:#e0e0e0;">
@@ -209,6 +209,12 @@
             'Gold: ' + (data.cost_per_gold ?? '?'),
             'Curse: ' + (data.cost_per_curse ?? '?'),
             'Gas: ' + (data.cost_per_gas ?? '?'),
+            'Scroll: ' + (data.cost_per_scroll ?? '?'),
+            'Trap: ' + (data.cost_per_trap ?? '?'),
+            'Transmute: ' + (data.cost_per_transmute ?? '?'),
+            'Buff: ' + (data.cost_per_buff ?? '?'),
+            'Debuff: ' + (data.cost_per_debuff ?? '?'),
+            'Wand: ' + [data.cost_per_wand_common, data.cost_per_wand_uncommon, data.cost_per_wand_rare, data.cost_per_wand_veryrare].map((v, i) => (v != null ? v : '?')).join('/'),
             'Default monster: ' + (data.default_monster_cost ?? '?'),
           ];
           const m = data.cost_per_monster || {};
@@ -220,17 +226,29 @@
 
     function loadViewerPoints() {
       const el = document.getElementById('viewerPoints');
+      const updatedEl = document.getElementById('vpUpdated');
       fetch('/api/viewer-points')
         .then(r => r.json())
         .then(data => {
           const entries = Object.entries(data).sort((a, b) => b[1].points - a[1].points);
           if (entries.length === 0) {
             el.textContent = 'No viewers yet.';
-            return;
+          } else {
+            el.innerHTML = entries.map(([u, d]) => u + ': ' + d.points).join('<br>');
           }
-          el.innerHTML = entries.map(([u, d]) => u + ': ' + d.points).join('<br>');
+          vpLastUpdate = Date.now();
+          if (updatedEl) updatedEl.textContent = '(updated just now)';
         })
-        .catch(() => { el.textContent = 'Overlay not running.'; });
+        .catch(() => { el.textContent = 'Overlay not running.'; if (updatedEl) updatedEl.textContent = '(offline)'; });
+    }
+
+    let vpLastUpdate = 0;
+    function updateVpUpdatedLabel() {
+      const el = document.getElementById('vpUpdated');
+      if (!el) return;
+      if (!vpLastUpdate) { el.textContent = '—'; return; }
+      const sec = Math.floor((Date.now() - vpLastUpdate) / 1000);
+      el.textContent = '(' + sec + 's ago)';
     }
 
     function setViewerPoints() {
@@ -243,14 +261,15 @@
         body: JSON.stringify({ username: user, points: pts }),
       })
         .then(r => r.json())
-        .then(d => { if (d.error) throw new Error(d.error); document.getElementById('vpUser').value = ''; loadViewerPoints(); })
+        .then(d => { if (d.error) throw new Error(d.error); document.getElementById('vpUser').value = ''; vpLastUpdate = Date.now(); loadViewerPoints(); })
         .catch(e => { document.getElementById('viewerPoints').textContent = 'Error: ' + e.message; });
     }
 
     loadCostConfig();
     loadViewerPoints();
     setInterval(loadCostConfig, 5000);
-    setInterval(loadViewerPoints, 5000);
+    setInterval(loadViewerPoints, 3000);
+    setInterval(updateVpUpdatedLabel, 1000);
     document.getElementById('vpSet').addEventListener('click', setViewerPoints);
 
     btn.addEventListener('click', connect);

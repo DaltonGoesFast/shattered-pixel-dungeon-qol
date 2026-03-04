@@ -21,24 +21,27 @@ Before implementing, ensure:
 3. Action 2 (!points) — viewers can check balance
 4. Action 2b (!toppoints) — show top 3 point holders
 5. Action 3 (!spawn) — spend points to spawn
-6. Action 3b (!gold) — spend points to drop gold near hero
-7. Action 3c (!curse) — spend points to curse equipped item
-8. Action 3d (!gas) — spend points to spawn random gas
-9. Action 3e (!scroll) — spend points to use a random scroll (like +10 Unstable Spellbook)
-10. Action 3e1 (!buff) — spend points to apply a random buff (Haste, Healing, Barrier, etc.)
-11. Action 3e2 (!debuff) — spend points to apply a random debuff (Blindness, Slow, Roots, etc.)
-12. Action 3f (!wand) — spend points to trigger a random cursed wand effect (cost varies by rarity)
-11. Action 1b (Passive earn) — optional, for viewers already in file
-12. Action 4 (!doublepoints) — optional, 2x points for N minutes
-13. Action 4a (Spend OFF / Spend ON) — optional, Stream Deck switch to disable/enable spend commands
-14. Action 4b (Super Chat / Cheer) — optional, 1 pt per $0.01
-15. Action 5 (Reset) — optional, clear points each stream
+6. Action 3a (!champion) — spend points to spawn a champion version of a monster (2× base cost, no zone discount)
+7. Action 3b (!gold) — spend points to drop gold near hero
+8. Action 3c (!curse) — spend points to curse equipped item
+9. Action 3d (!gas) — spend points to spawn random gas
+10. Action 3e (!scroll) — spend points to use a random scroll (like +10 Unstable Spellbook)
+11. Action 3e0 (!trap) — spend points to place a random visible trap nearby
+11a. Action 3e0a (!transmute) — spend points to transmute a random transmutable item (bag or equipped)
+12. Action 3e1 (!buff) — spend points to apply a random buff (Haste, Healing, Barrier, etc.)
+13. Action 3e2 (!debuff) — spend points to apply a random debuff (Blindness, Slow, Roots, etc.)
+14. Action 3f (!wand) — spend points to trigger a random cursed wand effect (cost varies by rarity)
+15. Action 1b (Passive earn) — optional, for viewers already in file
+16. Action 4 (!doublepoints) — optional, 2x points for N minutes
+17. Action 4a (Spend OFF / Spend ON) — optional, Stream Deck switch to disable/enable spend commands
+18. Action 4b (Super Chat / Cheer) — optional, 1 pt per $0.01
+19. Action 5 (Reset) — optional, clear points each stream
 
 ---
 
 ## YouTube Support
 
-- **Commands (!spawn, !gold, !curse, !gas, !scroll, !buff, !debuff, !wand, !points, !toppoints):** When creating the command, enable **both Twitch and YouTube** as sources so one action handles both platforms.
+- **Commands (!spawn, !champion, !gold, !curse, !gas, !scroll, !trap, !transmute, !buff, !debuff, !wand, !points, !toppoints):** When creating the command, enable **both Twitch and YouTube** as sources so one action handles both platforms.
 - **Earn Points (message):** Add **Message Received** from YouTube → Triggers to the same action, or create a duplicate action with the YouTube trigger.
 - **Earn Points (passive):** Add **Present Viewers** from YouTube → Triggers (YouTube uses chat-activity threshold; no live viewer list).
 - **Response messages:** Use the **commandSource pattern** below so a single action sends to the correct chat.
@@ -73,10 +76,13 @@ Use **one action per command** that works for both Twitch and YouTube. After che
 | Command | Success Message |
 |---------|-----------------|
 | !spawn | `%userName% spawned a %rawInput%!` |
+| !champion | `%userName% spawned a champion %championMonster%!` |
 | !gold | `%userName% dropped %goldAmount% gold!` |
 | !curse | `%userName% cursed your %curseItemName%!` |
 | !gas | `%userName% spewed %gasName%!` |
 | !scroll | `%userName% used a random scroll: %scrollName%!` |
+| !trap | `%userName% placed a %trapName% nearby!` |
+| !transmute | `%userName% transmuted an item into %transmuteItemName%!` |
 | !buff | `%userName% gave you %buffName%!` |
 | !debuff | `%userName% afflicted you with %debuffName%!` |
 | !wand | `%userName% triggered a cursed wand effect: %wandEffectName%!` |
@@ -108,6 +114,7 @@ The file is created automatically when the first action runs.
 - **Points costs:** Edit `points_config.json` or open **http://localhost:5000** in your browser (main control page; overlay server must be running)
 - **Donation rate:** 1 point per $0.01 (Super Chat uses Frankfurter API for conversion; not in points config)
 - **Top farder 2x:** Set `TOP_FARDER_FILE` to the path of the text file (default: `OBS files\textread\leader.txt`). Expected format: `Top Farder: USERNAME - 45`. That user always earns 2x points.
+- **Subscriber / member 2x:** Twitch subscribers and YouTube channel members earn 2x points. Uses Streamer.bot variables `isSubscribed` (Twitch) and `userIsSponsor` (YouTube). Stacks with double points and top farder (e.g. 4x or 8x when multiple apply).
 
 ---
 
@@ -117,7 +124,7 @@ The file is created automatically when the first action runs.
 
 **Sub-Action:** Execute C# Code (Inline)
 
-Uses plain-text format (no JSON) to avoid System.Core dependency. Uses a lock file (`viewer_points.txt.lock`) so Earn Points and Python (superchat, spawn, etc.) don't overwrite each other.
+Uses plain-text format (no JSON) to avoid System.Core dependency. **All code that reads or writes `viewer_points.txt` must use the same lock file** (`viewer_points.txt.lock`) so Earn Points, Passive earn, !points, !toppoints, First Words, Reset, the overlay server, and Python (superchat, spawn, etc.) don't overwrite each other. Action 1 below and Actions 1b, 1c, 2, 2b, and 5 all use this lock.
 
 ```csharp
 using System;
@@ -163,7 +170,7 @@ public class CPHInline
             if (COOLDOWN_SEC > 0 && lastEarn > 0 && unixNow - lastEarn < COOLDOWN_SEC)
                 return false;
 
-            int mult = (IsDoublePointsActive(unixNow) ? 2 : 1) * (IsTopFarder(key) ? 2 : 1);
+            int mult = (IsDoublePointsActive(unixNow) ? 2 : 1) * (IsTopFarder(key) ? 2 : 1) * (IsSubscriberOrMember() ? 2 : 1);
             int toAdd = POINTS_PER_MESSAGE * mult;
             pts += toAdd;
                 data[key] = new Tuple<int, long>(pts, unixNow);
@@ -255,6 +262,14 @@ public class CPHInline
         }
         catch { return false; }
     }
+
+    // Twitch: isSubscribed. YouTube: userIsSponsor (channel member). Stacks with double points & top farder.
+    bool IsSubscriberOrMember()
+    {
+        if (CPH.TryGetArg("isSubscribed", out string tw) && tw.Equals("True", StringComparison.OrdinalIgnoreCase)) return true;
+        if (CPH.TryGetArg("userIsSponsor", out string yt) && yt.Equals("True", StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
 }
 ```
 
@@ -266,7 +281,7 @@ public class CPHInline
 
 Adds points over time to viewers who are already in the file (have chatted at least once). Enable **Live Update** under Platform → Twitch → Settings and set the interval (e.g. 5 minutes).
 
-**Note:** The C# tries both `userName` and `presentUserName`. If Present Viewers uses a list, add **Add Present User** (index 0, 1, 2, …) in a loop before the C# so each viewer gets processed.
+**Note:** The C# tries both `userName` and `presentUserName`. If Present Viewers uses a list, add **Add Present User** (index 0, 1, 2, …) in a loop before the C# so each viewer gets processed. Subscriber/member 2x applies when Streamer.bot provides `isSubscribed` or `userIsSponsor` for that viewer (Message Received does; Present Viewers may not, depending on your setup).
 
 **Sub-Action:** Execute C# Code (Inline)
 
@@ -274,10 +289,12 @@ Adds points over time to viewers who are already in the file (have chatted at le
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 
 public class CPHInline
 {
     const string FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt";
+    const string LOCK_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt.lock";
     const string DOUBLE_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\double_points_end.txt";
     const string TOP_FARDER_FILE = @"C:\Users\dalto\Documents\OBS files\textread\leader.txt";  // Format: "Top Farder: USERNAME - 45"
     const int POINTS_PER_TICK = 1;
@@ -293,25 +310,50 @@ public class CPHInline
 
         try
         {
-            var data = ReadAll();
-            string key = user.ToLowerInvariant();
-            if (!data.ContainsKey(key)) return false;  // Only add to users already in file
+            if (!AcquirePointsLock()) return false;
+            try
+            {
+                var data = ReadAll();
+                string key = user.ToLowerInvariant();
+                if (!data.ContainsKey(key)) return false;  // Only add to users already in file
 
-            int pts = data[key].Item1;
-            long lastEarn = data[key].Item2;
-            long unixNow = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds;
+                int pts = data[key].Item1;
+                long lastEarn = data[key].Item2;
+                long unixNow = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds;
 
-            if (COOLDOWN_SEC > 0 && lastEarn > 0 && unixNow - lastEarn < COOLDOWN_SEC)
-                return false;
+                if (COOLDOWN_SEC > 0 && lastEarn > 0 && unixNow - lastEarn < COOLDOWN_SEC)
+                    return false;
 
-            int mult = (IsDoublePointsActive(unixNow) ? 2 : 1) * (IsTopFarder(key) ? 2 : 1);
-            int toAdd = POINTS_PER_TICK * mult;
-            pts += toAdd;
-            data[key] = new Tuple<int, long>(pts, unixNow);
-            WriteAll(data);
-            return true;
+                int mult = (IsDoublePointsActive(unixNow) ? 2 : 1) * (IsTopFarder(key) ? 2 : 1) * (IsSubscriberOrMember() ? 2 : 1);
+                int toAdd = POINTS_PER_TICK * mult;
+                pts += toAdd;
+                data[key] = new Tuple<int, long>(pts, unixNow);
+                WriteAll(data);
+                return true;
+            }
+            finally { ReleasePointsLock(); }
         }
         catch (Exception ex) { CPH.LogInfo("Passive earn: " + ex.Message); return false; }
+    }
+
+    bool AcquirePointsLock()
+    {
+        for (int i = 0; i < 200; i++)  // 10 sec at 50ms
+        {
+            try
+            {
+                using (var fs = new FileStream(LOCK_FILE, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                    fs.WriteByte(0);
+                return true;
+            }
+            catch (IOException) { Thread.Sleep(50); }
+        }
+        return false;
+    }
+
+    void ReleasePointsLock()
+    {
+        try { if (File.Exists(LOCK_FILE)) File.Delete(LOCK_FILE); } catch { }
     }
 
     Dictionary<string, Tuple<int, long>> ReadAll()
@@ -373,6 +415,13 @@ public class CPHInline
             return !string.IsNullOrEmpty(username) && userKey.Equals(username, StringComparison.OrdinalIgnoreCase);
         }
         catch { return false; }
+    }
+
+    bool IsSubscriberOrMember()
+    {
+        if (CPH.TryGetArg("isSubscribed", out string tw) && tw.Equals("True", StringComparison.OrdinalIgnoreCase)) return true;
+        if (CPH.TryGetArg("userIsSponsor", out string yt) && yt.Equals("True", StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
     }
 }
 ```
@@ -389,10 +438,12 @@ Add this as a **sub-action** to your existing First Words action (before or afte
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 
 public class CPHInline
 {
     const string FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt";
+    const string LOCK_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt.lock";
     const string DOUBLE_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\double_points_end.txt";
     const string TOP_FARDER_FILE = @"C:\Users\dalto\Documents\OBS files\textread\leader.txt";  // Format: "Top Farder: USERNAME - 45"
     const int FIRST_WORDS_BONUS = 5;
@@ -404,18 +455,43 @@ public class CPHInline
 
         try
         {
-            long unixNow = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds;
-            var data = ReadAll();
-            string key = user.ToLowerInvariant();
-            int pts = data.ContainsKey(key) ? data[key].Item1 : 0;
-            int mult = (IsDoublePointsActive(unixNow) ? 2 : 1) * (IsTopFarder(key) ? 2 : 1);
-            int toAdd = FIRST_WORDS_BONUS * mult;
-            pts += toAdd;
-            data[key] = new Tuple<int, long>(pts, unixNow);
-            WriteAll(data);
-            return true;
+            if (!AcquirePointsLock()) return false;
+            try
+            {
+                long unixNow = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds;
+                var data = ReadAll();
+                string key = user.ToLowerInvariant();
+                int pts = data.ContainsKey(key) ? data[key].Item1 : 0;
+                int mult = (IsDoublePointsActive(unixNow) ? 2 : 1) * (IsTopFarder(key) ? 2 : 1) * (IsSubscriberOrMember() ? 2 : 1);
+                int toAdd = FIRST_WORDS_BONUS * mult;
+                pts += toAdd;
+                data[key] = new Tuple<int, long>(pts, unixNow);
+                WriteAll(data);
+                return true;
+            }
+            finally { ReleasePointsLock(); }
         }
         catch (Exception ex) { CPH.LogInfo("First words bonus: " + ex.Message); return false; }
+    }
+
+    bool AcquirePointsLock()
+    {
+        for (int i = 0; i < 200; i++)  // 10 sec at 50ms
+        {
+            try
+            {
+                using (var fs = new FileStream(LOCK_FILE, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                    fs.WriteByte(0);
+                return true;
+            }
+            catch (IOException) { Thread.Sleep(50); }
+        }
+        return false;
+    }
+
+    void ReleasePointsLock()
+    {
+        try { if (File.Exists(LOCK_FILE)) File.Delete(LOCK_FILE); } catch { }
     }
 
     Dictionary<string, Tuple<int, long>> ReadAll()
@@ -477,6 +553,13 @@ public class CPHInline
             return !string.IsNullOrEmpty(username) && userKey.Equals(username, StringComparison.OrdinalIgnoreCase);
         }
         catch { return false; }
+    }
+
+    bool IsSubscriberOrMember()
+    {
+        if (CPH.TryGetArg("isSubscribed", out string tw) && tw.Equals("True", StringComparison.OrdinalIgnoreCase)) return true;
+        if (CPH.TryGetArg("userIsSponsor", out string yt) && yt.Equals("True", StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
     }
 }
 ```
@@ -497,10 +580,12 @@ Edit `FIRST_WORDS_BONUS` to change the amount (default 5).
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 
 public class CPHInline
 {
     const string FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt";
+    const string LOCK_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt.lock";
 
     public bool Execute()
     {
@@ -509,12 +594,37 @@ public class CPHInline
 
         try
         {
-            var data = ReadAll();
-            int pts = data.ContainsKey(user.ToLowerInvariant()) ? data[user.ToLowerInvariant()].Item1 : 0;
-            CPH.SetArgument("userPoints", pts.ToString());
-            return true;
+            if (!AcquirePointsLock()) { CPH.SetArgument("userPoints", "0"); return true; }
+            try
+            {
+                var data = ReadAll();
+                int pts = data.ContainsKey(user.ToLowerInvariant()) ? data[user.ToLowerInvariant()].Item1 : 0;
+                CPH.SetArgument("userPoints", pts.ToString());
+                return true;
+            }
+            finally { ReleasePointsLock(); }
         }
         catch { CPH.SetArgument("userPoints", "0"); return true; }
+    }
+
+    bool AcquirePointsLock()
+    {
+        for (int i = 0; i < 200; i++)  // 10 sec at 50ms
+        {
+            try
+            {
+                using (var fs = new FileStream(LOCK_FILE, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                    fs.WriteByte(0);
+                return true;
+            }
+            catch (IOException) { Thread.Sleep(50); }
+        }
+        return false;
+    }
+
+    void ReleasePointsLock()
+    {
+        try { if (File.Exists(LOCK_FILE)) File.Delete(LOCK_FILE); } catch { }
     }
 
     Dictionary<string, Tuple<int, long>> ReadAll()
@@ -560,46 +670,73 @@ public class CPHInline
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 
 public class CPHInline
 {
     const string FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt";
+    const string LOCK_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt.lock";
 
     public bool Execute()
     {
         try
         {
-            var list = new List<Tuple<string, int>>();
-            if (File.Exists(FILE))
+            if (!AcquirePointsLock()) { CPH.SetArgument("topPointsResult", "Nobody has points yet. Chat to earn!"); return true; }
+            try
             {
-                foreach (string line in File.ReadAllLines(FILE))
+                var list = new List<Tuple<string, int>>();
+                if (File.Exists(FILE))
                 {
-                    string[] parts = line.Split('|');
-                    if (parts.Length >= 2)
+                    foreach (string line in File.ReadAllLines(FILE))
                     {
-                        string name = parts[0].Trim();
-                        int p;
-                        if (int.TryParse(parts[1].Trim(), out p) && !string.IsNullOrEmpty(name))
-                            list.Add(new Tuple<string, int>(name, p));
+                        string[] parts = line.Split('|');
+                        if (parts.Length >= 2)
+                        {
+                            string name = parts[0].Trim();
+                            int p;
+                            if (int.TryParse(parts[1].Trim(), out p) && !string.IsNullOrEmpty(name))
+                                list.Add(new Tuple<string, int>(name, p));
+                        }
                     }
                 }
+                list.Sort((a, b) => b.Item2.CompareTo(a.Item2));
+                string msg;
+                if (list.Count == 0)
+                    msg = "Nobody has points yet. Chat to earn!";
+                else
+                {
+                    var parts = new List<string>();
+                    int take = Math.Min(3, list.Count);
+                    for (int i = 0; i < take; i++)
+                        parts.Add((i + 1) + ". " + list[i].Item1 + " (" + list[i].Item2 + " pts)");
+                    msg = string.Join(" | ", parts);
+                }
+                CPH.SetArgument("topPointsResult", msg);
+                return true;
             }
-            list.Sort((a, b) => b.Item2.CompareTo(a.Item2));
-            string msg;
-            if (list.Count == 0)
-                msg = "Nobody has points yet. Chat to earn!";
-            else
-            {
-                var parts = new List<string>();
-                int take = Math.Min(3, list.Count);
-                for (int i = 0; i < take; i++)
-                    parts.Add((i + 1) + ". " + list[i].Item1 + " (" + list[i].Item2 + " pts)");
-                msg = string.Join(" | ", parts);
-            }
-            CPH.SetArgument("topPointsResult", msg);
-            return true;
+            finally { ReleasePointsLock(); }
         }
         catch (Exception ex) { CPH.SetArgument("topPointsResult", "Error: " + ex.Message); return true; }
+    }
+
+    bool AcquirePointsLock()
+    {
+        for (int i = 0; i < 200; i++)  // 10 sec at 50ms
+        {
+            try
+            {
+                using (var fs = new FileStream(LOCK_FILE, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                    fs.WriteByte(0);
+                return true;
+            }
+            catch (IOException) { Thread.Sleep(50); }
+        }
+        return false;
+    }
+
+    void ReleasePointsLock()
+    {
+        try { if (File.Exists(LOCK_FILE)) File.Delete(LOCK_FILE); } catch { }
     }
 }
 ```
@@ -676,6 +813,75 @@ The `points_command.py` script checks points, attempts the spawn, and **only ded
 - **Overlay server not running:** Start `python server.py` in `Lastest UI`.
 - **Game not connected:** Game must be running with streaming enabled (port 5001). Server console shows "Game WebSocket: waiting for game..." when disconnected.
 - **Test manually:** Run `python "Lastest UI\points_command.py" spawn rat YourUsername` in a terminal—should write `ok` to `spawn_result.txt` or an error.
+
+---
+
+## Action 3a: Spawn Champion (with points)
+
+**Trigger:** Command Triggered → `!champion` (enable **both Twitch and YouTube** as sources)
+
+**Usage:** `!champion <monster>` (e.g. `!champion rat`, `!champion eye`). Spawns a **champion** version of the specified monster (random type: Blazing, Projecting, Antimagic, Giant, Blessed, or Growing). Same valid monsters as `!spawn`. **Cost:** always **2× the base spawn cost** — no early-zone discount.
+
+**Sub-Actions (in order):**
+
+1. **Run a Program**
+   - **Target:** `python`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" champion %rawInput% %userName%`
+   - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait maximum:** `10` seconds
+   - **Note:** `%rawInput%` = monster name (e.g. rat, eye). Same as spawn.
+
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%` and `%championMonster%` (monster name on success, after the pipe):
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string RESULT_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spawn_result.txt";
+
+    public bool Execute()
+    {
+        string result = "Champion spawn failed (no result file - is overlay server running?)";
+        string monsterName = "";
+        try
+        {
+            if (File.Exists(RESULT_FILE))
+            {
+                result = File.ReadAllText(RESULT_FILE).Trim();
+                File.Delete(RESULT_FILE);
+                int pipe = result.IndexOf('|');
+                if (pipe >= 0)
+                {
+                    monsterName = result.Substring(pipe + 1).Trim();
+                    result = result.Substring(0, pipe).Trim();
+                }
+            }
+        }
+        catch (Exception ex) { result = ex.Message; }
+        CPH.SetArgument("spawnResult", result);
+        CPH.SetArgument("championMonster", monsterName);
+        return true;
+    }
+}
+```
+
+3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
+   - **True branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% spawned a champion %championMonster%!`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% spawned a champion %championMonster%!`
+     - Leave **False Result** empty for both.
+   - **False branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+     - Leave **False Result** empty for both.
+
+**Cost:** 2× base monster cost (e.g. rat = 10 pts, eye = 140 pts). No half-price discount for spawning in a later zone.
+
+**Add to the same blocking queue** as spawn, gold, and earn actions. Shares spawn cooldown with `!spawn`.
+
+**Fails when:** Same as spawn (not in run, hero dead, no space, unknown monster).
 
 ---
 
@@ -955,6 +1161,142 @@ public class CPHInline
 
 ---
 
+## Action 3e0: Place Trap (with points)
+
+**Trigger:** Command Triggered → `!trap` (enable **both Twitch and YouTube** as sources)
+
+**Usage:** `!trap` — places a random **visible** trap 1–4 tiles from the hero (same placement logic as gold). Picks from a pool of 27 traps; instant-death and very high-damage traps (Grim, Disintegration, Pitfall, Explosive, Rockfall, Gnoll Rockfall) are blacklisted by default. Configurable in game code.
+
+**Sub-Actions (in order):**
+
+1. **Run a Program**
+   - **Target:** `python`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" trap %userName%`
+   - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait maximum:** `10` seconds
+
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%` and `%trapName%`:
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string RESULT_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spawn_result.txt";
+
+    public bool Execute()
+    {
+        string result = "No result file - is overlay server running?";
+        string itemName = "";
+        try
+        {
+            if (File.Exists(RESULT_FILE))
+            {
+                result = File.ReadAllText(RESULT_FILE).Trim();
+                File.Delete(RESULT_FILE);
+                int pipe = result.IndexOf('|');
+                if (pipe >= 0)
+                {
+                    itemName = result.Substring(pipe + 1).Trim();
+                    result = result.Substring(0, pipe).Trim();
+                }
+            }
+        }
+        catch (Exception ex) { result = ex.Message; }
+        CPH.SetArgument("spawnResult", result);
+        CPH.SetArgument("trapName", itemName);
+        return true;
+    }
+}
+```
+
+3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
+   - **True branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% placed a %trapName% nearby!`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% placed a %trapName% nearby!`
+     - Leave **False Result** empty for both.
+   - **False branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+     - Leave **False Result** empty for both.
+
+**Cost:** 50 points (edit via points config).
+
+**Add to the same blocking queue** as spawn, gold, curse, gas, scroll, and earn actions.
+
+**Fails when:** Not in an active run, hero dead, no empty passable tile 1–4 tiles from hero (e.g. surrounded), or all traps blacklisted.
+
+---
+
+## Action 3e0a: Transmute (with points)
+
+**Trigger:** Command Triggered → `!transmute` (enable **both Twitch and YouTube** as sources)
+
+**Usage:** `!transmute` — transmutes a **random** transmutable item from the hero's bag or equipped slots (weapon, armor, ring, artifact, misc, second weapon). Same rules as Scroll of Transmutation: melee/missile weapons (except pickaxe on mining level, plain darts), potions (no brews/elixirs), scrolls, non-unique artifacts, rings, wands, trinkets, seeds, runestones. Cost 150 pts (configurable).
+
+**Sub-Actions (in order):**
+
+1. **Run a Program**
+   - **Target:** `python`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" transmute %userName%`
+   - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait maximum:** `10` seconds
+
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%` and `%transmuteItemName%`:
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string RESULT_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spawn_result.txt";
+
+    public bool Execute()
+    {
+        string result = "No result file - is overlay server running?";
+        string itemName = "";
+        try
+        {
+            if (File.Exists(RESULT_FILE))
+            {
+                result = File.ReadAllText(RESULT_FILE).Trim();
+                File.Delete(RESULT_FILE);
+                int pipe = result.IndexOf('|');
+                if (pipe >= 0)
+                {
+                    itemName = result.Substring(pipe + 1).Trim();
+                    result = result.Substring(0, pipe).Trim();
+                }
+            }
+        }
+        catch (Exception ex) { result = ex.Message; }
+        CPH.SetArgument("spawnResult", result);
+        CPH.SetArgument("transmuteItemName", itemName);
+        return true;
+    }
+}
+```
+
+3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
+   - **True branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% transmuted an item into %transmuteItemName%!`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% transmuted an item into %transmuteItemName%!`
+     - Leave **False Result** empty for both.
+   - **False branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+     - Leave **False Result** empty for both.
+
+**Cost:** 150 points (edit via points config).
+
+**Add to the same blocking queue** as spawn, gold, curse, gas, scroll, trap, and earn actions.
+
+**Fails when:** Not in an active run, hero dead, or no transmutable item (need at least one weapon, armor, ring, artifact, potion, scroll, wand, seed, runestone, or trinket in bag or equipped).
+
+---
+
 ## Action 3e1: Random Buff (with points)
 
 **Trigger:** Command Triggered → `!buff` (enable **both Twitch and YouTube** as sources)
@@ -1092,7 +1434,7 @@ public class CPHInline
 - **Add Wait maximum:** The Run a Program step must have **Wait maximum: 10 seconds**. Without it, Streamer.bot runs the C# step before Python finishes writing `spawn_result.txt`.
 - **Overlay running:** Ensure `python server.py` is running in `Lastest UI`.
 - **Game connected:** The game must be running with streaming enabled (port 5001). Overlay console shows "Game WebSocket: waiting for game..." when disconnected.
-- **Test manually:** From project root: `python "Lastest UI\points_command.py" scroll YourUsername`. From `Lastest UI` folder: `python points_command.py scroll YourUsername`. Should write `ok|ScrollName` or an error to `spawn_result.txt`.
+- **Test manually:** From project root: `python "Lastest UI\points_command.py" scroll YourUsername`. From `Lastest UI` folder: `python points_command.py scroll YourUsername`. Should write `ok|ScrollName` or an error to `spawn_result.txt`. For trap: `python points_command.py trap YourUsername` → `ok|TrapName` or error.
 
 ---
 
@@ -1340,7 +1682,7 @@ public class CPHInline
 
 ## Action 4b: Earn Points (Super Chat / Cheer)
 
-**Rate:** 1 point per $0.01 USD. Super Chats use the [Frankfurter API](https://www.frankfurter.app/) for currency conversion (no API key). Twitch bits: 100 bits = $1 = 100 points.
+**Rate:** 1 point per $0.01 USD. Super Chats use the [Frankfurter API](https://www.frankfurter.app/) for currency conversion (no API key). Twitch bits: 100 bits = $1 = 100 points. **When !doublepoints is active, Super Chat and Cheer points are doubled** (same as chat earn).
 
 **Add both actions to your points queue** (same blocking queue as earn/spend) to avoid race conditions.
 
@@ -1388,20 +1730,47 @@ Clears all points when you go live so everyone starts fresh each stream.
 ```csharp
 using System;
 using System.IO;
+using System.Threading;
 
 public class CPHInline
 {
     const string FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt";
+    const string LOCK_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt.lock";
 
     public bool Execute()
     {
         try
         {
-            if (File.Exists(FILE))
-                File.Delete(FILE);
-            return true;
+            if (!AcquirePointsLock()) return false;
+            try
+            {
+                if (File.Exists(FILE))
+                    File.Delete(FILE);
+                return true;
+            }
+            finally { ReleasePointsLock(); }
         }
         catch (Exception ex) { CPH.LogInfo("Reset points: " + ex.Message); return false; }
+    }
+
+    bool AcquirePointsLock()
+    {
+        for (int i = 0; i < 200; i++)  // 10 sec at 50ms
+        {
+            try
+            {
+                using (var fs = new FileStream(LOCK_FILE, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                    fs.WriteByte(0);
+                return true;
+            }
+            catch (IOException) { Thread.Sleep(50); }
+        }
+        return false;
+    }
+
+    void ReleasePointsLock()
+    {
+        try { if (File.Exists(LOCK_FILE)) File.Delete(LOCK_FILE); } catch { }
     }
 }
 ```
@@ -1415,10 +1784,13 @@ public class CPHInline
 | **!points** | `!points` | Free | Check your point balance. |
 | **!toppoints** | `!toppoints` | Free | Show top 3 point holders. |
 | **!spawn** | `!spawn <monster>` | Varies by monster (5–80 pts) | Spawn a monster near the hero. Half price when spawned beyond its native biome. Valid monsters: rat, albino, snake, gnoll, crab, slime, swarm, thief, skeleton, bat, brute, shaman, spinner, dm100, guard, necromancer, ghoul, elemental, warlock, monk, golem, succubus, eye, scorpio. |
+| **!champion** | `!champion <monster>` | 2× base (10–160 pts) | Spawn a **champion** version of the monster (random type: Blazing, Projecting, Antimagic, Giant, Blessed, Growing). Same monster list as spawn. No zone discount. |
 | **!gold** | `!gold <amount>` | 2 pts per gold | Drop gold near the hero. Amount 1–100 required (e.g. `!gold 10` = 20 pts). |
 | **!curse** | `!curse` | 200 pts | Curse a **random** equipped item (weapon, armor, ring, artifact, or misc). |
 | **!gas** | `!gas` | 75 pts | Spawn random gas (Chaotic Censer +3). Toxic, confusion, regrowth, storm clouds, smoke, stench, inferno, blizzard, or corrosive gas. |
 | **!scroll** | `!scroll` | 100 pts | Use a random scroll (like +10 Unstable Spellbook). 50% chance for exotic version. |
+| **!trap** | `!trap` | 50 pts | Place a random visible trap 1–4 tiles from the hero. Pool of 27 traps (instant-death/high-damage ones blacklisted). |
+| **!transmute** | `!transmute` | 150 pts | Transmute a random transmutable item from bag or equipped. Same rules as Scroll of Transmutation. |
 | **!buff** | `!buff` | 75 pts | Apply a random buff (Haste, Healing, Barrier, Invisibility, etc.). Healing = 10% HP over 10 turns; Barrier = 10% HP shield. |
 | **!debuff** | `!debuff` | 50 pts | Apply a random debuff (Blindness, Slow, Roots, Daze, etc.). Excludes Paralysis, Burning, Poison. |
 | **!wand** | `!wand common` (tier required) | 50–400 pts | Trigger a cursed wand effect. Tier required: common, uncommon, rare, or veryrare. |
@@ -1432,21 +1804,24 @@ public class CPHInline
 
 | Action       | Trigger           | Purpose                                      |
 |-------------|-------------------|----------------------------------------------|
-| Earn Points | Message Received  | +1 per message (30s cooldown; 2x double points; 2x if top farder) |
-| Earn Points (passive) | Present Viewers | +1 per tick (60s cooldown; 2x double points; 2x if top farder) |
-| First Words Bonus     | (add to your First Words action) | +5 on first chat (2x double points; 2x if top farder) |
+| Earn Points | Message Received  | +1 per message (30s cooldown; 2x double points; 2x top farder; 2x sub/member) |
+| Earn Points (passive) | Present Viewers | +1 per tick (60s cooldown; 2x double points; 2x top farder; 2x sub/member) |
+| First Words Bonus     | (add to your First Words action) | +5 on first chat (2x double points; 2x top farder; 2x sub/member) |
 | Check Points| !points           | Show viewer their balance                    |
 | Top Points  | !toppoints        | Show top 3 point holders in chat              |
 | Spawn Monster| !spawn           | Deduct points (cost varies by monster)       |
+| Spawn Champion | !champion      | Spawn champion version of monster (2× base cost, no discount) |
 | Drop Gold    | !gold <amount>  | Spend points to drop gold (2 pts/gold, amount required) |
 | Curse Item   | !curse         | Spend points to curse a random equipped item (200 pts) |
 | Spawn Gas    | !gas           | Spend points to spawn random gas (Chaotic Censer +3, 75 pts) |
 | Random Scroll | !scroll        | Spend points to use a random scroll (like +10 Unstable Spellbook, 100 pts) |
+| Place Trap    | !trap          | Spend points to place a random visible trap nearby (50 pts) |
+| Transmute     | !transmute    | Spend points to transmute a random transmutable item from bag or equipped (150 pts) |
 | Random Buff   | !buff          | Spend points to apply a random buff (75 pts, e.g. Haste, Healing, Barrier) |
 | Random Debuff | !debuff        | Spend points to apply a random debuff (50 pts, e.g. Blindness, Slow, Roots) |
 | Cursed Wand   | !wand          | Spend points to trigger a random cursed wand effect (50–400 pts by rarity) |
-| Super Chat Points | YouTube Super Chat | 1 pt per $0.01 (currency converted via Frankfurter API) |
-| Cheer Points | Twitch Cheer | 1 pt per bit (100 bits = $1 = 100 pts) |
+| Super Chat Points | YouTube Super Chat | 1 pt per $0.01 (currency converted via Frankfurter API); 2x when !doublepoints active |
+| Cheer Points | Twitch Cheer | 1 pt per bit (100 bits = $1 = 100 pts); 2x when !doublepoints active |
 | Double Points | !doublepoints (streamer only) | 2x points for N minutes: `!doublepoints 5` |
 | Reset Points| Stream Started    | Clear all points when you go live            |
 

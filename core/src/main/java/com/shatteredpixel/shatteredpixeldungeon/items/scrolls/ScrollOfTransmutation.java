@@ -24,6 +24,7 @@ package com.shatteredpixel.shatteredpixeldungeon.items.scrolls;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
+import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Speck;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Transmuting;
@@ -56,6 +57,9 @@ import com.shatteredpixel.shatteredpixeldungeon.plants.Plant;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSpriteSheet;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
 import com.watabou.utils.Reflection;
+
+import java.util.ArrayList;
+import com.watabou.utils.Random;
 
 public class ScrollOfTransmutation extends InventoryScroll {
 	
@@ -93,6 +97,81 @@ public class ScrollOfTransmutation extends InventoryScroll {
 		} else {
 			return item instanceof Ring || item instanceof Wand || item instanceof Trinket
 					|| item instanceof Plant.Seed || item instanceof Runestone;
+		}
+	}
+
+	/** For chat/streaming: pick one random transmutable item from hero's bag and equipped, transmute it. Returns result with original and new item, or null if none. Caller should GLog. */
+	public static class TransmuteResult {
+		public final String originalName;
+		public final Item result;
+		public TransmuteResult(String originalName, Item result) {
+			this.originalName = originalName;
+			this.result = result;
+		}
+	}
+
+	public static TransmuteResult transmuteOneRandom(Hero hero) {
+		ScrollOfTransmutation scroll = new ScrollOfTransmutation();
+		identifiedByUse = true;
+		ArrayList<Item> list = new ArrayList<>();
+		for (Item i : hero.belongings.backpack) {
+			if (scroll.usableOnItem(i)) list.add(i);
+		}
+		if (hero.belongings.weapon() != null && scroll.usableOnItem(hero.belongings.weapon())) list.add(hero.belongings.weapon());
+		if (hero.belongings.armor() != null && scroll.usableOnItem(hero.belongings.armor())) list.add(hero.belongings.armor());
+		if (hero.belongings.ring() != null && scroll.usableOnItem(hero.belongings.ring())) list.add(hero.belongings.ring());
+		if (hero.belongings.artifact() != null && scroll.usableOnItem(hero.belongings.artifact())) list.add(hero.belongings.artifact());
+		if (hero.belongings.misc() != null && scroll.usableOnItem(hero.belongings.misc())) list.add(hero.belongings.misc());
+		if (hero.belongings.secondWep() != null && scroll.usableOnItem(hero.belongings.secondWep())) list.add(hero.belongings.secondWep());
+		identifiedByUse = false;
+		if (list.isEmpty()) return null;
+		Item item = Random.element(list);
+		String originalName = item.name();
+		Item result = changeItem(item);
+		if (result == null) return null;
+		if (result != item) {
+			replaceTransmutedItem(hero, item, result);
+		}
+		if (result.isIdentified()) {
+			Catalog.setSeen(result.getClass());
+			Statistics.itemTypesDiscovered.add(result.getClass());
+		}
+		Transmuting.show(hero, item, result);
+		hero.sprite.emitter().start(Speck.factory(Speck.CHANGE), 0.2f, 10);
+		return new TransmuteResult(originalName, result);
+	}
+
+	private static void replaceTransmutedItem(Hero hero, Item item, Item result) {
+		int slot = Dungeon.quickslot.getSlot(item);
+		if (item.isEquipped(hero)) {
+			item.cursed = false;
+			if (item instanceof Artifact && result instanceof Ring) {
+				((EquipableItem) item).doUnequip(hero, false);
+				if (!result.collect()) {
+					Dungeon.level.drop(result, hero.pos).sprite.drop();
+				}
+			} else if (item instanceof KindOfWeapon && hero.belongings.secondWep() == item) {
+				((EquipableItem) item).doUnequip(hero, false);
+				((KindOfWeapon) result).equipSecondary(hero);
+			} else {
+				((EquipableItem) item).doUnequip(hero, false);
+				((EquipableItem) result).doEquip(hero);
+			}
+			hero.spend(-hero.cooldown());
+		} else {
+			if (item instanceof MissileWeapon && !(item instanceof TippedDart)) {
+				item.detachAll(hero.belongings.backpack);
+			} else {
+				item.detach(hero.belongings.backpack);
+			}
+			if (!result.collect()) {
+				Dungeon.level.drop(result, hero.pos).sprite.drop();
+			} else if (result.stackable && hero.belongings.getSimilar(result) != null) {
+				result = hero.belongings.getSimilar(result);
+			}
+		}
+		if (slot != -1 && result.defaultAction() != null && !Dungeon.quickslot.isNonePlaceholder(slot) && hero.belongings.contains(result)) {
+			Dungeon.quickslot.setSlot(slot, result);
 		}
 	}
 	

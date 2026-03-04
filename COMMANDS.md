@@ -11,10 +11,13 @@ Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also g
 | **!points** | Check your balance |
 | **!toppoints** / **!leaderboard** | Top 3 point holders |
 | **!spawn** \<monster\> | Spawn a monster (cost varies). Half price when spawned beyond its native area (e.g. sewer mobs in prison+). Examples: `!spawn rat`, `!spawn bat`, `!spawn scorpio` |
+| **!champion** \<monster\> | Spawn a **champion** version of that monster (2× base cost, **no zone discount**). Random type: Blazing, Projecting, Antimagic, Giant, Blessed, Growing. Examples: `!champion rat`, `!champion eye` |
 | **!gold** \<amount\> | Drop gold near the hero (pts per gold configurable, amount 1–100). Example: `!gold 25` |
 | **!curse** | Curse a **random** equipped item (200 pts). No slot needed — picks weapon, armor, ring, artifact, or misc at random. |
 | **!gas** | Spawn random gas (75 pts). Toxic, confusion, storm clouds, inferno, blizzard, and more! |
 | **!scroll** | Use a random scroll (100 pts). Like +10 Unstable Spellbook — 50% chance for exotic version! |
+| **!trap** | Place a random visible trap 1–4 tiles from the hero (50 pts). Pool of 27 traps (instant-death/high-damage blacklisted). |
+| **!transmute** | Transmute a random transmutable item from bag or equipped (150 pts). Same rules as Scroll of Transmutation. |
 | **!buff** | Apply a random buff (75 pts). Haste, Healing, Barrier, Invisibility, Levitation, and more! |
 | **!debuff** | Apply a random debuff (50 pts). Blindness, Slow, Roots, Daze, Weakness, and more! |
 | **!wand** \<tier\> | Trigger a cursed wand effect. **Tier required:** common (50 pts), uncommon (100 pts), rare (200 pts), or veryrare (400 pts). Burn, freeze, teleport, gas, sheep, and more! |
@@ -41,5 +44,7 @@ Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also g
 | 80 | scorpio |
 
 ---
+
+**Champion:** 2× base cost (no zone discount). e.g. !champion rat = 10 pts, !champion eye = 140 pts.
 
 *Costs are configurable by the streamer (points config / overlay).*
