@@ -20,6 +20,7 @@ local.properties
 *.idea
 
 # Lastest UI generated/runtime
+Lastest UI/**/My-Nice-Script_*.cmd
 Lastest UI/game_summary.txt
 Lastest UI/game_summary.json
 Lastest UI/last_seed.txt

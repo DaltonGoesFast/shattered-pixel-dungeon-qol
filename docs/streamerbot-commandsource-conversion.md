@@ -4,24 +4,7 @@ This guide helps you convert actions that have separate Twitch and YouTube versi
 
 ---
 
-## Step 1: Decode Your Export (Optional)
-
-You can inspect your export structure to see action names and sub-action types:
-
-1. Copy your full Streamer.bot export string (from Export → Export to Clipboard)
-2. Paste it into a new file: `Lastest UI/streamerbot_export.txt` (no extra spaces or line breaks in the middle of the string)
-3. Run the decoder:
-
-```powershell
-cd "C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI"
-python convert_to_commandsource.py streamerbot_export.txt
-```
-
-4. This creates `streamerbot_export_decoded.json` with the raw action structure (useful for reference).
-
----
-
-## Step 2: Manual Conversion Pattern
+## Step 1: Manual Conversion Pattern
 
 Because Streamer.bot's internal format is complex, **automated conversion isn't reliable**. Use this pattern manually for each spend command (spawn, gold, curse, gas, scroll, buff, debuff, wand):
 
@@ -54,7 +37,7 @@ Because Streamer.bot's internal format is complex, **automated conversion isn't 
 
 ---
 
-## Step 3: Commands to Convert
+## Step 2: Commands to Convert
 
 | Command | Success Message | C# Sets |
 |---------|-----------------|---------|
@@ -69,7 +52,7 @@ Because Streamer.bot's internal format is complex, **automated conversion isn't 
 
 ---
 
-## Step 4: Delete Duplicate Actions
+## Step 3: Delete Duplicate Actions
 
 After converting each action to use commandSource:
 1. Delete the platform-specific duplicate (e.g. "Scroll TW" and "Scroll YT")

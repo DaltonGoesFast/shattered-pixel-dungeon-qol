@@ -29,34 +29,18 @@ Connect chat `!spawn <monster>` to the SPD overlay server. Works with **Twitch a
 
 Create an action that runs when the command is triggered. Two options:
 
-### Option A: Run a Program with Python script (recommended)
-
-1. Use the included `spawn_post.py` in the `Lastest UI` folder.
-2. **Triggers** → Add **Command Triggered** → Select your `!spawn` command
-3. **Sub-Actions** → Add **Run a Program** (Core → System → Run a Program, or search "Run a Program")
-4. **Command:** `python` (the executable)
-5. **Arguments:** Enter the full path to the script (in quotes), then the two variables:
-   - `"C:\path\to\Lastest UI\spawn_post.py"` — The script path. Replace with your actual project path, e.g. `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spawn_post.py"`
-   - `%rawInput%` — The text after the command (the monster name). For `!spawn rat`, this is `rat`. (If that doesn't work, try `%input0%`.)
-   - `%userName%` — The Twitch username. This appears in the in-game log.
-   
-   **Full example:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spawn_post.py" %rawInput% %userName%`
-6. Ensure variable substitution is enabled for the Arguments field (Streamer.bot should replace `%rawInput%` and `%userName%` with real values). If `%input1%` was not being replaced, try `%rawInput%` instead.
-
-**Note:** The chatter's name is sent to the game and shown in the in-game log (e.g. "ViewerName spawned a rat!").
-
-### Option A2: Run Command with PowerShell (no extra file)
+### Option A: Run Command with PowerShell
 
 1. **Triggers** → Add **Command Triggered** → Select your `!spawn` command
 2. **Actions** → Add **Run Command** sub-action
 3. **Program:** `powershell`
-4. **Arguments:** (PowerShell does not easily pass username; use Option A for chatter name in log)
+4. **Arguments:** (PowerShell does not easily pass username; use Option B for chatter name in log)
    ```
    -NoProfile -Command "Invoke-RestMethod -Uri 'http://127.0.0.1:5000/api/spawn-command' -Method POST -ContentType 'application/json' -Body ('{\"monster\":\"%input1%\"}')"
    ```
 5. **Replace in Arguments:** Enable
 
-If the JSON body is malformed, use Option A with the Python script instead.
+**Note:** The PowerShell option does not easily pass the chatter's username to the game. For chatter name in the in-game log, use Option B (C# Code) instead.
 
 ### Option B: C# Code (more control, error handling)
 
@@ -172,23 +156,7 @@ Unknown monsters return `400` with `{"ok": false, "error": "Unknown monster: ...
 
 ## Game State Variables (Seed, Depth, etc.)
 
-To use the current game seed in chat commands (e.g. `!seed`), use the file-based approach (Run a Program output capture is unreliable in Streamer.bot):
-
-### Sub-actions (in order)
-
-1. **Run a Program**
-   - **Target:** Path to `python.exe` (e.g. `python` or full path)
-   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\get_game_seed.py" %input1%`
-   - **Wait maximum:** `5` seconds
-
-2. **Read Specific Line From File** (Core → File I/O)
-   - **File:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\last_seed.txt`
-   - **Line Number:** `1`
-   - **Variable Name:** `gameSeed` (or leave default `line` and use `%line%`)
-
-3. **Twitch/YouTube Message:** `Current Seed: %gameSeed%` (or `%line%` if you kept the default)
-
-The script writes the seed to `last_seed.txt`; Streamer.bot reads it. If no game is running, the file may be empty or stale—consider adding a conditional to skip the message when `%gameSeed%` is empty.
+To use the current game seed in chat commands (e.g. `!seed`), fetch from the overlay server's `game_summary.json` (e.g. `http://127.0.0.1:5000/game_summary.json`) using C# or a custom script. The `seed` key contains the current game seed when a game is active.
 
 ---
 
@@ -219,7 +187,7 @@ Create a new action (e.g. **Spawn Monster (Points)**) with these sub-actions **i
 |---|------------|-------|
 | 1 | **Get Global Points** (Points System) | Source: **User** → `%userName%`. Output goes to `%pointsArgs%` (or the variable your extension uses). |
 | 2 | **Conditional** | `if (%pointsArgs% >= 100)` — adjust `100` to your desired cost. |
-| 3a | **True branch** | **Add Points** (Points System): add `-100` (negative = deduct). Then **Run a Program**: `python` with args `"path\to\spawn_post.py" %input1% %userName%`. |
+| 3a | **True branch** | **Add Points** (Points System): add `-100` (negative = deduct). Then **Run a Program**: `python` with args `"path\to\points_command.py" spawn %input1% %userName%`. |
 | 3b | **False branch** | **Twitch Message**: `Not enough points! Spawns cost 100 points. You have %pointsArgs%.` |
 
 ### 3. Cost Options
