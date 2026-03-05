@@ -19,6 +19,9 @@ local.properties
 *.iml
 *.idea
 
+# Cursor IDE
+.cursor/
+
 # Lastest UI generated/runtime
 Lastest UI/**/My-Nice-Script_*.cmd
 Lastest UI/game_summary.txt
