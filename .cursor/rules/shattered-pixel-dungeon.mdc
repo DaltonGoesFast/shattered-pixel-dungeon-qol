@@ -1,0 +1,26 @@
+---
+description: Shattered Pixel Dungeon mod project conventions
+globs: "**/*.java"
+alwaysApply: false
+---
+
+# Shattered Pixel Dungeon Mod
+
+## Project structure
+
+- `core/` - Main game logic, assets, messages
+- `SPD-classes/` - Upstream libGDX/SPD base classes (avoid editing)
+- `desktop/` - Desktop launcher, streaming server
+- `android/` - Android build
+
+## Key files for common changes
+
+- **Settings**: `SPDSettings.java` (keys + get/set), `WndSettings.java` (UI), `windows.properties` (strings)
+- **UI components**: `core/.../ui/`
+- **Actors/mobs**: `core/.../actors/`
+
+## Conventions
+
+- Follow existing SPD style: package `com.shatteredpixel.shatteredpixeldungeon.*`
+- Add new settings via `SPDSettings` + `WndSettings` + `windows.properties`
+- Use `Messages.get()` for user-facing text; add keys to `*.properties` in `core/src/main/assets/messages/`

@@ -155,6 +155,14 @@
       <input type="number" id="cost_per_transmute" min="1" value="150">
     </div>
     <div class="row">
+      <label for="cost_per_ally_bee">Bee:</label>
+      <input type="number" id="cost_per_ally_bee" min="1" value="75">
+    </div>
+    <div class="row">
+      <label for="cost_per_ward">Ward:</label>
+      <input type="number" id="cost_per_ward" min="1" value="30">
+    </div>
+    <div class="row">
       <label for="cost_per_buff">Random buff:</label>
       <input type="number" id="cost_per_buff" min="1" value="75">
     </div>
@@ -198,7 +206,7 @@
   <div class="col-center">
   <section>
     <h2>Viewer points <span id="vpUpdated" style="margin-left:6px;font-weight:normal;color:#94a1b2;font-size:0.85rem;">—</span></h2>
-    <p class="sub" style="margin-bottom: 0.75rem;">Search to filter, or type a new username + points to add. Auto-refreshes every 3s. Used by !spawn, !champion, !gold, !curse, !gas, !scroll, !trap, !transmute, !wand.</p>
+    <p class="sub" style="margin-bottom: 0.75rem;">Search to filter, or type a new username + points to add. Auto-refreshes every 3s. Used by !spawn, !champion, !gold, !curse, !gas, !scroll, !trap, !transmute, !bee, !wand.</p>
     <div class="search-bar">
       <input type="text" id="vp_search" placeholder="Search users or type new username…" autocomplete="off">
       <input type="number" id="new_points" placeholder="Pts" min="0" value="100" style="width: 64px;">
@@ -252,6 +260,8 @@
           document.getElementById('cost_per_scroll').value = data.cost_per_scroll ?? 100;
           document.getElementById('cost_per_trap').value = data.cost_per_trap ?? 50;
           document.getElementById('cost_per_transmute').value = data.cost_per_transmute ?? 150;
+          document.getElementById('cost_per_ally_bee').value = data.cost_per_ally_bee ?? 75;
+          document.getElementById('cost_per_ward').value = data.cost_per_ward ?? 30;
           document.getElementById('cost_per_buff').value = data.cost_per_buff ?? 75;
           document.getElementById('cost_per_debuff').value = data.cost_per_debuff ?? 50;
           document.getElementById('cost_per_wand_common').value = data.cost_per_wand_common ?? 50;
@@ -286,6 +296,8 @@
         cost_per_scroll: parseInt(document.getElementById('cost_per_scroll').value, 10) || 100,
         cost_per_trap: parseInt(document.getElementById('cost_per_trap').value, 10) || 50,
         cost_per_transmute: parseInt(document.getElementById('cost_per_transmute').value, 10) || 150,
+        cost_per_ally_bee: parseInt(document.getElementById('cost_per_ally_bee').value, 10) || 75,
+        cost_per_ward: parseInt(document.getElementById('cost_per_ward').value, 10) || 30,
         cost_per_buff: parseInt(document.getElementById('cost_per_buff').value, 10) || 75,
         cost_per_debuff: parseInt(document.getElementById('cost_per_debuff').value, 10) || 50,
         cost_per_wand_common: parseInt(document.getElementById('cost_per_wand_common').value, 10) || 50,

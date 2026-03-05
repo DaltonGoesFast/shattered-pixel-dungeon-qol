@@ -72,17 +72,23 @@ public class BossHealthBar extends Component {
 		instance = this;
 	}
 
+	/** Returns true if c is a valid Mob target (alive, in level). */
+	private boolean isValidTarget(Char c) {
+		return c != null && c.isAlive() && Actor.chars().contains(c) && c instanceof Mob;
+	}
+
 	/** Returns the Mob to display: the assigned boss, or the current target if it's a Mob (QoL: full bar for target). */
 	private Mob getDisplayMob() {
 		if (boss != null && boss.isAlive() && Dungeon.level != null && Dungeon.level.mobs.contains(boss))
 			return boss;
+		if (!SPDSettings.bossBarAllEnemies())
+			return null;
 		Char target = null;
 		if (TargetHealthIndicator.instance != null)
 			target = TargetHealthIndicator.instance.target();
 		if (target == null && QuickSlotButton.lastTarget != null)
 			target = QuickSlotButton.lastTarget;
-		if (target instanceof Mob && target.isAlive()
-				&& Actor.chars().contains(target))
+		if (isValidTarget(target))
 			return (Mob) target;
 		return null;
 	}
@@ -193,8 +199,15 @@ public class BossHealthBar extends Component {
 		}
 
 		Mob toShow = getDisplayMob();
-		if (toShow == null) {
+		// Sync with Switch Enemy (DangerIndicator): only show when there are visible enemies
+		boolean switchEnemyVisible = Dungeon.hero != null && Dungeon.hero.isAlive() && Dungeon.hero.visibleEnemies() > 0;
+		if (toShow == null || !switchEnemyVisible) {
+			if (TargetHealthIndicator.instance != null)
+				TargetHealthIndicator.instance.target(null);
+			if (QuickSlotButton.lastTarget != null && !isValidTarget(QuickSlotButton.lastTarget))
+				QuickSlotButton.lastTarget = null;
 			visible = false;
+			if (bossInfo != null) bossInfo.active = false;
 			if (currentDisplayMob != null) {
 				teardownDisplayMob();
 				currentDisplayMob = null;
@@ -203,6 +216,7 @@ public class BossHealthBar extends Component {
 		}
 
 		visible = true;
+		if (bossInfo != null) bossInfo.active = true;
 
 		// When display mob changes (boss vs target, or different target), refresh skull and buffs
 		if (toShow != currentDisplayMob) {
@@ -289,26 +303,32 @@ public class BossHealthBar extends Component {
 		BossHealthBar.boss = boss;
 		bleed(false);
 		if (instance != null) {
+			final Mob b = boss;
 			ShatteredPixelDungeon.runOnRenderThread(new Callback() {
 				@Override
 				public void call() {
-					instance.visible = instance.active = true;
-					instance.currentDisplayMob = boss; // so update() won't re-setup
-					if (boss != null){
+					boolean valid = b != null && b.isAlive() && Dungeon.level != null && Dungeon.level.mobs.contains(b);
+					boolean switchEnemyVisible = Dungeon.hero != null && Dungeon.hero.isAlive() && Dungeon.hero.visibleEnemies() > 0;
+					if (valid && switchEnemyVisible) {
+						instance.visible = true;
+						if (instance.bossInfo != null) instance.bossInfo.active = true;
+					}
+					instance.currentDisplayMob = b; // so update() won't re-setup
+					if (b != null){
 						if (instance.large){
 							if (instance.skull != null){
 								instance.remove(instance.skull);
 								// only destroy our default icon, not a previous target's sprite
 								if (instance.skull instanceof Image) instance.skull.destroy();
 							}
-							instance.skull = boss.sprite();
+							instance.skull = b.sprite();
 							instance.add(instance.skull);
 						}
 						if (instance.buffs != null){
 							instance.remove(instance.buffs);
 							instance.buffs.destroy();
 						}
-						instance.buffs = new BuffIndicator(boss, instance.large);
+						instance.buffs = new BuffIndicator(b, instance.large);
 						BuffIndicator.setBossInstance(instance.buffs);
 						instance.add(instance.buffs);
 						instance.layout();

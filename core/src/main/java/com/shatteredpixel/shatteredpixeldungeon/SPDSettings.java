@@ -54,6 +54,7 @@ public class SPDSettings extends GameSettings {
 	public static final String KEY_ZOOM			= "zoom";
 	public static final String KEY_BRIGHTNESS	= "brightness";
 	public static final String KEY_GRID 	    = "visual_grid";
+	public static final String KEY_TILE_INDICATOR = "tile_indicator";
 	public static final String KEY_CAMERA_FOLLOW= "camera_follow";
 	public static final String KEY_SCREEN_SHAKE = "screen_shake";
 	
@@ -102,6 +103,14 @@ public class SPDSettings extends GameSettings {
 		return getInt( KEY_GRID, 0, -1, 2 );
 	}
 
+	public static void tileIndicator( boolean value ) {
+		put( KEY_TILE_INDICATOR, value );
+	}
+
+	public static boolean tileIndicator() {
+		return getBoolean( KEY_TILE_INDICATOR, true );
+	}
+
 	public static void cameraFollow( int value ){
 		put( KEY_CAMERA_FOLLOW, value );
 	}
@@ -121,12 +130,12 @@ public class SPDSettings extends GameSettings {
 	//Interface
 
 	public static final String KEY_UI_SIZE 	    = "full_ui";
-	public static final String KEY_UI_MARGIN_X   = "ui_margin_x";
-	public static final String KEY_UI_MARGIN_Y   = "ui_margin_y";
 	public static final String KEY_SCALE		= "scale";
 	public static final String KEY_QUICK_SWAP	= "quickslot_swapper";
 	public static final String KEY_FLIPTOOLBAR	= "flipped_ui";
 	public static final String KEY_FLIPTAGS 	= "flip_tags";
+	public static final String KEY_CENTER_ON_CYCLE_NO_ENEMIES = "center_on_cycle_no_enemies";
+	public static final String KEY_BOSS_BAR_ALL_ENEMIES = "boss_bar_all_enemies";
 	public static final String KEY_BARMODE		= "toolbar_mode";
 	public static final String KEY_SLOTWATERSKIN= "quickslot_waterskin";
 	public static final String KEY_SYSTEMFONT	= "system_font";
@@ -152,22 +161,6 @@ public class SPDSettings extends GameSettings {
 		return size;
 	}
 
-	/** Extra horizontal margin (virtual pixels) added to left and right; pulls UI toward center. 0 = default. */
-	public static void uiMarginX( int value ) {
-		put( KEY_UI_MARGIN_X, Math.max( 0, Math.min( 24, value ) ) );
-	}
-	public static int uiMarginX() {
-		return getInt( KEY_UI_MARGIN_X, 0, 0, 24 );
-	}
-
-	/** Extra vertical margin (virtual pixels) added to top and bottom; pulls UI toward center. 0 = default. */
-	public static void uiMarginY( int value ) {
-		put( KEY_UI_MARGIN_Y, Math.max( 0, Math.min( 24, value ) ) );
-	}
-	public static int uiMarginY() {
-		return getInt( KEY_UI_MARGIN_Y, 0, 0, 24 );
-	}
-
 	public static void scale( int value ) {
 		put( KEY_SCALE, value );
 	}
@@ -191,6 +184,22 @@ public class SPDSettings extends GameSettings {
 	}
 	
 	public static boolean flipTags(){ return getBoolean(KEY_FLIPTAGS, false); }
+
+	public static void centerOnCycleNoEnemies( boolean value ) {
+		put( KEY_CENTER_ON_CYCLE_NO_ENEMIES, value );
+	}
+
+	public static boolean centerOnCycleNoEnemies() {
+		return getBoolean( KEY_CENTER_ON_CYCLE_NO_ENEMIES, false );
+	}
+
+	public static void bossBarAllEnemies( boolean value ) {
+		put( KEY_BOSS_BAR_ALL_ENEMIES, value );
+	}
+
+	public static boolean bossBarAllEnemies() {
+		return getBoolean( KEY_BOSS_BAR_ALL_ENEMIES, true );
+	}
 	
 	public static void toolbarMode( String value ) {
 		put( KEY_BARMODE, value );

@@ -23,6 +23,7 @@ package com.shatteredpixel.shatteredpixeldungeon.ui;
 
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.tiles.DungeonTilemap;
 import com.watabou.input.PointerEvent;
 import com.watabou.noosa.Camera;
@@ -58,7 +59,7 @@ public class TileIndicator extends Component {
 			image.scale.set( s );
 		}
 		PointF hover = PointerEvent.currentHoverPos();
-		if ( hover != null ) {
+		if ( hover != null && SPDSettings.tileIndicator() ) {
 			int cell = tilemap.screenToTile( (int) hover.x, (int) hover.y );
 			if ( Dungeon.level != null && Dungeon.level.insideMap( cell ) ) {
 				PointF p = DungeonTilemap.tileToWorld( cell );

@@ -28,6 +28,8 @@ Before implementing, ensure:
 10. Action 3e (!scroll) — spend points to use a random scroll (like +10 Unstable Spellbook)
 11. Action 3e0 (!trap) — spend points to place a random visible trap nearby
 11a. Action 3e0a (!transmute) — spend points to transmute a random transmutable item (bag or equipped)
+11b. Action 3e0b (!bee) — spend points to summon an allied bee (50 turns)
+11c. Action 3e0c (!ward) — spend points to summon a ward (scales with depth; upgrades existing if same tile)
 12. Action 3e1 (!buff) — spend points to apply a random buff (Haste, Healing, Barrier, etc.)
 13. Action 3e2 (!debuff) — spend points to apply a random debuff (Blindness, Slow, Roots, etc.)
 14. Action 3f (!wand) — spend points to trigger a random cursed wand effect (cost varies by rarity)
@@ -41,7 +43,7 @@ Before implementing, ensure:
 
 ## YouTube Support
 
-- **Commands (!spawn, !champion, !gold, !curse, !gas, !scroll, !trap, !transmute, !buff, !debuff, !wand, !points, !toppoints):** When creating the command, enable **both Twitch and YouTube** as sources so one action handles both platforms.
+- **Commands (!spawn, !champion, !gold, !curse, !gas, !scroll, !trap, !transmute, !bee, !ward, !buff, !debuff, !wand, !points, !toppoints):** When creating the command, enable **both Twitch and YouTube** as sources so one action handles both platforms.
 - **Earn Points (message):** Add **Message Received** from YouTube → Triggers to the same action, or create a duplicate action with the YouTube trigger.
 - **Earn Points (passive):** Add **Present Viewers** from YouTube → Triggers (YouTube uses chat-activity threshold; no live viewer list).
 - **Response messages:** Use the **commandSource pattern** below so a single action sends to the correct chat.
@@ -83,6 +85,8 @@ Use **one action per command** that works for both Twitch and YouTube. After che
 | !scroll | `%userName% used a random scroll: %scrollName%!` |
 | !trap | `%userName% placed a %trapName% nearby!` |
 | !transmute | `%userName% transmuted an item into %transmuteItemName%!` |
+| !bee | `%userName% summoned a bee to help you!` |
+| !ward | `%userName% summoned a ward to help you!` |
 | !buff | `%userName% gave you %buffName%!` |
 | !debuff | `%userName% afflicted you with %debuffName%!` |
 | !wand | `%userName% triggered a cursed wand effect: %wandEffectName%!` |
@@ -1297,6 +1301,110 @@ public class CPHInline
 
 ---
 
+## Action 3e0b: Bee (with points)
+
+**Trigger:** Command Triggered → `!bee` (enable **both Twitch and YouTube** as sources)
+
+**Usage:** `!bee` — summons an **allied bee** next to the hero for 50 turns. The bee fights for the player like the one from Elixir of Honeyed Healing. Cost 75 pts (configurable).
+
+**Sub-Actions (in order):**
+
+1. **Run a Program**
+   - **Target:** `python`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" bee %userName%`
+   - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait maximum:** `10` seconds
+
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%` and `%allyName%`:
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string RESULT_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spawn_result.txt";
+
+    public bool Execute()
+    {
+        string result = "No result file - is overlay server running?";
+        string itemName = "";
+        try
+        {
+            if (File.Exists(RESULT_FILE))
+            {
+                result = File.ReadAllText(RESULT_FILE).Trim();
+                File.Delete(RESULT_FILE);
+                int pipe = result.IndexOf('|');
+                if (pipe >= 0)
+                {
+                    itemName = result.Substring(pipe + 1).Trim();
+                    result = result.Substring(0, pipe).Trim();
+                }
+            }
+        }
+        catch (Exception ex) { result = ex.Message; }
+        CPH.SetArgument("spawnResult", result);
+        CPH.SetArgument("allyName", itemName);
+        return true;
+    }
+}
+```
+
+3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
+   - **True branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% summoned a bee to help you!`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% summoned a bee to help you!`
+     - Leave **False Result** empty for both.
+   - **False branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+     - Leave **False Result** empty for both.
+
+**Cost:** 75 points (edit via points config).
+
+**Add to the same blocking queue** as spawn, gold, curse, gas, scroll, trap, transmute, and earn actions.
+
+**Fails when:** Not in an active run, hero dead, or no adjacent passable tile (hero surrounded).
+
+---
+
+## Action 3e0c: Ward (with points)
+
+**Trigger:** Command Triggered → `!ward` (enable **both Twitch and YouTube** as sources)
+
+**Usage:** `!ward` — summons a **ward** (Wand of Warding style) near the hero. Level scales with depth: +0 sewers, +3 prison, +5 caves, +7 city, +8 halls. If the ward lands on the same tile as an existing ward, it upgrades that ward instead. Cost 30 pts (configurable).
+
+**Sub-Actions (in order):**
+
+1. **Run a Program**
+   - **Target:** `python`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" ward %userName%`
+   - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait maximum:** `10` seconds
+
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%` and `%allyName%` (same pattern as bee; allyName will be "Ward"):
+
+Use the same C# code block as Action 3e0b (Bee), which reads the result file and sets `spawnResult` and `allyName`.
+
+3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
+   - **True branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% summoned a ward to help you!`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% summoned a ward to help you!`
+     - Leave **False Result** empty for both.
+   - **False branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+     - Leave **False Result** empty for both.
+
+**Cost:** 30 points (edit via points config).
+
+**Add to the same blocking queue** as spawn, gold, curse, gas, scroll, trap, transmute, bee, and earn actions.
+
+**Fails when:** Not in an active run, hero dead, or no space to spawn ward (hero surrounded).
+
+---
+
 ## Action 3e1: Random Buff (with points)
 
 **Trigger:** Command Triggered → `!buff` (enable **both Twitch and YouTube** as sources)
@@ -1791,6 +1899,7 @@ public class CPHInline
 | **!scroll** | `!scroll` | 100 pts | Use a random scroll (like +10 Unstable Spellbook). 50% chance for exotic version. |
 | **!trap** | `!trap` | 50 pts | Place a random visible trap 1–4 tiles from the hero. Pool of 27 traps (instant-death/high-damage ones blacklisted). |
 | **!transmute** | `!transmute` | 150 pts | Transmute a random transmutable item from bag or equipped. Same rules as Scroll of Transmutation. |
+| **!bee** | `!bee` | 75 pts | Summon an allied bee next to the hero for 50 turns. Fights for you like Elixir of Honeyed Healing. |
 | **!buff** | `!buff` | 75 pts | Apply a random buff (Haste, Healing, Barrier, Invisibility, etc.). Healing = 10% HP over 10 turns; Barrier = 10% HP shield. |
 | **!debuff** | `!debuff` | 50 pts | Apply a random debuff (Blindness, Slow, Roots, Daze, etc.). Excludes Paralysis, Burning, Poison. |
 | **!wand** | `!wand common` (tier required) | 50–400 pts | Trigger a cursed wand effect. Tier required: common, uncommon, rare, or veryrare. |
@@ -1817,6 +1926,8 @@ public class CPHInline
 | Random Scroll | !scroll        | Spend points to use a random scroll (like +10 Unstable Spellbook, 100 pts) |
 | Place Trap    | !trap          | Spend points to place a random visible trap nearby (50 pts) |
 | Transmute     | !transmute    | Spend points to transmute a random transmutable item from bag or equipped (150 pts) |
+| Bee     | !bee     | Spend points to summon an allied bee for 50 turns (75 pts) |
+| Ward    | !ward    | Spend points to summon a ward (30 pts, scales with depth; upgrades existing if same tile) |
 | Random Buff   | !buff          | Spend points to apply a random buff (75 pts, e.g. Haste, Healing, Barrier) |
 | Random Debuff | !debuff        | Spend points to apply a random debuff (50 pts, e.g. Blindness, Slow, Roots) |
 | Cursed Wand   | !wand          | Spend points to trigger a random cursed wand effect (50–400 pts by rarity) |

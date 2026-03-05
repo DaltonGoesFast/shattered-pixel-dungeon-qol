@@ -27,11 +27,18 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.AllyBuff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Amok;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.TimedAllyDuration;
+import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.items.stones.StoneOfAggression;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
+import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
+import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfTeleportation;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.BeeSprite;
 import com.watabou.utils.Bundle;
+import com.watabou.utils.PathFinder;
 import com.watabou.utils.Random;
+
+import java.util.ArrayList;
 
 //FIXME the AI for these things is becoming a complete mess, should refactor
 public class Bee extends Mob {
@@ -99,6 +106,27 @@ public class Bee extends Mob {
 			this.potHolder = -1;
 		else
 			this.potHolder = potHolder.id();
+	}
+
+	/** For chat/streaming: spawn an allied bee next to the hero that lasts durationTurns. Like honeyed healing bee. Returns true if spawned. */
+	public static boolean spawnAllyForChat(Hero hero, int durationTurns) {
+		ArrayList<Integer> spawnPoints = new ArrayList<>();
+		for (int i = 0; i < PathFinder.NEIGHBOURS8.length; i++) {
+			int p = hero.pos + PathFinder.NEIGHBOURS8[i];
+			if (Actor.findChar(p) == null && Dungeon.level.passable[p]) {
+				spawnPoints.add(p);
+			}
+		}
+		if (spawnPoints.isEmpty()) return false;
+		Bee bee = new Bee();
+		bee.spawn(Dungeon.scalingDepth());
+		bee.HP = bee.HT;
+		bee.alignment = Alignment.ALLY;
+		bee.setPotInfo(-1, null);
+		Buff.affect(bee, TimedAllyDuration.class, durationTurns);
+		GameScene.add(bee);
+		ScrollOfTeleportation.appear(bee, Random.element(spawnPoints));
+		return true;
 	}
 	
 	public int potPos(){

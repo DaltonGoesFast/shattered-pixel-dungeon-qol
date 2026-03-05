@@ -124,7 +124,7 @@ def _game_ws_on_message(ws, message):
     try:
         data = json.loads(message)
         # Handle spawn/gold result (game reports success/failure)
-        if data.get('type') in ('spawn_result', 'champion_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result', 'trap_result', 'transmute_result'):
+        if data.get('type') in ('spawn_result', 'champion_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result', 'trap_result', 'transmute_result', 'summon_bee_result', 'ward_result'):
             rid = data.get('request_id')
             ok = data.get('success', False)
             if rid:
@@ -170,6 +170,14 @@ def _game_ws_on_message(ws, message):
                         if data.get('type') == 'transmute_result' and data.get('item_name'):
                             pending_spawns[rid]['item_name'] = data.get('item_name')
                         if data.get('type') == 'transmute_result' and data.get('error'):
+                            pending_spawns[rid]['error'] = data.get('error')
+                        if data.get('type') == 'summon_bee_result' and data.get('ally_name'):
+                            pending_spawns[rid]['ally_name'] = data.get('ally_name')
+                        if data.get('type') == 'summon_bee_result' and data.get('error'):
+                            pending_spawns[rid]['error'] = data.get('error')
+                        if data.get('type') == 'ward_result' and data.get('ward_name'):
+                            pending_spawns[rid]['ward_name'] = data.get('ward_name')
+                        if data.get('type') == 'ward_result' and data.get('error'):
                             pending_spawns[rid]['error'] = data.get('error')
                         pending_spawns[rid]['event'].set()
             print(f"Game {data.get('type')}: request_id={rid} success={ok}")
@@ -362,6 +370,8 @@ def points_config_api():
                     "cost_per_scroll": 100,
                     "cost_per_trap": 50,
                     "cost_per_transmute": 150,
+                    "cost_per_ally_bee": 75,
+                    "cost_per_ward": 30,
                     "cost_per_buff": 75,
                     "cost_per_debuff": 50,
                     "cost_per_wand_common": 50,
@@ -391,6 +401,8 @@ def points_config_api():
             "cost_per_scroll": max(1, int(data.get("cost_per_scroll", 100))),
             "cost_per_trap": max(1, int(data.get("cost_per_trap", 50))),
             "cost_per_transmute": max(1, int(data.get("cost_per_transmute", 150))),
+            "cost_per_ally_bee": max(1, int(data.get("cost_per_ally_bee", 75))),
+            "cost_per_ward": max(1, int(data.get("cost_per_ward", 30))),
             "cost_per_buff": max(1, int(data.get("cost_per_buff", 75))),
             "cost_per_debuff": max(1, int(data.get("cost_per_debuff", 50))),
             "cost_per_wand_common": max(1, int(data.get("cost_per_wand_common", 50))),
@@ -974,6 +986,98 @@ def transmute_command():
         return jsonify({'ok': False, 'error': err}), 200
     except Exception as e:
         print(f"Transmute 400 exception: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 400
+
+
+@app.route('/api/ward-command', methods=['POST', 'OPTIONS'])
+def ward_command():
+    """Receive ward command from Streamer.bot; forward to game via WebSocket."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        if not data and request.form:
+            data = request.form.to_dict()
+        username = (data.get('username') or '').strip() or None
+        if not game_ws_app:
+            return jsonify({'ok': False, 'error': 'Game not connected'}), 503
+        request_id = str(uuid.uuid4())
+        ev = threading.Event()
+        with spawn_lock:
+            pending_spawns[request_id] = {'event': ev, 'success': False}
+        try:
+            payload = {'command': 'ward', 'request_id': request_id}
+            if username:
+                payload['username'] = username
+            print(f"Ward send to game: request_id={request_id}")
+            game_ws_app.send(json.dumps(payload))
+        except Exception as e:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': str(e)}), 503
+        if ev.wait(timeout=SPAWN_RESULT_TIMEOUT):
+            with spawn_lock:
+                pending = pending_spawns.pop(request_id, {})
+                success = pending.get('success', False)
+                ward_name = pending.get('ward_name', '')
+                ward_error = pending.get('error')
+        else:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': 'Ward command timed out'}), 504
+        if success:
+            print(f"Ward OK: {ward_name} for {username}")
+            return jsonify({'ok': True, 'ward_name': ward_name})
+        err = ward_error or 'No space for ward'
+        return jsonify({'ok': False, 'error': err}), 200
+    except Exception as e:
+        print(f"Ward 400 exception: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 400
+
+
+@app.route('/api/summon-bee-command', methods=['POST', 'OPTIONS'])
+def summon_bee_command():
+    """Receive summon bee command from Streamer.bot; forward to game via WebSocket."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        if not data and request.form:
+            data = request.form.to_dict()
+        username = (data.get('username') or '').strip() or None
+        if not game_ws_app:
+            return jsonify({'ok': False, 'error': 'Game not connected'}), 503
+        request_id = str(uuid.uuid4())
+        ev = threading.Event()
+        with spawn_lock:
+            pending_spawns[request_id] = {'event': ev, 'success': False}
+        try:
+            payload = {'command': 'summon_bee', 'request_id': request_id}
+            if username:
+                payload['username'] = username
+            print(f"Summon bee send to game: request_id={request_id}")
+            game_ws_app.send(json.dumps(payload))
+        except Exception as e:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': str(e)}), 503
+        if ev.wait(timeout=SPAWN_RESULT_TIMEOUT):
+            with spawn_lock:
+                pending = pending_spawns.pop(request_id, {})
+                success = pending.get('success', False)
+                ally_name = pending.get('ally_name', '')
+                summon_bee_error = pending.get('error')
+        else:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': 'Summon bee command timed out'}), 504
+        if success:
+            print(f"Summon bee OK: {ally_name} for {username}")
+            return jsonify({'ok': True, 'ally_name': ally_name})
+        err = summon_bee_error or 'No space for bee'
+        return jsonify({'ok': False, 'error': err}), 200
+    except Exception as e:
+        print(f"Summon bee 400 exception: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 400
 
 

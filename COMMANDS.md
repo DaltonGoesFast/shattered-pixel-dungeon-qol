@@ -18,6 +18,8 @@ Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also g
 | **!scroll** | Use a random scroll (100 pts). Like +10 Unstable Spellbook — 50% chance for exotic version! |
 | **!trap** | Place a random visible trap 1–4 tiles from the hero (50 pts). Pool of 27 traps (instant-death/high-damage blacklisted). |
 | **!transmute** | Transmute a random transmutable item from bag or equipped (150 pts). Same rules as Scroll of Transmutation. |
+| **!bee** | Summon an allied bee next to the hero for 50 turns (75 pts). Fights for you like Elixir of Honeyed Healing. |
+| **!ward** | Summon a ward near the hero (30 pts). Level scales with depth: +0 sewers, +3 prison, +5 caves, +7 city, +8 halls. Upgrades existing ward if same tile. |
 | **!buff** | Apply a random buff (75 pts). Haste, Healing, Barrier, Invisibility, Levitation, and more! |
 | **!debuff** | Apply a random debuff (50 pts). Blindness, Slow, Roots, Daze, Weakness, and more! |
 | **!wand** \<tier\> | Trigger a cursed wand effect. **Tier required:** common (50 pts), uncommon (100 pts), rare (200 pts), or veryrare (400 pts). Burn, freeze, teleport, gas, sheep, and more! |

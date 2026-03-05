@@ -24,6 +24,10 @@ Spend points to mess with the run! Earn points by chatting (1 per message, 30s c
 
 **!transmute** — Transmute a random transmutable item from bag or equipped (150 pts). Same rules as Scroll of Transmutation.
 
+**!bee** — Summon an allied bee for 50 turns (75 pts). Fights for you like honeyed healing!
+
+**!ward** — Summon a ward (30 pts). Scales with depth; upgrades existing ward if same tile.
+
 **!buff** — Apply a random buff (75 pts). Haste, Healing, Barrier, Invisibility, and more!
 
 **!debuff** — Apply a random debuff (50 pts). Blindness, Slow, Roots, Daze, and more!

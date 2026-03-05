@@ -408,7 +408,7 @@ public class PixelScene extends Scene {
 	}
 
 	//returns insets for the common case of all on top/bottom and only blocking on left/right
-	//plus scaled to pixel zoom; includes user UI margin (pulls UI toward center)
+	//plus scaled to pixel zoom
 	public RectF getCommonInsets(){
 		RectF all = Game.platform.getSafeInsets(PlatformSupport.INSET_ALL);
 		RectF blocking = Game.platform.getSafeInsets(PlatformSupport.INSET_BLK);
@@ -417,12 +417,6 @@ public class PixelScene extends Scene {
 		all.right = blocking.right;
 
 		all = all.scale(1f/defaultZoom);
-		float marginX = SPDSettings.uiMarginX();
-		float marginY = SPDSettings.uiMarginY();
-		all.left += marginX;
-		all.right += marginX;
-		all.top += marginY;
-		all.bottom += marginY;
 		return all;
 	}
 	

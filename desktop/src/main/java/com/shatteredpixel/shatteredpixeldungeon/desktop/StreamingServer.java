@@ -254,6 +254,38 @@ public class StreamingServer extends WebSocketServer {
 						conn.send(resp.toString());
 					}
 				});
+			} else if ("summon_bee".equals(cmd)) {
+				Gdx.app.postRunnable(() -> {
+					String result = StreamingCommandHandler.handleSummonBee(usernameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String allyName = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "summon_bee_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (allyName != null) resp.addProperty("ally_name", allyName);
+						if (err != null) resp.addProperty("error", err);
+						conn.send(resp.toString());
+					}
+				});
+			} else if ("ward".equals(cmd)) {
+				Gdx.app.postRunnable(() -> {
+					String result = StreamingCommandHandler.handleSpawnWard(usernameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String wardName = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "ward_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (wardName != null) resp.addProperty("ward_name", wardName);
+						if (err != null) resp.addProperty("error", err);
+						conn.send(resp.toString());
+					}
+				});
 			}
 		} catch (Exception ignored) {}
 	}

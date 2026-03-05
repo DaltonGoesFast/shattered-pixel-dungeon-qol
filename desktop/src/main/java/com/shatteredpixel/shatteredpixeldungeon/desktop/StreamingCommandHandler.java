@@ -27,6 +27,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Albino;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Bat;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Bee;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Brute;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Crab;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.DM100;
@@ -80,6 +81,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.trinkets.ChaoticCenser;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.CursedWand;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfMagicMissile;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfWarding;
 import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.MagesStaff;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.MissileWeapon;
@@ -478,6 +480,79 @@ public final class StreamingCommandHandler {
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		GLog.p(Messages.get(StreamingCommandHandler.class, "chat_transmuted"), chatter, originalName, resultName);
 		return resultName;
+	}
+
+	/** Summon an allied bee next to the hero (lasts 50 turns). Returns "Bee" on success, error on failure. */
+	public static String handleSummonBee(String username) {
+		if (Dungeon.hero == null || Dungeon.level == null)
+			return "ERR:Not in an active run (title/menu)";
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+			return "ERR:Not in an active run (title/menu)";
+		if (!Dungeon.hero.isAlive())
+			return "ERR:Hero is dead";
+
+		if (!Bee.spawnAllyForChat(Dungeon.hero, 50))
+			return "ERR:No space for bee (hero surrounded)";
+
+		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
+		GLog.p(Messages.get(StreamingCommandHandler.class, "chat_summoned_bee"), chatter);
+		return "Bee";
+	}
+
+	/** Ward level by region: sewers +0, prison +3, caves +5, city +7, halls +8. Maps to wand buffedLvl (1 + upgrade). */
+	private static int wardWandLevelForDepth(int depth) {
+		if (depth <= 5) return 1;   // sewers: +0
+		if (depth <= 10) return 4;  // prison: +3
+		if (depth <= 15) return 6;   // caves: +5
+		if (depth <= 20) return 8;  // city: +7
+		return 9;                    // halls: +8
+	}
+
+	/** Spawn a ward near the hero (or upgrade existing ward if same tile). Level scales with depth. Returns "Ward" on success, error on failure. */
+	public static String handleSpawnWard(String username) {
+		if (Dungeon.hero == null || Dungeon.level == null)
+			return "ERR:Not in an active run (title/menu)";
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+			return "ERR:Not in an active run (title/menu)";
+		if (!Dungeon.hero.isAlive())
+			return "ERR:Hero is dead";
+
+		int wandLevel = wardWandLevelForDepth(Dungeon.depth);
+		int heroPos = Dungeon.hero.pos;
+		boolean[] spawnPassable = new boolean[Dungeon.level.length()];
+		for (int i = 0; i < spawnPassable.length; i++) {
+			spawnPassable[i] = Dungeon.level.passable[i] || Dungeon.level.avoid[i];
+		}
+		PathFinder.buildDistanceMap(heroPos, spawnPassable, SPAWN_RADIUS);
+
+		// Candidates: passable tiles 1–4 from hero, OR tiles with an existing Ward (for upgrade)
+		ArrayList<Integer> candidates = new ArrayList<>();
+		for (int p = 0; p < Dungeon.level.length(); p++) {
+			int d = PathFinder.distance[p];
+			if (d < 1 || d > SPAWN_RADIUS) continue;
+			Char ch = Actor.findChar(p);
+			if (ch != null && !(ch instanceof WandOfWarding.Ward)) continue;
+			if (!Dungeon.level.passable[p] && !Dungeon.level.avoid[p]) continue;
+			candidates.add(p);
+		}
+		if (candidates.isEmpty())
+			return "ERR:No space to spawn ward (hero surrounded)";
+
+		int cell = Random.element(candidates);
+		Char existing = Actor.findChar(cell);
+		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
+
+		if (existing instanceof WandOfWarding.Ward) {
+			WandOfWarding.Ward ward = (WandOfWarding.Ward) existing;
+			ward.upgrade(wandLevel);
+			ward.sprite.emitter().burst(com.shatteredpixel.shatteredpixeldungeon.effects.MagicMissile.WardParticle.UP, ward.tier);
+			GLog.p(Messages.get(StreamingCommandHandler.class, "chat_ward_upgraded"), chatter);
+			return "Ward";
+		}
+
+		WandOfWarding.spawnWardForChat(cell, wandLevel);
+		GLog.p(Messages.get(StreamingCommandHandler.class, "chat_summoned_ward"), chatter);
+		return "Ward";
 	}
 
 	/** Curse an equipped item in the given slot. Returns item name on success, error message on failure. */

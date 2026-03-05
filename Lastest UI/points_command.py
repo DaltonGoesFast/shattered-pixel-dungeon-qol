@@ -10,6 +10,8 @@ Usage:
   scroll:   python points_command.py scroll <username>
   trap:     python points_command.py trap <username>
   transmute: python points_command.py transmute <username>
+  bee:       python points_command.py bee <username>  (summon allied bee, 75 pts, 50 turns)
+  ward:      python points_command.py ward <username>  (summon ward, 30 pts, scales with depth)
   buff:     python points_command.py buff <username>
   debuff:   python points_command.py debuff <username>
   wand:     python points_command.py wand <common|uncommon|rare|veryrare> <username>  (tier required)
@@ -78,6 +80,8 @@ def load_config():
         "cost_per_scroll": 100,
         "cost_per_trap": 50,
         "cost_per_transmute": 150,
+        "cost_per_ally_bee": 75,
+        "cost_per_ward": 30,
         "cost_per_buff": 75,
         "cost_per_debuff": 50,
         "cost_per_wand_common": 50,
@@ -111,6 +115,8 @@ def load_config():
             "cost_per_scroll": int(cfg.get("cost_per_scroll", defaults["cost_per_scroll"])),
             "cost_per_trap": int(cfg.get("cost_per_trap", defaults["cost_per_trap"])),
             "cost_per_transmute": int(cfg.get("cost_per_transmute", defaults["cost_per_transmute"])),
+            "cost_per_ally_bee": int(cfg.get("cost_per_ally_bee", defaults["cost_per_ally_bee"])),
+            "cost_per_ward": int(cfg.get("cost_per_ward", defaults["cost_per_ward"])),
             "cost_per_buff": int(cfg.get("cost_per_buff", defaults["cost_per_buff"])),
             "cost_per_debuff": int(cfg.get("cost_per_debuff", defaults["cost_per_debuff"])),
             "cost_per_wand_common": int(cfg.get("cost_per_wand_common", defaults["cost_per_wand_common"])),
@@ -673,6 +679,108 @@ def cmd_transmute(args):
         return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
 
+def cmd_ally_bee(args):
+    if is_spend_disabled():
+        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
+    if len(args) < 1:
+        return SPAWN_RESULT_FILE, "Usage: !bee (summons an allied bee for 50 turns, 75 pts)"
+    username = args[0]
+
+    cost = get_config()["cost_per_ally_bee"]
+    key = username.lower()
+    try:
+        with points_lock():
+            data = read_points()
+            pts, last = data.get(key, (0, 0))
+            if pts < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to summon a bee, you have {pts}."
+
+            url = "http://127.0.0.1:5000/api/summon-bee-command"
+            payload = {"username": username}
+            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+            req.add_header("Content-Type", "application/json")
+
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    raw = resp.read().decode("utf-8", errors="replace")
+                    if not raw.strip():
+                        return SPAWN_RESULT_FILE, "Summon bee failed (empty response from server)"
+                    try:
+                        body = json.loads(raw)
+                    except json.JSONDecodeError:
+                        return SPAWN_RESULT_FILE, "Summon bee failed (server error). Is the overlay running?"
+                    if not body.get("ok"):
+                        return SPAWN_RESULT_FILE, body.get("error", "Summon bee failed")
+            except urllib.error.HTTPError as e:
+                return SPAWN_RESULT_FILE, _http_error_msg(
+                    e, "Summon bee timed out. Is the game running and in an active run?"
+                )
+            except urllib.error.URLError as e:
+                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
+            except Exception as e:
+                msg = str(e).strip() if e else ""
+                return SPAWN_RESULT_FILE, "Summon bee failed. " + (msg if msg else "Check overlay server and try again.")
+
+            pts -= cost
+            data[key] = (pts, last)
+            write_points(data)
+            ally_name = body.get("ally_name", "Bee")
+            return SPAWN_RESULT_FILE, f"ok|{ally_name}"
+    except TimeoutError:
+        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+
+
+def cmd_ward(args):
+    if is_spend_disabled():
+        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
+    if len(args) < 1:
+        return SPAWN_RESULT_FILE, "Usage: !ward (summons a ward, 30 pts, scales with depth)"
+    username = args[0]
+
+    cost = get_config()["cost_per_ward"]
+    key = username.lower()
+    try:
+        with points_lock():
+            data = read_points()
+            pts, last = data.get(key, (0, 0))
+            if pts < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to summon a ward, you have {pts}."
+
+            url = "http://127.0.0.1:5000/api/ward-command"
+            payload = {"username": username}
+            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+            req.add_header("Content-Type", "application/json")
+
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    raw = resp.read().decode("utf-8", errors="replace")
+                    if not raw.strip():
+                        return SPAWN_RESULT_FILE, "Summon ward failed (empty response from server)"
+                    try:
+                        body = json.loads(raw)
+                    except json.JSONDecodeError:
+                        return SPAWN_RESULT_FILE, "Summon ward failed (server error). Is the overlay running?"
+                    if not body.get("ok"):
+                        return SPAWN_RESULT_FILE, body.get("error", "Summon ward failed")
+            except urllib.error.HTTPError as e:
+                return SPAWN_RESULT_FILE, _http_error_msg(
+                    e, "Summon ward timed out. Is the game running and in an active run?"
+                )
+            except urllib.error.URLError as e:
+                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
+            except Exception as e:
+                msg = str(e).strip() if e else ""
+                return SPAWN_RESULT_FILE, "Summon ward failed. " + (msg if msg else "Check overlay server and try again.")
+
+            pts -= cost
+            data[key] = (pts, last)
+            write_points(data)
+            ward_name = body.get("ward_name", "Ward")
+            return SPAWN_RESULT_FILE, f"ok|{ward_name}"
+    except TimeoutError:
+        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+
+
 def cmd_buff(args):
     if is_spend_disabled():
         return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
@@ -958,6 +1066,8 @@ COMMANDS = {
     "scroll": cmd_scroll,
     "trap": cmd_trap,
     "transmute": cmd_transmute,
+    "bee": cmd_ally_bee,
+    "ward": cmd_ward,
     "buff": cmd_buff,
     "debuff": cmd_debuff,
     "wand": cmd_wand,
@@ -970,7 +1080,7 @@ def main():
     args = [a.strip() for a in sys.argv[1:] if a.strip()]
     if len(args) < 1:
         with open(SPAWN_RESULT_FILE, "w", encoding="utf-8") as f:
-            f.write("Usage: points_command.py <spawn|champion|gold|curse|gas|scroll|trap|transmute|buff|debuff|wand|superchat|cheer> [args...]")
+            f.write("Usage: points_command.py <spawn|champion|gold|curse|gas|scroll|trap|transmute|bee|ward|buff|debuff|wand|superchat|cheer> [args...]")
         sys.exit(0)
 
     cmd = args[0].lower()

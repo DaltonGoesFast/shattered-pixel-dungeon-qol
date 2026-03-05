@@ -23,6 +23,7 @@ package com.shatteredpixel.shatteredpixeldungeon.ui;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.SPDAction;
+import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
@@ -120,6 +121,8 @@ public class DangerIndicator extends Tag {
 			if (Dungeon.hero.curAction == null && target.sprite != null) {
 				Camera.main.panFollow(target.sprite, 5f);
 			}
+		} else if (SPDSettings.centerOnCycleNoEnemies()) {
+			Camera.main.panTo( Dungeon.hero.sprite.center(), 5f );
 		}
 	}
 

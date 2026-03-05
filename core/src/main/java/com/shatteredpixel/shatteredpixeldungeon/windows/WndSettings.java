@@ -226,6 +226,7 @@ public class WndSettings extends WndTabbed {
 		ColorBlock sep2;
 		OptionSlider optBrightness;
 		OptionSlider optVisGrid;
+		CheckBox chkTileIndicator;
 		OptionSlider optFollowIntensity;
 		OptionSlider optScreenShake;
 
@@ -294,6 +295,16 @@ public class WndSettings extends WndTabbed {
 			optVisGrid.setSelectedValue(SPDSettings.visualGrid());
 			add(optVisGrid);
 
+			chkTileIndicator = new CheckBox(Messages.get(this, "tile_indicator")) {
+				@Override
+				protected void onClick() {
+					super.onClick();
+					SPDSettings.tileIndicator(checked());
+				}
+			};
+			chkTileIndicator.checked(SPDSettings.tileIndicator());
+			add(chkTileIndicator);
+
 			optFollowIntensity = new OptionSlider(Messages.get(this, "camera_follow"),
 					Messages.get(this, "low"), Messages.get(this, "high"), 1, 4) {
 				@Override
@@ -343,13 +354,17 @@ public class WndSettings extends WndTabbed {
 				optBrightness.setRect(0, bottom + GAP, width/2-GAP/2, SLIDER_HEIGHT);
 				optVisGrid.setRect(optBrightness.right() + GAP, optBrightness.top(), width/2-GAP/2, SLIDER_HEIGHT);
 
-				optFollowIntensity.setRect(0, optVisGrid.bottom() + GAP, width/2-GAP/2, SLIDER_HEIGHT);
+				chkTileIndicator.setRect(0, optVisGrid.bottom() + GAP, width, BTN_HEIGHT);
+
+				optFollowIntensity.setRect(0, chkTileIndicator.bottom() + GAP, width/2-GAP/2, SLIDER_HEIGHT);
 				optScreenShake.setRect(optFollowIntensity.right() + GAP, optFollowIntensity.top(), width/2-GAP/2, SLIDER_HEIGHT);
 			} else {
 				optBrightness.setRect(0, bottom + GAP, width, SLIDER_HEIGHT);
 				optVisGrid.setRect(0, optBrightness.bottom() + GAP, width, SLIDER_HEIGHT);
 
-				optFollowIntensity.setRect(0, optVisGrid.bottom() + GAP, width, SLIDER_HEIGHT);
+				chkTileIndicator.setRect(0, optVisGrid.bottom() + GAP, width, BTN_HEIGHT);
+
+				optFollowIntensity.setRect(0, chkTileIndicator.bottom() + GAP, width, SLIDER_HEIGHT);
 				optScreenShake.setRect(0, optFollowIntensity.bottom() + GAP, width, SLIDER_HEIGHT);
 			}
 
@@ -365,10 +380,10 @@ public class WndSettings extends WndTabbed {
 		ColorBlock sep1;
 		OptionSlider optUIMode;
 		OptionSlider optUIScale;
-		OptionSlider optUIMarginX;
-		OptionSlider optUIMarginY;
 		RedButton btnToolbarSettings;
 		CheckBox chkFlipTags;
+		CheckBox chkCenterOnCycleNoEnemies;
+		CheckBox chkBossBarAllEnemies;
 		ColorBlock sep2;
 		CheckBox chkFont;
 		CheckBox chkVibrate;
@@ -420,38 +435,6 @@ public class WndSettings extends WndTabbed {
 				optUIScale.setSelectedValue(PixelScene.defaultZoom);
 				add(optUIScale);
 			}
-
-			optUIMarginX = new OptionSlider(Messages.get(this, "ui_margin_x"),
-					"0",
-					"24",
-					0,
-					24 ) {
-				@Override
-				protected void onChange() {
-					if (getSelectedValue() != SPDSettings.uiMarginX()) {
-						SPDSettings.uiMarginX(getSelectedValue());
-						ShatteredPixelDungeon.seamlessResetScene();
-					}
-				}
-			};
-			optUIMarginX.setSelectedValue(SPDSettings.uiMarginX());
-			add(optUIMarginX);
-
-			optUIMarginY = new OptionSlider(Messages.get(this, "ui_margin_y"),
-					"0",
-					"24",
-					0,
-					24 ) {
-				@Override
-				protected void onChange() {
-					if (getSelectedValue() != SPDSettings.uiMarginY()) {
-						SPDSettings.uiMarginY(getSelectedValue());
-						ShatteredPixelDungeon.seamlessResetScene();
-					}
-				}
-			};
-			optUIMarginY.setSelectedValue(SPDSettings.uiMarginY());
-			add(optUIMarginY);
 
 			if (SPDSettings.interfaceSize() == 0) {
 				btnToolbarSettings = new RedButton(Messages.get(this, "toolbar_settings"), 9){
@@ -599,6 +582,26 @@ public class WndSettings extends WndTabbed {
 
 			}
 
+			chkCenterOnCycleNoEnemies = new CheckBox(Messages.get(this, "center_on_cycle_no_enemies")) {
+				@Override
+				protected void onClick() {
+					super.onClick();
+					SPDSettings.centerOnCycleNoEnemies(checked());
+				}
+			};
+			chkCenterOnCycleNoEnemies.checked(SPDSettings.centerOnCycleNoEnemies());
+			add(chkCenterOnCycleNoEnemies);
+
+			chkBossBarAllEnemies = new CheckBox(Messages.get(this, "boss_bar_all_enemies")) {
+				@Override
+				protected void onClick() {
+					super.onClick();
+					SPDSettings.bossBarAllEnemies(checked());
+				}
+			};
+			chkBossBarAllEnemies.checked(SPDSettings.bossBarAllEnemies());
+			add(chkBossBarAllEnemies);
+
 			sep2 = new ColorBlock(1, 1, 0xFF000000);
 			add(sep2);
 
@@ -663,21 +666,6 @@ public class WndSettings extends WndTabbed {
 				}
 			}
 
-			if (optUIMarginX != null && optUIMarginY != null && width > 200) {
-				optUIMarginX.setRect(0, height + GAP, width/2-1, SLIDER_HEIGHT);
-				optUIMarginY.setRect(width/2+1, height + GAP, width/2-1, SLIDER_HEIGHT);
-				height = optUIMarginY.bottom();
-			} else {
-				if (optUIMarginX != null) {
-					optUIMarginX.setRect(0, height + GAP, width, SLIDER_HEIGHT);
-					height = optUIMarginX.bottom();
-				}
-				if (optUIMarginY != null) {
-					optUIMarginY.setRect(0, height + GAP, width, SLIDER_HEIGHT);
-					height = optUIMarginY.bottom();
-				}
-			}
-
 			if (btnToolbarSettings != null) {
 				btnToolbarSettings.setRect(0, height + GAP, width, BTN_HEIGHT);
 				height = btnToolbarSettings.bottom();
@@ -685,6 +673,12 @@ public class WndSettings extends WndTabbed {
 				chkFlipTags.setRect(0, height + GAP, width, BTN_HEIGHT);
 				height = chkFlipTags.bottom();
 			}
+
+			chkCenterOnCycleNoEnemies.setRect(0, height + GAP, width, BTN_HEIGHT);
+			height = chkCenterOnCycleNoEnemies.bottom();
+
+			chkBossBarAllEnemies.setRect(0, height + GAP, width, BTN_HEIGHT);
+			height = chkBossBarAllEnemies.bottom();
 
 			sep2.size(width, 1);
 			sep2.y = height + GAP;

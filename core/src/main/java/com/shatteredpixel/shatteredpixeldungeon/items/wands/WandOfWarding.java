@@ -208,6 +208,18 @@ public class WandOfWarding extends Wand {
 		particle.radiateXY(2.5f);
 	}
 
+	/** Spawn a ward at the given cell with the given wand level (for chat/streaming). */
+	public static Ward spawnWardForChat(int cell, int wandLevel) {
+		Ward ward = new Ward();
+		ward.pos = cell;
+		ward.wandLevel = wandLevel;
+		GameScene.add(ward, 1f);
+		Dungeon.level.occupyCell(ward);
+		ward.sprite.emitter().burst(MagicMissile.WardParticle.UP, ward.tier);
+		Dungeon.level.pressCell(cell);
+		return ward;
+	}
+
 	@Override
 	public String statsDesc() {
 		if (levelKnown)
