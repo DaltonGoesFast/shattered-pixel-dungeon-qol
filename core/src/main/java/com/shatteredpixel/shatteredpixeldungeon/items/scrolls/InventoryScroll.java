@@ -58,7 +58,7 @@ public abstract class InventoryScroll extends Scroll {
 		public WndConfirmCancel(){
 			super(new ItemSprite(InventoryScroll.this),
 					Messages.titleCase(name()),
-					Messages.get(InventoryScroll.this, "warning"),
+					Messages.get(InventoryScroll.this, anonymous ? "warning_chat" : "warning"),
 					Messages.get(InventoryScroll.this, "yes"),
 					Messages.get(InventoryScroll.this, "no") );
 		}
@@ -140,7 +140,7 @@ public abstract class InventoryScroll extends Scroll {
 				
 			} else if (((Scroll)curItem).anonymous) {
 
-				curUser.spendAndNext( TIME_TO_READ );
+				((InventoryScroll)curItem).confirmCancelation();
 
 			}
 		}

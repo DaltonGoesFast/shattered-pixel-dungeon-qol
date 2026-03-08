@@ -18,7 +18,7 @@ Usage:
   superchat: python points_command.py superchat <microAmount> <currencyCode> <username>
   cheer:    python points_command.py cheer <bits> <username>
 
-All spend commands write to spawn_result.txt (ok or ok|extra). Donation writes to donation_result.txt.
+All spend commands write to spawn_result.txt (ok or ok|extra|pts). The last value is remaining points. Donation writes to donation_result.txt.
 """
 import sys
 import urllib.request
@@ -36,6 +36,7 @@ POINTS_LOCK_TIMEOUT = 10.0  # seconds to wait for lock
 SPAWN_RESULT_FILE = os.path.join(SCRIPT_DIR, "spawn_result.txt")
 DONATION_RESULT_FILE = os.path.join(SCRIPT_DIR, "donation_result.txt")
 CONFIG_FILE = os.path.join(SCRIPT_DIR, "points_config.json")
+FREE_UNTIL_FILE = os.path.join(SCRIPT_DIR, "free_until.json")
 SPEND_DISABLED_FILE = os.path.join(SCRIPT_DIR, "spend_disabled.txt")
 GAME_DATA_URL = "http://127.0.0.1:5000/api/game-data"
 DOUBLE_POINTS_END_FILE = os.path.join(SCRIPT_DIR, "double_points_end.txt")
@@ -133,6 +134,26 @@ def load_config():
 def get_config():
     """Cached config (reloads each command to allow live edits)."""
     return load_config()
+
+
+def is_cost_free(cost_key):
+    """True if cost_key is free until a future timestamp (from free_until.json)."""
+    if not os.path.exists(FREE_UNTIL_FILE):
+        return False
+    try:
+        with open(FREE_UNTIL_FILE, encoding="utf-8") as f:
+            free_until = json.load(f)
+        end_ts = free_until.get(cost_key)
+        if end_ts is None:
+            return False
+        return int(time.time()) < int(end_ts)
+    except (json.JSONDecodeError, OSError, TypeError, ValueError):
+        return False
+
+
+def effective_cost(cost_key, base_cost):
+    """Return 0 if cost is free, else base_cost."""
+    return 0 if is_cost_free(cost_key) else base_cost
 VALID_MONSTERS = frozenset([
     "rat", "albino", "snake", "gnoll", "crab", "slime", "swarm", "thief",
     "skeleton", "bat", "brute", "shaman", "spinner", "dm100", "guard",
@@ -147,7 +168,7 @@ SLOT_HELP = "weapon, armor, ring, artifact, misc (middle slot)"
 FALLBACK_RATES = {
     "USD": 1.0, "EUR": 1.08, "GBP": 1.27, "CAD": 0.74, "AUD": 0.65,
     "JPY": 0.0067, "MXN": 0.058, "BRL": 0.20, "INR": 0.012,
-    "KRW": 0.00075, "CHF": 1.13, "PLN": 0.25, "SEK": 0.095,
+    "KRW": 0.00075, "CHF": 1.13, "PLN": 0.25, "SEK": 0.095, "ARS": 0.0053,
 }
 
 
@@ -196,14 +217,15 @@ def read_points():
                 parts = line.strip().split("|")
                 if len(parts) >= 3:
                     try:
-                        data[parts[0].lower()] = (int(parts[1]), int(parts[2]))
+                        donation_pts = int(parts[3]) if len(parts) >= 4 else 0
+                        data[parts[0].lower()] = (int(parts[1]), int(parts[2]), donation_pts)
                     except ValueError:
                         pass
     return data
 
 
 def write_points(data):
-    lines = [f"{k}|{v[0]}|{v[1]}" for k, v in data.items()]
+    lines = [f"{k}|{v[0]}|{v[1]}|{v[2]}" for k, v in data.items()]
     with open(POINTS_FILE, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
@@ -247,6 +269,23 @@ def _http_error_msg(e, default_timeout: str) -> str:
         return str(e)
 
 
+def effective_total(pts: int, donation_pts: int) -> int:
+    """Total spendable points. Handles legacy format where pts may be chat-only."""
+    if donation_pts > 0 and pts < donation_pts:
+        return pts + donation_pts
+    return pts
+
+
+def deduct_points(pts: int, donation_pts: int, cost: int):
+    """Deduct cost from total. Returns (new_pts, new_donation_pts) or None if insufficient."""
+    total = effective_total(pts, donation_pts)
+    if total < cost:
+        return None
+    new_total = total - cost
+    new_donation_pts = min(donation_pts, new_total)
+    return (new_total, new_donation_pts)
+
+
 def cmd_spawn(args):
     if is_spend_disabled():
         return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
@@ -257,14 +296,15 @@ def cmd_spawn(args):
     if monster not in VALID_MONSTERS:
         return SPAWN_RESULT_FILE, f"Unknown monster: {monster}"
 
-    cost = compute_spawn_cost(monster)
+    cost = effective_cost("cost_per_monster." + monster, compute_spawn_cost(monster))
     key = username.lower()
     try:
         with points_lock():
             data = read_points()
-            pts, last = data.get(key, (0, 0))
-            if pts < cost:
-                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost}, you have {pts}."
+            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            total = effective_total(pts, donation_pts)
+            if total < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost}, you have {total}."
 
             url = "http://127.0.0.1:5000/api/spawn-command"
             payload = {"monster": monster, "username": username}
@@ -292,10 +332,10 @@ def cmd_spawn(args):
                 msg = str(e).strip() if e else ""
                 return SPAWN_RESULT_FILE, "Spawn failed. " + (msg if msg else "Check overlay server and try again.")
 
-            pts -= cost
-            data[key] = (pts, last)
+            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
+            data[key] = (new_pts, last, new_donation)
             write_points(data)
-            return SPAWN_RESULT_FILE, "ok"
+            return SPAWN_RESULT_FILE, f"ok|{new_pts}"
     except TimeoutError:
         return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
@@ -310,14 +350,15 @@ def cmd_champion(args):
     if monster not in VALID_MONSTERS:
         return SPAWN_RESULT_FILE, f"Unknown monster: {monster}"
 
-    cost = compute_champion_cost(monster)
+    cost = effective_cost("cost_per_monster." + monster, compute_champion_cost(monster))
     key = username.lower()
     try:
         with points_lock():
             data = read_points()
-            pts, last = data.get(key, (0, 0))
-            if pts < cost:
-                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} for champion {monster}, you have {pts}."
+            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            total = effective_total(pts, donation_pts)
+            if total < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} for champion {monster}, you have {total}."
 
             url = "http://127.0.0.1:5000/api/champion-command"
             payload = {"monster": monster, "username": username}
@@ -345,10 +386,10 @@ def cmd_champion(args):
                 msg = str(e).strip() if e else ""
                 return SPAWN_RESULT_FILE, "Champion spawn failed. " + (msg if msg else "Check overlay server and try again.")
 
-            pts -= cost
-            data[key] = (pts, last)
+            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
+            data[key] = (new_pts, last, new_donation)
             write_points(data)
-            return SPAWN_RESULT_FILE, "ok|" + body.get("monster", monster)
+            return SPAWN_RESULT_FILE, "ok|" + body.get("monster", monster) + f"|{new_pts}"
     except TimeoutError:
         return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
@@ -366,14 +407,15 @@ def cmd_gold(args):
         return SPAWN_RESULT_FILE, "Amount must be 1-100. Example: !gold 10"
     username = args[1]
 
-    cost = amount * get_config()["cost_per_gold"]
+    cost = effective_cost("cost_per_gold", amount * get_config()["cost_per_gold"])
     key = username.lower()
     try:
         with points_lock():
             data = read_points()
-            pts, last = data.get(key, (0, 0))
-            if pts < cost:
-                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} for {amount} gold, you have {pts}."
+            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            total = effective_total(pts, donation_pts)
+            if total < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} for {amount} gold, you have {total}."
 
             url = "http://127.0.0.1:5000/api/gold-command"
             payload = {"amount": amount, "username": username}
@@ -401,10 +443,10 @@ def cmd_gold(args):
                 msg = str(e).strip() if e else ""
                 return SPAWN_RESULT_FILE, "Gold drop failed. " + (msg if msg else "Check overlay server and try again.")
 
-            pts -= cost
-            data[key] = (pts, last)
+            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
+            data[key] = (new_pts, last, new_donation)
             write_points(data)
-            return SPAWN_RESULT_FILE, f"ok|{amount}"
+            return SPAWN_RESULT_FILE, f"ok|{amount}|{new_pts}"
     except TimeoutError:
         return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
@@ -424,14 +466,15 @@ def cmd_curse(args):
         return SPAWN_RESULT_FILE, "Usage: !curse (curses a random equipped item)"
     username = args[0]
 
-    cost = get_config()["cost_per_curse"]
+    cost = effective_cost("cost_per_curse", get_config()["cost_per_curse"])
     key = username.lower()
     try:
         with points_lock():
             data = read_points()
-            pts, last = data.get(key, (0, 0))
-            if pts < cost:
-                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to curse, you have {pts}."
+            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            total = effective_total(pts, donation_pts)
+            if total < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to curse, you have {total}."
 
             url = "http://127.0.0.1:5000/api/curse-command"
             slots_left = list(VALID_SLOTS)
@@ -453,11 +496,11 @@ def cmd_curse(args):
                         except json.JSONDecodeError:
                             return SPAWN_RESULT_FILE, "Curse failed (server error). Is the overlay running?"
                         if body.get("ok"):
-                            pts -= cost
-                            data[key] = (pts, last)
+                            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
+                            data[key] = (new_pts, last, new_donation)
                             write_points(data)
                             item_name = body.get("item_name", slot)
-                            return SPAWN_RESULT_FILE, f"ok|{item_name}"
+                            return SPAWN_RESULT_FILE, f"ok|{item_name}|{new_pts}"
                         last_error = body.get("error", "Curse failed")
                         if not _curse_error_retryable(last_error):
                             return SPAWN_RESULT_FILE, last_error
@@ -489,9 +532,10 @@ def cmd_gas(args):
     try:
         with points_lock():
             data = read_points()
-            pts, last = data.get(key, (0, 0))
-            if pts < cost:
-                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to spew gas, you have {pts}."
+            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            total = effective_total(pts, donation_pts)
+            if total < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to spew gas, you have {total}."
 
             url = "http://127.0.0.1:5000/api/gas-command"
             payload = {"username": username}
@@ -519,11 +563,11 @@ def cmd_gas(args):
                 msg = str(e).strip() if e else ""
                 return SPAWN_RESULT_FILE, "Gas spawn failed. " + (msg if msg else "Check overlay server and try again.")
 
-            pts -= cost
-            data[key] = (pts, last)
+            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
+            data[key] = (new_pts, last, new_donation)
             write_points(data)
             gas_name = body.get("gas_name", "gas")
-            return SPAWN_RESULT_FILE, f"ok|{gas_name}"
+            return SPAWN_RESULT_FILE, f"ok|{gas_name}|{new_pts}"
     except TimeoutError:
         return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
@@ -533,14 +577,15 @@ def cmd_scroll(args):
         return SPAWN_RESULT_FILE, "Usage: !scroll (uses a random scroll like +10 Unstable Spellbook)"
     username = args[0]
 
-    cost = get_config()["cost_per_scroll"]
+    cost = effective_cost("cost_per_scroll", get_config()["cost_per_scroll"])
     key = username.lower()
     try:
         with points_lock():
             data = read_points()
-            pts, last = data.get(key, (0, 0))
-            if pts < cost:
-                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} for random scroll, you have {pts}."
+            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            total = effective_total(pts, donation_pts)
+            if total < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} for random scroll, you have {total}."
 
             url = "http://127.0.0.1:5000/api/scroll-command"
             payload = {"username": username}
@@ -568,11 +613,11 @@ def cmd_scroll(args):
                 msg = str(e).strip() if e else ""
                 return SPAWN_RESULT_FILE, "Scroll command failed. " + (msg if msg else "Check overlay server and try again.")
 
-            pts -= cost
-            data[key] = (pts, last)
+            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
+            data[key] = (new_pts, last, new_donation)
             write_points(data)
             scroll_name = body.get("scroll_name", "scroll")
-            return SPAWN_RESULT_FILE, f"ok|{scroll_name}"
+            return SPAWN_RESULT_FILE, f"ok|{scroll_name}|{new_pts}"
     except TimeoutError:
         return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
@@ -584,14 +629,15 @@ def cmd_trap(args):
         return SPAWN_RESULT_FILE, "Usage: !trap (places a random visible trap near you)"
     username = args[0]
 
-    cost = get_config()["cost_per_trap"]
+    cost = effective_cost("cost_per_trap", get_config()["cost_per_trap"])
     key = username.lower()
     try:
         with points_lock():
             data = read_points()
-            pts, last = data.get(key, (0, 0))
-            if pts < cost:
-                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to place a trap, you have {pts}."
+            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            total = effective_total(pts, donation_pts)
+            if total < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to place a trap, you have {total}."
 
             url = "http://127.0.0.1:5000/api/trap-command"
             payload = {"username": username}
@@ -619,11 +665,11 @@ def cmd_trap(args):
                 msg = str(e).strip() if e else ""
                 return SPAWN_RESULT_FILE, "Trap command failed. " + (msg if msg else "Check overlay server and try again.")
 
-            pts -= cost
-            data[key] = (pts, last)
+            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
+            data[key] = (new_pts, last, new_donation)
             write_points(data)
             trap_name = body.get("trap_name", "trap")
-            return SPAWN_RESULT_FILE, f"ok|{trap_name}"
+            return SPAWN_RESULT_FILE, f"ok|{trap_name}|{new_pts}"
     except TimeoutError:
         return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
@@ -635,14 +681,15 @@ def cmd_transmute(args):
         return SPAWN_RESULT_FILE, "Usage: !transmute (transmutes a random transmutable item from bag or equipped)"
     username = args[0]
 
-    cost = get_config()["cost_per_transmute"]
+    cost = effective_cost("cost_per_transmute", get_config()["cost_per_transmute"])
     key = username.lower()
     try:
         with points_lock():
             data = read_points()
-            pts, last = data.get(key, (0, 0))
-            if pts < cost:
-                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to transmute, you have {pts}."
+            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            total = effective_total(pts, donation_pts)
+            if total < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to transmute, you have {total}."
 
             url = "http://127.0.0.1:5000/api/transmute-command"
             payload = {"username": username}
@@ -670,11 +717,11 @@ def cmd_transmute(args):
                 msg = str(e).strip() if e else ""
                 return SPAWN_RESULT_FILE, "Transmute command failed. " + (msg if msg else "Check overlay server and try again.")
 
-            pts -= cost
-            data[key] = (pts, last)
+            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
+            data[key] = (new_pts, last, new_donation)
             write_points(data)
             item_name = body.get("item_name", "item")
-            return SPAWN_RESULT_FILE, f"ok|{item_name}"
+            return SPAWN_RESULT_FILE, f"ok|{item_name}|{new_pts}"
     except TimeoutError:
         return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
@@ -691,9 +738,10 @@ def cmd_ally_bee(args):
     try:
         with points_lock():
             data = read_points()
-            pts, last = data.get(key, (0, 0))
-            if pts < cost:
-                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to summon a bee, you have {pts}."
+            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            total = effective_total(pts, donation_pts)
+            if total < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to summon a bee, you have {total}."
 
             url = "http://127.0.0.1:5000/api/summon-bee-command"
             payload = {"username": username}
@@ -721,11 +769,11 @@ def cmd_ally_bee(args):
                 msg = str(e).strip() if e else ""
                 return SPAWN_RESULT_FILE, "Summon bee failed. " + (msg if msg else "Check overlay server and try again.")
 
-            pts -= cost
-            data[key] = (pts, last)
+            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
+            data[key] = (new_pts, last, new_donation)
             write_points(data)
             ally_name = body.get("ally_name", "Bee")
-            return SPAWN_RESULT_FILE, f"ok|{ally_name}"
+            return SPAWN_RESULT_FILE, f"ok|{ally_name}|{new_pts}"
     except TimeoutError:
         return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
@@ -737,14 +785,15 @@ def cmd_ward(args):
         return SPAWN_RESULT_FILE, "Usage: !ward (summons a ward, 30 pts, scales with depth)"
     username = args[0]
 
-    cost = get_config()["cost_per_ward"]
+    cost = effective_cost("cost_per_ward", get_config()["cost_per_ward"])
     key = username.lower()
     try:
         with points_lock():
             data = read_points()
-            pts, last = data.get(key, (0, 0))
-            if pts < cost:
-                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to summon a ward, you have {pts}."
+            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            total = effective_total(pts, donation_pts)
+            if total < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to summon a ward, you have {total}."
 
             url = "http://127.0.0.1:5000/api/ward-command"
             payload = {"username": username}
@@ -772,11 +821,11 @@ def cmd_ward(args):
                 msg = str(e).strip() if e else ""
                 return SPAWN_RESULT_FILE, "Summon ward failed. " + (msg if msg else "Check overlay server and try again.")
 
-            pts -= cost
-            data[key] = (pts, last)
+            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
+            data[key] = (new_pts, last, new_donation)
             write_points(data)
             ward_name = body.get("ward_name", "Ward")
-            return SPAWN_RESULT_FILE, f"ok|{ward_name}"
+            return SPAWN_RESULT_FILE, f"ok|{ward_name}|{new_pts}"
     except TimeoutError:
         return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
@@ -793,9 +842,10 @@ def cmd_buff(args):
     try:
         with points_lock():
             data = read_points()
-            pts, last = data.get(key, (0, 0))
-            if pts < cost:
-                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} for random buff, you have {pts}."
+            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            total = effective_total(pts, donation_pts)
+            if total < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} for random buff, you have {total}."
 
             url = "http://127.0.0.1:5000/api/buff-command"
             payload = {"username": username}
@@ -823,11 +873,11 @@ def cmd_buff(args):
                 msg = str(e).strip() if e else ""
                 return SPAWN_RESULT_FILE, "Buff command failed. " + (msg if msg else "Check overlay server and try again.")
 
-            pts -= cost
-            data[key] = (pts, last)
+            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
+            data[key] = (new_pts, last, new_donation)
             write_points(data)
             buff_name = body.get("buff_name", "buff")
-            return SPAWN_RESULT_FILE, f"ok|{buff_name}"
+            return SPAWN_RESULT_FILE, f"ok|{buff_name}|{new_pts}"
     except TimeoutError:
         return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
@@ -839,14 +889,15 @@ def cmd_debuff(args):
         return SPAWN_RESULT_FILE, "Usage: !debuff (gives a random debuff)"
     username = args[0]
 
-    cost = get_config()["cost_per_debuff"]
+    cost = effective_cost("cost_per_debuff", get_config()["cost_per_debuff"])
     key = username.lower()
     try:
         with points_lock():
             data = read_points()
-            pts, last = data.get(key, (0, 0))
-            if pts < cost:
-                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} for random debuff, you have {pts}."
+            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            total = effective_total(pts, donation_pts)
+            if total < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} for random debuff, you have {total}."
 
             url = "http://127.0.0.1:5000/api/debuff-command"
             payload = {"username": username}
@@ -874,16 +925,19 @@ def cmd_debuff(args):
                 msg = str(e).strip() if e else ""
                 return SPAWN_RESULT_FILE, "Debuff command failed. " + (msg if msg else "Check overlay server and try again.")
 
-            pts -= cost
-            data[key] = (pts, last)
+            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
+            data[key] = (new_pts, last, new_donation)
             write_points(data)
             debuff_name = body.get("debuff_name", "debuff")
-            return SPAWN_RESULT_FILE, f"ok|{debuff_name}"
+            return SPAWN_RESULT_FILE, f"ok|{debuff_name}|{new_pts}"
     except TimeoutError:
         return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
 
 WAND_TIERS = frozenset(["common", "uncommon", "rare", "veryrare", "very_rare"])
+
+
+WAND_COST_KEYS = ["cost_per_wand_common", "cost_per_wand_uncommon", "cost_per_wand_rare", "cost_per_wand_veryrare"]
 
 
 def _wand_cost_for_rarity(cfg, rarity):
@@ -895,6 +949,13 @@ def _wand_cost_for_rarity(cfg, rarity):
         cfg.get("cost_per_wand_veryrare", 400),
     ]
     return costs[min(rarity, 3)]
+
+
+def _wand_effective_cost(cfg, rarity):
+    """Effective cost for wand at given rarity (0 if free)."""
+    base = _wand_cost_for_rarity(cfg, rarity)
+    key = WAND_COST_KEYS[min(rarity, 3)]
+    return effective_cost(key, base)
 
 
 def _tier_to_int(tier_str):
@@ -920,22 +981,22 @@ def cmd_wand(args):
 
     cfg = get_config()
     if tier >= 0:
-        cost = _wand_cost_for_rarity(cfg, tier)
-        cost_check = cost
+        cost_check = _wand_effective_cost(cfg, tier)
     else:
         cost_check = max(
-            cfg.get("cost_per_wand_common", 50),
-            cfg.get("cost_per_wand_uncommon", 100),
-            cfg.get("cost_per_wand_rare", 200),
-            cfg.get("cost_per_wand_veryrare", 400),
+            _wand_effective_cost(cfg, 0),
+            _wand_effective_cost(cfg, 1),
+            _wand_effective_cost(cfg, 2),
+            _wand_effective_cost(cfg, 3),
         )
     key = username.lower()
     try:
         with points_lock():
             data = read_points()
-            pts, last = data.get(key, (0, 0))
-            if pts < cost_check:
-                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost_check}, you have {pts}."
+            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            total = effective_total(pts, donation_pts)
+            if total < cost_check:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost_check}, you have {total}."
 
             url = "http://127.0.0.1:5000/api/wand-command"
             payload = {"username": username}
@@ -966,12 +1027,12 @@ def cmd_wand(args):
                 return SPAWN_RESULT_FILE, "Wand command failed. " + (msg if msg else "Check overlay server and try again.")
 
             rarity = body.get("rarity", 0)
-            cost = _wand_cost_for_rarity(cfg, rarity)
-            pts -= cost
-            data[key] = (pts, last)
+            cost = _wand_effective_cost(cfg, rarity)
+            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
+            data[key] = (new_pts, last, new_donation)
             write_points(data)
             effect_name = body.get("effect_name", "effect")
-            return SPAWN_RESULT_FILE, f"ok|{effect_name}"
+            return SPAWN_RESULT_FILE, f"ok|{effect_name}|{new_pts}"
     except TimeoutError:
         return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
@@ -1019,9 +1080,9 @@ def cmd_superchat(args):
     try:
         with points_lock():
             data = read_points()
-            pts, last = data.get(key, (0, 0))
+            pts, last, donation_pts = data.get(key, (0, 0, 0))
             pts += to_add
-            data[key] = (pts, last)
+            data[key] = (pts, last, donation_pts + to_add)
             write_points(data)
         return DONATION_RESULT_FILE, f"ok|{to_add}"
     except TimeoutError:
@@ -1048,9 +1109,9 @@ def cmd_cheer(args):
     try:
         with points_lock():
             data = read_points()
-            pts, last = data.get(key, (0, 0))
+            pts, last, donation_pts = data.get(key, (0, 0, 0))
             pts += to_add
-            data[key] = (pts, last)
+            data[key] = (pts, last, donation_pts + to_add)
             write_points(data)
         return DONATION_RESULT_FILE, f"ok|{to_add}"
     except TimeoutError:

@@ -128,14 +128,16 @@ public class ScrollOfRemoveCurse extends InventoryScroll {
 			if (item instanceof Weapon){
 				Weapon w = (Weapon) item;
 				if (w.hasCurseEnchant()){
-					w.enchant(null);
+					Weapon.Enchantment saved = w.restoreSavedEnchantment();
+					w.enchant(saved != null ? saved : null);
 					procced = true;
 				}
 			}
 			if (item instanceof Armor){
 				Armor a = (Armor) item;
 				if (a.hasCurseGlyph()){
-					a.inscribe(null);
+					Armor.Glyph saved = a.restoreSavedGlyph();
+					a.inscribe(saved != null ? saved : null);
 					procced = true;
 				}
 			}

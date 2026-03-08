@@ -8,18 +8,23 @@
     * { box-sizing: border-box; }
     body {
       font-family: system-ui, -apple-system, sans-serif;
-      max-width: 1600px;
+      max-width: min(1920px, 98vw);
       margin: 2rem auto;
-      padding: 0 1rem;
+      padding: 0 0.5rem;
       background: #1a1a2e;
       color: #eee;
     }
     .main-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(320px, 1fr) minmax(360px, 1fr);
       gap: 1.5rem;
       align-items: start;
     }
+    .main-grid.col-default {
+      grid-template-columns: minmax(0, 1fr) minmax(320px, 1fr) minmax(360px, 1fr);
+    }
+    .main-grid.col-1 { grid-template-columns: 1fr; }
+    .main-grid.col-2 { grid-template-columns: 1fr 1fr; }
+    .main-grid.col-3 { grid-template-columns: minmax(0, 1fr) minmax(320px, 1fr) minmax(360px, 1fr); }
     .col-center,
     .col-right {
       position: sticky;
@@ -40,8 +45,12 @@
       border-radius: 8px;
       padding: 1rem 1.25rem;
       margin-bottom: 1rem;
+      min-width: 0;
     }
-    section h2 { font-size: 1rem; color: #7f5af0; margin: 0 0 0.75rem 0; }
+    section.dragging { opacity: 0.6; }
+    section .section-drag-handle { cursor: grab; padding: 0 6px; margin-right: 4px; color: #94a1b2; user-select: none; }
+    section .section-drag-handle:active { cursor: grabbing; }
+    section h2 { font-size: 1rem; color: #7f5af0; margin: 0 0 0.75rem 0; display: flex; align-items: center; }
     .row {
       display: flex;
       align-items: center;
@@ -61,7 +70,7 @@
     input[type="number"] { width: 80px; }
     .monsters {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
       gap: 0.75rem 1rem;
     }
     .monsters .row {
@@ -69,7 +78,7 @@
       gap: 0.5rem;
       min-width: 0;
       display: grid;
-      grid-template-columns: 1fr 56px;
+      grid-template-columns: 1fr 56px auto;
       align-items: center;
     }
     .monsters label {
@@ -94,6 +103,25 @@
       margin-top: 0.5rem;
     }
     button:hover { background: #9d7bff; }
+    button.free-btn {
+      padding: 0.35rem 0.6rem;
+      font-size: 0.85rem;
+      margin: 0;
+      background: #4a5568;
+    }
+    button.free-btn:hover { background: #5a6578; }
+    button.cancel-free-btn {
+      padding: 0.35rem 0.6rem;
+      font-size: 0.85rem;
+      margin: 0;
+      background: #7f1d1d;
+    }
+    button.cancel-free-btn:hover { background: #991b1b; }
+    .free-countdown {
+      font-size: 0.85rem;
+      color: #6ee7b7;
+      min-width: 5em;
+    }
     .msg {
       margin-top: 1rem;
       padding: 0.5rem;
@@ -103,11 +131,16 @@
     .msg.ok { background: #065f46; color: #6ee7b7; }
     .msg.err { background: #7f1d1d; color: #fca5a5; }
     .search-bar {
-      display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem;
+      display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem;
       background: #0f0f1a; border: 1px solid #4a5568; border-radius: 6px; padding: 0.4rem 0.75rem;
     }
-    .search-bar input[type="text"] { flex: 1; min-width: 0; border: none; background: transparent; }
+    .search-bar input[type="text"] { flex: 1; min-width: 120px; border: none; background: transparent; }
     .search-bar input[type="text"]:focus { outline: none; }
+    .vp-actions {
+      display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.75rem;
+    }
+    .vp-actions label { display: flex; align-items: center; gap: 0.35rem; }
+    .vp-actions input[type="number"] { width: 72px; padding: 0.35rem 0.5rem; }
     .ws-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
     .ws-status { color: #94a1b2; font-size: 0.9rem; }
     .ws-status.connected { color: #6ee7b7; }
@@ -120,105 +153,173 @@
     .bool { color: #c9c; }
     .null { color: #666; }
     summary { cursor: pointer; }
+    .vp-col-config-modal {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100;
+      align-items: center; justify-content: center;
+    }
+    .vp-col-config-modal.open { display: flex; }
+    .vp-col-config-panel {
+      background: #16213e; border-radius: 8px; padding: 1rem 1.25rem; min-width: 220px;
+      border: 1px solid #4a5568;
+    }
+    .vp-col-config-panel h3 { margin: 0 0 0.75rem 0; font-size: 1rem; color: #7f5af0; }
+    .vp-col-config-panel .row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+    .vp-col-config-panel label { min-width: 90px; }
+    .vp-col-config-panel input[type="number"] { width: 80px; padding: 0.35rem 0.5rem; }
+    .vp-col-config-panel .btns { margin-top: 1rem; display: flex; gap: 0.5rem; justify-content: flex-end; }
+    .overall-config-modal {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 101;
+      align-items: center; justify-content: center;
+    }
+    .overall-config-modal.open { display: flex; }
+    .overall-config-panel {
+      background: #16213e; border-radius: 8px; padding: 1.25rem 1.5rem; min-width: 280px;
+      border: 1px solid #4a5568;
+    }
+    .overall-config-panel h3 { margin: 0 0 1rem 0; font-size: 1rem; color: #7f5af0; }
+    .overall-config-panel .config-row { margin-bottom: 0.75rem; }
+    .overall-config-panel .config-row label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+    .overall-config-panel input[type="checkbox"] { width: 18px; height: 18px; }
+    .overall-config-panel .col-options { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .overall-config-panel .col-options label { display: flex; align-items: center; gap: 0.35rem; cursor: pointer; }
   </style>
 </head>
 <body>
   <h1>SPD Overlay Control</h1>
-  <p class="sub">Edit costs, viewer points, and inspect game data. <a href="/overlay" target="_blank" style="color:#7f5af0;">OBS overlay</a></p>
+  <p class="sub">Edit costs, viewer points, and inspect game data. <a href="/overlay" target="_blank" style="color:#7f5af0;">OBS overlay</a> <button id="overallConfigBtn" style="margin-left:8px;padding:4px 10px;font-size:0.85rem;background:#4a5568;">Layout & sections</button> <button id="save">Save costs</button> <button id="refresh" style="margin-left:4px;background:#444;">Refresh</button> <span id="msg" style="margin-left:8px;"></span></p>
 
-  <div class="main-grid">
-  <div class="col-left">
-  <section>
-    <h2>General costs</h2>
-    <div class="row">
+  <div class="main-grid col-default" id="mainGrid">
+  <section id="section-general" data-section="general" draggable="true">
+    <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>General costs</h2>
+    <div class="row free-mins-row" style="margin-bottom:0.75rem;padding-bottom:0.75rem;border-bottom:1px solid #4a5568;">
+      <label for="freeMins">Free for (mins):</label>
+      <input type="number" id="freeMins" min="1" max="1440" value="5" style="width:64px;">
+    </div>
+    <div class="row" data-cost-key="cost_per_gold">
       <label for="cost_per_gold">Gold (per 1):</label>
       <input type="number" id="cost_per_gold" min="1" value="5">
+      <button type="button" class="free-btn">Free</button>
+      <span class="free-countdown" style="display:none;"></span>
+      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
     </div>
-    <div class="row">
+    <div class="row" data-cost-key="cost_per_curse">
       <label for="cost_per_curse">Curse:</label>
       <input type="number" id="cost_per_curse" min="1" value="200">
+      <button type="button" class="free-btn">Free</button>
+      <span class="free-countdown" style="display:none;"></span>
+      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
     </div>
-    <div class="row">
+    <div class="row" data-cost-key="cost_per_gas">
       <label for="cost_per_gas">Gas:</label>
       <input type="number" id="cost_per_gas" min="1" value="75">
+      <button type="button" class="free-btn">Free</button>
+      <span class="free-countdown" style="display:none;"></span>
+      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
     </div>
-    <div class="row">
+    <div class="row" data-cost-key="cost_per_scroll">
       <label for="cost_per_scroll">Random scroll:</label>
       <input type="number" id="cost_per_scroll" min="1" value="100">
+      <button type="button" class="free-btn">Free</button>
+      <span class="free-countdown" style="display:none;"></span>
+      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
     </div>
-    <div class="row">
+    <div class="row" data-cost-key="cost_per_trap">
       <label for="cost_per_trap">Trap:</label>
       <input type="number" id="cost_per_trap" min="1" value="50">
+      <button type="button" class="free-btn">Free</button>
     </div>
-    <div class="row">
+    <div class="row" data-cost-key="cost_per_transmute">
       <label for="cost_per_transmute">Transmute:</label>
       <input type="number" id="cost_per_transmute" min="1" value="150">
+      <button type="button" class="free-btn">Free</button>
+      <span class="free-countdown" style="display:none;"></span>
+      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
     </div>
-    <div class="row">
+    <div class="row" data-cost-key="cost_per_ally_bee">
       <label for="cost_per_ally_bee">Bee:</label>
       <input type="number" id="cost_per_ally_bee" min="1" value="75">
+      <button type="button" class="free-btn">Free</button>
     </div>
-    <div class="row">
+    <div class="row" data-cost-key="cost_per_ward">
       <label for="cost_per_ward">Ward:</label>
       <input type="number" id="cost_per_ward" min="1" value="30">
+      <button type="button" class="free-btn">Free</button>
+      <span class="free-countdown" style="display:none;"></span>
+      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
     </div>
-    <div class="row">
+    <div class="row" data-cost-key="cost_per_buff">
       <label for="cost_per_buff">Random buff:</label>
       <input type="number" id="cost_per_buff" min="1" value="75">
+      <button type="button" class="free-btn">Free</button>
     </div>
-    <div class="row">
+    <div class="row" data-cost-key="cost_per_debuff">
       <label for="cost_per_debuff">Random debuff:</label>
       <input type="number" id="cost_per_debuff" min="1" value="50">
+      <button type="button" class="free-btn">Free</button>
+      <span class="free-countdown" style="display:none;"></span>
+      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
     </div>
-    <div class="row">
+    <div class="row" data-cost-key="cost_per_wand_common">
       <label for="cost_per_wand_common">Wand (common):</label>
       <input type="number" id="cost_per_wand_common" min="1" value="50">
+      <button type="button" class="free-btn">Free</button>
+      <span class="free-countdown" style="display:none;"></span>
+      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
     </div>
-    <div class="row">
+    <div class="row" data-cost-key="cost_per_wand_uncommon">
       <label for="cost_per_wand_uncommon">Wand (uncommon):</label>
       <input type="number" id="cost_per_wand_uncommon" min="1" value="100">
+      <button type="button" class="free-btn">Free</button>
     </div>
-    <div class="row">
+    <div class="row" data-cost-key="cost_per_wand_rare">
       <label for="cost_per_wand_rare">Wand (rare):</label>
       <input type="number" id="cost_per_wand_rare" min="1" value="200">
+      <button type="button" class="free-btn">Free</button>
+      <span class="free-countdown" style="display:none;"></span>
+      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
     </div>
-    <div class="row">
+    <div class="row" data-cost-key="cost_per_wand_veryrare">
       <label for="cost_per_wand_veryrare">Wand (very rare):</label>
       <input type="number" id="cost_per_wand_veryrare" min="1" value="400">
+      <button type="button" class="free-btn">Free</button>
+      <span class="free-countdown" style="display:none;"></span>
+      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
     </div>
-    <div class="row">
+    <div class="row" data-cost-key="default_monster_cost">
       <label for="default_monster_cost">Default monster:</label>
       <input type="number" id="default_monster_cost" min="1" value="100">
+      <button type="button" class="free-btn">Free</button>
+      <span class="free-countdown" style="display:none;"></span>
+      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
     </div>
   </section>
 
-  <section>
-    <h2>Monster costs (per spawn)</h2>
+  <section id="section-monsters" data-section="monsters" draggable="true">
+    <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>Monster costs (per spawn)</h2>
     <p class="sub" style="margin-bottom: 0.75rem;">Half price when spawned beyond native biome. Champion: 2× base cost (no discount).</p>
     <div class="monsters" id="monsters"></div>
   </section>
 
-  <button id="save">Save costs</button>
-  <button id="refresh" style="margin-left:8px;background:#444;">Refresh</button>
-  <div id="msg"></div>
-  </div>
-
-  <div class="col-center">
-  <section>
-    <h2>Viewer points <span id="vpUpdated" style="margin-left:6px;font-weight:normal;color:#94a1b2;font-size:0.85rem;">—</span></h2>
-    <p class="sub" style="margin-bottom: 0.75rem;">Search to filter, or type a new username + points to add. Auto-refreshes every 3s. Used by !spawn, !champion, !gold, !curse, !gas, !scroll, !trap, !transmute, !bee, !wand.</p>
+  <section id="section-viewer" data-section="viewer" draggable="true">
+    <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>Viewer points <span id="vpUpdated" style="margin-left:6px;font-weight:normal;color:#94a1b2;font-size:0.85rem;">—</span> <button id="vpColConfig" style="margin-left:6px;padding:2px 8px;font-size:0.8rem;background:#4a5568;">Columns</button></h2>
+    <p class="sub" style="margin-bottom: 0.5rem;">Search to filter, or type a new username + points to add. Auto-refreshes every 10s. Used by !spawn, !champion, !gold, !curse, !gas, !scroll, !trap, !transmute, !bee, !wand.</p>
     <div class="search-bar">
       <input type="text" id="vp_search" placeholder="Search users or type new username…" autocomplete="off">
-      <input type="number" id="new_points" placeholder="Pts" min="0" value="100" style="width: 64px;">
-      <button id="add_user">Add / Set</button>
+    </div>
+    <div class="vp-actions">
+      <label>Points <input type="number" id="new_points" placeholder="Pts" min="0" value="100"></label>
+      <label>Donor <input type="number" id="new_donation" placeholder="Donor" min="0" value="0"></label>
+      <button id="add_points">Add</button>
+      <button id="set_points">Set</button>
+      <button id="chatToDonor" style="background:#4a5568;" title="Convert selected users' chat points to donor points">Chat → Donor</button>
+      <button id="clearNonDonor" style="background:#6b4423;">Delete all points</button>
+      <button id="clearAll" style="background:#7f1d1d;">Delete all donor points</button>
     </div>
     <div id="viewer_points_list" style="max-height: 70vh; overflow-y: auto;"></div>
   </section>
-  </div>
 
-  <div class="col-right">
-  <section>
-    <h2>Game data (WebSocket)</h2>
+  <section id="section-game" data-section="game" draggable="true">
+    <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>Game data (WebSocket)</h2>
     <p class="sub" style="margin-bottom: 0.75rem;">Connect to game on port 5001. Enable WebSocket streaming in game Settings.</p>
     <div class="ws-bar">
       <label>Port <input type="number" id="wsPort" value="5001" min="1" max="65535" style="width:64px;"></label>
@@ -233,7 +334,51 @@
     <div id="wsOut">Connect to see game data.</div>
   </section>
   </div>
+
+  <div id="vpColConfigModal" class="vp-col-config-modal">
+    <div class="vp-col-config-panel">
+      <h3>Viewer points panel</h3>
+      <div class="row"><label>Container width (px):</label><input type="number" id="colContainer" min="280" max="800" value="400"></div>
+      <div class="btns">
+        <button id="vpColReset">Reset</button>
+        <button id="vpColApply">Apply</button>
+      </div>
+    </div>
   </div>
+
+  <div id="overallConfigModal" class="overall-config-modal">
+    <div class="overall-config-panel">
+      <h3>Layout & sections</h3>
+      <div class="config-row">
+        <span style="display:block;margin-bottom:0.35rem;">Columns:</span>
+        <div class="col-options">
+          <label><input type="radio" name="overallCols" value="1"> 1</label>
+          <label><input type="radio" name="overallCols" value="2"> 2</label>
+          <label><input type="radio" name="overallCols" value="3" checked> 3</label>
+        </div>
+      </div>
+      <div class="config-row"><label>Show sections:</label></div>
+      <div class="config-row"><label><input type="checkbox" id="cfg-section-general" checked> General costs</label></div>
+      <div class="config-row"><label><input type="checkbox" id="cfg-section-monsters" checked> Monster costs</label></div>
+      <div class="config-row">
+        <span style="display:block;margin-bottom:0.35rem;">Monster columns:</span>
+        <div class="col-options">
+          <label><input type="radio" name="monsterCols" value="1"> 1</label>
+          <label><input type="radio" name="monsterCols" value="2" checked> 2</label>
+          <label><input type="radio" name="monsterCols" value="3"> 3</label>
+          <label><input type="radio" name="monsterCols" value="auto"> Auto</label>
+        </div>
+      </div>
+      <div class="config-row"><label>Monster section width (px):</label><input type="number" id="cfg-monster-width" min="280" max="800" value="540"></div>
+      <div class="config-row"><label><input type="checkbox" id="cfg-section-viewer" checked> Viewer points</label></div>
+      <div class="config-row"><label><input type="checkbox" id="cfg-section-game" checked> Game data (WebSocket)</label></div>
+      <div class="btns">
+        <button id="overallConfigReset">Reset</button>
+        <button id="overallConfigApply">Apply</button>
+      </div>
+    </div>
+  </div>
+
 
   <script>
     const MONSTERS = [
@@ -243,11 +388,42 @@
       'succubus', 'eye', 'scorpio'
     ];
 
+    let freeUntilData = {};
+
     function showMsg(text, ok) {
       const el = document.getElementById('msg');
       el.textContent = text;
       el.className = 'msg ' + (ok ? 'ok' : 'err');
       el.style.display = 'block';
+    }
+
+    function formatCountdown(sec) {
+      if (sec <= 0) return '';
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      return m + ':' + (s < 10 ? '0' : '') + s;
+    }
+
+    function updateFreeCountdowns() {
+      const now = Math.floor(Date.now() / 1000);
+      document.querySelectorAll('.row[data-cost-key]').forEach(row => {
+        const key = row.dataset.costKey;
+        const endTs = freeUntilData[key];
+        const countdownEl = row.querySelector('.free-countdown');
+        const cancelEl = row.querySelector('.cancel-free-btn');
+        if (!endTs || endTs <= now) {
+          if (countdownEl) { countdownEl.style.display = 'none'; countdownEl.textContent = ''; }
+          if (cancelEl) cancelEl.style.display = 'none';
+          if (endTs && endTs <= now) delete freeUntilData[key];
+          return;
+        }
+        const sec = endTs - now;
+        if (countdownEl) {
+          countdownEl.style.display = '';
+          countdownEl.textContent = formatCountdown(sec);
+        }
+        if (cancelEl) cancelEl.style.display = '';
+      });
     }
 
     function load() {
@@ -275,9 +451,12 @@
           MONSTERS.forEach(m => {
             const div = document.createElement('div');
             div.className = 'row';
-            div.innerHTML = `<label>${m}:</label><input type="number" data-monster="${m}" min="0" value="${monsters[m] ?? ''}">`;
+            div.dataset.costKey = 'cost_per_monster.' + m;
+            div.innerHTML = `<label>${m}:</label><input type="number" data-monster="${m}" min="0" value="${monsters[m] ?? ''}"><button type="button" class="free-btn">Free</button><span class="free-countdown" style="display:none;"></span><button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>`;
             container.appendChild(div);
           });
+          freeUntilData = data.free_until || {};
+          updateFreeCountdowns();
         })
         .catch(e => showMsg('Failed to load: ' + e.message, false));
     }
@@ -320,6 +499,75 @@
         .catch(e => showMsg('Save failed: ' + e.message, false));
     }
 
+    const VP_COL_STORAGE = 'vp_container_width';
+    const VP_COL_DEFAULT = 400;
+    const OVERALL_CONFIG_STORAGE = 'overlay_layout_config';
+    const OVERALL_CONFIG_DEFAULT = { columns: 3, sections: { general: true, monsters: true, viewer: true, game: true }, order: ['general', 'monsters', 'viewer', 'game'], monsterColumns: 2, monsterSectionWidth: 540 };
+    function getOverallConfig() {
+      try {
+        const s = localStorage.getItem(OVERALL_CONFIG_STORAGE);
+        if (s) {
+          const c = JSON.parse(s);
+          if (c && typeof c.columns === 'number' && c.sections) {
+            if (!Array.isArray(c.order)) c.order = ['general', 'monsters', 'viewer', 'game'];
+            if (c.monsterColumns == null) c.monsterColumns = 2;
+            if (c.monsterSectionWidth == null) c.monsterSectionWidth = 420;
+            return c;
+          }
+        }
+      } catch (_) {}
+      return JSON.parse(JSON.stringify(OVERALL_CONFIG_DEFAULT));
+    }
+    function saveOverallConfig(cfg) {
+      try { localStorage.setItem(OVERALL_CONFIG_STORAGE, JSON.stringify(cfg)); } catch (_) {}
+    }
+    function applyOverallConfig() {
+      const cfg = getOverallConfig();
+      const grid = document.getElementById('mainGrid');
+      if (grid) {
+        grid.classList.remove('col-default', 'col-1', 'col-2', 'col-3');
+        grid.classList.add('col-' + Math.max(1, Math.min(3, cfg.columns)));
+        if (cfg.columns === 3) applyContainerWidth();
+        else grid.style.gridTemplateColumns = '';
+      }
+      ['general', 'monsters', 'viewer', 'game'].forEach(id => {
+        const el = document.getElementById('section-' + id);
+        if (el) el.style.display = (cfg.sections[id] !== false) ? '' : 'none';
+      });
+      const order = cfg.order || ['general', 'monsters', 'viewer', 'game'];
+      order.forEach(id => {
+        const el = document.getElementById('section-' + id);
+        if (el && grid) grid.appendChild(el);
+      });
+      const monstersEl = document.getElementById('monsters');
+      const monstersSection = document.getElementById('section-monsters');
+      if (monstersEl) {
+        const cols = cfg.monsterColumns;
+        monstersEl.style.gridTemplateColumns = (cols === 'auto' || !cols) ? 'repeat(auto-fill, minmax(220px, 1fr))' : 'repeat(' + Math.max(1, Math.min(4, parseInt(cols, 10) || 2)) + ', 1fr)';
+      }
+      if (monstersSection) {
+        const w = Math.max(280, Math.min(800, parseInt(cfg.monsterSectionWidth, 10) || 420));
+        monstersSection.style.minWidth = '0';
+        monstersSection.style.maxWidth = '100%';
+        monstersSection.style.width = 'min(' + w + 'px, 100%)';
+      }
+    }
+    function getContainerWidth() {
+      try {
+        const s = localStorage.getItem(VP_COL_STORAGE);
+        if (s) { const n = parseInt(s, 10); if (!isNaN(n) && n >= 280) return Math.min(800, n); }
+      } catch (_) {}
+      return VP_COL_DEFAULT;
+    }
+    function saveContainerWidth(w) {
+      try { localStorage.setItem(VP_COL_STORAGE, String(w)); } catch (_) {}
+    }
+    function applyContainerWidth() {
+      const w = getContainerWidth();
+      const grid = document.getElementById('mainGrid');
+      if (grid) grid.style.gridTemplateColumns = 'minmax(0, 1fr) minmax(280px, ' + w + 'px) minmax(360px, 1fr)';
+    }
+
     let viewerPointsData = [];
     function filterViewerPoints() {
       const q = (document.getElementById('vp_search').value || '').trim().toLowerCase();
@@ -329,8 +577,13 @@
         tr.style.display = (!q || user.includes(q)) ? '' : 'none';
       });
     }
-    function loadViewerPoints() {
-      fetch('/api/viewer-points')
+    function loadViewerPoints(forceRefresh) {
+      const active = document.activeElement;
+      const vpSection = document.getElementById('section-viewer');
+      if (!forceRefresh && active && vpSection && vpSection.contains(active) && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+        return;
+      }
+      fetch('/api/viewer-points' + (forceRefresh ? '?t=' + Date.now() : ''), forceRefresh ? { cache: 'no-store' } : {})
         .then(r => r.json())
         .then(data => {
           viewerPointsData = Object.entries(data).sort((a, b) => b[1].points - a[1].points);
@@ -339,21 +592,34 @@
           if (updatedEl) { updatedEl.textContent = '(updated just now)'; }
           vpLastUpdate = Date.now();
           if (viewerPointsData.length === 0) {
-            container.innerHTML = '<p style="color:#94a1b2;font-size:0.9rem;">No viewers yet. Type a username above and click Add / Set.</p>';
+            container.innerHTML = '<p style="color:#94a1b2;font-size:0.9rem;">No viewers yet. Type a username above and click Add or Set.</p>';
             return;
           }
-          container.innerHTML = '<table style="width:100%;border-collapse:collapse;"><thead><tr><th style="text-align:left;padding:4px 8px;">User</th><th style="text-align:right;padding:4px 8px;min-width:85px;">Points</th><th></th></tr></thead><tbody>' +
-            viewerPointsData.map(([u, d]) => `<tr data-user="${escapeHtml(u)}"><td style="padding:4px 8px;">${escapeHtml(u)}</td><td style="padding:4px 8px;"><input type="number" class="edit-pts" value="${d.points}" min="0" style="width:85px;padding:2px 4px;"></td><td style="padding:4px 8px;"><button class="save-row" style="padding:2px 8px;font-size:0.85rem;">Save</button> <button class="del-row" style="padding:2px 8px;font-size:0.85rem;background:#7f1d1d;">Del</button></td></tr>`).join('') +
+          const donationPts = (d) => (d.donationPts != null ? d.donationPts : 0);
+          const chatPts = (d) => Math.max(0, (d.points || 0) - donationPts(d));
+          container.innerHTML = '<table style="width:100%;border-collapse:collapse;"><thead><tr><th style="width:36px;"><input type="checkbox" id="vpSelectAll" title="Select all visible"></th><th style="text-align:left;padding:4px 8px;">User</th><th style="text-align:right;padding:4px 8px;">Points</th><th style="text-align:right;padding:4px 8px;">Donor</th><th></th></tr></thead><tbody>' +
+            viewerPointsData.map(([u, d]) => `<tr data-user="${escapeHtml(u)}"><td style="padding:4px 8px;"><input type="checkbox" class="vp-row-select"></td><td style="padding:4px 8px;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(u)}">${escapeHtml(u)}</td><td style="padding:4px 8px;"><input type="number" class="edit-pts" value="${chatPts(d)}" min="0" style="width:90px;min-width:50px;padding:2px 4px;box-sizing:border-box;"></td><td style="padding:4px 8px;"><input type="number" class="edit-donor" value="${donationPts(d)}" min="0" style="width:90px;min-width:50px;padding:2px 4px;box-sizing:border-box;"></td><td style="padding:4px 8px;"><button class="save-row" style="padding:2px 8px;font-size:0.85rem;">Save</button> <button class="del-row" style="padding:2px 8px;font-size:0.85rem;background:#7f1d1d;">Del</button></td></tr>`).join('') +
             '</tbody></table>';
           filterViewerPoints();
+          const selectAllEl = document.getElementById('vpSelectAll');
+          if (selectAllEl) {
+            selectAllEl.addEventListener('change', function() {
+              container.querySelectorAll('tbody tr').forEach(tr => {
+                if (tr.style.display !== 'none') tr.querySelector('.vp-row-select').checked = this.checked;
+              });
+            });
+          }
           container.querySelectorAll('.save-row').forEach(btn => {
             btn.addEventListener('click', () => {
               const tr = btn.closest('tr');
               const user = tr.dataset.user;
-              const pts = parseInt(tr.querySelector('.edit-pts').value, 10);
-              if (isNaN(pts) || pts < 0) { showMsg('Invalid points', false); return; }
-              fetch('/api/viewer-points', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, points: pts }) })
-                .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg(user + ' updated', true); loadViewerPoints(); })
+              const chat = parseInt(tr.querySelector('.edit-pts').value, 10);
+              const donor = parseInt(tr.querySelector('.edit-donor').value, 10);
+              if (isNaN(chat) || chat < 0) { showMsg('Invalid points', false); return; }
+              if (isNaN(donor) || donor < 0) { showMsg('Invalid donor points', false); return; }
+              const totalPoints = chat + donor;
+              fetch('/api/viewer-points', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, points: totalPoints, donationPts: donor }) })
+                .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg(user + ' updated', true); loadViewerPoints(true); })
                 .catch(e => showMsg('Failed: ' + e.message, false));
             });
           });
@@ -362,7 +628,7 @@
               const user = btn.closest('tr').dataset.user;
               if (!confirm('Remove ' + user + '?')) return;
               fetch('/api/viewer-points/' + encodeURIComponent(user), { method: 'DELETE' })
-                .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg(user + ' removed', true); loadViewerPoints(); })
+                .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg(user + ' removed', true); loadViewerPoints(true); })
                 .catch(e => showMsg('Failed: ' + e.message, false));
             });
           });
@@ -389,39 +655,247 @@
 
     function addViewerUser() {
       const username = document.getElementById('vp_search').value.trim();
-      const points = parseInt(document.getElementById('new_points').value, 10);
+      const chat = parseInt(document.getElementById('new_points').value, 10);
+      const donor = parseInt(document.getElementById('new_donation').value, 10) || 0;
       if (!username) {
         showMsg('Enter a username', false);
         return;
       }
-      if (isNaN(points) || points < 0) {
+      if (isNaN(chat) || chat < 0) {
         showMsg('Enter valid points', false);
         return;
       }
+      if (isNaN(donor) || donor < 0) {
+        showMsg('Enter valid donor points', false);
+        return;
+      }
+      const totalPoints = chat + donor;
       fetch('/api/viewer-points', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, points }),
+        body: JSON.stringify({ username, points: totalPoints, donationPts: donor }),
       })
         .then(r => r.json())
         .then(data => {
           if (data.error) throw new Error(data.error);
           showMsg(`${username} set to ${data.points} points`, true);
           document.getElementById('vp_search').value = '';
-          loadViewerPoints();
+          loadViewerPoints(true);
         })
         .catch(e => showMsg('Failed: ' + e.message, false));
     }
 
+    function setCostFree(costKey) {
+      const mins = parseInt(document.getElementById('freeMins').value, 10);
+      if (isNaN(mins) || mins < 1 || mins > 1440) {
+        showMsg('Enter minutes 1–1440', false);
+        return;
+      }
+      fetch('/api/cost-free', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ costKey, minutes: mins }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.error) throw new Error(data.error);
+          if (data.freeUntil) freeUntilData[costKey] = data.freeUntil;
+          updateFreeCountdowns();
+          showMsg(costKey + ' free for ' + mins + ' min', true);
+        })
+        .catch(e => showMsg('Failed: ' + e.message, false));
+    }
+    function cancelCostFree(costKey) {
+      fetch('/api/cost-free?costKey=' + encodeURIComponent(costKey), { method: 'DELETE' })
+        .then(r => r.json())
+        .then(data => {
+          if (data.error) throw new Error(data.error);
+          delete freeUntilData[costKey];
+          updateFreeCountdowns();
+          showMsg(costKey + ' free cancelled', true);
+        })
+        .catch(e => showMsg('Failed: ' + e.message, false));
+    }
+    document.body.addEventListener('click', (e) => {
+      const freeBtn = e.target.closest('.free-btn');
+      const cancelBtn = e.target.closest('.cancel-free-btn');
+      const row = (freeBtn || cancelBtn) && (freeBtn || cancelBtn).closest('.row[data-cost-key]');
+      const costKey = row && row.dataset.costKey;
+      if (!costKey) return;
+      if (freeBtn) setCostFree(costKey);
+      else if (cancelBtn) cancelCostFree(costKey);
+    });
+
     document.getElementById('save').addEventListener('click', save);
     document.getElementById('refresh').addEventListener('click', () => { load(); loadViewerPoints(); showMsg('Refreshed', true); });
-    document.getElementById('add_user').addEventListener('click', addViewerUser);
+    document.getElementById('add_points').addEventListener('click', () => {
+      const selected = Array.from(document.querySelectorAll('.vp-row-select:checked')).map(cb => cb.closest('tr').dataset.user);
+      const username = document.getElementById('vp_search').value.trim();
+      const users = selected.length > 0 ? selected : (username ? [username.toLowerCase()] : []);
+      const chat = parseInt(document.getElementById('new_points').value, 10);
+      const donor = parseInt(document.getElementById('new_donation').value, 10) || 0;
+      if (isNaN(chat) || chat < 0 || isNaN(donor) || donor < 0) {
+        showMsg('Enter valid points and donor values', false);
+        return;
+      }
+      if (chat === 0 && donor === 0) {
+        showMsg('Enter at least one point value', false);
+        return;
+      }
+      if (users.length === 0) {
+        showMsg('Select users or enter a username', false);
+        return;
+      }
+      fetch('/api/viewer-points/bulk/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ points: chat, donationPts: donor, users }),
+      })
+        .then(r => r.json())
+        .then(d => { if (d.error) throw new Error(d.error); showMsg(`Added to ${d.count} users`, true); loadViewerPoints(true); })
+        .catch(e => showMsg('Failed: ' + e.message, false));
+    });
+    document.getElementById('set_points').addEventListener('click', () => {
+      const username = document.getElementById('vp_search').value.trim();
+      if (!username) {
+        showMsg('Enter a username to set', false);
+        return;
+      }
+      addViewerUser();
+    });
+    document.getElementById('chatToDonor').addEventListener('click', () => {
+      const selected = Array.from(document.querySelectorAll('.vp-row-select:checked')).map(cb => cb.closest('tr').dataset.user);
+      const username = document.getElementById('vp_search').value.trim();
+      const users = selected.length > 0 ? selected : (username ? [username.toLowerCase()] : []);
+      if (users.length === 0) {
+        showMsg('Select users or enter a username', false);
+        return;
+      }
+      fetch('/api/viewer-points/bulk/chat-to-donor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ users }),
+      })
+        .then(r => r.json())
+        .then(d => { if (d.error) throw new Error(d.error); showMsg(`Converted chat→donor for ${d.count} users`, true); loadViewerPoints(true); })
+        .catch(e => showMsg('Failed: ' + e.message, false));
+    });
+    document.getElementById('clearNonDonor').addEventListener('click', () => {
+      if (!confirm('Delete all non-donor points? Donors will keep their donation amount.')) return;
+      fetch('/api/viewer-points/clear-non-donor', { method: 'POST' })
+        .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('Non-donor points cleared', true); loadViewerPoints(true); })
+        .catch(e => showMsg('Failed: ' + e.message, false));
+    });
+    document.getElementById('clearAll').addEventListener('click', () => {
+      if (!confirm('Remove all donor points? Chat points will be kept.')) return;
+      fetch('/api/viewer-points/bulk/clear-donor', { method: 'POST' })
+        .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('Donor points cleared', true); loadViewerPoints(true); })
+        .catch(e => showMsg('Failed: ' + e.message, false));
+    });
+    document.getElementById('vpColConfig').addEventListener('click', () => {
+      document.getElementById('colContainer').value = getContainerWidth();
+      document.getElementById('vpColConfigModal').classList.add('open');
+    });
+    document.getElementById('vpColConfigModal').addEventListener('click', (e) => {
+      if (e.target.id === 'vpColConfigModal') e.target.classList.remove('open');
+    });
+    document.getElementById('vpColApply').addEventListener('click', () => {
+      const w = Math.max(280, Math.min(800, parseInt(document.getElementById('colContainer').value, 10) || VP_COL_DEFAULT));
+      saveContainerWidth(w);
+      document.getElementById('vpColConfigModal').classList.remove('open');
+      applyContainerWidth();
+    });
+    document.getElementById('vpColReset').addEventListener('click', () => {
+      document.getElementById('colContainer').value = VP_COL_DEFAULT;
+    });
+    document.getElementById('overallConfigBtn').addEventListener('click', () => {
+      const cfg = getOverallConfig();
+      document.querySelector('input[name="overallCols"][value="' + cfg.columns + '"]').checked = true;
+      document.querySelector('input[name="monsterCols"][value="' + (cfg.monsterColumns || '2') + '"]').checked = true;
+      document.getElementById('cfg-monster-width').value = cfg.monsterSectionWidth || 540;
+      document.getElementById('cfg-section-general').checked = cfg.sections.general !== false;
+      document.getElementById('cfg-section-monsters').checked = cfg.sections.monsters !== false;
+      document.getElementById('cfg-section-viewer').checked = cfg.sections.viewer !== false;
+      document.getElementById('cfg-section-game').checked = cfg.sections.game !== false;
+      document.getElementById('overallConfigModal').classList.add('open');
+    });
+    document.getElementById('overallConfigModal').addEventListener('click', (e) => {
+      if (e.target.id === 'overallConfigModal') e.target.classList.remove('open');
+    });
+    document.getElementById('overallConfigApply').addEventListener('click', () => {
+      const grid = document.getElementById('mainGrid');
+      const order = grid ? [...grid.querySelectorAll('section[data-section]')].map(s => s.dataset.section) : ['general', 'monsters', 'viewer', 'game'];
+      const monsterCols = document.querySelector('input[name="monsterCols"]:checked').value;
+      const monsterW = Math.max(280, Math.min(800, parseInt(document.getElementById('cfg-monster-width').value, 10) || 420));
+      const cfg = {
+        columns: parseInt(document.querySelector('input[name="overallCols"]:checked').value, 10) || 3,
+        sections: {
+          general: document.getElementById('cfg-section-general').checked,
+          monsters: document.getElementById('cfg-section-monsters').checked,
+          viewer: document.getElementById('cfg-section-viewer').checked,
+          game: document.getElementById('cfg-section-game').checked,
+        },
+        order,
+        monsterColumns: monsterCols === 'auto' ? 'auto' : parseInt(monsterCols, 10) || 2,
+        monsterSectionWidth: monsterW,
+      };
+      saveOverallConfig(cfg);
+      document.getElementById('overallConfigModal').classList.remove('open');
+      applyOverallConfig();
+    });
+    document.getElementById('overallConfigReset').addEventListener('click', () => {
+      document.querySelector('input[name="overallCols"][value="3"]').checked = true;
+      document.querySelector('input[name="monsterCols"][value="2"]').checked = true;
+      document.getElementById('cfg-monster-width').value = 540;
+      document.getElementById('cfg-section-general').checked = true;
+      document.getElementById('cfg-section-monsters').checked = true;
+      document.getElementById('cfg-section-viewer').checked = true;
+      document.getElementById('cfg-section-game').checked = true;
+    });
     document.getElementById('vp_search').addEventListener('input', filterViewerPoints);
-    document.getElementById('vp_search').addEventListener('keydown', e => { if (e.key === 'Enter') addViewerUser(); });
+    ['vp_search', 'new_points', 'new_donation'].forEach(id => {
+      document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') addViewerUser(); });
+    });
+    applyOverallConfig();
+    applyContainerWidth();
     load();
+    (function setupSectionDragDrop() {
+      const grid = document.getElementById('mainGrid');
+      if (!grid) return;
+      let dragged = null;
+      grid.querySelectorAll('section[data-section]').forEach(section => {
+        section.addEventListener('dragstart', (e) => {
+          if (e.target.closest('input, button, a, [contenteditable]')) { e.preventDefault(); return; }
+          dragged = section;
+          section.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', section.dataset.section);
+        });
+        section.addEventListener('dragend', () => {
+          section.classList.remove('dragging');
+          dragged = null;
+        });
+        section.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+        });
+        section.addEventListener('drop', (e) => {
+          e.preventDefault();
+          if (dragged && dragged !== section) {
+            const rect = section.getBoundingClientRect();
+            const insertBefore = e.clientY < rect.top + rect.height / 2 ? section : section.nextElementSibling;
+            grid.insertBefore(dragged, insertBefore);
+            const cfg = getOverallConfig();
+            cfg.order = [...grid.querySelectorAll('section[data-section]')].map(s => s.dataset.section);
+            saveOverallConfig(cfg);
+          }
+        });
+      });
+    })();
     loadViewerPoints();
     setInterval(loadViewerPoints, 10000);
     setInterval(updateVpUpdatedLabel, 1000);
+    setInterval(updateFreeCountdowns, 1000);
 
     // WebSocket inspector
     let ws = null, wsLastData = null, wsLastTime = 0, wsStaleInterval = null;

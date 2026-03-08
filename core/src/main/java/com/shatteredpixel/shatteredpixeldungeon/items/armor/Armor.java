@@ -117,6 +117,7 @@ public class Armor extends EquipableItem {
 	public boolean glyphHardened = false;
 	public boolean curseInfusionBonus = false;
 	public boolean masteryPotionBonus = false;
+	private Glyph savedGlyphForRestore = null;
 	
 	protected BrokenSeal seal;
 	
@@ -138,6 +139,7 @@ public class Armor extends EquipableItem {
 	private static final String MASTERY_POTION_BONUS = "mastery_potion_bonus";
 	private static final String SEAL            = "seal";
 	private static final String AUGMENT			= "augment";
+	private static final String SAVED_GLYPH     = "saved_glyph";
 
 	@Override
 	public void storeInBundle( Bundle bundle ) {
@@ -162,6 +164,7 @@ public class Armor extends EquipableItem {
 		curseInfusionBonus = bundle.getBoolean( CURSE_INFUSION_BONUS );
 		masteryPotionBonus = bundle.getBoolean( MASTERY_POTION_BONUS );
 		seal = (BrokenSeal)bundle.get(SEAL);
+		savedGlyphForRestore = (Glyph)bundle.get( SAVED_GLYPH );
 		
 		augment = bundle.getEnum(AUGMENT, Augment.class);
 	}
@@ -775,6 +778,20 @@ public class Armor extends EquipableItem {
 
 	public boolean hasCurseGlyph(){
 		return glyph != null && glyph.curse();
+	}
+
+	/** Save current glyph before chat curse overwrites it. Restored when curse is removed. */
+	public void saveGlyphBeforeChatCurse() {
+		if (glyph != null && !hasCurseGlyph()) {
+			savedGlyphForRestore = glyph;
+		}
+	}
+
+	/** Restore saved glyph when curse is removed. Returns saved value and clears it. */
+	public Glyph restoreSavedGlyph() {
+		Glyph saved = savedGlyphForRestore;
+		savedGlyphForRestore = null;
+		return saved;
 	}
 
 	private static ItemSprite.Glowing HOLY = new ItemSprite.Glowing( 0xFFFF00 );

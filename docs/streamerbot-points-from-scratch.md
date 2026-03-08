@@ -16,28 +16,28 @@ Before implementing, ensure:
 
 ## Implementation Order
 
-1. Action 1 (Earn on message) — gets users into the file
-2. Action 1c (First Words) — optional, add to your existing action
-3. Action 2 (!points) — viewers can check balance
-4. Action 2b (!toppoints) — show top 3 point holders
-5. Action 3 (!spawn) — spend points to spawn
-6. Action 3a (!champion) — spend points to spawn a champion version of a monster (2× base cost, no zone discount)
-7. Action 3b (!gold) — spend points to drop gold near hero
-8. Action 3c (!curse) — spend points to curse equipped item
-9. Action 3d (!gas) — spend points to spawn random gas
-10. Action 3e (!scroll) — spend points to use a random scroll (like +10 Unstable Spellbook)
-11. Action 3e0 (!trap) — spend points to place a random visible trap nearby
-11a. Action 3e0a (!transmute) — spend points to transmute a random transmutable item (bag or equipped)
-11b. Action 3e0b (!bee) — spend points to summon an allied bee (50 turns)
-11c. Action 3e0c (!ward) — spend points to summon a ward (scales with depth; upgrades existing if same tile)
-12. Action 3e1 (!buff) — spend points to apply a random buff (Haste, Healing, Barrier, etc.)
-13. Action 3e2 (!debuff) — spend points to apply a random debuff (Blindness, Slow, Roots, etc.)
-14. Action 3f (!wand) — spend points to trigger a random cursed wand effect (cost varies by rarity)
-15. Action 1b (Passive earn) — optional, for viewers already in file
-16. Action 4 (!doublepoints) — optional, 2x points for N minutes
-17. Action 4a (Spend OFF / Spend ON) — optional, Stream Deck switch to disable/enable spend commands
-18. Action 4b (Super Chat / Cheer) — optional, 1 pt per $0.01
-19. Action 5 (Reset) — optional, clear points each stream
+1. Action 01: Earn Points (on message) — gets users into the file
+2. Action 03: First Words — optional, add to your existing action
+3. Action 04: Check Points (!points) — viewers can check balance
+4. Action 05: Top Points (!toppoints) — show top 3 point holders
+5. Action 06: Spawn Monster (!spawn) — spend points to spawn
+6. Action 07: Spawn Champion (!champion) — spend points to spawn a champion version of a monster (2× base cost, no zone discount)
+7. Action 08: Drop Gold (!gold) — spend points to drop gold near hero
+8. Action 09: Curse Item (!curse) — spend points to curse equipped item
+9. Action 10: Spawn Random Gas (!gas) — spend points to spawn random gas
+10. Action 11: Random Scroll (!scroll) — spend points to use a random scroll (like +10 Unstable Spellbook)
+11. Action 12: Place Trap (!trap) — spend points to place a random visible trap nearby
+12. Action 13: Transmute (!transmute) — spend points to transmute a random transmutable item (bag or equipped)
+13. Action 14: Bee (!bee) — spend points to summon an allied bee (50 turns)
+14. Action 15: Ward (!ward) — spend points to summon a ward (scales with depth; upgrades existing if same tile)
+15. Action 16: Random Buff (!buff) — spend points to apply a random buff (Haste, Healing, Barrier, etc.)
+16. Action 17: Random Debuff (!debuff) — spend points to apply a random debuff (Blindness, Slow, Roots, etc.)
+17. Action 18: Cursed Wand Effect (!wand) — spend points to trigger a random cursed wand effect (cost varies by rarity)
+18. Action 02: Earn Points (passive) — optional, for viewers already in file
+19. Action 19: Double Points (!doublepoints) — optional, 2x points for N minutes
+20. Action 20: Spend OFF / Spend ON — optional, Stream Deck switch to disable/enable spend commands
+21. Action 21: Super Chat / Cheer — optional, 1 pt per $0.01
+22. Action 22: Reset Points — optional, clear points each stream
 
 ---
 
@@ -59,7 +59,7 @@ Use **one action per command** that works for both Twitch and YouTube. After che
 **Structure for each spend command:**
 ```
 1. Run a Program (points_command.py ...)
-2. Execute C# Code (reads spawn_result.txt, sets %spawnResult% and any extra vars)
+2. Execute C# Code (reads spawn_result.txt, sets %spawnResult%, %userPointsRemaining%, and any extra vars)
 3. Conditional: if ("%spawnResult%" Equals "ok")
    - True branch (success):
      - if ("%commandSource%" Equals (Ignore Case) "youtube") → True: YouTube Message (success text)
@@ -73,23 +73,25 @@ Use **one action per command** that works for both Twitch and YouTube. After che
 
 **Important:** The **False Result** of each `commandSource` conditional must have **no sub-actions**. Only the **True Result** sends a message.
 
+**Result format:** Success results are `ok|extra|pts` (spawn: `ok|pts`). The last value is the user's remaining points. Each C# block parses this and sets `%userPointsRemaining%` so you can tell chatters their balance after use.
+
 **Quick reference — success messages by command:**
 
 | Command | Success Message |
 |---------|-----------------|
-| !spawn | `%userName% spawned a %rawInput%!` |
-| !champion | `%userName% spawned a champion %championMonster%!` |
-| !gold | `%userName% dropped %goldAmount% gold!` |
-| !curse | `%userName% cursed your %curseItemName%!` |
-| !gas | `%userName% spewed %gasName%!` |
-| !scroll | `%userName% used a random scroll: %scrollName%!` |
-| !trap | `%userName% placed a %trapName% nearby!` |
-| !transmute | `%userName% transmuted an item into %transmuteItemName%!` |
-| !bee | `%userName% summoned a bee to help you!` |
-| !ward | `%userName% summoned a ward to help you!` |
-| !buff | `%userName% gave you %buffName%!` |
-| !debuff | `%userName% afflicted you with %debuffName%!` |
-| !wand | `%userName% triggered a cursed wand effect: %wandEffectName%!` |
+| !spawn | `%userName% spawned a %rawInput%! You have %userPointsRemaining% points left.` |
+| !champion | `%userName% spawned a champion %championMonster%! You have %userPointsRemaining% points left.` |
+| !gold | `%userName% dropped %goldAmount% gold! You have %userPointsRemaining% points left.` |
+| !curse | `%userName% cursed your %curseItemName%! You have %userPointsRemaining% points left.` |
+| !gas | `%userName% spewed %gasName%! You have %userPointsRemaining% points left.` |
+| !scroll | `%userName% used a random scroll: %scrollName%! You have %userPointsRemaining% points left.` |
+| !trap | `%userName% placed a %trapName% nearby! You have %userPointsRemaining% points left.` |
+| !transmute | `%userName% transmuted an item into %transmuteItemName%! You have %userPointsRemaining% points left.` |
+| !bee | `%userName% summoned a bee to help you! You have %userPointsRemaining% points left.` |
+| !ward | `%userName% summoned a ward to help you! You have %userPointsRemaining% points left.` |
+| !buff | `%userName% gave you %buffName%! You have %userPointsRemaining% points left.` |
+| !debuff | `%userName% afflicted you with %debuffName%! You have %userPointsRemaining% points left.` |
+| !wand | `%userName% triggered a cursed wand effect: %wandEffectName%! You have %userPointsRemaining% points left.` |
 
 ---
 
@@ -101,7 +103,7 @@ Points are stored in (update the path in all C# code if your project is elsewher
 ```
 C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt
 ```
-Format: one line per user: `username|points|lastEarnTimestamp`
+Format: one line per user: `username|points|lastEarnTimestamp|donationPts` (donationPts from Super Chat/Cheer; 3-column lines treated as donationPts=0)
 The file is created automatically when the first action runs.
 
 **Double points:** Stored in `double_points_end.txt` (Unix timestamp when 2x ends; `0` = off). Created when you first use `!doublepoints`.
@@ -110,25 +112,25 @@ The file is created automatically when the first action runs.
 
 ## Configuration (edit in the C# code)
 
-- **Points per message:** `1` (change `POINTS_PER_MESSAGE` in Action 1)
-- **Points per passive tick:** `1` (change `POINTS_PER_TICK` in Action 1b)
-- **Bot exclusion:** `daltongoesslow` never earns points (change `BOT_USER` in Action 1 and 1b)
-- **Chat cooldown:** `30` seconds (change `COOLDOWN_SEC` in Action 1; `0` = no cooldown)
-- **Passive cooldown:** `60` seconds (change `COOLDOWN_SEC` in Action 1b; shares `lastEarn` with chat)
-- **Points costs:** Edit `points_config.json` or open **http://localhost:5000** in your browser (main control page; overlay server must be running)
+- **Points per message:** `1` (change `POINTS_PER_MESSAGE` in Earn Points on chat)
+- **Points per passive tick:** `1` (change `POINTS_PER_TICK` in Earn Points passive)
+- **Bot exclusion:** `daltongoesslow` never earns points (change `BOT_USER` in Earn Points on chat and passive)
+- **Chat cooldown:** `30` seconds (change `COOLDOWN_SEC` in Earn Points on chat; `0` = no cooldown)
+- **Passive cooldown:** `60` seconds (change `COOLDOWN_SEC` in Earn Points passive; shares `lastEarn` with chat)
+- **Points costs:** Edit `points_config.json` or open **http://localhost:5000** in your browser (main control page; overlay server must be running). The overlay also has **Delete all points** (clears non-donor only; donors keep donation) and **Delete all donor points** (full wipe).
 - **Donation rate:** 1 point per $0.01 (Super Chat uses Frankfurter API for conversion; not in points config)
 - **Top farder 2x:** Set `TOP_FARDER_FILE` to the path of the text file (default: `OBS files\textread\leader.txt`). Expected format: `Top Farder: USERNAME - 45`. That user always earns 2x points.
 - **Subscriber / member 2x:** Twitch subscribers and YouTube channel members earn 2x points. Uses Streamer.bot variables `isSubscribed` (Twitch) and `userIsSponsor` (YouTube). Stacks with double points and top farder (e.g. 4x or 8x when multiple apply).
 
 ---
 
-## Action 1: Earn Points (on chat message)
+## Action 01: Earn Points (on chat message)
 
 **Trigger:** Message Received (Twitch → Triggers → Message Received)
 
 **Sub-Action:** Execute C# Code (Inline)
 
-Uses plain-text format (no JSON) to avoid System.Core dependency. **All code that reads or writes `viewer_points.txt` must use the same lock file** (`viewer_points.txt.lock`) so Earn Points, Passive earn, !points, !toppoints, First Words, Reset, the overlay server, and Python (superchat, spawn, etc.) don't overwrite each other. Action 1 below and Actions 1b, 1c, 2, 2b, and 5 all use this lock.
+Uses plain-text format (no JSON) to avoid System.Core dependency. **All code that reads or writes `viewer_points.txt` must use the same lock file** (`viewer_points.txt.lock`) so Earn Points, Passive earn, !points, !toppoints, First Words, Reset, the overlay server, and Python (superchat, spawn, etc.) don't overwrite each other. Earn Points on chat, Earn Points passive, First Words, Check Points, Top Points, and Reset Points all use this lock.
 
 ```csharp
 using System;
@@ -170,6 +172,7 @@ public class CPHInline
                 pts = data[key].Item1;
                 lastEarn = data[key].Item2;
             }
+            int donationPts = data.ContainsKey(key) ? data[key].Item3 : 0;
 
             if (COOLDOWN_SEC > 0 && lastEarn > 0 && unixNow - lastEarn < COOLDOWN_SEC)
                 return false;
@@ -177,7 +180,7 @@ public class CPHInline
             int mult = (IsDoublePointsActive(unixNow) ? 2 : 1) * (IsTopFarder(key) ? 2 : 1) * (IsSubscriberOrMember() ? 2 : 1);
             int toAdd = POINTS_PER_MESSAGE * mult;
             pts += toAdd;
-                data[key] = new Tuple<int, long>(pts, unixNow);
+                data[key] = new Tuple<int, long, int>(pts, unixNow, donationPts);
                 WriteAll(data);
                 return true;
             }
@@ -206,9 +209,9 @@ public class CPHInline
         try { if (File.Exists(LOCK_FILE)) File.Delete(LOCK_FILE); } catch { }
     }
 
-    Dictionary<string, Tuple<int, long>> ReadAll()
+    Dictionary<string, Tuple<int, long, int>> ReadAll()
     {
-        var result = new Dictionary<string, Tuple<int, long>>(StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, Tuple<int, long, int>>(StringComparer.OrdinalIgnoreCase);
         if (!File.Exists(FILE)) return result;
         try
         {
@@ -218,9 +221,12 @@ public class CPHInline
                 if (parts.Length >= 3)
                 {
                     string k = parts[0].Trim();
-                    int p; long l;
+                    int p; long l; int d = 0;
                     if (int.TryParse(parts[1].Trim(), out p) && long.TryParse(parts[2].Trim(), out l))
-                        result[k] = new Tuple<int, long>(p, l);
+                    {
+                        if (parts.Length >= 4) int.TryParse(parts[3].Trim(), out d);
+                        result[k] = new Tuple<int, long, int>(p, l, d);
+                    }
                 }
             }
         }
@@ -228,11 +234,11 @@ public class CPHInline
         return result;
     }
 
-    void WriteAll(Dictionary<string, Tuple<int, long>> data)
+    void WriteAll(Dictionary<string, Tuple<int, long, int>> data)
     {
         var lines = new List<string>();
         foreach (var kv in data)
-            lines.Add(kv.Key + "|" + kv.Value.Item1 + "|" + kv.Value.Item2);
+            lines.Add(kv.Key + "|" + kv.Value.Item1 + "|" + kv.Value.Item2 + "|" + kv.Value.Item3);
         File.WriteAllLines(FILE, lines.ToArray());
     }
 
@@ -279,7 +285,7 @@ public class CPHInline
 
 ---
 
-## Action 1b: Earn Points (passive – present viewers)
+## Action 02: Earn Points (passive – present viewers)
 
 **Trigger:** Present Viewers (Twitch → Triggers → Present Viewers)
 
@@ -331,7 +337,8 @@ public class CPHInline
                 int mult = (IsDoublePointsActive(unixNow) ? 2 : 1) * (IsTopFarder(key) ? 2 : 1) * (IsSubscriberOrMember() ? 2 : 1);
                 int toAdd = POINTS_PER_TICK * mult;
                 pts += toAdd;
-                data[key] = new Tuple<int, long>(pts, unixNow);
+                int donationPts = data[key].Item3;
+                data[key] = new Tuple<int, long, int>(pts, unixNow, donationPts);
                 WriteAll(data);
                 return true;
             }
@@ -360,9 +367,9 @@ public class CPHInline
         try { if (File.Exists(LOCK_FILE)) File.Delete(LOCK_FILE); } catch { }
     }
 
-    Dictionary<string, Tuple<int, long>> ReadAll()
+    Dictionary<string, Tuple<int, long, int>> ReadAll()
     {
-        var result = new Dictionary<string, Tuple<int, long>>(StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, Tuple<int, long, int>>(StringComparer.OrdinalIgnoreCase);
         if (!File.Exists(FILE)) return result;
         try
         {
@@ -372,9 +379,12 @@ public class CPHInline
                 if (parts.Length >= 3)
                 {
                     string k = parts[0].Trim();
-                    int p; long l;
+                    int p; long l; int d = 0;
                     if (int.TryParse(parts[1].Trim(), out p) && long.TryParse(parts[2].Trim(), out l))
-                        result[k] = new Tuple<int, long>(p, l);
+                    {
+                        if (parts.Length >= 4) int.TryParse(parts[3].Trim(), out d);
+                        result[k] = new Tuple<int, long, int>(p, l, d);
+                    }
                 }
             }
         }
@@ -382,11 +392,11 @@ public class CPHInline
         return result;
     }
 
-    void WriteAll(Dictionary<string, Tuple<int, long>> data)
+    void WriteAll(Dictionary<string, Tuple<int, long, int>> data)
     {
         var lines = new List<string>();
         foreach (var kv in data)
-            lines.Add(kv.Key + "|" + kv.Value.Item1 + "|" + kv.Value.Item2);
+            lines.Add(kv.Key + "|" + kv.Value.Item1 + "|" + kv.Value.Item2 + "|" + kv.Value.Item3);
         File.WriteAllLines(FILE, lines.ToArray());
     }
 
@@ -432,7 +442,7 @@ public class CPHInline
 
 ---
 
-## Action 1c: First Words Bonus (add to your existing First Words action)
+## Action 03: First Words Bonus (add to your existing First Words action)
 
 Add this as a **sub-action** to your existing First Words action (before or after the shout out). Gives 5 points the first time a user chats.
 
@@ -466,10 +476,11 @@ public class CPHInline
                 var data = ReadAll();
                 string key = user.ToLowerInvariant();
                 int pts = data.ContainsKey(key) ? data[key].Item1 : 0;
+                int donationPts = data.ContainsKey(key) ? data[key].Item3 : 0;
                 int mult = (IsDoublePointsActive(unixNow) ? 2 : 1) * (IsTopFarder(key) ? 2 : 1) * (IsSubscriberOrMember() ? 2 : 1);
                 int toAdd = FIRST_WORDS_BONUS * mult;
                 pts += toAdd;
-                data[key] = new Tuple<int, long>(pts, unixNow);
+                data[key] = new Tuple<int, long, int>(pts, unixNow, donationPts);
                 WriteAll(data);
                 return true;
             }
@@ -498,9 +509,9 @@ public class CPHInline
         try { if (File.Exists(LOCK_FILE)) File.Delete(LOCK_FILE); } catch { }
     }
 
-    Dictionary<string, Tuple<int, long>> ReadAll()
+    Dictionary<string, Tuple<int, long, int>> ReadAll()
     {
-        var result = new Dictionary<string, Tuple<int, long>>(StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, Tuple<int, long, int>>(StringComparer.OrdinalIgnoreCase);
         if (!File.Exists(FILE)) return result;
         try
         {
@@ -510,9 +521,12 @@ public class CPHInline
                 if (parts.Length >= 3)
                 {
                     string k = parts[0].Trim();
-                    int p; long l;
+                    int p; long l; int d = 0;
                     if (int.TryParse(parts[1].Trim(), out p) && long.TryParse(parts[2].Trim(), out l))
-                        result[k] = new Tuple<int, long>(p, l);
+                    {
+                        if (parts.Length >= 4) int.TryParse(parts[3].Trim(), out d);
+                        result[k] = new Tuple<int, long, int>(p, l, d);
+                    }
                 }
             }
         }
@@ -520,11 +534,11 @@ public class CPHInline
         return result;
     }
 
-    void WriteAll(Dictionary<string, Tuple<int, long>> data)
+    void WriteAll(Dictionary<string, Tuple<int, long, int>> data)
     {
         var lines = new List<string>();
         foreach (var kv in data)
-            lines.Add(kv.Key + "|" + kv.Value.Item1 + "|" + kv.Value.Item2);
+            lines.Add(kv.Key + "|" + kv.Value.Item1 + "|" + kv.Value.Item2 + "|" + kv.Value.Item3);
         File.WriteAllLines(FILE, lines.ToArray());
     }
 
@@ -572,7 +586,7 @@ Edit `FIRST_WORDS_BONUS` to change the amount (default 5).
 
 ---
 
-## Action 2: Check Points (!points)
+## Action 04: Check Points (!points)
 
 **Trigger:** Command Triggered → create command `!points` (enable **both Twitch and YouTube** as sources)
 
@@ -602,7 +616,12 @@ public class CPHInline
             try
             {
                 var data = ReadAll();
-                int pts = data.ContainsKey(user.ToLowerInvariant()) ? data[user.ToLowerInvariant()].Item1 : 0;
+                int pts = 0;
+                if (data.TryGetValue(user.ToLowerInvariant(), out var t))
+                {
+                    int p = t.Item1, d = t.Item3;
+                    pts = (d > 0 && p < d) ? (p + d) : p;
+                }
                 CPH.SetArgument("userPoints", pts.ToString());
                 return true;
             }
@@ -631,9 +650,9 @@ public class CPHInline
         try { if (File.Exists(LOCK_FILE)) File.Delete(LOCK_FILE); } catch { }
     }
 
-    Dictionary<string, Tuple<int, long>> ReadAll()
+    Dictionary<string, Tuple<int, long, int>> ReadAll()
     {
-        var result = new Dictionary<string, Tuple<int, long>>(StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, Tuple<int, long, int>>(StringComparer.OrdinalIgnoreCase);
         if (!File.Exists(FILE)) return result;
         try
         {
@@ -643,9 +662,12 @@ public class CPHInline
                 if (parts.Length >= 3)
                 {
                     string k = parts[0].Trim();
-                    int p; long l;
+                    int p; long l; int d = 0;
                     if (int.TryParse(parts[1].Trim(), out p) && long.TryParse(parts[2].Trim(), out l))
-                        result[k] = new Tuple<int, long>(p, l);
+                    {
+                        if (parts.Length >= 4) int.TryParse(parts[3].Trim(), out d);
+                        result[k] = new Tuple<int, long, int>(p, l, d);
+                    }
                 }
             }
         }
@@ -662,7 +684,7 @@ public class CPHInline
 
 ---
 
-## Action 2b: Top Points (!toppoints)
+## Action 05: Top Points (!toppoints)
 
 **Trigger:** Command Triggered → create command `!toppoints` (or `!leaderboard`) (enable **both Twitch and YouTube** as sources)
 
@@ -697,9 +719,13 @@ public class CPHInline
                         if (parts.Length >= 2)
                         {
                             string name = parts[0].Trim();
-                            int p;
+                            int p; int d = 0;
                             if (int.TryParse(parts[1].Trim(), out p) && !string.IsNullOrEmpty(name))
-                                list.Add(new Tuple<string, int>(name, p));
+                            {
+                                if (parts.Length >= 4) int.TryParse(parts[3].Trim(), out d);
+                                int pts = (d > 0 && p < d) ? (p + d) : p;
+                                list.Add(new Tuple<string, int>(name, pts));
+                            }
                         }
                     }
                 }
@@ -754,7 +780,7 @@ public class CPHInline
 
 ---
 
-## Action 3: Spawn Monster (with points)
+## Action 06: Spawn Monster (!spawn, with points)
 
 **Trigger:** Command Triggered → `!spawn` (enable **both Twitch and YouTube** as sources)
 
@@ -767,7 +793,7 @@ public class CPHInline
    - **Wait maximum:** `10` seconds
    - **Note:** Use `%rawInput%` for the monster name (text after `!spawn`). If that's empty, try `%input1%` depending on your Streamer.bot version.
 
-2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`:
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%` and `%userPointsRemaining%`:
 
 ```csharp
 using System;
@@ -780,16 +806,24 @@ public class CPHInline
     public bool Execute()
     {
         string result = "Spawn failed (no result file - is overlay server running?)";
+        string userPointsRemaining = "";
         try
         {
             if (File.Exists(RESULT_FILE))
             {
                 result = File.ReadAllText(RESULT_FILE).Trim();
                 File.Delete(RESULT_FILE);
+                var parts = result.Split('|');
+                if (parts.Length >= 2 && int.TryParse(parts[parts.Length - 1].Trim(), out _))
+                {
+                    userPointsRemaining = parts[parts.Length - 1].Trim();
+                    result = parts[0].Trim();
+                }
             }
         }
         catch (Exception ex) { result = ex.Message; }
         CPH.SetArgument("spawnResult", result);
+        CPH.SetArgument("userPointsRemaining", userPointsRemaining);
         return true;
     }
 }
@@ -797,8 +831,8 @@ public class CPHInline
 
 3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
    - **True branch:** Use commandSource pattern:
-     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% spawned a %rawInput%!`
-     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% spawned a %rawInput%!`
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% spawned a %rawInput%! You have %userPointsRemaining% points left.`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% spawned a %rawInput%! You have %userPointsRemaining% points left.`
      - Leave **False Result** empty for both.
    - **False branch:** Use commandSource pattern:
      - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
@@ -816,11 +850,11 @@ The `points_command.py` script checks points, attempts the spawn, and **only ded
 - **No points:** Chat to earn points.
 - **Overlay server not running:** Start `python server.py` in `Lastest UI`.
 - **Game not connected:** Game must be running with streaming enabled (port 5001). Server console shows "Game WebSocket: waiting for game..." when disconnected.
-- **Test manually:** Run `python "Lastest UI\points_command.py" spawn rat YourUsername` in a terminal—should write `ok` to `spawn_result.txt` or an error.
+- **Test manually:** Run `python "Lastest UI\points_command.py" spawn rat YourUsername` in a terminal—should write `ok|{pts}` to `spawn_result.txt` or an error.
 
 ---
 
-## Action 3a: Spawn Champion (with points)
+## Action 07: Spawn Champion (!champion, with points)
 
 **Trigger:** Command Triggered → `!champion` (enable **both Twitch and YouTube** as sources)
 
@@ -835,7 +869,7 @@ The `points_command.py` script checks points, attempts the spawn, and **only ded
    - **Wait maximum:** `10` seconds
    - **Note:** `%rawInput%` = monster name (e.g. rat, eye). Same as spawn.
 
-2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%` and `%championMonster%` (monster name on success, after the pipe):
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`, `%championMonster%`, and `%userPointsRemaining%`:
 
 ```csharp
 using System;
@@ -849,23 +883,31 @@ public class CPHInline
     {
         string result = "Champion spawn failed (no result file - is overlay server running?)";
         string monsterName = "";
+        string userPointsRemaining = "";
         try
         {
             if (File.Exists(RESULT_FILE))
             {
                 result = File.ReadAllText(RESULT_FILE).Trim();
                 File.Delete(RESULT_FILE);
-                int pipe = result.IndexOf('|');
-                if (pipe >= 0)
+                var parts = result.Split('|');
+                if (parts.Length >= 3 && int.TryParse(parts[parts.Length - 1].Trim(), out _))
                 {
-                    monsterName = result.Substring(pipe + 1).Trim();
-                    result = result.Substring(0, pipe).Trim();
+                    userPointsRemaining = parts[parts.Length - 1].Trim();
+                    monsterName = parts[1].Trim();
+                    result = parts[0].Trim();
+                }
+                else if (parts.Length >= 2)
+                {
+                    monsterName = parts[1].Trim();
+                    result = parts[0].Trim();
                 }
             }
         }
         catch (Exception ex) { result = ex.Message; }
         CPH.SetArgument("spawnResult", result);
         CPH.SetArgument("championMonster", monsterName);
+        CPH.SetArgument("userPointsRemaining", userPointsRemaining);
         return true;
     }
 }
@@ -873,8 +915,8 @@ public class CPHInline
 
 3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
    - **True branch:** Use commandSource pattern:
-     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% spawned a champion %championMonster%!`
-     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% spawned a champion %championMonster%!`
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% spawned a champion %championMonster%! You have %userPointsRemaining% points left.`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% spawned a champion %championMonster%! You have %userPointsRemaining% points left.`
      - Leave **False Result** empty for both.
    - **False branch:** Use commandSource pattern:
      - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
@@ -889,7 +931,7 @@ public class CPHInline
 
 ---
 
-## Action 3b: Drop Gold (with points)
+## Action 08: Drop Gold (!gold, with points)
 
 **Trigger:** Command Triggered → `!gold` (enable **both Twitch and YouTube** as sources)
 
@@ -904,7 +946,7 @@ public class CPHInline
    - **Wait maximum:** `10` seconds
    - **Note:** `%rawInput%` = amount (required). `%userName%` = who ran the command.
 
-2. **Execute C# Code** (Inline) — reads `spawn_result.txt`, sets `%spawnResult%` and `%goldAmount%`:
+2. **Execute C# Code** (Inline) — reads `spawn_result.txt`, sets `%spawnResult%`, `%goldAmount%`, and `%userPointsRemaining%`:
 
 ```csharp
 using System;
@@ -918,6 +960,7 @@ public class CPHInline
     {
         string result = "Gold failed (no result file - is overlay server running?)";
         string goldAmount = "";
+        string userPointsRemaining = "";
         try
         {
             if (File.Exists(RESULT_FILE))
@@ -925,17 +968,24 @@ public class CPHInline
                 result = File.ReadAllText(RESULT_FILE).Trim();
                 File.Delete(RESULT_FILE);
                 if (string.IsNullOrEmpty(result)) result = "Gold failed (empty response)";
-                int pipe = result.IndexOf('|');
-                if (pipe >= 0)
+                var parts = result.Split('|');
+                if (parts.Length >= 3 && int.TryParse(parts[parts.Length - 1].Trim(), out _))
                 {
-                    goldAmount = result.Substring(pipe + 1).Trim();
-                    result = result.Substring(0, pipe).Trim();
+                    userPointsRemaining = parts[parts.Length - 1].Trim();
+                    goldAmount = parts[1].Trim();
+                    result = parts[0].Trim();
+                }
+                else if (parts.Length >= 2)
+                {
+                    goldAmount = parts[1].Trim();
+                    result = parts[0].Trim();
                 }
             }
         }
         catch (Exception ex) { result = ex.Message ?? "Gold failed"; }
         CPH.SetArgument("spawnResult", result);
         CPH.SetArgument("goldAmount", goldAmount);
+        CPH.SetArgument("userPointsRemaining", userPointsRemaining);
         return true;
     }
 }
@@ -943,8 +993,8 @@ public class CPHInline
 
 3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
    - **True branch:** Use commandSource pattern:
-     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% dropped %goldAmount% gold!`
-     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% dropped %goldAmount% gold!`
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% dropped %goldAmount% gold! You have %userPointsRemaining% points left.`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% dropped %goldAmount% gold! You have %userPointsRemaining% points left.`
      - Leave **False Result** empty for both.
    - **False branch:** Use commandSource pattern:
      - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
@@ -960,7 +1010,7 @@ public class CPHInline
 
 ---
 
-## Action 3c: Curse Item (with points)
+## Action 09: Curse Item (!curse, with points)
 
 **Trigger:** Command Triggered → `!curse` (enable **both Twitch and YouTube** as sources)
 
@@ -975,7 +1025,7 @@ public class CPHInline
    - **Wait maximum:** `10` seconds
    - **Note:** No slot argument — the script picks a random equipped slot (weapon, armor, ring, artifact, misc).
 
-2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%` and `%curseItemName%` (item name on success):
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`, `%curseItemName%`, and `%userPointsRemaining%`:
 
 ```csharp
 using System;
@@ -989,23 +1039,31 @@ public class CPHInline
     {
         string result = "No result file - is overlay server running?";
         string itemName = "";
+        string userPointsRemaining = "";
         try
         {
             if (File.Exists(RESULT_FILE))
             {
                 result = File.ReadAllText(RESULT_FILE).Trim();
                 File.Delete(RESULT_FILE);
-                int pipe = result.IndexOf('|');
-                if (pipe >= 0)
+                var parts = result.Split('|');
+                if (parts.Length >= 3 && int.TryParse(parts[parts.Length - 1].Trim(), out _))
                 {
-                    itemName = result.Substring(pipe + 1).Trim();
-                    result = result.Substring(0, pipe).Trim();
+                    userPointsRemaining = parts[parts.Length - 1].Trim();
+                    itemName = parts[1].Trim();
+                    result = parts[0].Trim();
+                }
+                else if (parts.Length >= 2)
+                {
+                    itemName = parts[1].Trim();
+                    result = parts[0].Trim();
                 }
             }
         }
         catch (Exception ex) { result = ex.Message; }
         CPH.SetArgument("spawnResult", result);
         CPH.SetArgument("curseItemName", itemName);
+        CPH.SetArgument("userPointsRemaining", userPointsRemaining);
         return true;
     }
 }
@@ -1013,8 +1071,8 @@ public class CPHInline
 
 3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
    - **True branch:** Use commandSource pattern:
-     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% cursed your %curseItemName%!`
-     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% cursed your %curseItemName%!`
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% cursed your %curseItemName%! You have %userPointsRemaining% points left.`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% cursed your %curseItemName%! You have %userPointsRemaining% points left.`
      - Leave **False Result** empty for both.
    - **False branch:** Use commandSource pattern:
      - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
@@ -1029,7 +1087,7 @@ public class CPHInline
 
 ---
 
-## Action 3d: Spawn Random Gas (with points)
+## Action 10: Spawn Random Gas (!gas, with points)
 
 **Trigger:** Command Triggered → `!gas` (enable **both Twitch and YouTube** as sources)
 
@@ -1043,7 +1101,7 @@ public class CPHInline
    - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
    - **Wait maximum:** `10` seconds
 
-2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%` and `%gasName%`:
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`, `%gasName%`, and `%userPointsRemaining%`:
 
 ```csharp
 using System;
@@ -1057,23 +1115,31 @@ public class CPHInline
     {
         string result = "No result file - is overlay server running?";
         string itemName = "";
+        string userPointsRemaining = "";
         try
         {
             if (File.Exists(RESULT_FILE))
             {
                 result = File.ReadAllText(RESULT_FILE).Trim();
                 File.Delete(RESULT_FILE);
-                int pipe = result.IndexOf('|');
-                if (pipe >= 0)
+                var parts = result.Split('|');
+                if (parts.Length >= 3 && int.TryParse(parts[parts.Length - 1].Trim(), out _))
                 {
-                    itemName = result.Substring(pipe + 1).Trim();
-                    result = result.Substring(0, pipe).Trim();
+                    userPointsRemaining = parts[parts.Length - 1].Trim();
+                    itemName = parts[1].Trim();
+                    result = parts[0].Trim();
+                }
+                else if (parts.Length >= 2)
+                {
+                    itemName = parts[1].Trim();
+                    result = parts[0].Trim();
                 }
             }
         }
         catch (Exception ex) { result = ex.Message; }
         CPH.SetArgument("spawnResult", result);
         CPH.SetArgument("gasName", itemName);
+        CPH.SetArgument("userPointsRemaining", userPointsRemaining);
         return true;
     }
 }
@@ -1081,8 +1147,8 @@ public class CPHInline
 
 3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
    - **True branch:** Use commandSource pattern:
-     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% spewed %gasName%!`
-     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% spewed %gasName%!`
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% spewed %gasName%! You have %userPointsRemaining% points left.`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% spewed %gasName%! You have %userPointsRemaining% points left.`
      - Leave **False Result** empty for both.
    - **False branch:** Use commandSource pattern:
      - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
@@ -1097,7 +1163,7 @@ public class CPHInline
 
 ---
 
-## Action 3e: Random Scroll (with points)
+## Action 11: Random Scroll (!scroll, with points)
 
 **Trigger:** Command Triggered → `!scroll` (enable **both Twitch and YouTube** as sources)
 
@@ -1111,7 +1177,7 @@ public class CPHInline
    - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
    - **Wait maximum:** `10` seconds *(required — otherwise C# runs before the script writes the result file)*
 
-2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%` and `%scrollName%`:
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`, `%scrollName%`, and `%userPointsRemaining%`:
 
 ```csharp
 using System;
@@ -1125,23 +1191,31 @@ public class CPHInline
     {
         string result = "No result file - is overlay server running?";
         string itemName = "";
+        string userPointsRemaining = "";
         try
         {
             if (File.Exists(RESULT_FILE))
             {
                 result = File.ReadAllText(RESULT_FILE).Trim();
                 File.Delete(RESULT_FILE);
-                int pipe = result.IndexOf('|');
-                if (pipe >= 0)
+                var parts = result.Split('|');
+                if (parts.Length >= 3 && int.TryParse(parts[parts.Length - 1].Trim(), out _))
                 {
-                    itemName = result.Substring(pipe + 1).Trim();
-                    result = result.Substring(0, pipe).Trim();
+                    userPointsRemaining = parts[parts.Length - 1].Trim();
+                    itemName = parts[1].Trim();
+                    result = parts[0].Trim();
+                }
+                else if (parts.Length >= 2)
+                {
+                    itemName = parts[1].Trim();
+                    result = parts[0].Trim();
                 }
             }
         }
         catch (Exception ex) { result = ex.Message; }
         CPH.SetArgument("spawnResult", result);
         CPH.SetArgument("scrollName", itemName);
+        CPH.SetArgument("userPointsRemaining", userPointsRemaining);
         return true;
     }
 }
@@ -1149,8 +1223,8 @@ public class CPHInline
 
 3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
    - **True branch:** Use commandSource pattern:
-     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% used a random scroll: %scrollName%!`
-     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% used a random scroll: %scrollName%!`
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% used a random scroll: %scrollName%! You have %userPointsRemaining% points left.`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% used a random scroll: %scrollName%! You have %userPointsRemaining% points left.`
      - Leave **False Result** empty for both.
    - **False branch:** Use commandSource pattern:
      - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
@@ -1165,7 +1239,7 @@ public class CPHInline
 
 ---
 
-## Action 3e0: Place Trap (with points)
+## Action 12: Place Trap (!trap, with points)
 
 **Trigger:** Command Triggered → `!trap` (enable **both Twitch and YouTube** as sources)
 
@@ -1179,7 +1253,7 @@ public class CPHInline
    - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
    - **Wait maximum:** `10` seconds
 
-2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%` and `%trapName%`:
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`, `%trapName%`, and `%userPointsRemaining%`:
 
 ```csharp
 using System;
@@ -1193,23 +1267,31 @@ public class CPHInline
     {
         string result = "No result file - is overlay server running?";
         string itemName = "";
+        string userPointsRemaining = "";
         try
         {
             if (File.Exists(RESULT_FILE))
             {
                 result = File.ReadAllText(RESULT_FILE).Trim();
                 File.Delete(RESULT_FILE);
-                int pipe = result.IndexOf('|');
-                if (pipe >= 0)
+                var parts = result.Split('|');
+                if (parts.Length >= 3 && int.TryParse(parts[parts.Length - 1].Trim(), out _))
                 {
-                    itemName = result.Substring(pipe + 1).Trim();
-                    result = result.Substring(0, pipe).Trim();
+                    userPointsRemaining = parts[parts.Length - 1].Trim();
+                    itemName = parts[1].Trim();
+                    result = parts[0].Trim();
+                }
+                else if (parts.Length >= 2)
+                {
+                    itemName = parts[1].Trim();
+                    result = parts[0].Trim();
                 }
             }
         }
         catch (Exception ex) { result = ex.Message; }
         CPH.SetArgument("spawnResult", result);
         CPH.SetArgument("trapName", itemName);
+        CPH.SetArgument("userPointsRemaining", userPointsRemaining);
         return true;
     }
 }
@@ -1217,8 +1299,8 @@ public class CPHInline
 
 3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
    - **True branch:** Use commandSource pattern:
-     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% placed a %trapName% nearby!`
-     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% placed a %trapName% nearby!`
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% placed a %trapName% nearby! You have %userPointsRemaining% points left.`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% placed a %trapName% nearby! You have %userPointsRemaining% points left.`
      - Leave **False Result** empty for both.
    - **False branch:** Use commandSource pattern:
      - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
@@ -1233,7 +1315,7 @@ public class CPHInline
 
 ---
 
-## Action 3e0a: Transmute (with points)
+## Action 13: Transmute (!transmute, with points)
 
 **Trigger:** Command Triggered → `!transmute` (enable **both Twitch and YouTube** as sources)
 
@@ -1247,7 +1329,7 @@ public class CPHInline
    - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
    - **Wait maximum:** `10` seconds
 
-2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%` and `%transmuteItemName%`:
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`, `%transmuteItemName%`, and `%userPointsRemaining%`:
 
 ```csharp
 using System;
@@ -1261,23 +1343,31 @@ public class CPHInline
     {
         string result = "No result file - is overlay server running?";
         string itemName = "";
+        string userPointsRemaining = "";
         try
         {
             if (File.Exists(RESULT_FILE))
             {
                 result = File.ReadAllText(RESULT_FILE).Trim();
                 File.Delete(RESULT_FILE);
-                int pipe = result.IndexOf('|');
-                if (pipe >= 0)
+                var parts = result.Split('|');
+                if (parts.Length >= 3 && int.TryParse(parts[parts.Length - 1].Trim(), out _))
                 {
-                    itemName = result.Substring(pipe + 1).Trim();
-                    result = result.Substring(0, pipe).Trim();
+                    userPointsRemaining = parts[parts.Length - 1].Trim();
+                    itemName = parts[1].Trim();
+                    result = parts[0].Trim();
+                }
+                else if (parts.Length >= 2)
+                {
+                    itemName = parts[1].Trim();
+                    result = parts[0].Trim();
                 }
             }
         }
         catch (Exception ex) { result = ex.Message; }
         CPH.SetArgument("spawnResult", result);
         CPH.SetArgument("transmuteItemName", itemName);
+        CPH.SetArgument("userPointsRemaining", userPointsRemaining);
         return true;
     }
 }
@@ -1285,8 +1375,8 @@ public class CPHInline
 
 3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
    - **True branch:** Use commandSource pattern:
-     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% transmuted an item into %transmuteItemName%!`
-     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% transmuted an item into %transmuteItemName%!`
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% transmuted an item into %transmuteItemName%! You have %userPointsRemaining% points left.`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% transmuted an item into %transmuteItemName%! You have %userPointsRemaining% points left.`
      - Leave **False Result** empty for both.
    - **False branch:** Use commandSource pattern:
      - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
@@ -1301,7 +1391,7 @@ public class CPHInline
 
 ---
 
-## Action 3e0b: Bee (with points)
+## Action 14: Bee (!bee, with points)
 
 **Trigger:** Command Triggered → `!bee` (enable **both Twitch and YouTube** as sources)
 
@@ -1315,7 +1405,7 @@ public class CPHInline
    - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
    - **Wait maximum:** `10` seconds
 
-2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%` and `%allyName%`:
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`, `%allyName%`, and `%userPointsRemaining%`:
 
 ```csharp
 using System;
@@ -1329,23 +1419,31 @@ public class CPHInline
     {
         string result = "No result file - is overlay server running?";
         string itemName = "";
+        string userPointsRemaining = "";
         try
         {
             if (File.Exists(RESULT_FILE))
             {
                 result = File.ReadAllText(RESULT_FILE).Trim();
                 File.Delete(RESULT_FILE);
-                int pipe = result.IndexOf('|');
-                if (pipe >= 0)
+                var parts = result.Split('|');
+                if (parts.Length >= 3 && int.TryParse(parts[parts.Length - 1].Trim(), out _))
                 {
-                    itemName = result.Substring(pipe + 1).Trim();
-                    result = result.Substring(0, pipe).Trim();
+                    userPointsRemaining = parts[parts.Length - 1].Trim();
+                    itemName = parts[1].Trim();
+                    result = parts[0].Trim();
+                }
+                else if (parts.Length >= 2)
+                {
+                    itemName = parts[1].Trim();
+                    result = parts[0].Trim();
                 }
             }
         }
         catch (Exception ex) { result = ex.Message; }
         CPH.SetArgument("spawnResult", result);
         CPH.SetArgument("allyName", itemName);
+        CPH.SetArgument("userPointsRemaining", userPointsRemaining);
         return true;
     }
 }
@@ -1353,8 +1451,8 @@ public class CPHInline
 
 3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
    - **True branch:** Use commandSource pattern:
-     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% summoned a bee to help you!`
-     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% summoned a bee to help you!`
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% summoned a bee to help you! You have %userPointsRemaining% points left.`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% summoned a bee to help you! You have %userPointsRemaining% points left.`
      - Leave **False Result** empty for both.
    - **False branch:** Use commandSource pattern:
      - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
@@ -1369,7 +1467,7 @@ public class CPHInline
 
 ---
 
-## Action 3e0c: Ward (with points)
+## Action 15: Ward (!ward, with points)
 
 **Trigger:** Command Triggered → `!ward` (enable **both Twitch and YouTube** as sources)
 
@@ -1383,14 +1481,14 @@ public class CPHInline
    - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
    - **Wait maximum:** `10` seconds
 
-2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%` and `%allyName%` (same pattern as bee; allyName will be "Ward"):
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`, `%allyName%`, and `%userPointsRemaining%`:
 
-Use the same C# code block as Action 3e0b (Bee), which reads the result file and sets `spawnResult` and `allyName`.
+Use the same C# code block as Action 14: Bee, which reads the result file and sets `spawnResult`, `allyName`, and `userPointsRemaining`.
 
 3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
    - **True branch:** Use commandSource pattern:
-     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% summoned a ward to help you!`
-     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% summoned a ward to help you!`
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% summoned a ward to help you! You have %userPointsRemaining% points left.`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% summoned a ward to help you! You have %userPointsRemaining% points left.`
      - Leave **False Result** empty for both.
    - **False branch:** Use commandSource pattern:
      - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
@@ -1405,7 +1503,7 @@ Use the same C# code block as Action 3e0b (Bee), which reads the result file and
 
 ---
 
-## Action 3e1: Random Buff (with points)
+## Action 16: Random Buff (!buff, with points)
 
 **Trigger:** Command Triggered → `!buff` (enable **both Twitch and YouTube** as sources)
 
@@ -1419,7 +1517,7 @@ Use the same C# code block as Action 3e0b (Bee), which reads the result file and
    - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
    - **Wait maximum:** `10` seconds
 
-2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%` and `%buffName%`:
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`, `%buffName%`, and `%userPointsRemaining%`:
 
 ```csharp
 using System;
@@ -1433,23 +1531,31 @@ public class CPHInline
     {
         string result = "No result file - is overlay server running?";
         string itemName = "";
+        string userPointsRemaining = "";
         try
         {
             if (File.Exists(RESULT_FILE))
             {
                 result = File.ReadAllText(RESULT_FILE).Trim();
                 File.Delete(RESULT_FILE);
-                int pipe = result.IndexOf('|');
-                if (pipe >= 0)
+                var parts = result.Split('|');
+                if (parts.Length >= 3 && int.TryParse(parts[parts.Length - 1].Trim(), out _))
                 {
-                    itemName = result.Substring(pipe + 1).Trim();
-                    result = result.Substring(0, pipe).Trim();
+                    userPointsRemaining = parts[parts.Length - 1].Trim();
+                    itemName = parts[1].Trim();
+                    result = parts[0].Trim();
+                }
+                else if (parts.Length >= 2)
+                {
+                    itemName = parts[1].Trim();
+                    result = parts[0].Trim();
                 }
             }
         }
         catch (Exception ex) { result = ex.Message; }
         CPH.SetArgument("spawnResult", result);
         CPH.SetArgument("buffName", itemName);
+        CPH.SetArgument("userPointsRemaining", userPointsRemaining);
         return true;
     }
 }
@@ -1457,8 +1563,8 @@ public class CPHInline
 
 3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
    - **True branch:** Use commandSource pattern:
-     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% gave you %buffName%!`
-     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% gave you %buffName%!`
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% gave you %buffName%! You have %userPointsRemaining% points left.`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% gave you %buffName%! You have %userPointsRemaining% points left.`
      - Leave **False Result** empty for both.
    - **False branch:** Use commandSource pattern:
      - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
@@ -1471,7 +1577,7 @@ public class CPHInline
 
 ---
 
-## Action 3e2: Random Debuff (with points)
+## Action 17: Random Debuff (!debuff, with points)
 
 **Trigger:** Command Triggered → `!debuff` (enable **both Twitch and YouTube** as sources)
 
@@ -1485,7 +1591,7 @@ public class CPHInline
    - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
    - **Wait maximum:** `10` seconds
 
-2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%` and `%debuffName%`:
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`, `%debuffName%`, and `%userPointsRemaining%`:
 
 ```csharp
 using System;
@@ -1499,23 +1605,31 @@ public class CPHInline
     {
         string result = "No result file - is overlay server running?";
         string itemName = "";
+        string userPointsRemaining = "";
         try
         {
             if (File.Exists(RESULT_FILE))
             {
                 result = File.ReadAllText(RESULT_FILE).Trim();
                 File.Delete(RESULT_FILE);
-                int pipe = result.IndexOf('|');
-                if (pipe >= 0)
+                var parts = result.Split('|');
+                if (parts.Length >= 3 && int.TryParse(parts[parts.Length - 1].Trim(), out _))
                 {
-                    itemName = result.Substring(pipe + 1).Trim();
-                    result = result.Substring(0, pipe).Trim();
+                    userPointsRemaining = parts[parts.Length - 1].Trim();
+                    itemName = parts[1].Trim();
+                    result = parts[0].Trim();
+                }
+                else if (parts.Length >= 2)
+                {
+                    itemName = parts[1].Trim();
+                    result = parts[0].Trim();
                 }
             }
         }
         catch (Exception ex) { result = ex.Message; }
         CPH.SetArgument("spawnResult", result);
         CPH.SetArgument("debuffName", itemName);
+        CPH.SetArgument("userPointsRemaining", userPointsRemaining);
         return true;
     }
 }
@@ -1523,8 +1637,8 @@ public class CPHInline
 
 3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
    - **True branch:** Use commandSource pattern:
-     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% afflicted you with %debuffName%!`
-     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% afflicted you with %debuffName%!`
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% afflicted you with %debuffName%! You have %userPointsRemaining% points left.`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% afflicted you with %debuffName%! You have %userPointsRemaining% points left.`
      - Leave **False Result** empty for both.
    - **False branch:** Use commandSource pattern:
      - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
@@ -1542,11 +1656,11 @@ public class CPHInline
 - **Add Wait maximum:** The Run a Program step must have **Wait maximum: 10 seconds**. Without it, Streamer.bot runs the C# step before Python finishes writing `spawn_result.txt`.
 - **Overlay running:** Ensure `python server.py` is running in `Lastest UI`.
 - **Game connected:** The game must be running with streaming enabled (port 5001). Overlay console shows "Game WebSocket: waiting for game..." when disconnected.
-- **Test manually:** From project root: `python "Lastest UI\points_command.py" scroll YourUsername`. From `Lastest UI` folder: `python points_command.py scroll YourUsername`. Should write `ok|ScrollName` or an error to `spawn_result.txt`. For trap: `python points_command.py trap YourUsername` → `ok|TrapName` or error.
+- **Test manually:** From project root: `python "Lastest UI\points_command.py" scroll YourUsername`. From `Lastest UI` folder: `python points_command.py scroll YourUsername`. Should write `ok|ScrollName|{pts}` or an error to `spawn_result.txt`. For trap: `python points_command.py trap YourUsername` → `ok|TrapName|{pts}` or error.
 
 ---
 
-## Action 3f: Cursed Wand Effect (with points)
+## Action 18: Cursed Wand Effect (!wand, with points)
 
 **Trigger:** Command Triggered → `!wand` (enable **both Twitch and YouTube** as sources)
 
@@ -1568,7 +1682,7 @@ Excludes: AbortRetryFail, Explosion, FireBall, ForestFire.
    - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
    - **Wait maximum:** `10` seconds *(required — otherwise C# runs before the script writes the result file)*
 
-2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%` and `%wandEffectName%`:
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`, `%wandEffectName%`, and `%userPointsRemaining%`:
 
 ```csharp
 using System;
@@ -1582,23 +1696,31 @@ public class CPHInline
     {
         string result = "No result file - is overlay server running?";
         string itemName = "";
+        string userPointsRemaining = "";
         try
         {
             if (File.Exists(RESULT_FILE))
             {
                 result = File.ReadAllText(RESULT_FILE).Trim();
                 File.Delete(RESULT_FILE);
-                int pipe = result.IndexOf('|');
-                if (pipe >= 0)
+                var parts = result.Split('|');
+                if (parts.Length >= 3 && int.TryParse(parts[parts.Length - 1].Trim(), out _))
                 {
-                    itemName = result.Substring(pipe + 1).Trim();
-                    result = result.Substring(0, pipe).Trim();
+                    userPointsRemaining = parts[parts.Length - 1].Trim();
+                    itemName = parts[1].Trim();
+                    result = parts[0].Trim();
+                }
+                else if (parts.Length >= 2)
+                {
+                    itemName = parts[1].Trim();
+                    result = parts[0].Trim();
                 }
             }
         }
         catch (Exception ex) { result = ex.Message; }
         CPH.SetArgument("spawnResult", result);
         CPH.SetArgument("wandEffectName", itemName);
+        CPH.SetArgument("userPointsRemaining", userPointsRemaining);
         return true;
     }
 }
@@ -1606,8 +1728,8 @@ public class CPHInline
 
 3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
    - **True branch:** Use commandSource pattern:
-     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% triggered a cursed wand effect: %wandEffectName%!`
-     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% triggered a cursed wand effect: %wandEffectName%!`
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% triggered a cursed wand effect: %wandEffectName%! You have %userPointsRemaining% points left.`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% triggered a cursed wand effect: %wandEffectName%! You have %userPointsRemaining% points left.`
      - Leave **False Result** empty for both.
    - **False branch:** Use commandSource pattern:
      - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
@@ -1626,7 +1748,7 @@ public class CPHInline
 
 ---
 
-## Action 3 (alternative): File Bridge (when %output1% is empty)
+## Action 06a: Spawn Monster – File Bridge (alternative, when %output1% is empty)
 
 Use this if **Run a Program** does not capture `%output1%`. The Python script writes its result to a file; C# reads it and sets `%spawnResult%`. No HTTP in C# (avoids assembly errors).
 
@@ -1674,7 +1796,7 @@ public class CPHInline
 
 ---
 
-## Action 4: Double Points (streamer command, timed)
+## Action 19: Double Points (!doublepoints, streamer command, timed)
 
 **Trigger:** Command Triggered → `!doublepoints` (or `!2x`)
 
@@ -1735,7 +1857,7 @@ public class CPHInline
 
 ---
 
-## Action 4a: Spend OFF / Spend ON (Stream Deck switch)
+## Action 20: Spend OFF / Spend ON (Stream Deck switch)
 
 **Purpose:** Two separate actions for Stream Deck "action switches" — when the switch is ON, trigger Spend ON (enable spending); when OFF, trigger Spend OFF (disable spending). Users can still earn points; they just can't spend them when disabled.
 
@@ -1788,7 +1910,7 @@ public class CPHInline
 
 ---
 
-## Action 4b: Earn Points (Super Chat / Cheer)
+## Action 21: Earn Points (Super Chat / Cheer)
 
 **Rate:** 1 point per $0.01 USD. Super Chats use the [Frankfurter API](https://www.frankfurter.app/) for currency conversion (no API key). Twitch bits: 100 bits = $1 = 100 points. **When !doublepoints is active, Super Chat and Cheer points are doubled** (same as chat earn).
 
@@ -1827,16 +1949,17 @@ public class CPHInline
 
 ---
 
-## Action 5: Reset Points (every stream)
+## Action 22: Reset Points (every stream)
 
 **Trigger:** Stream Started (Twitch → Triggers → Stream Started). For YouTube, use the equivalent "Stream Online" or "Stream Started" trigger.
 
 **Sub-Action:** Execute C# Code (Inline)
 
-Clears all points when you go live so everyone starts fresh each stream.
+Clears non-donor points when you go live. Donors (Super Chat / Cheer) keep their donation amount; everyone else starts fresh.
 
 ```csharp
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 
@@ -1852,8 +1975,15 @@ public class CPHInline
             if (!AcquirePointsLock()) return false;
             try
             {
-                if (File.Exists(FILE))
-                    File.Delete(FILE);
+                var data = ReadAll();
+                var toWrite = new Dictionary<string, Tuple<int, long, int>>(StringComparer.OrdinalIgnoreCase);
+                foreach (var kv in data)
+                {
+                    int donationPts = kv.Value.Item3;
+                    if (donationPts > 0)
+                        toWrite[kv.Key] = new Tuple<int, long, int>(donationPts, 0, donationPts);
+                }
+                WriteAll(toWrite);
                 return true;
             }
             finally { ReleasePointsLock(); }
@@ -1861,9 +1991,42 @@ public class CPHInline
         catch (Exception ex) { CPH.LogInfo("Reset points: " + ex.Message); return false; }
     }
 
+    Dictionary<string, Tuple<int, long, int>> ReadAll()
+    {
+        var result = new Dictionary<string, Tuple<int, long, int>>(StringComparer.OrdinalIgnoreCase);
+        if (!File.Exists(FILE)) return result;
+        try
+        {
+            foreach (string line in File.ReadAllLines(FILE))
+            {
+                string[] parts = line.Split('|');
+                if (parts.Length >= 3)
+                {
+                    string k = parts[0].Trim();
+                    int p; long l; int d = 0;
+                    if (int.TryParse(parts[1].Trim(), out p) && long.TryParse(parts[2].Trim(), out l))
+                    {
+                        if (parts.Length >= 4) int.TryParse(parts[3].Trim(), out d);
+                        result[k] = new Tuple<int, long, int>(p, l, d);
+                    }
+                }
+            }
+        }
+        catch { }
+        return result;
+    }
+
+    void WriteAll(Dictionary<string, Tuple<int, long, int>> data)
+    {
+        var lines = new List<string>();
+        foreach (var kv in data)
+            lines.Add(kv.Key + "|" + kv.Value.Item1 + "|" + kv.Value.Item2 + "|" + kv.Value.Item3);
+        File.WriteAllLines(FILE, lines.ToArray());
+    }
+
     bool AcquirePointsLock()
     {
-        for (int i = 0; i < 200; i++)  // 10 sec at 50ms
+        for (int i = 0; i < 200; i++)
         {
             try
             {
@@ -1934,17 +2097,17 @@ public class CPHInline
 | Super Chat Points | YouTube Super Chat | 1 pt per $0.01 (currency converted via Frankfurter API); 2x when !doublepoints active |
 | Cheer Points | Twitch Cheer | 1 pt per bit (100 bits = $1 = 100 pts); 2x when !doublepoints active |
 | Double Points | !doublepoints (streamer only) | 2x points for N minutes: `!doublepoints 5` |
-| Reset Points| Stream Started    | Clear all points when you go live            |
+| Reset Points| Stream Started    | Clear non-donor points; donors keep donation amount |
 
 ---
 
 ## Notes
 
-- **Reset Points** runs when your stream goes live, so points reset at the start of each stream.
+- **Reset Points** runs when your stream goes live. Non-donors lose all points; donors (Super Chat / Cheer) keep their donation amount.
 - **Passive earn** only adds to users already in the file—they must send at least one message first. Enable **Live Update** under Platform → Twitch → Settings for Present Viewers to work.
 - **Message Received** fires on every chat message. Ensure the Earn action does not also fire on bot messages or your own messages if you want to exclude them (add a conditional if needed).
 - For `!spawn`, the Command Triggered must pass `input1` (the text after the command). Use `%rawInput%` or `%input1%` depending on your Streamer.bot version.
-- Edit `POINTS_PER_MESSAGE`, `POINTS_PER_TICK`, and `COOLDOWN_SEC` (in Action 1 for chat, Action 1b for passive) in the C# code. Edit points costs via http://localhost:5000/points-config or `points_config.json`.
+- Edit `POINTS_PER_MESSAGE`, `POINTS_PER_TICK`, and `COOLDOWN_SEC` (in Earn Points on chat for chat, Earn Points passive for passive) in the C# code. Edit points costs via http://localhost:5000/points-config or `points_config.json`.
 - **Double points** persists until the duration ends. To clear it when the stream starts, add `File.WriteAllText(DOUBLE_FILE, "0");` to the Reset Points action.
 - **Top farder 2x:** The earn actions read from `TOP_FARDER_FILE` (default: `OBS files\textread\leader.txt`). Expected format: `Top Farder: USERNAME - 45`. Change the path if your fard counter writes to a different file.
 - **Super Chat / Cheer:** Uses `points_command.py` (superchat/cheer subcommands). Currency conversion via Frankfurter (free, no key). Add these actions to the same blocking queue as earn/spend. Anonymous cheers are skipped.

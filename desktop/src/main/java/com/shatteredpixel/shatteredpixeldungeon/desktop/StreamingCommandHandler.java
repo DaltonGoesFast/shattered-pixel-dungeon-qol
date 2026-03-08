@@ -599,6 +599,12 @@ public final class StreamingCommandHandler {
 		if (item.cursed && item.cursedKnown)
 			return "ERR:Item in " + slotName + " is already cursed";
 
+		if (item instanceof Weapon) {
+			((Weapon) item).saveEnchantmentBeforeChatCurse();
+		}
+		if (item instanceof Armor) {
+			((Armor) item).saveGlyphBeforeChatCurse();
+		}
 		item.cursed = item.cursedKnown = true;
 		if (item instanceof Weapon) {
 			Weapon w = (Weapon) item;

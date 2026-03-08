@@ -126,6 +126,7 @@ abstract public class Weapon extends KindOfWeapon {
 	public boolean enchantHardened = false;
 	public boolean curseInfusionBonus = false;
 	public boolean masteryPotionBonus = false;
+	private Enchantment savedEnchantmentForRestore = null;
 	
 	@Override
 	public int proc( Char attacker, Char defender, int damage ) {
@@ -224,6 +225,7 @@ abstract public class Weapon extends KindOfWeapon {
 	private static final String CURSE_INFUSION_BONUS = "curse_infusion_bonus";
 	private static final String MASTERY_POTION_BONUS = "mastery_potion_bonus";
 	private static final String AUGMENT	        = "augment";
+	private static final String SAVED_ENCHANT   = "saved_enchant";
 
 	@Override
 	public void storeInBundle( Bundle bundle ) {
@@ -235,6 +237,7 @@ abstract public class Weapon extends KindOfWeapon {
 		bundle.put( CURSE_INFUSION_BONUS, curseInfusionBonus );
 		bundle.put( MASTERY_POTION_BONUS, masteryPotionBonus );
 		bundle.put( AUGMENT, augment );
+		bundle.put( SAVED_ENCHANT, savedEnchantmentForRestore );
 	}
 	
 	@Override
@@ -246,6 +249,7 @@ abstract public class Weapon extends KindOfWeapon {
 		enchantHardened = bundle.getBoolean( ENCHANT_HARDENED );
 		curseInfusionBonus = bundle.getBoolean( CURSE_INFUSION_BONUS );
 		masteryPotionBonus = bundle.getBoolean( MASTERY_POTION_BONUS );
+		savedEnchantmentForRestore = (Enchantment)bundle.get( SAVED_ENCHANT );
 
 		augment = bundle.getEnum(AUGMENT, Augment.class);
 	}
@@ -496,6 +500,20 @@ abstract public class Weapon extends KindOfWeapon {
 
 	public boolean hasCurseEnchant(){
 		return enchantment != null && enchantment.curse();
+	}
+
+	/** Save current enchant before chat curse overwrites it. Restored when curse is removed. */
+	public void saveEnchantmentBeforeChatCurse() {
+		if (enchantment != null && !hasCurseEnchant()) {
+			savedEnchantmentForRestore = enchantment;
+		}
+	}
+
+	/** Restore saved enchant when curse is removed. Returns saved value and clears it. */
+	public Enchantment restoreSavedEnchantment() {
+		Enchantment saved = savedEnchantmentForRestore;
+		savedEnchantmentForRestore = null;
+		return saved;
 	}
 
 	private static ItemSprite.Glowing HOLY = new ItemSprite.Glowing( 0xFFFF00 );

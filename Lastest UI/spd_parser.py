@@ -487,16 +487,37 @@ class SPDSaveParser:
 
 if __name__ == "__main__":
     import sys
-    save_dir = sys.argv[1] if len(sys.argv) > 1 else r"C:\Users\dalto\AppData\Roaming\.shatteredpixel\Shattered Pixel Dungeon QoL"
+    _script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    def _default_save_dir():
+        home = os.path.expanduser("~")
+        if os.name == "nt":
+            return os.path.join(home, "AppData", "Roaming", ".shatteredpixel", "Shattered Pixel Dungeon QoL")
+        return os.path.join(home, ".shatteredpixel", "Shattered Pixel Dungeon QoL")
+
+    def _load_config():
+        path = os.path.join(_script_dir, "config.json")
+        try:
+            if os.path.exists(path):
+                with open(path, encoding="utf-8") as f:
+                    return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            pass
+        return {}
+
+    _cfg = _load_config()
+    save_dir = sys.argv[1] if len(sys.argv) > 1 else _cfg.get("save_directory", _default_save_dir())
     parser = SPDSaveParser(save_dir)
     latest = parser.find_latest_save()
     if latest:
         info = parser.get_current_game_info()
         if info:
             summary = parser.generate_summary_text(info)
-            with open("game_summary.txt", "w", encoding='utf-8') as f:
+            txt_path = os.path.join(_script_dir, "game_summary.txt")
+            json_path = os.path.join(_script_dir, "game_summary.json")
+            with open(txt_path, "w", encoding='utf-8') as f:
                 f.write(summary)
-            with open("game_summary.json", "w", encoding='utf-8') as f:
+            with open(json_path, "w", encoding='utf-8') as f:
                 json.dump(info, f, indent=4)
             print("Saved to game_summary.txt and game_summary.json")
     else:

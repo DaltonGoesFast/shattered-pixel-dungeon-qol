@@ -16,12 +16,36 @@ except ImportError:
 app = Flask(__name__, static_folder='.')
 CORS(app)
 
-# Configuration
-SAVE_DIRECTORY = r"C:\Users\dalto\AppData\Roaming\.shatteredpixel\Shattered Pixel Dungeon QoL"
-UPDATE_INTERVAL = 1.0  # Check for updates every second
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def _default_save_directory():
+    """Platform-aware default save directory."""
+    home = os.path.expanduser("~")
+    if os.name == "nt":
+        return os.path.join(home, "AppData", "Roaming", ".shatteredpixel", "Shattered Pixel Dungeon QoL")
+    return os.path.join(home, ".shatteredpixel", "Shattered Pixel Dungeon QoL")
+
+def load_config():
+    """Load config.json. Returns {} if missing or invalid."""
+    path = os.path.join(SCRIPT_DIR, "config.json")
+    try:
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as f:
+                return json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"Warning: could not load config.json: {e}")
+    return {}
+
+_config = load_config()
+SAVE_DIRECTORY = _config.get("save_directory", _default_save_directory())
+
+# Configuration
+UPDATE_INTERVAL = 1.0  # Check for updates every second
 DOUBLE_POINTS_END_FILE = os.path.join(SCRIPT_DIR, "double_points_end.txt")
+GAME_SUMMARY_TXT = os.path.join(SCRIPT_DIR, "game_summary.txt")
+GAME_SUMMARY_JSON = os.path.join(SCRIPT_DIR, "game_summary.json")
 POINTS_CONFIG_FILE = os.path.join(SCRIPT_DIR, "points_config.json")
+FREE_UNTIL_FILE = os.path.join(SCRIPT_DIR, "free_until.json")
 VIEWER_POINTS_FILE = os.path.join(SCRIPT_DIR, "viewer_points.txt")
 VIEWER_POINTS_LOCK_FILE = VIEWER_POINTS_FILE + ".lock"
 DOUBLE_POINTS_COUNTDOWN_FILE = os.path.join(SCRIPT_DIR, "double_points_countdown.txt")
@@ -91,13 +115,13 @@ def update_game_data():
                         try:
                             # Text summary
                             summary_text = parser.generate_summary_text(game_info)
-                            with open("game_summary.txt", "w", encoding='utf-8') as f:
+                            with open(GAME_SUMMARY_TXT, "w", encoding='utf-8') as f:
                                 f.write(summary_text)
                                 f.flush()
                                 os.fsync(f.fileno())
                             
                             # JSON summary
-                            with open("game_summary.json", "w", encoding='utf-8') as f:
+                            with open(GAME_SUMMARY_JSON, "w", encoding='utf-8') as f:
                                 json.dump(game_info, f, indent=4)
                                 f.flush()
                                 os.fsync(f.fileno())
@@ -189,13 +213,13 @@ def _game_ws_on_message(ws, message):
         with data_lock:
             current_game_data = data
         try:
-            with open("game_summary.json", "w", encoding='utf-8') as f:
+            with open(GAME_SUMMARY_JSON, "w", encoding='utf-8') as f:
                 json.dump(data, f, indent=4)
                 f.flush()
                 os.fsync(f.fileno())
             # Generate text summary (parser expects same shape as game_summary.json)
             summary_text = parser.generate_summary_text(data)
-            with open("game_summary.txt", "w", encoding='utf-8') as f:
+            with open(GAME_SUMMARY_TXT, "w", encoding='utf-8') as f:
                 f.write(summary_text)
                 f.flush()
                 os.fsync(f.fileno())
@@ -387,6 +411,14 @@ def points_config_api():
                         "monk": 50, "golem": 50, "succubus": 60, "eye": 70, "scorpio": 80,
                     },
                 }
+            free_until = {}
+            if os.path.exists(FREE_UNTIL_FILE):
+                try:
+                    with open(FREE_UNTIL_FILE, encoding='utf-8') as f:
+                        free_until = json.load(f)
+                except Exception:
+                    pass
+            data["free_until"] = free_until
             return jsonify(data)
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -420,6 +452,43 @@ def points_config_api():
         with open(POINTS_CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2)
         return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/cost-free', methods=['POST', 'DELETE', 'OPTIONS'])
+def cost_free_api():
+    """Set a cost as free for N minutes, or cancel. costKey: e.g. cost_per_gold, cost_per_monster.rat"""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        body = request.get_json(force=True, silent=True) if request.method == 'POST' else {}
+        body = body or {}
+        cost_key = ''
+        if request.method == 'DELETE':
+            cost_key = (request.args.get('costKey') or request.args.get('cost_key') or '').strip()
+        else:
+            cost_key = (body.get('costKey') or body.get('cost_key') or '').strip()
+        if not cost_key:
+            return jsonify({"error": "costKey required"}), 400
+        free_until = {}
+        if os.path.exists(FREE_UNTIL_FILE):
+            try:
+                with open(FREE_UNTIL_FILE, encoding='utf-8') as f:
+                    free_until = json.load(f)
+            except Exception:
+                pass
+        if request.method == 'DELETE' or body.get('cancel'):
+            free_until.pop(cost_key, None)
+            with open(FREE_UNTIL_FILE, 'w', encoding='utf-8') as f:
+                json.dump(free_until, f, indent=2)
+            return jsonify({"ok": True, "costKey": cost_key, "cancelled": True})
+        minutes = max(0, min(1440, int(body.get('minutes', body.get('mins', 5)))))
+        end_ts = int(time.time()) + minutes * 60
+        free_until[cost_key] = end_ts
+        with open(FREE_UNTIL_FILE, 'w', encoding='utf-8') as f:
+            json.dump(free_until, f, indent=2)
+        return jsonify({"ok": True, "costKey": cost_key, "freeUntil": end_ts})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -463,9 +532,11 @@ def viewer_points_api():
                             parts = line.strip().split('|')
                             if len(parts) >= 3:
                                 try:
+                                    donation_pts = int(parts[3]) if len(parts) >= 4 else 0
                                     data[parts[0].lower()] = {
                                         'points': int(parts[1]),
                                         'last': int(parts[2]),
+                                        'donationPts': donation_pts,
                                     }
                                 except ValueError:
                                     pass
@@ -479,6 +550,10 @@ def viewer_points_api():
         body = request.get_json(force=True, silent=True) or {}
         username = (body.get('username') or '').strip()
         points = int(body.get('points', 0))
+        if 'donationPts' in body or 'donation_pts' in body:
+            donation_pts = max(0, int(body.get('donationPts') or body.get('donation_pts') or 0))
+        else:
+            donation_pts = None
         if not username:
             return jsonify({"error": "username required"}), 400
         if not _acquire_viewer_points_lock():
@@ -491,11 +566,17 @@ def viewer_points_api():
                         parts = line.strip().split('|')
                         if len(parts) >= 3:
                             try:
-                                data[parts[0].lower()] = (int(parts[1]), int(parts[2]))
+                                dp = int(parts[3]) if len(parts) >= 4 else 0
+                                data[parts[0].lower()] = (int(parts[1]), int(parts[2]), dp)
                             except ValueError:
                                 pass
-            data[username.lower()] = (max(0, points), data.get(username.lower(), (0, 0))[1])
-            lines = [f"{k}|{v[0]}|{v[1]}" for k, v in data.items()]
+            existing = data.get(username.lower(), (0, 0, 0))
+            if donation_pts is None:
+                donation_pts = existing[2]
+            donation_pts = min(donation_pts, max(0, points))
+            new_pts = max(max(0, points), donation_pts)
+            data[username.lower()] = (new_pts, existing[1], donation_pts)
+            lines = [f"{k}|{v[0]}|{v[1]}|{v[2]}" for k, v in data.items()]
             with open(VIEWER_POINTS_FILE, 'w', encoding='utf-8') as f:
                 f.write('\n'.join(lines))
             return jsonify({"ok": True, "username": username, "points": data[username.lower()][0]})
@@ -505,6 +586,140 @@ def viewer_points_api():
         return jsonify({"error": "Invalid points: " + str(e)}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+def _read_viewer_points_raw():
+    """Read viewer_points file as dict[key] = (pts, last, donation_pts). Returns {} if not exists."""
+    data = {}
+    if not os.path.exists(VIEWER_POINTS_FILE):
+        return data
+    with open(VIEWER_POINTS_FILE, encoding='utf-8') as f:
+        for line in f:
+            parts = line.strip().split('|')
+            if len(parts) >= 3:
+                try:
+                    donation_pts = int(parts[3]) if len(parts) >= 4 else 0
+                    data[parts[0].lower()] = (int(parts[1]), int(parts[2]), donation_pts)
+                except ValueError:
+                    pass
+    return data
+
+
+def _write_viewer_points_raw(data):
+    lines = [f"{k}|{v[0]}|{v[1]}|{v[2]}" for k, v in data.items()]
+    with open(VIEWER_POINTS_FILE, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines))
+
+
+@app.route('/api/viewer-points/clear-non-donor', methods=['POST', 'OPTIONS'])
+def viewer_points_clear_non_donor():
+    """Set each user's points = donationPts. Donors keep their amount; non-donors go to 0."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    if not _acquire_viewer_points_lock():
+        return jsonify({"error": "Points file busy, try again"}), 503
+    try:
+        data = _read_viewer_points_raw()
+        for k in data:
+            pts, last, donation_pts = data[k]
+            data[k] = (donation_pts, 0, donation_pts)
+        _write_viewer_points_raw(data)
+        return jsonify({"ok": True})
+    finally:
+        _release_viewer_points_lock()
+
+
+@app.route('/api/viewer-points/bulk/add', methods=['POST', 'OPTIONS'])
+def viewer_points_bulk_add():
+    """Add points and donationPts to every user."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    body = request.get_json(force=True, silent=True) or {}
+    chat_add = max(0, int(body.get('points') or body.get('chat') or 0))
+    donor_add = max(0, int(body.get('donationPts') or body.get('donor') or 0))
+    if chat_add == 0 and donor_add == 0:
+        return jsonify({"ok": True, "count": 0})
+    users_filter = body.get('users')
+    if users_filter:
+        users_filter = [str(u).strip().lower() for u in users_filter if u and str(u).strip()]
+    if not _acquire_viewer_points_lock():
+        return jsonify({"error": "Points file busy, try again"}), 503
+    try:
+        data = _read_viewer_points_raw()
+        keys = users_filter if users_filter else list(data.keys())
+        for k in keys:
+            pts, last, donation_pts = data.get(k, (0, 0, 0))
+            data[k] = (pts + chat_add, last, donation_pts + donor_add)
+        _write_viewer_points_raw(data)
+        return jsonify({"ok": True, "count": len(keys)})
+    finally:
+        _release_viewer_points_lock()
+
+
+@app.route('/api/viewer-points/bulk/chat-to-donor', methods=['POST', 'OPTIONS'])
+def viewer_points_chat_to_donor():
+    """Convert chat points to donor points for specified users. pts stays same, donation_pts = pts."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    body = request.get_json(force=True, silent=True) or {}
+    users_filter = body.get('users')
+    if users_filter:
+        users_filter = [str(u).strip().lower() for u in users_filter if u and str(u).strip()]
+    if not users_filter:
+        return jsonify({"error": "users required"}), 400
+    if not _acquire_viewer_points_lock():
+        return jsonify({"error": "Points file busy, try again"}), 503
+    try:
+        data = _read_viewer_points_raw()
+        count = 0
+        for k in users_filter:
+            if k not in data:
+                continue
+            pts, last, donation_pts = data[k]
+            chat_pts = max(0, pts - donation_pts)
+            if chat_pts > 0:
+                data[k] = (pts, last, donation_pts + chat_pts)
+                count += 1
+        _write_viewer_points_raw(data)
+        return jsonify({"ok": True, "count": count})
+    finally:
+        _release_viewer_points_lock()
+
+
+@app.route('/api/viewer-points/bulk/clear-donor', methods=['POST', 'OPTIONS'])
+def viewer_points_clear_donor_only():
+    """Remove donor points only: set donationPts = 0, keep chat points."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    if not _acquire_viewer_points_lock():
+        return jsonify({"error": "Points file busy, try again"}), 503
+    try:
+        data = _read_viewer_points_raw()
+        for k in data:
+            pts, last, donation_pts = data[k]
+            chat_only = max(0, pts - donation_pts)
+            data[k] = (chat_only, last, 0)
+        _write_viewer_points_raw(data)
+        return jsonify({"ok": True})
+    finally:
+        _release_viewer_points_lock()
+
+
+@app.route('/api/viewer-points/clear-all', methods=['POST', 'OPTIONS'])
+def viewer_points_clear_all():
+    """Full wipe: set each user's points = 0, donationPts = 0."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    if not _acquire_viewer_points_lock():
+        return jsonify({"error": "Points file busy, try again"}), 503
+    try:
+        data = _read_viewer_points_raw()
+        for k in data:
+            data[k] = (0, 0, 0)
+        _write_viewer_points_raw(data)
+        return jsonify({"ok": True})
+    finally:
+        _release_viewer_points_lock()
 
 
 @app.route('/api/viewer-points/<username>', methods=['DELETE', 'OPTIONS'])
@@ -525,10 +740,11 @@ def viewer_points_delete(username):
                     parts = line.strip().split('|')
                     if len(parts) >= 3 and parts[0].lower() != username.lower():
                         try:
-                            data[parts[0].lower()] = (int(parts[1]), int(parts[2]))
+                            donation_pts = int(parts[3]) if len(parts) >= 4 else 0
+                            data[parts[0].lower()] = (int(parts[1]), int(parts[2]), donation_pts)
                         except ValueError:
                             pass
-        lines = [f"{k}|{v[0]}|{v[1]}" for k, v in data.items()]
+        lines = [f"{k}|{v[0]}|{v[1]}|{v[2]}" for k, v in data.items()]
         with open(VIEWER_POINTS_FILE, 'w', encoding='utf-8') as f:
             f.write('\n'.join(lines))
         return jsonify({"ok": True})
@@ -545,10 +761,10 @@ def serve_font(filename):
 def serve_summary():
     """Serve the text summary file manually to avoid framework-specific issues"""
     try:
-        if not os.path.exists('game_summary.txt'):
+        if not os.path.exists(GAME_SUMMARY_TXT):
             return "File not found.", 404
             
-        with open('game_summary.txt', 'r', encoding='utf-8') as f:
+        with open(GAME_SUMMARY_TXT, 'r', encoding='utf-8') as f:
             content = f.read()
         return content, 200, {
             'Content-Type': 'text/plain; charset=utf-8',
@@ -564,10 +780,10 @@ def serve_summary():
 def serve_json_summary():
     """Serve the JSON summary file"""
     try:
-        if not os.path.exists('game_summary.json'):
+        if not os.path.exists(GAME_SUMMARY_JSON):
             return jsonify({"error": "File not found"}), 404
             
-        with open('game_summary.json', 'r', encoding='utf-8') as f:
+        with open(GAME_SUMMARY_JSON, 'r', encoding='utf-8') as f:
             data = json.load(f)
         return jsonify(data)
     except Exception as e:

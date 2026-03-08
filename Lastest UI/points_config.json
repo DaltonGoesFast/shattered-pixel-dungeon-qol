@@ -6,7 +6,7 @@
   "cost_per_trap": 50,
   "cost_per_transmute": 150,
   "cost_per_ally_bee": 75,
-  "cost_per_ward": 30,
+  "cost_per_ward": 9,
   "cost_per_buff": 75,
   "cost_per_debuff": 50,
   "cost_per_wand_common": 50,

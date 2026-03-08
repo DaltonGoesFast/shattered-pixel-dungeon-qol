@@ -31,6 +31,6 @@ To test or verify changes to the overlay, points system, or chat spawn features,
 
 If you're running this on a different machine, update these paths:
 
-- **server.py:** `SAVE_DIRECTORY` (SPD save file location)
+- **config.json:** `save_directory` (SPD save file location; copy from `config.example.json`)
 - **docs/streamerbot-points-from-scratch.md:** All `FILE`, `DOUBLE_FILE`, `TOP_FARDER_FILE` paths in the C# code
 - **points_command.py:** Uses `SCRIPT_DIR` for points file; fetches depth from `http://127.0.0.1:5000/api/game-data`

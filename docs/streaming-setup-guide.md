@@ -25,8 +25,8 @@ pip install -r requirements.txt
 python server.py
 ```
 
-**Configure paths in `server.py`:**
-- `SAVE_DIRECTORY` — Where SPD saves are stored. Default: `C:\Users\dalto\AppData\Roaming\.shatteredpixel\Shattered Pixel Dungeon QoL`
+**Configure paths in `config.json`:**
+- Copy `config.example.json` to `config.json` (gitignored). Set `save_directory` to where SPD saves are stored (default in example: `C:\Users\dalto\AppData\Roaming\.shatteredpixel\Shattered Pixel Dungeon QoL`).
 - On your machine, find your SPD save folder (e.g. under `%APPDATA%` or `~/.shatteredpixel/`)
 
 Server runs at `http://localhost:5000`. You should see:
@@ -104,7 +104,7 @@ For full chat integration:
 
 ## Troubleshooting
 
-- **"No game data available"** — Game not running, or save directory wrong. Check `SAVE_DIRECTORY` in `server.py`.
+- **"No game data available"** — Game not running, or save directory wrong. Check `save_directory` in `config.json`.
 - **"Game not connected"** on spawn — Game must be running with streaming enabled on port 5001.
 - **"Not enough points"** — Add your username to `viewer_points.txt` with enough points: `username|100|0`
 - **Paths in C#** — Streamer.bot C# uses absolute paths. Update them for your machine.

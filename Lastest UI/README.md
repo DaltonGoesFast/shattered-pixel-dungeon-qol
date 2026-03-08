@@ -15,7 +15,7 @@ A lightweight, real-time text-only overlay for Shattered Pixel Dungeon. It autom
 ## Getting Started
 
 1. **Install Python** - Ensure [Python](https://www.python.org/downloads/) is installed and added to your PATH.
-2. **Configure (Optional)** - Open `config.txt` to adjust your save file location if it's not in the default directory.
+2. **Configure (Optional)** - Copy `config.example.json` to `config.json` and set `save_directory` if your save file location differs from the default.
 3. **Launch** - Double-click `start.bat`. This will:
    - Check your Python installation.
    - Install required libraries (from `requirements.txt`).

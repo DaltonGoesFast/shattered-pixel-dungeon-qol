@@ -28,7 +28,7 @@ Quick reference for what each part of the project does.
 | `fonts/` | Overlay fonts |
 | `requirements.txt` | Python dependencies |
 | `start.bat` | Launch script |
-| `config.txt` | Save path, etc. |
+| `config.example.json` | Template for paths; copy to `config.json` and edit `save_directory` if needed |
 
 ### Runtime files (auto-created, in .gitignore)
 
