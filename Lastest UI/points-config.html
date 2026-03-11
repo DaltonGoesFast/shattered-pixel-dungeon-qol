@@ -6,51 +6,166 @@
   <title>SPD Overlay Control</title>
   <style>
     * { box-sizing: border-box; }
+    :root {
+      --spd-bg: #1a1a2e;
+      --spd-surface: #16213e;
+      --spd-surface-dark: #0f0f1a;
+      --spd-text: #eee;
+      --spd-muted: #94a1b2;
+      --spd-accent: #7f5af0;
+      --spd-accent-hover: #9d7bff;
+      --spd-accent-rgba: 127, 90, 240;
+      --spd-success: #6ee7b7;
+      --spd-success-bg: #065f46;
+      --spd-error: #fca5a5;
+      --spd-error-bg: #7f1d1d;
+      --spd-border: #4a5568;
+      --spd-btn-secondary: #4a5568;
+      --spd-btn-secondary-hover: #5a6578;
+      --spd-danger: #7f1d1d;
+      --spd-danger-hover: #991b1b;
+      --spd-text-on-bg: #f0f0f0;
+      --spd-text-on-surface: #f0f0f0;
+      --spd-text-on-surface-dark: #f0f0f0;
+      --spd-muted-on-bg: rgba(240, 240, 240, 0.72);
+      --spd-muted-on-surface: rgba(240, 240, 240, 0.72);
+      --spd-muted-on-surface-dark: rgba(240, 240, 240, 0.72);
+      --spd-text-on-accent: #f0f0f0;
+      --spd-viewer-list: #0f0f1a;
+      --spd-activity-list: #0f0f1a;
+      --spd-text-on-viewer-list: #f0f0f0;
+      --spd-muted-on-viewer-list: rgba(240, 240, 240, 0.72);
+      --spd-text-on-activity-list: #f0f0f0;
+      --spd-muted-on-activity-list: rgba(240, 240, 240, 0.72);
+      color-scheme: dark;
+    }
     body {
       font-family: system-ui, -apple-system, sans-serif;
       max-width: min(1920px, 98vw);
       margin: 2rem auto;
       padding: 0 0.5rem;
-      background: #1a1a2e;
-      color: #eee;
+      background: var(--spd-bg);
+      color: var(--spd-text-on-bg);
     }
+    body.resizing { user-select: none; }
     .main-grid {
       display: grid;
-      gap: 1.5rem;
+      gap: 0;
       align-items: start;
+      grid-template-columns: var(--col-left, 300px) 8px var(--col-center, 520px) 8px minmax(280px, 1fr);
     }
-    .main-grid.col-default {
-      grid-template-columns: minmax(0, 1fr) minmax(320px, 1fr) minmax(360px, 1fr);
+    .main-grid.col-default { /* kept for class toggle */ }
+    .resize-handle {
+      width: 8px;
+      cursor: col-resize;
+      background: transparent;
+      position: relative;
+      flex-shrink: 0;
+      align-self: stretch;
+      margin: 0 -4px;
+      z-index: 2;
+    }
+    .resize-handle::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4px;
+      background: var(--spd-border);
+      border-radius: 2px;
+      opacity: 0.6;
+    }
+    .resize-handle:hover::after, .resize-handle.resizing::after {
+      background: var(--spd-accent);
+      opacity: 1;
+    }
+    .resize-handle-v {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 8px;
+      cursor: row-resize;
+      z-index: 1;
+    }
+    .resize-handle-v::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 40px;
+      height: 4px;
+      background: var(--spd-border);
+      border-radius: 2px;
+      opacity: 0.6;
+    }
+    .resize-handle-v:hover::after, .resize-handle-v.resizing::after {
+      background: var(--spd-accent);
+      opacity: 1;
+    }
+    .vp-list-wrapper { min-height: 200px; }
+    .column-drop-zone {
+      min-height: 80px;
+      border: 2px dashed var(--spd-border);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--spd-muted-on-surface);
+      font-size: 0.9rem;
+      margin-top: 0.5rem;
+    }
+    .column-drop-zone.drag-over-zone {
+      border-color: var(--spd-accent);
+      background: rgba(var(--spd-accent-rgba), 0.15);
+      color: var(--spd-accent);
+    }
+    .col-left, .col-right, .col-center {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      min-width: 0;
     }
     .main-grid.col-1 { grid-template-columns: 1fr; }
-    .main-grid.col-2 { grid-template-columns: 1fr 1fr; }
-    .main-grid.col-3 { grid-template-columns: minmax(0, 1fr) minmax(320px, 1fr) minmax(360px, 1fr); }
-    .col-center,
-    .col-right {
-      position: sticky;
-      top: 1rem;
-    }
+    .main-grid.col-1 .resize-handle { display: none; }
+    .main-grid.col-2 { grid-template-columns: var(--col-left) 8px 1fr; }
+    .main-grid.col-2 #resizeCenter { display: none; }
+    .main-grid.col-2 .col-right { grid-column: 1 / -1; }
+    .main-grid.col-3 { grid-template-columns: var(--col-left) 8px var(--col-center) 8px minmax(280px, 1fr); }
     @media (max-width: 1200px) {
-      .main-grid { grid-template-columns: 1fr 1fr; }
-      .col-right { grid-column: 1 / -1; }
+      .main-grid { grid-template-columns: var(--col-left, 300px) 8px 1fr; }
+      .main-grid #resizeCenter { display: none; }
+      .main-grid .col-right { grid-column: 1 / -1; }
     }
     @media (max-width: 768px) {
       .main-grid { grid-template-columns: 1fr; }
-      .col-center, .col-right { position: static; }
+      .main-grid .resize-handle { display: none; }
+      .main-grid .col-left, .main-grid .col-right, .main-grid .col-center { flex-direction: column; }
     }
-    h1 { color: #7f5af0; margin-bottom: 0.5rem; }
-    .sub { color: #94a1b2; font-size: 0.9rem; margin-bottom: 1.5rem; }
+    h1 { color: var(--spd-text-on-bg); margin-bottom: 0.5rem; }
+    .sub { color: var(--spd-muted-on-bg); font-size: 0.9rem; margin-bottom: 1.5rem; }
+    section .sub { color: var(--spd-muted-on-surface); }
     section {
-      background: #16213e;
+      background: var(--spd-surface);
+      color: var(--spd-text-on-surface);
       border-radius: 8px;
       padding: 1rem 1.25rem;
       margin-bottom: 1rem;
       min-width: 0;
     }
+    #section-general .costs-scroll {
+      max-height: 320px;
+      overflow-y: auto;
+    }
     section.dragging { opacity: 0.6; }
-    section .section-drag-handle { cursor: grab; padding: 0 6px; margin-right: 4px; color: #94a1b2; user-select: none; }
+    section.drag-over-top { background: linear-gradient(to bottom, rgba(var(--spd-accent-rgba), 0.3) 0%, transparent 60%); }
+    section.drag-over-bottom { background: linear-gradient(to top, rgba(var(--spd-accent-rgba), 0.3) 0%, transparent 60%); }
+    section .section-drag-handle { cursor: grab; padding: 0 6px; margin-right: 4px; color: var(--spd-muted-on-surface); user-select: none; }
     section .section-drag-handle:active { cursor: grabbing; }
-    section h2 { font-size: 1rem; color: #7f5af0; margin: 0 0 0.75rem 0; display: flex; align-items: center; }
+    section h2 { font-size: 1rem; color: var(--spd-text-on-surface); margin: 0 0 0.75rem 0; display: flex; align-items: center; }
     .row {
       display: flex;
       align-items: center;
@@ -61,11 +176,22 @@
     label { min-width: 140px; }
     input[type="number"], input[type="text"] {
       padding: 0.4rem 0.5rem;
-      border: 1px solid #4a5568;
+      border: 1px solid var(--spd-border);
       border-radius: 4px;
-      background: #0f0f1a;
-      color: #eee;
+      background: var(--spd-surface-dark);
+      color: var(--spd-text-on-surface-dark);
       font-size: 1rem;
+    }
+    input[type="checkbox"] {
+      background: var(--spd-surface-dark);
+      border: 1px solid var(--spd-border);
+      accent-color: var(--spd-accent);
+    }
+    select {
+      background: var(--spd-surface-dark);
+      color: var(--spd-text);
+      border: 1px solid var(--spd-border);
+      border-radius: 4px;
     }
     input[type="number"] { width: 80px; }
     .monsters {
@@ -93,8 +219,8 @@
       box-sizing: border-box;
     }
     button {
-      background: #7f5af0;
-      color: white;
+      background: var(--spd-accent);
+      color: var(--spd-text-on-accent);
       border: none;
       padding: 0.6rem 1.25rem;
       border-radius: 6px;
@@ -102,24 +228,24 @@
       cursor: pointer;
       margin-top: 0.5rem;
     }
-    button:hover { background: #9d7bff; }
+    button:hover { background: var(--spd-accent-hover); }
     button.free-btn {
       padding: 0.35rem 0.6rem;
       font-size: 0.85rem;
       margin: 0;
-      background: #4a5568;
+      background: var(--spd-btn-secondary);
     }
-    button.free-btn:hover { background: #5a6578; }
+    button.free-btn:hover { background: var(--spd-btn-secondary-hover); }
     button.cancel-free-btn {
       padding: 0.35rem 0.6rem;
       font-size: 0.85rem;
       margin: 0;
-      background: #7f1d1d;
+      background: var(--spd-danger);
     }
-    button.cancel-free-btn:hover { background: #991b1b; }
+    button.cancel-free-btn:hover { background: var(--spd-danger-hover); }
     .free-countdown {
       font-size: 0.85rem;
-      color: #6ee7b7;
+      color: var(--spd-success);
       min-width: 5em;
     }
     .msg {
@@ -128,13 +254,14 @@
       border-radius: 4px;
       font-size: 0.9rem;
     }
-    .msg.ok { background: #065f46; color: #6ee7b7; }
-    .msg.err { background: #7f1d1d; color: #fca5a5; }
+    .msg.ok { background: var(--spd-success-bg); color: var(--spd-success); }
+    .msg.err { background: var(--spd-error-bg); color: var(--spd-error); }
     .search-bar {
       display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem;
-      background: #0f0f1a; border: 1px solid #4a5568; border-radius: 6px; padding: 0.4rem 0.75rem;
+      background: var(--spd-surface-dark); border: 1px solid var(--spd-border); border-radius: 6px; padding: 0.4rem 0.75rem;
+      color: var(--spd-text-on-surface-dark);
     }
-    .search-bar input[type="text"] { flex: 1; min-width: 120px; border: none; background: transparent; }
+    .search-bar input[type="text"] { flex: 1; min-width: 120px; border: none; background: transparent; color: var(--spd-text-on-surface-dark); }
     .search-bar input[type="text"]:focus { outline: none; }
     .vp-actions {
       display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.75rem;
@@ -142,10 +269,10 @@
     .vp-actions label { display: flex; align-items: center; gap: 0.35rem; }
     .vp-actions input[type="number"] { width: 72px; padding: 0.35rem 0.5rem; }
     .ws-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
-    .ws-status { color: #94a1b2; font-size: 0.9rem; }
-    .ws-status.connected { color: #6ee7b7; }
-    .ws-status.error { color: #fca5a5; }
-    #wsOut { white-space: pre-wrap; word-break: break-all; max-height: 400px; overflow: auto; border: 1px solid #4a5568; padding: 10px; background: #0f0f1a; font-size: 12px; font-family: ui-monospace, monospace; border-radius: 4px; }
+    .ws-status { color: var(--spd-muted-on-bg); font-size: 0.9rem; }
+    .ws-status.connected { color: var(--spd-success); }
+    .ws-status.error { color: var(--spd-error); }
+    #wsOut { white-space: pre-wrap; word-break: break-all; max-height: 400px; overflow: auto; border: 1px solid var(--spd-border); padding: 10px; background: var(--spd-surface-dark); color: var(--spd-text-on-surface-dark); font-size: 12px; font-family: ui-monospace, monospace; border-radius: 4px; }
     .tree { margin: 4px 0 4px 16px; }
     .key { color: #7af; }
     .str { color: #9c9; }
@@ -153,48 +280,100 @@
     .bool { color: #c9c; }
     .null { color: #666; }
     summary { cursor: pointer; }
-    .vp-col-config-modal {
-      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100;
-      align-items: center; justify-content: center;
-    }
-    .vp-col-config-modal.open { display: flex; }
-    .vp-col-config-panel {
-      background: #16213e; border-radius: 8px; padding: 1rem 1.25rem; min-width: 220px;
-      border: 1px solid #4a5568;
-    }
-    .vp-col-config-panel h3 { margin: 0 0 0.75rem 0; font-size: 1rem; color: #7f5af0; }
-    .vp-col-config-panel .row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
-    .vp-col-config-panel label { min-width: 90px; }
-    .vp-col-config-panel input[type="number"] { width: 80px; padding: 0.35rem 0.5rem; }
-    .vp-col-config-panel .btns { margin-top: 1rem; display: flex; gap: 0.5rem; justify-content: flex-end; }
     .overall-config-modal {
       display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 101;
       align-items: center; justify-content: center;
     }
     .overall-config-modal.open { display: flex; }
     .overall-config-panel {
-      background: #16213e; border-radius: 8px; padding: 1.25rem 1.5rem; min-width: 280px;
-      border: 1px solid #4a5568;
+      background: var(--spd-surface); border-radius: 8px; padding: 1.25rem 1.5rem; min-width: 280px;
+      border: 1px solid var(--spd-border);
+      color: var(--spd-text-on-surface);
     }
-    .overall-config-panel h3 { margin: 0 0 1rem 0; font-size: 1rem; color: #7f5af0; }
+    .overall-config-panel h3 { margin: 0 0 1rem 0; font-size: 1rem; color: var(--spd-accent); }
     .overall-config-panel .config-row { margin-bottom: 0.75rem; }
     .overall-config-panel .config-row label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
     .overall-config-panel input[type="checkbox"] { width: 18px; height: 18px; }
     .overall-config-panel .col-options { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .overall-config-panel .col-options { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
     .overall-config-panel .col-options label { display: flex; align-items: center; gap: 0.35rem; cursor: pointer; }
+    .game-status { font-size: 0.85rem; color: var(--spd-muted-on-bg); }
+    .game-status.connected { color: var(--spd-success); }
+    .game-status.error { color: var(--spd-error); }
+    #viewer_points_list table { width: 100%; border-collapse: collapse; background: var(--spd-viewer-list); color: var(--spd-text-on-viewer-list); }
+    #viewer_points_list th, #viewer_points_list td { padding: 4px 8px; background: var(--spd-viewer-list); color: var(--spd-text-on-viewer-list); border-bottom: 1px solid var(--spd-border); }
+    #viewer_points_list th { text-align: left; }
+    #viewer_points_list tbody tr:hover { background: var(--spd-surface); }
+    #viewer_points_list input[type="number"], #viewer_points_list input[type="text"] { background: var(--spd-viewer-list); color: var(--spd-text-on-viewer-list); border-color: var(--spd-border); }
+    #activityList { background: var(--spd-activity-list); color: var(--spd-text-on-activity-list); border-radius: 4px; }
+    #activityList > div { padding: 2px 0; border-bottom: 1px solid var(--spd-border); color: var(--spd-muted-on-activity-list); }
+    .theme-color-rows { display: flex; flex-direction: column; gap: 6px; }
+    .theme-color-row { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; }
+    .theme-color-row label { min-width: 80px; margin: 0; cursor: pointer; }
+    .theme-color-input { width: 44px; height: 28px; padding: 2px; border: 1px solid var(--spd-border); border-radius: 4px; background: var(--spd-surface-dark); cursor: pointer; box-sizing: border-box; }
+    .theme-color-input::-webkit-color-swatch-wrapper { padding: 0; }
+    .theme-color-input::-webkit-color-swatch { border: none; border-radius: 2px; }
+    #themeCustomizePanel { color: var(--spd-text-on-surface); background: var(--spd-surface); }
+    #themeCustomizePanel .theme-color-row label { color: var(--spd-text-on-surface); }
+    #themeCustomizePanel p { color: var(--spd-muted-on-surface); }
+    .theme-preset-btn:hover { background: var(--spd-surface) !important; color: var(--spd-text-on-surface) !important; border-color: var(--spd-accent) !important; }
   </style>
 </head>
 <body>
   <h1>SPD Overlay Control</h1>
-  <p class="sub">Edit costs, viewer points, and inspect game data. <a href="/overlay" target="_blank" style="color:#7f5af0;">OBS overlay</a> <button id="overallConfigBtn" style="margin-left:8px;padding:4px 10px;font-size:0.85rem;background:#4a5568;">Layout & sections</button> <button id="save">Save costs</button> <button id="refresh" style="margin-left:4px;background:#444;">Refresh</button> <span id="msg" style="margin-left:8px;"></span></p>
+  <p class="sub">Edit costs, viewer points, and inspect game data.
+    <a href="/double-points-countdown" target="_blank" style="color:var(--spd-text-on-bg);text-decoration:underline;">2x countdown</a>
+    <button id="overallConfigBtn" style="margin-left:8px;padding:4px 10px;font-size:0.85rem;background:var(--spd-btn-secondary);">Layout & sections</button>
+    <span id="themeControl" style="margin-left:8px;">
+      <span style="color:var(--spd-muted-on-bg);font-size:0.9rem;">Theme:</span>
+      <button type="button" id="themeDark" class="theme-toggle" style="margin-left:4px;padding:2px 8px;font-size:0.85rem;">Dark</button>
+      <button type="button" id="themeLight" class="theme-toggle" style="margin-left:2px;padding:2px 8px;font-size:0.85rem;">Light</button>
+      <button type="button" id="themeCustom" class="theme-toggle" style="margin-left:2px;padding:2px 8px;font-size:0.85rem;">Custom</button>
+      <button type="button" id="themeCustomizeBtn" style="margin-left:4px;padding:2px 8px;font-size:0.85rem;background:var(--spd-btn-secondary);">Customize</button>
+    </span>
+    <div id="themeCustomizePanel" style="display:none;margin-top:8px;padding:10px 12px;background:var(--spd-surface);color:var(--spd-text-on-surface);border-radius:6px;border:1px solid var(--spd-border);max-width:320px;">
+      <p style="margin:0 0 8px 0;font-size:0.85rem;color:var(--spd-muted-on-surface);">Click a swatch to change that color (used when Custom theme is selected).</p>
+      <p style="margin:0 0 6px 0;font-size:0.85rem;color:var(--spd-muted-on-surface);">Presets:</p>
+      <div id="themePresetBtns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;"></div>
+      <div class="theme-color-rows">
+        <div class="theme-color-row"><label for="themeAccent">Accent</label><input type="color" id="themeAccent" data-var="accent" class="theme-color-input" title="Buttons, links"></div>
+        <div class="theme-color-row"><label for="themeSurface">Surface</label><input type="color" id="themeSurface" data-var="surface" class="theme-color-input" title="Section panels"></div>
+        <div class="theme-color-row"><label for="themeBg">Background</label><input type="color" id="themeBg" data-var="bg" class="theme-color-input" title="Page background"></div>
+        <div class="theme-color-row"><label for="themeSuccess">Success</label><input type="color" id="themeSuccess" data-var="success" class="theme-color-input" title="Success text"></div>
+        <div class="theme-color-row"><label for="themeError">Error</label><input type="color" id="themeError" data-var="error" class="theme-color-input" title="Error text"></div>
+        <div class="theme-color-row"><label for="themeBorder">Border</label><input type="color" id="themeBorder" data-var="border" class="theme-color-input" title="Borders"></div>
+        <div class="theme-color-row"><label for="themeViewerList">Viewer list</label><input type="color" id="themeViewerList" data-var="viewer-list" class="theme-color-input" title="Viewer points table background"></div>
+        <div class="theme-color-row"><label for="themeActivityList">Activity list</label><input type="color" id="themeActivityList" data-var="activity-list" class="theme-color-input" title="Activity log rows background"></div>
+      </div>
+      <button type="button" id="themeResetCustom" style="margin-top:10px;font-size:0.85rem;background:var(--spd-btn-secondary);">Reset to dark defaults</button>
+    </div>
+    <button id="save">Save costs</button>
+    <button id="exportConfig" style="margin-left:4px;background:var(--spd-btn-secondary);" title="Download current config (costs + optional layout)">Export</button>
+    <button id="importConfig" style="margin-left:4px;background:var(--spd-btn-secondary);" title="Load config from a JSON file">Import</button>
+    <input type="file" id="importConfigFile" accept=".json" style="display:none;">
+    <button id="refresh" style="margin-left:4px;background:var(--spd-btn-secondary);">Refresh</button>
+    <span id="presetsControl" style="margin-left:12px;">
+      <span style="color:var(--spd-muted-on-bg);font-size:0.9rem;">Presets:</span>
+      <select id="presetsSelect" style="margin-left:4px;padding:2px 6px;font-size:0.9rem;background:var(--spd-surface-dark);color:var(--spd-text-on-surface-dark);border:1px solid var(--spd-border);border-radius:4px;">
+        <option value="">—</option>
+      </select>
+      <button type="button" id="presetSaveAs" style="margin-left:4px;padding:2px 8px;font-size:0.85rem;background:var(--spd-btn-secondary);">Save current as…</button>
+      <button type="button" id="presetApply" style="margin-left:2px;padding:2px 8px;font-size:0.85rem;background:var(--spd-btn-secondary);">Apply</button>
+      <button type="button" id="presetDelete" style="margin-left:2px;padding:2px 8px;font-size:0.85rem;background:var(--spd-danger);">Delete</button>
+    </span>
+    <span id="gameStatus" class="game-status" style="margin-left:12px;" title="Game WebSocket (port 5001)">—</span>
+    <span id="msg" style="margin-left:8px;"></span>
+  </p>
 
   <div class="main-grid col-default" id="mainGrid">
-  <section id="section-general" data-section="general" draggable="true">
+  <div class="col-left" id="colLeft">
+  <section id="section-general" data-section="general">
     <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>General costs</h2>
-    <div class="row free-mins-row" style="margin-bottom:0.75rem;padding-bottom:0.75rem;border-bottom:1px solid #4a5568;">
+    <div class="row free-mins-row" style="margin-bottom:0.75rem;padding-bottom:0.75rem;border-bottom:1px solid var(--spd-border);">
       <label for="freeMins">Free for (mins):</label>
       <input type="number" id="freeMins" min="1" max="1440" value="5" style="width:64px;">
     </div>
+    <div class="costs-scroll">
     <div class="row" data-cost-key="cost_per_gold">
       <label for="cost_per_gold">Gold (per 1):</label>
       <input type="number" id="cost_per_gold" min="1" value="5">
@@ -292,16 +471,21 @@
       <span class="free-countdown" style="display:none;"></span>
       <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
     </div>
+    </div>
   </section>
 
-  <section id="section-monsters" data-section="monsters" draggable="true">
+  <section id="section-monsters" data-section="monsters">
     <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>Monster costs (per spawn)</h2>
     <p class="sub" style="margin-bottom: 0.75rem;">Half price when spawned beyond native biome. Champion: 2× base cost (no discount).</p>
     <div class="monsters" id="monsters"></div>
   </section>
+  <div class="column-drop-zone" data-column="left" id="dropZoneLeft">Drop here</div>
+  </div>
 
-  <section id="section-viewer" data-section="viewer" draggable="true">
-    <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>Viewer points <span id="vpUpdated" style="margin-left:6px;font-weight:normal;color:#94a1b2;font-size:0.85rem;">—</span> <button id="vpColConfig" style="margin-left:6px;padding:2px 8px;font-size:0.8rem;background:#4a5568;">Columns</button></h2>
+  <div class="resize-handle" id="resizeLeft" title="Drag to resize columns"></div>
+  <div class="col-center" id="colCenter">
+  <section id="section-viewer" data-section="viewer" class="col-center">
+    <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>Viewer points <span id="vpUpdated" style="margin-left:6px;font-weight:normal;color:var(--spd-muted-on-surface);font-size:0.85rem;">—</span> <label style="margin-left:8px;font-weight:normal;font-size:0.85rem;">Refresh <input type="number" id="vpRefreshSec" min="5" max="120" value="10" style="width:44px;padding:2px 4px;">s</label></h2>
     <p class="sub" style="margin-bottom: 0.5rem;">Search to filter, or type a new username + points to add. Auto-refreshes every 10s. Used by !spawn, !champion, !gold, !curse, !gas, !scroll, !trap, !transmute, !bee, !wand.</p>
     <div class="search-bar">
       <input type="text" id="vp_search" placeholder="Search users or type new username…" autocomplete="off">
@@ -311,19 +495,28 @@
       <label>Donor <input type="number" id="new_donation" placeholder="Donor" min="0" value="0"></label>
       <button id="add_points">Add</button>
       <button id="set_points">Set</button>
-      <button id="chatToDonor" style="background:#4a5568;" title="Convert selected users' chat points to donor points">Chat → Donor</button>
-      <button id="clearNonDonor" style="background:#6b4423;">Delete all points</button>
-      <button id="clearAll" style="background:#7f1d1d;">Delete all donor points</button>
+      <button id="chatToDonor" style="background:var(--spd-btn-secondary);" title="Convert selected users' chat points to donor points">Chat → Donor</button>
+      <button id="clearNonDonor" style="background:var(--spd-btn-secondary);">Delete all points</button>
+      <button id="clearAll" style="background:var(--spd-danger);">Delete all donor points</button>
+      <button id="exportViewerCsv" style="background:var(--spd-btn-secondary);" title="Download viewer points as CSV">Export CSV</button>
     </div>
-    <div id="viewer_points_list" style="max-height: 70vh; overflow-y: auto;"></div>
+    <div class="vp-list-wrapper" style="position:relative;">
+      <div id="viewer_points_list" style="height: 420px; max-height: 70vh; overflow-y: auto;"></div>
+      <div class="resize-handle-v" id="resizeVpList" title="Drag to resize list height"></div>
+    </div>
   </section>
+  <div class="column-drop-zone" data-column="center" id="dropZoneCenter">Drop here</div>
+  </div>
 
-  <section id="section-game" data-section="game" draggable="true">
+  <div class="resize-handle" id="resizeCenter" title="Drag to resize columns"></div>
+  <div class="col-right" id="colRight">
+  <section id="section-game" data-section="game">
     <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>Game data (WebSocket)</h2>
-    <p class="sub" style="margin-bottom: 0.75rem;">Connect to game on port 5001. Enable WebSocket streaming in game Settings.</p>
+    <p class="sub" style="margin-bottom: 0.75rem;">Connect to game on port 5001. Enable WebSocket streaming in game Settings. Full state (hero, depth, gold) appears when you're <strong>in a run</strong>; on title screen only scene is sent.</p>
     <div class="ws-bar">
       <label>Port <input type="number" id="wsPort" value="5001" min="1" max="65535" style="width:64px;"></label>
       <button id="wsBtn">Connect</button>
+      <button id="wsLoadServer" style="background:var(--spd-btn-secondary);" title="Load current run from server (game_summary.json)">Load from server</button>
       <span class="ws-status" id="wsStatus">Disconnected</span>
       <span class="ws-status" id="wsLast"></span>
     </div>
@@ -333,17 +526,62 @@
     </div>
     <div id="wsOut">Connect to see game data.</div>
   </section>
-  </div>
 
-  <div id="vpColConfigModal" class="vp-col-config-modal">
-    <div class="vp-col-config-panel">
-      <h3>Viewer points panel</h3>
-      <div class="row"><label>Container width (px):</label><input type="number" id="colContainer" min="280" max="800" value="400"></div>
-      <div class="btns">
-        <button id="vpColReset">Reset</button>
-        <button id="vpColApply">Apply</button>
-      </div>
+  <section id="section-score" data-section="score">
+    <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>Streamer vs Chat Score</h2>
+    <p class="sub" style="margin-bottom: 0.75rem;">Chat +1 when hero dies, Streamer +1 when boss slain. Output: streamer_chat_score.txt (OBS Read from file).</p>
+    <div class="row" style="margin-bottom:0.25rem;">
+      <span style="color:var(--spd-muted-on-surface);font-size:0.85rem;" id="score_session_label">Session: —</span>
     </div>
+    <div class="row">
+      <label for="score_streamer_label">Streamer label:</label>
+      <input type="text" id="score_streamer_label" placeholder="Streamer" style="width:140px;">
+    </div>
+    <div class="row">
+      <label for="score_chat_label">Chat label:</label>
+      <input type="text" id="score_chat_label" placeholder="Chat" style="width:140px;">
+    </div>
+    <div class="row">
+      <label for="score_streamer">Streamer score:</label>
+      <input type="number" id="score_streamer" min="0" value="0" style="width:72px;">
+    </div>
+    <div class="row">
+      <label for="score_chat">Chat score:</label>
+      <input type="number" id="score_chat" min="0" value="0" style="width:72px;">
+    </div>
+    <div class="row" style="margin-top:0.5rem;">
+      <span style="color:var(--spd-muted-on-surface);font-size:0.9rem;">Preview:</span>
+      <span id="score_preview" style="font-family:ui-monospace;color:var(--spd-success);">Streamer: 0 | Chat: 0</span>
+    </div>
+    <div class="row" style="margin-top:0.75rem;">
+      <button id="scoreUpdate">Update</button>
+      <button id="scoreReset" style="background:var(--spd-btn-secondary);">Reset</button>
+    </div>
+    <div class="row" style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--spd-border);">
+      <label for="doublePointsMins" style="min-width:100px;">2x points (min):</label>
+      <input type="number" id="doublePointsMins" min="1" max="1440" value="5" style="width:56px;">
+      <button id="doublePointsStart" style="margin:0;">Start 2x</button>
+      <span id="doublePointsCountdown" class="free-countdown" style="margin-left:8px;">—</span>
+    </div>
+  </section>
+  <section id="section-activity" data-section="activity">
+    <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>Activity</h2>
+    <details id="activityDetails" open style="margin-top:0.25rem;">
+      <summary style="cursor:pointer;font-size:0.9rem;color:var(--spd-muted-on-surface);">Recent activity</summary>
+      <div class="activity-options" style="margin-top:0.5rem;">
+        <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;color:var(--spd-muted-on-surface);cursor:pointer;">
+          <input type="checkbox" id="activityHideGameLoaded" title="Hide 'Game data loaded from server' in feed">
+          <span>Hide &quot;Game data loaded&quot; messages</span>
+        </label>
+      </div>
+      <div class="activity-filter-wrap" style="margin-top:0.5rem;">
+        <input type="text" id="activityFilter" placeholder="Filter activity…" autocomplete="off" style="width:100%;padding:0.35rem 0.5rem;font-size:0.85rem;border:1px solid var(--spd-border);border-radius:4px;background:var(--spd-activity-list);color:var(--spd-text-on-activity-list);box-sizing:border-box;">
+      </div>
+      <div id="activityList" style="max-height:200px;overflow-y:auto;font-size:0.85rem;margin-top:0.5rem;"></div>
+    </details>
+  </section>
+  <div class="column-drop-zone" data-column="right" id="dropZoneRight">Drop here</div>
+  </div>
   </div>
 
   <div id="overallConfigModal" class="overall-config-modal">
@@ -369,11 +607,13 @@
           <label><input type="radio" name="monsterCols" value="auto"> Auto</label>
         </div>
       </div>
-      <div class="config-row"><label>Monster section width (px):</label><input type="number" id="cfg-monster-width" min="280" max="800" value="540"></div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-viewer" checked> Viewer points</label></div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-game" checked> Game data (WebSocket)</label></div>
+      <div class="config-row"><label><input type="checkbox" id="cfg-section-score" checked> Streamer vs Chat Score</label></div>
+      <div class="config-row"><label><input type="checkbox" id="cfg-section-activity" checked> Activity</label></div>
       <div class="btns">
         <button id="overallConfigReset">Reset</button>
+        <button id="overallConfigRestoreLayout" style="background:var(--spd-btn-secondary);" title="Restore default section layout (General, Monsters | Viewer | Game, Score)">Restore layout</button>
         <button id="overallConfigApply">Apply</button>
       </div>
     </div>
@@ -395,6 +635,88 @@
       el.textContent = text;
       el.className = 'msg ' + (ok ? 'ok' : 'err');
       el.style.display = 'block';
+    }
+
+    const ACTIVITY_MAX = 50;
+    const ACTIVITY_STORAGE = 'spd_activity';
+    const ACTIVITY_HIDE_GAME_LOADED_KEY = 'spd_activity_hide_game_loaded';
+    const ACTIVITY_LAST_COMMAND_TS_KEY = 'spd_activity_last_command_ts';
+    function getHideGameLoadedSetting() {
+      try { return localStorage.getItem(ACTIVITY_HIDE_GAME_LOADED_KEY) === 'true'; } catch (_) { return false; }
+    }
+    function setHideGameLoadedSetting(val) {
+      try { localStorage.setItem(ACTIVITY_HIDE_GAME_LOADED_KEY, val ? 'true' : 'false'); } catch (_) {}
+    }
+    function getLastCommandTs() {
+      try { const s = sessionStorage.getItem(ACTIVITY_LAST_COMMAND_TS_KEY); if (s) return parseInt(s, 10) || 0; } catch (_) {}
+      return 0;
+    }
+    function setLastCommandTs(ts) {
+      try { sessionStorage.setItem(ACTIVITY_LAST_COMMAND_TS_KEY, String(ts)); } catch (_) {}
+    }
+    function formatCommandActivityMessage(e) {
+      const cmd = '!' + (e.command || '').replace(/_/g, ' ');
+      const detail = (e.detail || '').trim();
+      const part = detail ? cmd + ' ' + detail : cmd;
+      return (e.username ? e.username + ': ' + part : part) + (e.success === false ? ' (failed)' : '');
+    }
+    function pollActivityCommands() {
+      const since = getLastCommandTs();
+      fetch('/api/activity-commands?since=' + since)
+        .then(r => r.json())
+        .then(data => {
+          const events = (data && data.events) || [];
+          if (events.length === 0) return;
+          events.sort((a, b) => (a.time || 0) - (b.time || 0));
+          let maxTs = since;
+          events.forEach(ev => {
+            logActivity(formatCommandActivityMessage(ev));
+            if (ev.time > maxTs) maxTs = ev.time;
+          });
+          setLastCommandTs(maxTs);
+        })
+        .catch(() => {});
+    }
+    function getActivityLog() {
+      try {
+        const s = sessionStorage.getItem(ACTIVITY_STORAGE);
+        if (s) {
+          const arr = JSON.parse(s);
+          if (Array.isArray(arr)) return arr;
+        }
+      } catch (_) {}
+      return [];
+    }
+    function saveActivityLog(arr) {
+      try { sessionStorage.setItem(ACTIVITY_STORAGE, JSON.stringify(arr)); } catch (_) {}
+    }
+    function logActivity(text) {
+      const arr = getActivityLog();
+      arr.unshift({ time: Date.now(), text });
+      if (arr.length > ACTIVITY_MAX) arr.length = ACTIVITY_MAX;
+      saveActivityLog(arr);
+      renderActivityList();
+    }
+    function renderActivityList() {
+      const el = document.getElementById('activityList');
+      if (!el) return;
+      const filterEl = document.getElementById('activityFilter');
+      const q = (filterEl && filterEl.value || '').trim().toLowerCase();
+      const arr = getActivityLog();
+      const filtered = q === '' ? arr : arr.filter(entry => (entry.text || '').toLowerCase().includes(q));
+      if (arr.length === 0) {
+        el.innerHTML = '<p style="margin:0;">No activity yet.</p>';
+        return;
+      }
+      if (filtered.length === 0) {
+        el.innerHTML = '<p style="margin:0;">No matching activity.</p>';
+        return;
+      }
+      el.innerHTML = filtered.map(entry => {
+        const d = new Date(entry.time);
+        const t = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        return '<div style="margin-bottom:4px;">' + t + ' — ' + escapeHtml(entry.text) + '</div>';
+      }).join('');
     }
 
     function formatCountdown(sec) {
@@ -461,6 +783,34 @@
         .catch(e => showMsg('Failed to load: ' + e.message, false));
     }
 
+    function loadScoreData() {
+      fetch('/api/streamer-chat-score')
+        .then(r => r.json())
+        .then(data => {
+          document.getElementById('score_streamer_label').value = data.streamer_label ?? 'Streamer';
+          document.getElementById('score_chat_label').value = data.chat_label ?? 'Chat';
+          document.getElementById('score_streamer').value = data.streamer ?? 0;
+          document.getElementById('score_chat').value = data.chat ?? 0;
+          updateScorePreview();
+          const sessionEl = document.getElementById('score_session_label');
+          if (sessionEl && data.session_start) {
+            try {
+              const d = new Date(data.session_start);
+              sessionEl.textContent = 'Session: ' + d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
+            } catch (_) { sessionEl.textContent = 'Session: ' + data.session_start; }
+          } else if (sessionEl) sessionEl.textContent = 'Session: —';
+        })
+        .catch(() => {});
+    }
+
+    function updateScorePreview() {
+      const sl = document.getElementById('score_streamer_label').value.trim() || 'Streamer';
+      const cl = document.getElementById('score_chat_label').value.trim() || 'Chat';
+      const s = parseInt(document.getElementById('score_streamer').value, 10) || 0;
+      const c = parseInt(document.getElementById('score_chat').value, 10) || 0;
+      document.getElementById('score_preview').textContent = `${sl}: ${s} | ${cl}: ${c}`;
+    }
+
     function save() {
       const defaultCost = parseInt(document.getElementById('default_monster_cost').value, 10) || 100;
       const costPerMonster = {};
@@ -495,21 +845,187 @@
         .then(data => {
           if (data.error) throw new Error(data.error);
           showMsg('Saved!', true);
+          logActivity('Costs saved');
         })
         .catch(e => showMsg('Save failed: ' + e.message, false));
     }
 
+    function exportConfig() {
+      fetch('/api/points-config')
+        .then(r => r.json())
+        .then(data => {
+          const exportData = { ...data };
+          exportData._layout = getOverallConfig();
+          const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'spd-points-config-' + new Date().toISOString().slice(0, 10) + '.json';
+          a.click();
+          URL.revokeObjectURL(a.href);
+          showMsg('Config exported', true);
+          logActivity('Config exported');
+        })
+        .catch(e => showMsg('Export failed: ' + e.message, false));
+    }
+    function importConfigFile(file) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const parsed = JSON.parse(reader.result);
+          if (!parsed || typeof parsed !== 'object') throw new Error('Invalid JSON');
+          const payload = { ...parsed };
+          delete payload._layout;
+          if (Object.keys(payload).length === 0) throw new Error('No cost data in file');
+          fetch('/api/points-config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+            .then(r => r.json())
+            .then(d => {
+              if (d.error) throw new Error(d.error);
+              if (parsed._layout) {
+                saveOverallConfig(parsed._layout);
+                applyOverallConfig();
+              }
+          load();
+          showMsg('Config imported', true);
+          logActivity('Config imported');
+            })
+            .catch(e => showMsg('Import failed: ' + e.message, false));
+        } catch (e) {
+          showMsg('Import failed: ' + (e.message || 'Invalid file'), false);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function exportViewerCsv() {
+      fetch('/api/viewer-points')
+        .then(r => r.json())
+        .then(data => {
+          const rows = [['username', 'points', 'donor_pts', 'last']];
+          Object.keys(data || {}).forEach(username => {
+            const d = data[username];
+            const points = (d && typeof d.points === 'number') ? d.points : 0;
+            const donorPts = (d && typeof d.donationPts === 'number') ? d.donationPts : 0;
+            const last = (d && d.last != null) ? String(d.last) : '';
+            rows.push([username, String(points), String(donorPts), last]);
+          });
+          const csv = rows.map(row => row.map(cell => /[,"\n]/.test(cell) ? '"' + cell.replace(/"/g, '""') + '"' : cell).join(',')).join('\n');
+          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'viewer-points-' + new Date().toISOString().slice(0, 10) + '.csv';
+          a.click();
+          URL.revokeObjectURL(a.href);
+          showMsg('Viewer points exported', true);
+          logActivity('Viewer points CSV exported');
+        })
+        .catch(e => showMsg('Export failed: ' + e.message, false));
+    }
+
+    const PRESETS_STORAGE = 'spd_presets';
+    function getPresets() {
+      try {
+        const s = localStorage.getItem(PRESETS_STORAGE);
+        if (s) {
+          const arr = JSON.parse(s);
+          if (Array.isArray(arr)) return arr;
+        }
+      } catch (_) {}
+      return [];
+    }
+    function savePresets(arr) {
+      try { localStorage.setItem(PRESETS_STORAGE, JSON.stringify(arr)); } catch (_) {}
+    }
+    function refreshPresetsSelect() {
+      const sel = document.getElementById('presetsSelect');
+      if (!sel) return;
+      const presets = getPresets();
+      const current = sel.value;
+      sel.innerHTML = '<option value="">—</option>' + presets.map(p => '<option value="' + escapeHtml(p.id) + '">' + escapeHtml(p.name) + '</option>').join('');
+      if (current && presets.some(p => String(p.id) === current)) sel.value = current;
+    }
+    function saveCurrentAsPreset() {
+      const name = prompt('Preset name:');
+      if (name == null || !name.trim()) return;
+      fetch('/api/points-config')
+        .then(r => r.json())
+        .then(data => {
+          const config = { ...data };
+          config.layout = getOverallConfig();
+          const presets = getPresets();
+          const id = Date.now();
+          presets.push({ id, name: name.trim(), createdAt: id, config });
+          savePresets(presets);
+          refreshPresetsSelect();
+          document.getElementById('presetsSelect').value = String(id);
+          showMsg('Preset saved', true);
+          logActivity('Preset saved: ' + name.trim());
+        })
+        .catch(e => showMsg('Failed: ' + e.message, false));
+    }
+    function applyPreset() {
+      const sel = document.getElementById('presetsSelect');
+      const id = sel && sel.value;
+      if (!id) { showMsg('Select a preset', false); return; }
+      const presets = getPresets();
+      const preset = presets.find(p => String(p.id) === id);
+      if (!preset || !preset.config) { showMsg('Preset not found', false); return; }
+      const payload = { ...preset.config };
+      delete payload._layout;
+      delete payload.layout;
+      delete payload.free_until;
+      fetch('/api/points-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+        .then(r => r.json())
+        .then(d => {
+          if (d.error) throw new Error(d.error);
+          if (preset.config.layout) {
+            saveOverallConfig(preset.config.layout);
+            applyOverallConfig();
+          }
+          load();
+          showMsg('Preset applied', true);
+          logActivity('Preset applied');
+        })
+        .catch(e => showMsg('Apply failed: ' + e.message, false));
+    }
+    function deletePreset() {
+      const sel = document.getElementById('presetsSelect');
+      const id = sel && sel.value;
+      if (!id) { showMsg('Select a preset to delete', false); return; }
+      if (!confirm('Delete this preset?')) return;
+      const presets = getPresets().filter(p => String(p.id) !== id);
+      savePresets(presets);
+      refreshPresetsSelect();
+      showMsg('Preset deleted', true);
+      logActivity('Preset deleted');
+    }
+
     const VP_COL_STORAGE = 'vp_container_width';
-    const VP_COL_DEFAULT = 400;
+    const VP_COL_DEFAULT = 520;
+    const COL_LEFT_STORAGE = 'overlay_col_left_width';
+    const COL_LEFT_DEFAULT = 300;
+    const VP_LIST_HEIGHT_STORAGE = 'vp_list_height';
+    const VP_LIST_HEIGHT_DEFAULT = 420;
+    const VP_REFRESH_STORAGE = 'vp_refresh_sec';
+    const VP_REFRESH_DEFAULT = 10;
     const OVERALL_CONFIG_STORAGE = 'overlay_layout_config';
-    const OVERALL_CONFIG_DEFAULT = { columns: 3, sections: { general: true, monsters: true, viewer: true, game: true }, order: ['general', 'monsters', 'viewer', 'game'], monsterColumns: 2, monsterSectionWidth: 540 };
+    const OVERALL_CONFIG_DEFAULT = { columns: 3, sections: { general: true, monsters: true, viewer: true, game: true, score: true, activity: true }, order: ['general', 'monsters', 'viewer', 'game', 'score'], columnCounts: [2, 1, 2], monsterColumns: 2, monsterSectionWidth: 540 };
     function getOverallConfig() {
       try {
         const s = localStorage.getItem(OVERALL_CONFIG_STORAGE);
         if (s) {
           const c = JSON.parse(s);
           if (c && typeof c.columns === 'number' && c.sections) {
-            if (!Array.isArray(c.order)) c.order = ['general', 'monsters', 'viewer', 'game'];
+            if (!Array.isArray(c.order)) c.order = ['general', 'monsters', 'viewer', 'game', 'score'];
+            if (!Array.isArray(c.columnCounts) || c.columnCounts.length !== 3) c.columnCounts = [2, 1, 2];
             if (c.monsterColumns == null) c.monsterColumns = 2;
             if (c.monsterSectionWidth == null) c.monsterSectionWidth = 420;
             return c;
@@ -521,23 +1037,48 @@
     function saveOverallConfig(cfg) {
       try { localStorage.setItem(OVERALL_CONFIG_STORAGE, JSON.stringify(cfg)); } catch (_) {}
     }
+    function getSectionOrder() {
+      const colLeft = document.getElementById('colLeft');
+      const colRight = document.getElementById('colRight');
+      const colCenter = document.getElementById('colCenter');
+      const left = colLeft ? [...colLeft.querySelectorAll('section[data-section]')].map(s => s.dataset.section) : [];
+      const center = colCenter ? [...colCenter.querySelectorAll('section[data-section]')].map(s => s.dataset.section) : [];
+      const right = colRight ? [...colRight.querySelectorAll('section[data-section]')].map(s => s.dataset.section) : [];
+      return [...left.filter(id => id !== 'activity'), ...center, ...right.filter(id => id !== 'activity')];
+    }
     function applyOverallConfig() {
       const cfg = getOverallConfig();
       const grid = document.getElementById('mainGrid');
+      const colLeft = document.getElementById('colLeft');
+      const colRight = document.getElementById('colRight');
+      const colCenter = document.getElementById('colCenter');
       if (grid) {
         grid.classList.remove('col-default', 'col-1', 'col-2', 'col-3');
         grid.classList.add('col-' + Math.max(1, Math.min(3, cfg.columns)));
-        if (cfg.columns === 3) applyContainerWidth();
-        else grid.style.gridTemplateColumns = '';
+        applyColumnWidths();
       }
-      ['general', 'monsters', 'viewer', 'game'].forEach(id => {
+      ['general', 'monsters', 'viewer', 'game', 'score', 'activity'].forEach(id => {
         const el = document.getElementById('section-' + id);
         if (el) el.style.display = (cfg.sections[id] !== false) ? '' : 'none';
       });
-      const order = cfg.order || ['general', 'monsters', 'viewer', 'game'];
-      order.forEach(id => {
+      const order = cfg.order || ['general', 'monsters', 'viewer', 'game', 'score'];
+      const orderFiltered = order.filter(id => id !== 'activity');
+      let counts = cfg.columnCounts || [2, 1, 2];
+      if (counts[0] + counts[1] + counts[2] !== 5) counts = [2, 1, 2];
+      const [leftN, centerN, rightN] = [counts[0], counts[1], counts[2]];
+      if (!colLeft || !colRight || !colCenter) return;
+      const dropLeft = document.getElementById('dropZoneLeft');
+      const dropCenter = document.getElementById('dropZoneCenter');
+      const dropRight = document.getElementById('dropZoneRight');
+      const insertCol = (col, el, before) => { if (before) col.insertBefore(el, before); else col.appendChild(el); };
+      let idx = 0;
+      orderFiltered.forEach(id => {
         const el = document.getElementById('section-' + id);
-        if (el && grid) grid.appendChild(el);
+        if (!el) return;
+        if (idx < leftN) insertCol(colLeft, el, dropLeft);
+        else if (idx < leftN + centerN) insertCol(colCenter, el, dropCenter);
+        else insertCol(colRight, el, dropRight);
+        idx++;
       });
       const monstersEl = document.getElementById('monsters');
       const monstersSection = document.getElementById('section-monsters');
@@ -552,6 +1093,136 @@
         monstersSection.style.width = 'min(' + w + 'px, 100%)';
       }
     }
+    const THEME_STORAGE = 'spd_theme';
+    const THEME_DARK = {
+      bg: '#1a1a2e', surface: '#16213e', 'surface-dark': '#0f0f1a', text: '#eee', muted: '#94a1b2',
+      accent: '#7f5af0', 'accent-hover': '#9d7bff', 'accent-rgba': '127, 90, 240',
+      success: '#6ee7b7', 'success-bg': '#065f46', error: '#fca5a5', 'error-bg': '#7f1d1d',
+      border: '#4a5568', 'btn-secondary': '#4a5568', 'btn-secondary-hover': '#5a6578',
+      danger: '#7f1d1d', 'danger-hover': '#991b1b',
+      'viewer-list': '#0f0f1a', 'activity-list': '#0f0f1a'
+    };
+    const THEME_LIGHT = {
+      bg: '#f0f0f5', surface: '#e8e8f0', 'surface-dark': '#d8d8e0', text: '#1a1a2e', muted: '#5a5a6e',
+      accent: '#6b4cce', 'accent-hover': '#7f5af0', 'accent-rgba': '107, 76, 206',
+      success: '#0d9668', 'success-bg': '#c8f0e0', error: '#c53030', 'error-bg': '#fce8e8',
+      border: '#a0a0b0', 'btn-secondary': '#6a6a7e', 'btn-secondary-hover': '#5a5a6e',
+      danger: '#b91c1c', 'danger-hover': '#991b1b',
+      'viewer-list': '#d8d8e0', 'activity-list': '#d8d8e0'
+    };
+    const THEME_CUSTOM_PRESETS = [
+      { id: 'ocean', name: 'Ocean', colors: { bg: '#0f172a', surface: '#1e293b', accent: '#06b6d4', 'accent-hover': '#22d3ee', success: '#2dd4bf', error: '#f87171', border: '#334155', 'viewer-list': '#1e293b', 'activity-list': '#1e293b' } },
+      { id: 'forest', name: 'Forest', colors: { bg: '#0f1419', surface: '#1a2329', accent: '#4ade80', 'accent-hover': '#86efac', success: '#22c55e', error: '#f87171', border: '#2d3d47', 'viewer-list': '#1a2329', 'activity-list': '#1a2329' } },
+      { id: 'sunset', name: 'Sunset', colors: { bg: '#1c1917', surface: '#292524', accent: '#fb923c', 'accent-hover': '#fdba74', success: '#4ade80', error: '#f87171', border: '#44403c', 'viewer-list': '#292524', 'activity-list': '#292524' } },
+      { id: 'nord', name: 'Nord', colors: { bg: '#2e3440', surface: '#3b4252', accent: '#88c0d0', 'accent-hover': '#8fbcbb', success: '#a3be8c', error: '#bf616a', border: '#4c566a', 'viewer-list': '#3b4252', 'activity-list': '#3b4252' } },
+      { id: 'rose', name: 'Rose', colors: { bg: '#1f1315', surface: '#2d1f21', accent: '#f472b6', 'accent-hover': '#f9a8d4', success: '#34d399', error: '#f87171', border: '#3f2c2e', 'viewer-list': '#2d1f21', 'activity-list': '#2d1f21' } }
+    ];
+    let currentThemeMode = 'dark';
+    function hexToRgb(hex) {
+      const m = String(hex).replace(/^#/, '').match(/^(..)(..)(..)$/);
+      if (!m) return '127, 90, 240';
+      return parseInt(m[1], 16) + ', ' + parseInt(m[2], 16) + ', ' + parseInt(m[3], 16);
+    }
+    function luminance(hex) {
+      const m = String(hex).replace(/^#/, '').match(/^(..)(..)(..)$/);
+      if (!m) return 0.5;
+      const [r, g, b] = [m[1], m[2], m[3]].map(x => {
+        const v = parseInt(x, 16) / 255;
+        return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    }
+    function contrastColor(hex) {
+      return luminance(hex) > 0.5 ? '#111111' : '#f0f0f0';
+    }
+    function contrastColorMuted(hex) {
+      const lum = luminance(hex);
+      if (lum > 0.5) return 'rgba(17, 17, 17, 0.72)';
+      return 'rgba(240, 240, 240, 0.72)';
+    }
+    function applyContrastVars() {
+      const root = document.documentElement.style;
+      const bg = root.getPropertyValue('--spd-bg').trim() || '#1a1a2e';
+      const surface = root.getPropertyValue('--spd-surface').trim() || '#16213e';
+      const surfaceDark = root.getPropertyValue('--spd-surface-dark').trim() || '#0f0f1a';
+      const accent = root.getPropertyValue('--spd-accent').trim() || '#7f5af0';
+      const viewerList = root.getPropertyValue('--spd-viewer-list').trim() || surfaceDark;
+      const activityList = root.getPropertyValue('--spd-activity-list').trim() || surfaceDark;
+      root.setProperty('--spd-text-on-bg', contrastColor(bg));
+      root.setProperty('--spd-text-on-surface', contrastColor(surface));
+      root.setProperty('--spd-text-on-surface-dark', contrastColor(surfaceDark));
+      root.setProperty('--spd-text-on-accent', contrastColor(accent));
+      root.setProperty('--spd-text-on-viewer-list', contrastColor(viewerList));
+      root.setProperty('--spd-text-on-activity-list', contrastColor(activityList));
+      root.setProperty('--spd-muted-on-bg', contrastColorMuted(bg));
+      root.setProperty('--spd-muted-on-surface', contrastColorMuted(surface));
+      root.setProperty('--spd-muted-on-surface-dark', contrastColorMuted(surfaceDark));
+      root.setProperty('--spd-muted-on-viewer-list', contrastColorMuted(viewerList));
+      root.setProperty('--spd-muted-on-activity-list', contrastColorMuted(activityList));
+    }
+    function applyTheme(saved) {
+      const mode = (saved && (saved.mode === 'light' || saved.mode === 'dark' || saved.mode === 'custom')) ? saved.mode : 'dark';
+      currentThemeMode = mode;
+      const root = document.documentElement.style;
+      let base, custom = (saved && saved.custom) || {};
+      if (mode === 'dark') {
+        base = THEME_DARK;
+        custom = {};
+      } else if (mode === 'light') {
+        base = THEME_LIGHT;
+        custom = {};
+      } else {
+        base = THEME_DARK;
+      }
+      document.documentElement.style.colorScheme = mode === 'light' ? 'light' : 'dark';
+      ['bg', 'surface', 'surface-dark', 'text', 'muted', 'accent', 'accent-hover', 'success', 'success-bg', 'error', 'error-bg', 'border', 'btn-secondary', 'btn-secondary-hover', 'danger', 'danger-hover', 'viewer-list', 'activity-list'].forEach(key => {
+        const val = custom[key] != null ? custom[key] : base[key];
+        root.setProperty('--spd-' + key, val);
+      });
+      const accentVal = custom.accent != null ? custom.accent : base.accent;
+      root.setProperty('--spd-accent-rgba', hexToRgb(accentVal));
+      applyContrastVars();
+      const darkBtn = document.getElementById('themeDark');
+      const lightBtn = document.getElementById('themeLight');
+      const customBtn = document.getElementById('themeCustom');
+      if (darkBtn) darkBtn.style.background = mode === 'dark' ? 'var(--spd-accent)' : 'var(--spd-btn-secondary)';
+      if (lightBtn) lightBtn.style.background = mode === 'light' ? 'var(--spd-accent)' : 'var(--spd-btn-secondary)';
+      if (customBtn) customBtn.style.background = mode === 'custom' ? 'var(--spd-accent)' : 'var(--spd-btn-secondary)';
+      ['themeAccent', 'themeSurface', 'themeBg', 'themeSuccess', 'themeError', 'themeBorder', 'themeViewerList', 'themeActivityList'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const key = el.dataset.var;
+        const val = (custom[key] != null ? custom[key] : base[key]).replace(/^#/, '');
+        el.value = '#' + val;
+      });
+      applyContrastVars();
+    }
+    function saveTheme() {
+      const mode = currentThemeMode;
+      if (mode === 'dark' || mode === 'light') {
+        const existing = getTheme();
+        try { localStorage.setItem(THEME_STORAGE, JSON.stringify({ mode, custom: existing.custom })); } catch (_) {}
+        return;
+      }
+      const custom = {};
+      ['themeAccent', 'themeSurface', 'themeBg', 'themeSuccess', 'themeError', 'themeBorder', 'themeViewerList', 'themeActivityList'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.value) custom[el.dataset.var] = el.value;
+      });
+      try {
+        localStorage.setItem(THEME_STORAGE, JSON.stringify({ mode: 'custom', custom: Object.keys(custom).length ? custom : undefined }));
+      } catch (_) {}
+    }
+    function getTheme() {
+      try {
+        const s = localStorage.getItem(THEME_STORAGE);
+        if (s) {
+          const o = JSON.parse(s);
+          if (o && (o.mode === 'dark' || o.mode === 'light' || o.mode === 'custom')) return o;
+        }
+      } catch (_) {}
+      return { mode: 'dark' };
+    }
     function getContainerWidth() {
       try {
         const s = localStorage.getItem(VP_COL_STORAGE);
@@ -562,10 +1233,26 @@
     function saveContainerWidth(w) {
       try { localStorage.setItem(VP_COL_STORAGE, String(w)); } catch (_) {}
     }
-    function applyContainerWidth() {
-      const w = getContainerWidth();
+    function getColLeftWidth() {
+      try {
+        const s = localStorage.getItem(COL_LEFT_STORAGE);
+        if (s) { const n = parseInt(s, 10); if (!isNaN(n) && n >= 200) return Math.min(600, n); }
+      } catch (_) {}
+      return COL_LEFT_DEFAULT;
+    }
+    function saveColLeftWidth(w) {
+      try { localStorage.setItem(COL_LEFT_STORAGE, String(w)); } catch (_) {}
+    }
+    function applyColumnWidths() {
       const grid = document.getElementById('mainGrid');
-      if (grid) grid.style.gridTemplateColumns = 'minmax(0, 1fr) minmax(280px, ' + w + 'px) minmax(360px, 1fr)';
+      if (!grid || grid.classList.contains('col-1')) return;
+      const left = getColLeftWidth();
+      const center = getContainerWidth();
+      grid.style.setProperty('--col-left', left + 'px');
+      grid.style.setProperty('--col-center', center + 'px');
+    }
+    function applyContainerWidth() {
+      applyColumnWidths();
     }
 
     let viewerPointsData = [];
@@ -592,13 +1279,13 @@
           if (updatedEl) { updatedEl.textContent = '(updated just now)'; }
           vpLastUpdate = Date.now();
           if (viewerPointsData.length === 0) {
-            container.innerHTML = '<p style="color:#94a1b2;font-size:0.9rem;">No viewers yet. Type a username above and click Add or Set.</p>';
+            container.innerHTML = '<p style="color:var(--spd-muted-on-viewer-list);font-size:0.9rem;">No viewers yet. Type a username above and click Add or Set.</p>';
             return;
           }
           const donationPts = (d) => (d.donationPts != null ? d.donationPts : 0);
           const chatPts = (d) => Math.max(0, (d.points || 0) - donationPts(d));
           container.innerHTML = '<table style="width:100%;border-collapse:collapse;"><thead><tr><th style="width:36px;"><input type="checkbox" id="vpSelectAll" title="Select all visible"></th><th style="text-align:left;padding:4px 8px;">User</th><th style="text-align:right;padding:4px 8px;">Points</th><th style="text-align:right;padding:4px 8px;">Donor</th><th></th></tr></thead><tbody>' +
-            viewerPointsData.map(([u, d]) => `<tr data-user="${escapeHtml(u)}"><td style="padding:4px 8px;"><input type="checkbox" class="vp-row-select"></td><td style="padding:4px 8px;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(u)}">${escapeHtml(u)}</td><td style="padding:4px 8px;"><input type="number" class="edit-pts" value="${chatPts(d)}" min="0" style="width:90px;min-width:50px;padding:2px 4px;box-sizing:border-box;"></td><td style="padding:4px 8px;"><input type="number" class="edit-donor" value="${donationPts(d)}" min="0" style="width:90px;min-width:50px;padding:2px 4px;box-sizing:border-box;"></td><td style="padding:4px 8px;"><button class="save-row" style="padding:2px 8px;font-size:0.85rem;">Save</button> <button class="del-row" style="padding:2px 8px;font-size:0.85rem;background:#7f1d1d;">Del</button></td></tr>`).join('') +
+            viewerPointsData.map(([u, d]) => `<tr data-user="${escapeHtml(u)}"><td style="padding:4px 8px;"><input type="checkbox" class="vp-row-select"></td><td style="padding:4px 8px;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(u)}">${escapeHtml(u)}</td><td style="padding:4px 8px;"><input type="number" class="edit-pts" value="${chatPts(d)}" min="0" style="width:90px;min-width:50px;padding:2px 4px;box-sizing:border-box;"></td><td style="padding:4px 8px;"><input type="number" class="edit-donor" value="${donationPts(d)}" min="0" style="width:90px;min-width:50px;padding:2px 4px;box-sizing:border-box;"></td><td style="padding:4px 8px;"><button class="save-row" style="padding:2px 8px;font-size:0.85rem;">Save</button> <button class="del-row" style="padding:2px 8px;font-size:0.85rem;background:var(--spd-danger);">Del</button></td></tr>`).join('') +
             '</tbody></table>';
           filterViewerPoints();
           const selectAllEl = document.getElementById('vpSelectAll');
@@ -619,7 +1306,7 @@
               if (isNaN(donor) || donor < 0) { showMsg('Invalid donor points', false); return; }
               const totalPoints = chat + donor;
               fetch('/api/viewer-points', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, points: totalPoints, donationPts: donor }) })
-                .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg(user + ' updated', true); loadViewerPoints(true); })
+                .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg(user + ' updated', true); loadViewerPoints(true); logActivity('VP: updated ' + user); })
                 .catch(e => showMsg('Failed: ' + e.message, false));
             });
           });
@@ -628,13 +1315,13 @@
               const user = btn.closest('tr').dataset.user;
               if (!confirm('Remove ' + user + '?')) return;
               fetch('/api/viewer-points/' + encodeURIComponent(user), { method: 'DELETE' })
-                .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg(user + ' removed', true); loadViewerPoints(true); })
+                .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg(user + ' removed', true); loadViewerPoints(true); logActivity('VP: removed ' + user); })
                 .catch(e => showMsg('Failed: ' + e.message, false));
             });
           });
         })
         .catch(e => {
-          document.getElementById('viewer_points_list').innerHTML = '<p style="color:#fca5a5;">Failed to load: ' + escapeHtml(e.message) + '</p>';
+          document.getElementById('viewer_points_list').innerHTML = '<p style="color:var(--spd-error);">Failed to load: ' + escapeHtml(e.message) + '</p>';
           const u = document.getElementById('vpUpdated'); if (u) u.textContent = '(offline)';
         });
     }
@@ -681,6 +1368,7 @@
           showMsg(`${username} set to ${data.points} points`, true);
           document.getElementById('vp_search').value = '';
           loadViewerPoints(true);
+          logActivity('VP: added/updated ' + username);
         })
         .catch(e => showMsg('Failed: ' + e.message, false));
     }
@@ -727,7 +1415,25 @@
     });
 
     document.getElementById('save').addEventListener('click', save);
-    document.getElementById('refresh').addEventListener('click', () => { load(); loadViewerPoints(); showMsg('Refreshed', true); });
+    document.getElementById('exportConfig').addEventListener('click', exportConfig);
+    document.getElementById('importConfig').addEventListener('click', () => document.getElementById('importConfigFile').click());
+    document.getElementById('importConfigFile').addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) importConfigFile(file);
+      e.target.value = '';
+    });
+    refreshPresetsSelect();
+    document.getElementById('presetSaveAs').addEventListener('click', saveCurrentAsPreset);
+    document.getElementById('presetApply').addEventListener('click', applyPreset);
+    document.getElementById('presetDelete').addEventListener('click', deletePreset);
+    document.getElementById('refresh').addEventListener('click', () => { load(); loadViewerPoints(); loadScoreData(); showMsg('Refreshed', true); logActivity('Refreshed'); });
+    renderActivityList();
+    const activityHideGameLoadedEl = document.getElementById('activityHideGameLoaded');
+    if (activityHideGameLoadedEl) {
+      activityHideGameLoadedEl.checked = getHideGameLoadedSetting();
+      activityHideGameLoadedEl.addEventListener('change', () => setHideGameLoadedSetting(activityHideGameLoadedEl.checked));
+    }
+    document.addEventListener('keydown', (e) => { if (e.ctrlKey && e.key === 's') { e.preventDefault(); save(); } });
     document.getElementById('add_points').addEventListener('click', () => {
       const selected = Array.from(document.querySelectorAll('.vp-row-select:checked')).map(cb => cb.closest('tr').dataset.user);
       const username = document.getElementById('vp_search').value.trim();
@@ -752,7 +1458,7 @@
         body: JSON.stringify({ points: chat, donationPts: donor, users }),
       })
         .then(r => r.json())
-        .then(d => { if (d.error) throw new Error(d.error); showMsg(`Added to ${d.count} users`, true); loadViewerPoints(true); })
+        .then(d => { if (d.error) throw new Error(d.error); showMsg(`Added to ${d.count} users`, true); loadViewerPoints(true); logActivity('VP: bulk add ' + (d.count || 0) + ' users'); })
         .catch(e => showMsg('Failed: ' + e.message, false));
     });
     document.getElementById('set_points').addEventListener('click', () => {
@@ -777,128 +1483,356 @@
         body: JSON.stringify({ users }),
       })
         .then(r => r.json())
-        .then(d => { if (d.error) throw new Error(d.error); showMsg(`Converted chat→donor for ${d.count} users`, true); loadViewerPoints(true); })
+        .then(d => { if (d.error) throw new Error(d.error); showMsg(`Converted chat→donor for ${d.count} users`, true); loadViewerPoints(true); logActivity('VP: Chat→Donor ' + (d.count || 0) + ' users'); })
         .catch(e => showMsg('Failed: ' + e.message, false));
     });
     document.getElementById('clearNonDonor').addEventListener('click', () => {
       if (!confirm('Delete all non-donor points? Donors will keep their donation amount.')) return;
       fetch('/api/viewer-points/clear-non-donor', { method: 'POST' })
-        .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('Non-donor points cleared', true); loadViewerPoints(true); })
+        .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('Non-donor points cleared', true); loadViewerPoints(true); logActivity('VP: cleared non-donor'); })
         .catch(e => showMsg('Failed: ' + e.message, false));
     });
     document.getElementById('clearAll').addEventListener('click', () => {
       if (!confirm('Remove all donor points? Chat points will be kept.')) return;
       fetch('/api/viewer-points/bulk/clear-donor', { method: 'POST' })
-        .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('Donor points cleared', true); loadViewerPoints(true); })
+        .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('Donor points cleared', true); loadViewerPoints(true); logActivity('VP: cleared donor'); })
         .catch(e => showMsg('Failed: ' + e.message, false));
     });
-    document.getElementById('vpColConfig').addEventListener('click', () => {
-      document.getElementById('colContainer').value = getContainerWidth();
-      document.getElementById('vpColConfigModal').classList.add('open');
+    document.getElementById('exportViewerCsv').addEventListener('click', exportViewerCsv);
+    ['score_streamer_label', 'score_chat_label', 'score_streamer', 'score_chat'].forEach(id => {
+      document.getElementById(id).addEventListener('input', updateScorePreview);
     });
-    document.getElementById('vpColConfigModal').addEventListener('click', (e) => {
-      if (e.target.id === 'vpColConfigModal') e.target.classList.remove('open');
+    document.getElementById('scoreUpdate').addEventListener('click', () => {
+      const payload = {
+        streamer_label: document.getElementById('score_streamer_label').value.trim() || 'Streamer',
+        chat_label: document.getElementById('score_chat_label').value.trim() || 'Chat',
+        streamer: Math.max(0, parseInt(document.getElementById('score_streamer').value, 10) || 0),
+        chat: Math.max(0, parseInt(document.getElementById('score_chat').value, 10) || 0),
+      };
+      fetch('/api/streamer-chat-score', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('Score updated', true); logActivity('Score updated'); })
+        .catch(e => showMsg('Failed: ' + e.message, false));
     });
-    document.getElementById('vpColApply').addEventListener('click', () => {
-      const w = Math.max(280, Math.min(800, parseInt(document.getElementById('colContainer').value, 10) || VP_COL_DEFAULT));
-      saveContainerWidth(w);
-      document.getElementById('vpColConfigModal').classList.remove('open');
-      applyContainerWidth();
+    document.getElementById('scoreReset').addEventListener('click', () => {
+      fetch('/api/streamer-chat-score/reset', { method: 'POST' })
+        .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); loadScoreData(); showMsg('Score reset', true); logActivity('Score reset'); })
+        .catch(e => showMsg('Failed: ' + e.message, false));
     });
-    document.getElementById('vpColReset').addEventListener('click', () => {
-      document.getElementById('colContainer').value = VP_COL_DEFAULT;
+    document.getElementById('doublePointsStart').addEventListener('click', () => {
+      const mins = Math.max(1, Math.min(1440, parseInt(document.getElementById('doublePointsMins').value, 10) || 5));
+      fetch('/api/double-points-start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ minutes: mins }) })
+        .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('2x points started for ' + mins + ' min', true); logActivity('2x points started'); })
+        .catch(e => showMsg('Failed: ' + e.message, false));
     });
+    (function updateDoublePointsCountdown() {
+      const el = document.getElementById('doublePointsCountdown');
+      if (!el) return;
+      function tick() {
+        fetch('/api/double-points-remaining').then(r => r.json()).then(d => {
+          if (d.active && d.display) el.textContent = '2x: ' + d.display;
+          else el.textContent = '—';
+        }).catch(() => { el.textContent = '—'; });
+      }
+      tick();
+      setInterval(tick, 2000);
+    })();
     document.getElementById('overallConfigBtn').addEventListener('click', () => {
       const cfg = getOverallConfig();
       document.querySelector('input[name="overallCols"][value="' + cfg.columns + '"]').checked = true;
-      document.querySelector('input[name="monsterCols"][value="' + (cfg.monsterColumns || '2') + '"]').checked = true;
-      document.getElementById('cfg-monster-width').value = cfg.monsterSectionWidth || 540;
+      document.querySelector('input[name="monsterCols"][value="' + (cfg.monsterColumns === 'auto' ? 'auto' : String(cfg.monsterColumns || 2)) + '"]').checked = true;
       document.getElementById('cfg-section-general').checked = cfg.sections.general !== false;
       document.getElementById('cfg-section-monsters').checked = cfg.sections.monsters !== false;
       document.getElementById('cfg-section-viewer').checked = cfg.sections.viewer !== false;
       document.getElementById('cfg-section-game').checked = cfg.sections.game !== false;
+      document.getElementById('cfg-section-score').checked = cfg.sections.score !== false;
+      document.getElementById('cfg-section-activity').checked = cfg.sections.activity !== false;
       document.getElementById('overallConfigModal').classList.add('open');
     });
     document.getElementById('overallConfigModal').addEventListener('click', (e) => {
       if (e.target.id === 'overallConfigModal') e.target.classList.remove('open');
     });
     document.getElementById('overallConfigApply').addEventListener('click', () => {
-      const grid = document.getElementById('mainGrid');
-      const order = grid ? [...grid.querySelectorAll('section[data-section]')].map(s => s.dataset.section) : ['general', 'monsters', 'viewer', 'game'];
+      const order = getSectionOrder().length ? getSectionOrder() : ['general', 'monsters', 'viewer', 'game', 'score'];
       const monsterCols = document.querySelector('input[name="monsterCols"]:checked').value;
-      const monsterW = Math.max(280, Math.min(800, parseInt(document.getElementById('cfg-monster-width').value, 10) || 420));
-      const cfg = {
+      const cfg = getOverallConfig();
+      const applied = {
         columns: parseInt(document.querySelector('input[name="overallCols"]:checked').value, 10) || 3,
         sections: {
           general: document.getElementById('cfg-section-general').checked,
           monsters: document.getElementById('cfg-section-monsters').checked,
           viewer: document.getElementById('cfg-section-viewer').checked,
           game: document.getElementById('cfg-section-game').checked,
+          score: document.getElementById('cfg-section-score').checked,
+          activity: document.getElementById('cfg-section-activity').checked,
         },
         order,
         monsterColumns: monsterCols === 'auto' ? 'auto' : parseInt(monsterCols, 10) || 2,
-        monsterSectionWidth: monsterW,
+        monsterSectionWidth: cfg.monsterSectionWidth ?? 540,
       };
-      saveOverallConfig(cfg);
+      saveOverallConfig(applied);
       document.getElementById('overallConfigModal').classList.remove('open');
       applyOverallConfig();
     });
     document.getElementById('overallConfigReset').addEventListener('click', () => {
       document.querySelector('input[name="overallCols"][value="3"]').checked = true;
       document.querySelector('input[name="monsterCols"][value="2"]').checked = true;
-      document.getElementById('cfg-monster-width').value = 540;
       document.getElementById('cfg-section-general').checked = true;
       document.getElementById('cfg-section-monsters').checked = true;
       document.getElementById('cfg-section-viewer').checked = true;
       document.getElementById('cfg-section-game').checked = true;
+      document.getElementById('cfg-section-score').checked = true;
+      document.getElementById('cfg-section-activity').checked = true;
+    });
+    document.getElementById('overallConfigRestoreLayout').addEventListener('click', () => {
+      const cfg = getOverallConfig();
+      cfg.order = ['general', 'monsters', 'viewer', 'game', 'score'];
+      cfg.columnCounts = [2, 1, 2];
+      saveOverallConfig(cfg);
+      document.getElementById('overallConfigModal').classList.remove('open');
+      applyOverallConfig();
     });
     document.getElementById('vp_search').addEventListener('input', filterViewerPoints);
+    const activityFilterEl = document.getElementById('activityFilter');
+    if (activityFilterEl) activityFilterEl.addEventListener('input', renderActivityList);
     ['vp_search', 'new_points', 'new_donation'].forEach(id => {
       document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') addViewerUser(); });
     });
     applyOverallConfig();
-    applyContainerWidth();
+    applyColumnWidths();
     load();
-    (function setupSectionDragDrop() {
+
+    (function setupColumnResize() {
       const grid = document.getElementById('mainGrid');
-      if (!grid) return;
-      let dragged = null;
-      grid.querySelectorAll('section[data-section]').forEach(section => {
-        section.addEventListener('dragstart', (e) => {
-          if (e.target.closest('input, button, a, [contenteditable]')) { e.preventDefault(); return; }
-          dragged = section;
-          section.classList.add('dragging');
-          e.dataTransfer.effectAllowed = 'move';
-          e.dataTransfer.setData('text/plain', section.dataset.section);
-        });
-        section.addEventListener('dragend', () => {
-          section.classList.remove('dragging');
-          dragged = null;
-        });
-        section.addEventListener('dragover', (e) => {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = 'move';
-        });
-        section.addEventListener('drop', (e) => {
-          e.preventDefault();
-          if (dragged && dragged !== section) {
-            const rect = section.getBoundingClientRect();
-            const insertBefore = e.clientY < rect.top + rect.height / 2 ? section : section.nextElementSibling;
-            grid.insertBefore(dragged, insertBefore);
-            const cfg = getOverallConfig();
-            cfg.order = [...grid.querySelectorAll('section[data-section]')].map(s => s.dataset.section);
-            saveOverallConfig(cfg);
-          }
-        });
+      const resizeLeft = document.getElementById('resizeLeft');
+      const resizeCenter = document.getElementById('resizeCenter');
+      if (!grid || !resizeLeft || !resizeCenter) return;
+      let activeHandle = null, startX = 0, startLeft = 0, startCenter = 0;
+      function onMove(e) {
+        if (!activeHandle) return;
+        const dx = e.clientX - startX;
+        if (activeHandle === 'left') {
+          let newLeft = Math.max(200, Math.min(600, startLeft + dx));
+          let newCenter = startCenter - (newLeft - startLeft);
+          if (newCenter < 280) { newCenter = 280; newLeft = startLeft + startCenter - 280; }
+          grid.style.setProperty('--col-left', newLeft + 'px');
+          grid.style.setProperty('--col-center', newCenter + 'px');
+          saveColLeftWidth(newLeft);
+          saveContainerWidth(newCenter);
+        } else {
+          let newCenter = Math.max(280, Math.min(800, startCenter + dx));
+          grid.style.setProperty('--col-center', newCenter + 'px');
+          saveContainerWidth(newCenter);
+        }
+      }
+      function onUp() {
+        if (activeHandle) {
+          document.body.classList.remove('resizing');
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+          resizeLeft.classList.remove('resizing');
+          resizeCenter.classList.remove('resizing');
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          activeHandle = null;
+        }
+      }
+      resizeLeft.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        activeHandle = 'left';
+        startX = e.clientX;
+        startLeft = getColLeftWidth();
+        startCenter = getContainerWidth();
+        document.body.classList.add('resizing');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        resizeLeft.classList.add('resizing');
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+      resizeCenter.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        activeHandle = 'center';
+        startX = e.clientX;
+        startCenter = getContainerWidth();
+        document.body.classList.add('resizing');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        resizeCenter.classList.add('resizing');
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+      document.addEventListener('mouseup', () => {
+        if (!activeHandle) {
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+        }
       });
     })();
+
+    (function setupVpListResize() {
+      const list = document.getElementById('viewer_points_list');
+      const handle = document.getElementById('resizeVpList');
+      if (!list || !handle) return;
+      function getVpListHeight() {
+        try {
+          const s = localStorage.getItem(VP_LIST_HEIGHT_STORAGE);
+          if (s) { const n = parseInt(s, 10); if (!isNaN(n) && n >= 200) return Math.min(800, n); }
+        } catch (_) {}
+        return VP_LIST_HEIGHT_DEFAULT;
+      }
+      function saveVpListHeight(h) {
+        try { localStorage.setItem(VP_LIST_HEIGHT_STORAGE, String(h)); } catch (_) {}
+      }
+      list.style.height = getVpListHeight() + 'px';
+      let startY = 0, startH = 0;
+      handle.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        startY = e.clientY;
+        startH = list.offsetHeight;
+        handle.classList.add('resizing');
+        document.body.style.cursor = 'row-resize';
+        document.body.style.userSelect = 'none';
+        const onMove = (ev) => {
+          const dy = ev.clientY - startY;
+          const newH = Math.max(200, Math.min(800, startH + dy));
+          list.style.height = newH + 'px';
+          saveVpListHeight(newH);
+        };
+        const onUp = () => {
+          handle.classList.remove('resizing');
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+        };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+    })();
+    loadScoreData();
+    (function setupSectionDragDrop() {
+      const colLeft = document.getElementById('colLeft');
+      const colRight = document.getElementById('colRight');
+      if (!colLeft || !colRight) return;
+      const colCenter = document.getElementById('colCenter');
+      const dropZones = [document.getElementById('dropZoneLeft'), document.getElementById('dropZoneCenter'), document.getElementById('dropZoneRight')].filter(Boolean);
+      const columnByZone = { left: colLeft, center: colCenter, right: colRight };
+      const sections = () => [...colLeft.querySelectorAll('section[data-section]'), ...(colCenter ? colCenter.querySelectorAll('section[data-section]') : []), ...colRight.querySelectorAll('section[data-section]')];
+      const allDropTargets = () => [...document.querySelectorAll('section[data-section]')];
+      let dragged = null;
+      function setupHandlers() {
+        sections().forEach(section => {
+          if (section._dragHandled) return;
+          section._dragHandled = true;
+          const handle = section.querySelector('.section-drag-handle');
+          if (!handle) return;
+          handle.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            dragged = section;
+            section.classList.add('dragging');
+            const onMove = (e2) => {
+              if (!dragged) return;
+              const over = document.elementFromPoint(e2.clientX, e2.clientY);
+              const targetSection = over && over.closest('section[data-section]');
+              const targetZone = over && over.closest('.column-drop-zone');
+              allDropTargets().forEach(s => s.classList.remove('drag-over-top', 'drag-over-bottom'));
+              dropZones.forEach(z => z.classList.remove('drag-over-zone'));
+              if (targetSection && targetSection !== dragged) {
+                const rect = targetSection.getBoundingClientRect();
+                targetSection.classList.add(e2.clientY < rect.top + rect.height / 2 ? 'drag-over-top' : 'drag-over-bottom');
+              } else if (targetZone && targetZone !== dragged.parentElement) {
+                targetZone.classList.add('drag-over-zone');
+              }
+            };
+            const onUp = (e2) => {
+              if (!dragged) return;
+              const over = document.elementFromPoint(e2.clientX, e2.clientY);
+              const targetSection = over && over.closest('section[data-section]');
+              const targetZone = over && over.closest('.column-drop-zone');
+              if (targetSection && targetSection !== dragged) {
+                const rect = targetSection.getBoundingClientRect();
+                const insertBefore = e2.clientY < rect.top + rect.height / 2 ? targetSection : targetSection.nextElementSibling;
+                targetSection.parentElement.insertBefore(dragged, insertBefore);
+              } else if (targetZone) {
+                const col = columnByZone[targetZone.dataset.column];
+                if (col) col.insertBefore(dragged, targetZone);
+              } else {
+                targetSection = null;
+              }
+              if (targetSection || targetZone) {
+                const cfg = getOverallConfig();
+                cfg.order = getSectionOrder();
+                cfg.columnCounts = [
+                  colLeft ? colLeft.querySelectorAll('section[data-section]').length : 2,
+                  colCenter ? colCenter.querySelectorAll('section[data-section]').length : 1,
+                  colRight ? colRight.querySelectorAll('section[data-section]').length : 2
+                ];
+                saveOverallConfig(cfg);
+              }
+              dragged.classList.remove('dragging');
+              allDropTargets().forEach(s => s.classList.remove('drag-over-top', 'drag-over-bottom'));
+              dropZones.forEach(z => z.classList.remove('drag-over-zone'));
+              dragged = null;
+              document.removeEventListener('mousemove', onMove);
+              document.removeEventListener('mouseup', onUp);
+            };
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+          });
+        });
+      }
+      setupHandlers();
+      const observer = new MutationObserver(() => setupHandlers());
+      [colLeft, colCenter, colRight].filter(Boolean).forEach(col => observer.observe(col, { childList: true, subtree: true }));
+    })();
     loadViewerPoints();
-    setInterval(loadViewerPoints, 10000);
+    (function initVpRefresh() {
+      try {
+        const s = localStorage.getItem(VP_REFRESH_STORAGE);
+        if (s) { const n = parseInt(s, 10); if (!isNaN(n) && n >= 5 && n <= 120) document.getElementById('vpRefreshSec').value = n; }
+      } catch (_) {}
+      let vpRefreshIntervalId = null;
+      function getVpRefreshMs() { return Math.max(5000, Math.min(120000, (parseInt(document.getElementById('vpRefreshSec').value, 10) || VP_REFRESH_DEFAULT) * 1000)); }
+      function scheduleVpRefresh() {
+        if (vpRefreshIntervalId) clearInterval(vpRefreshIntervalId);
+        const ms = getVpRefreshMs();
+        try { localStorage.setItem(VP_REFRESH_STORAGE, String(ms / 1000)); } catch (_) {}
+        vpRefreshIntervalId = setInterval(loadViewerPoints, ms);
+      }
+      scheduleVpRefresh();
+      document.getElementById('vpRefreshSec').addEventListener('change', scheduleVpRefresh);
+      document.getElementById('vpRefreshSec').addEventListener('blur', scheduleVpRefresh);
+    })();
+    (function initGameStatus() {
+      const el = document.getElementById('gameStatus');
+      if (!el) return;
+      function update() {
+        fetch('/api/game-ping').then(r => r.json()).then(d => {
+          if (d.ok && d.version) { el.textContent = 'Game: ' + d.version; el.className = 'game-status connected'; }
+          else { el.textContent = 'Game: disconnected'; el.className = 'game-status error'; }
+        }).catch(() => { el.textContent = 'Game: —'; el.className = 'game-status'; });
+      }
+      update();
+      setInterval(update, 10000);
+    })();
     setInterval(updateVpUpdatedLabel, 1000);
     setInterval(updateFreeCountdowns, 1000);
+    pollActivityCommands();
+    setInterval(pollActivityCommands, 5000);
 
     // WebSocket inspector
     let ws = null, wsLastData = null, wsLastTime = 0, wsStaleInterval = null;
+    const WS_EVENT_TYPES = ['ping_result', 'spawn_result', 'champion_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result', 'trap_result', 'transmute_result', 'summon_bee_result', 'ward_result'];
+    function isGameStateMessage(data) {
+      if (!data || typeof data !== 'object') return false;
+      if (data.source !== 'shattered-pixel-dungeon') return false;
+      if (WS_EVENT_TYPES.indexOf(data.type) >= 0) return false;
+      return true;
+    }
     function wsRenderTree(obj, path = '') {
       if (obj === null) return '<span class="null">null</span>';
       if (typeof obj === 'boolean') return '<span class="bool">' + obj + '</span>';
@@ -926,6 +1860,18 @@
         out.innerHTML = wsRenderTree(data);
         out.querySelectorAll('details[data-path]').forEach(d => { if (closed[d.dataset.path]) d.open = false; });
       }
+    }
+    function loadGameDataFromServer() {
+      fetch('/api/game-data').then(r => {
+        if (!r.ok) throw new Error(r.status === 404 ? 'No game data' : r.status);
+        return r.json();
+      }).then(data => {
+        if (data && !data.error) {
+          wsLastData = data;
+          wsShowData(data);
+          if (!getHideGameLoadedSetting()) logActivity('Game data loaded from server');
+        }
+      }).catch(() => {});
     }
     function wsConnect() {
       if (ws && ws.readyState === WebSocket.OPEN) { ws.close(); return; }
@@ -956,12 +1902,76 @@
         ws.onerror = () => { document.getElementById('wsStatus').textContent = 'Error'; document.getElementById('wsStatus').className = 'ws-status error'; };
         ws.onmessage = (ev) => {
           wsLastTime = Date.now();
-          try { wsShowData(JSON.parse(ev.data)); } catch (e) { document.getElementById('wsOut').textContent = 'Invalid JSON'; }
+          try {
+            const data = JSON.parse(ev.data);
+            if (isGameStateMessage(data)) {
+              wsLastData = data;
+              wsShowData(data);
+            }
+          } catch (e) { document.getElementById('wsOut').textContent = 'Invalid JSON'; }
         };
       } catch (e) { document.getElementById('wsStatus').textContent = 'Error: ' + e.message; document.getElementById('wsStatus').className = 'ws-status error'; }
     }
     document.getElementById('wsBtn').addEventListener('click', wsConnect);
+    document.getElementById('wsLoadServer').addEventListener('click', loadGameDataFromServer);
+    loadGameDataFromServer();
     document.querySelectorAll('input[name="wsView"]').forEach(r => r.addEventListener('change', () => { if (wsLastData) wsShowData(wsLastData); }));
+
+    applyTheme(getTheme());
+    document.getElementById('themeDark').addEventListener('click', () => { currentThemeMode = 'dark'; applyTheme({ mode: 'dark' }); saveTheme(); document.getElementById('themeCustomizePanel').style.display = 'none'; });
+    document.getElementById('themeLight').addEventListener('click', () => { currentThemeMode = 'light'; applyTheme({ mode: 'light' }); saveTheme(); document.getElementById('themeCustomizePanel').style.display = 'none'; });
+    document.getElementById('themeCustom').addEventListener('click', () => { currentThemeMode = 'custom'; applyTheme({ mode: 'custom', custom: getTheme().custom }); saveTheme(); });
+    document.getElementById('themeCustomizeBtn').addEventListener('click', () => {
+      const panel = document.getElementById('themeCustomizePanel');
+      panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    });
+    (function initThemePresetBtns() {
+      const container = document.getElementById('themePresetBtns');
+      if (!container) return;
+      THEME_CUSTOM_PRESETS.forEach(preset => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'theme-preset-btn';
+        btn.textContent = preset.name;
+        btn.style.cssText = 'padding:4px 10px;font-size:0.8rem;border-radius:4px;border:1px solid var(--spd-border);background:var(--spd-surface-dark);color:var(--spd-text-on-surface-dark);cursor:pointer;';
+        btn.addEventListener('click', () => {
+          currentThemeMode = 'custom';
+          applyTheme({ mode: 'custom', custom: preset.colors });
+          saveTheme();
+          document.getElementById('themeCustom').style.background = 'var(--spd-accent)';
+          document.getElementById('themeDark').style.background = 'var(--spd-btn-secondary)';
+          document.getElementById('themeLight').style.background = 'var(--spd-btn-secondary)';
+        });
+        container.appendChild(btn);
+      });
+    })();
+    ['themeAccent', 'themeSurface', 'themeBg', 'themeSuccess', 'themeError', 'themeBorder', 'themeViewerList', 'themeActivityList'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', () => {
+        currentThemeMode = 'custom';
+        const key = el.dataset.var;
+        const hex = el.value;
+        document.documentElement.style.setProperty('--spd-' + key, hex);
+        if (key === 'accent') document.documentElement.style.setProperty('--spd-accent-rgba', hexToRgb(hex));
+        applyContrastVars();
+        const saved = getTheme();
+        saved.mode = 'custom';
+        saved.custom = saved.custom || {};
+        saved.custom[key] = hex;
+        try { localStorage.setItem(THEME_STORAGE, JSON.stringify(saved)); } catch (_) {}
+        document.getElementById('themeCustom').style.background = 'var(--spd-accent)';
+        document.getElementById('themeDark').style.background = 'var(--spd-btn-secondary)';
+        document.getElementById('themeLight').style.background = 'var(--spd-btn-secondary)';
+      });
+    });
+    document.getElementById('themeResetCustom').addEventListener('click', () => {
+      try { localStorage.setItem(THEME_STORAGE, JSON.stringify({ mode: currentThemeMode, custom: undefined })); } catch (_) {}
+      if (currentThemeMode === 'custom') {
+        applyTheme({ mode: 'custom', custom: {} });
+      } else {
+        applyTheme({ mode: currentThemeMode });
+      }
+    });
   </script>
 </body>
 </html>

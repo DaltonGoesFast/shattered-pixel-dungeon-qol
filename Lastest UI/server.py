@@ -3,10 +3,12 @@ from flask_cors import CORS
 from spd_parser import SPDSaveParser
 import os
 import json
+import logging
 import queue
 import uuid
 import threading
 import time
+from datetime import datetime
 
 try:
     import websocket
@@ -49,6 +51,8 @@ FREE_UNTIL_FILE = os.path.join(SCRIPT_DIR, "free_until.json")
 VIEWER_POINTS_FILE = os.path.join(SCRIPT_DIR, "viewer_points.txt")
 VIEWER_POINTS_LOCK_FILE = VIEWER_POINTS_FILE + ".lock"
 DOUBLE_POINTS_COUNTDOWN_FILE = os.path.join(SCRIPT_DIR, "double_points_countdown.txt")
+STREAMER_CHAT_SCORE_FILE = os.path.join(SCRIPT_DIR, "streamer_chat_score.json")
+STREAMER_CHAT_SCORE_TXT = os.path.join(SCRIPT_DIR, "streamer_chat_score.txt")
 
 # Game WebSocket: receive live stream from game and serve via HTTP /api/game-data and game_summary.json
 GAME_WS_URL = "ws://127.0.0.1:5001"   # Game streaming port (default in game Settings; change if you set a different port)
@@ -84,7 +88,27 @@ game_ws_received_count = 0
 game_ws_app = None
 pending_spawns = {}  # request_id -> {"event": Event, "success": bool}
 spawn_lock = threading.Lock()
-SPAWN_RESULT_TIMEOUT = 10.0  # seconds to wait for game to report spawn/gold result
+# Activity feed: recent command events for overlay (max 100, each: time, username, command, detail, success)
+recent_command_events = []
+COMMAND_EVENTS_MAX = 100
+command_events_lock = threading.Lock()
+
+
+def _record_command_event(username, command, detail, success):
+    """Append a command event for the activity feed (overlay polls /api/activity-commands)."""
+    with command_events_lock:
+        recent_command_events.append({
+            "time": int(time.time() * 1000),
+            "username": username or "",
+            "command": command,
+            "detail": detail or "",
+            "success": bool(success),
+        })
+        while len(recent_command_events) > COMMAND_EVENTS_MAX:
+            recent_command_events.pop(0)
+
+
+SPAWN_RESULT_TIMEOUT = 18.0  # seconds to wait for game to report spawn/gold result (game may be slow if not in run or main thread busy)
 SPAWN_WHITELIST = frozenset([
     'rat', 'albino', 'snake', 'gnoll', 'crab', 'slime', 'swarm', 'thief',
     'skeleton', 'bat', 'brute', 'shaman', 'spinner', 'dm100', 'guard',
@@ -142,19 +166,67 @@ def _send_obs_message(msg):
             pass
 
 
+def _load_score_data():
+    """Load streamer vs chat score. Returns dict with streamer, chat, session_start, streamer_label, chat_label."""
+    try:
+        if os.path.exists(STREAMER_CHAT_SCORE_FILE):
+            with open(STREAMER_CHAT_SCORE_FILE, encoding='utf-8') as f:
+                d = json.load(f)
+                d.setdefault('streamer', 0)
+                d.setdefault('chat', 0)
+                d.setdefault('session_start', datetime.now().isoformat())
+                d.setdefault('streamer_label', 'Streamer')
+                d.setdefault('chat_label', 'Chat')
+                return d
+    except (json.JSONDecodeError, OSError):
+        pass
+    return {'streamer': 0, 'chat': 0, 'session_start': datetime.now().isoformat(), 'streamer_label': 'Streamer', 'chat_label': 'Chat'}
+
+
+def _save_score_data(data):
+    """Save score JSON and write TXT for OBS."""
+    try:
+        with open(STREAMER_CHAT_SCORE_FILE, "w", encoding='utf-8') as f:
+            json.dump(data, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        sl = str(data.get('streamer_label', 'Streamer') or 'Streamer')
+        cl = str(data.get('chat_label', 'Chat') or 'Chat')
+        txt = f"{sl}: {data.get('streamer', 0)} | {cl}: {data.get('chat', 0)}\n"
+        with open(STREAMER_CHAT_SCORE_TXT, "w", encoding='utf-8') as f:
+            f.write(txt)
+            f.flush()
+            os.fsync(f.fileno())
+    except OSError as e:
+        print(f"Error saving streamer_chat_score: {e}")
+
+
+def _handle_score_event(data):
+    """Handle hero_died or boss_slain from game WebSocket."""
+    score_data = _load_score_data()
+    if data.get('type') == 'hero_died':
+        score_data['chat'] = score_data.get('chat', 0) + 1
+    elif data.get('type') == 'boss_slain':
+        score_data['streamer'] = score_data.get('streamer', 0) + 1
+    _save_score_data(score_data)
+    print(f"Score event {data.get('type')}: streamer={score_data['streamer']} chat={score_data['chat']}")
+
+
 def _game_ws_on_message(ws, message):
     """Handle message from game WebSocket: update live data (same JSON shape as inspector)."""
     global current_game_data, last_ws_update_time, last_item_info_open, game_ws_received_count
     try:
         data = json.loads(message)
         # Handle spawn/gold result (game reports success/failure)
-        if data.get('type') in ('spawn_result', 'champion_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result', 'trap_result', 'transmute_result', 'summon_bee_result', 'ward_result'):
+        if data.get('type') in ('ping_result', 'spawn_result', 'champion_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result', 'trap_result', 'transmute_result', 'summon_bee_result', 'ward_result'):
             rid = data.get('request_id')
             ok = data.get('success', False)
             if rid:
                 with spawn_lock:
                     if rid in pending_spawns:
                         pending_spawns[rid]['success'] = ok
+                        if data.get('type') == 'ping_result' and data.get('version'):
+                            pending_spawns[rid]['version'] = data.get('version')
                         if data.get('type') in ('spawn_result', 'gold_result') and data.get('error'):
                             pending_spawns[rid]['error'] = data.get('error')
                         if data.get('type') == 'champion_result' and data.get('error'):
@@ -205,6 +277,9 @@ def _game_ws_on_message(ws, message):
                             pending_spawns[rid]['error'] = data.get('error')
                         pending_spawns[rid]['event'].set()
             print(f"Game {data.get('type')}: request_id={rid} success={ok}")
+            return
+        if data.get('type') in ('hero_died', 'boss_slain') and data.get('source') == 'shattered-pixel-dungeon':
+            _handle_score_event(data)
             return
         if data.get('source') != 'shattered-pixel-dungeon':
             return
@@ -268,9 +343,12 @@ def double_points_countdown_thread():
 
 def obs_relay_thread():
     """Connect to OBS WebSocket and send Advanced Scene Switcher messages from the queue."""
+    last_obs_error_print = 0.0
+    OBS_ERROR_THROTTLE = 60.0  # seconds
     while USE_OBS_ITEM_INFO_RELAY and websocket:
         try:
             ws = websocket.create_connection(OBS_WS_URL)
+            last_obs_error_print = 0.0  # reset once connected
             msg = json.loads(ws.recv())
             if msg.get('op') != 0:
                 ws.close()
@@ -304,7 +382,14 @@ def obs_relay_thread():
                 }
                 ws.send(json.dumps(req))
         except Exception as e:
-            print(f"OBS relay error: {e}")
+            now = time.time()
+            is_refused = (getattr(e, 'errno', None) == 10061 or 'refused' in str(e).lower())
+            if is_refused and (now - last_obs_error_print) < OBS_ERROR_THROTTLE:
+                pass  # skip log when OBS not running
+            else:
+                if is_refused:
+                    last_obs_error_print = now
+                print(f"OBS relay error: {e}")
         time.sleep(5)
 
 
@@ -346,6 +431,12 @@ def game_ws_thread():
 def index():
     """Serve the main control page (config, viewer points, WebSocket inspector)"""
     return send_from_directory('.', 'points-config.html')
+
+
+@app.route('/favicon.ico')
+def favicon():
+    """Avoid 404 in browser tab; no favicon file required."""
+    return '', 204
 
 
 @app.route('/overlay')
@@ -759,19 +850,29 @@ def serve_font(filename):
 
 @app.route('/game_summary.txt')
 def serve_summary():
-    """Serve the text summary file manually to avoid framework-specific issues"""
+    """Serve the text summary. Prefer generating from game_summary.json so overlay matches the JSON file."""
     try:
-        if not os.path.exists(GAME_SUMMARY_TXT):
-            return "File not found.", 404
-            
-        with open(GAME_SUMMARY_TXT, 'r', encoding='utf-8') as f:
-            content = f.read()
-        return content, 200, {
-            'Content-Type': 'text/plain; charset=utf-8',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-        }
+        if os.path.exists(GAME_SUMMARY_JSON):
+            with open(GAME_SUMMARY_JSON, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            if data:
+                content = parser.generate_summary_text(data)
+                return content, 200, {
+                    'Content-Type': 'text/plain; charset=utf-8',
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                }
+        if os.path.exists(GAME_SUMMARY_TXT):
+            with open(GAME_SUMMARY_TXT, 'r', encoding='utf-8') as f:
+                content = f.read()
+            return content, 200, {
+                'Content-Type': 'text/plain; charset=utf-8',
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
+        return "No game data available.", 404
     except Exception as e:
         print(f"Error serving game_summary.txt: {e}")
         return f"Internal Server Error: {str(e)}", 500
@@ -792,12 +893,85 @@ def serve_json_summary():
 
 @app.route('/api/game-data')
 def get_game_data():
-    """API endpoint to get current game data"""
+    """API endpoint to get current game data. Prefer game_summary.json file so HTML/clients see same data as the file."""
+    try:
+        if os.path.exists(GAME_SUMMARY_JSON):
+            with open(GAME_SUMMARY_JSON, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            if data:
+                return jsonify(data)
+    except Exception as e:
+        print(f"Error reading game_summary.json for /api/game-data: {e}")
     with data_lock:
         if current_game_data:
             return jsonify(current_game_data)
-        else:
-            return jsonify({'error': 'No game data available'}), 404
+    return jsonify({'error': 'No game data available'}), 404
+
+@app.route('/api/game-ping')
+def game_ping():
+    """Verify connection to game. Returns version if connected to QoL mod; 504 if no response."""
+    if not game_ws_app:
+        return jsonify({'ok': False, 'error': 'Game not connected'}), 503
+    request_id = str(uuid.uuid4())
+    ev = threading.Event()
+    with spawn_lock:
+        pending_spawns[request_id] = {'event': ev, 'success': False}
+    try:
+        game_ws_app.send(json.dumps({'command': 'ping', 'request_id': request_id}))
+    except Exception as e:
+        with spawn_lock:
+            pending_spawns.pop(request_id, None)
+        return jsonify({'ok': False, 'error': str(e)}), 503
+    if ev.wait(timeout=5):
+        with spawn_lock:
+            popped = pending_spawns.pop(request_id, {})
+        version = popped.get('version', 'unknown')
+        return jsonify({'ok': True, 'version': version})
+    with spawn_lock:
+        pending_spawns.pop(request_id, None)
+    return jsonify({
+        'ok': False,
+        'error': 'No ping response. Ensure game is the latest build (desktop-3.3.7.jar) with streaming enabled.'
+    }), 504
+
+@app.route('/api/streamer-chat-score', methods=['GET', 'POST', 'OPTIONS'])
+def streamer_chat_score():
+    """Get or update streamer vs chat score. POST body: {streamer?, chat?, streamer_label?, chat_label?}."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    if request.method == 'GET':
+        return jsonify(_load_score_data())
+    # POST - merge and save
+    try:
+        data = _load_score_data()
+        body = request.get_json(force=True, silent=True) or {}
+        if 'streamer' in body:
+            data['streamer'] = max(0, int(body['streamer']))
+        if 'chat' in body:
+            data['chat'] = max(0, int(body['chat']))
+        if 'streamer_label' in body:
+            data['streamer_label'] = str(body['streamer_label']).strip() or 'Streamer'
+        if 'chat_label' in body:
+            data['chat_label'] = str(body['chat_label']).strip() or 'Chat'
+        _save_score_data(data)
+        return jsonify(data)
+    except (ValueError, TypeError) as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/api/streamer-chat-score/reset', methods=['POST', 'OPTIONS'])
+def streamer_chat_score_reset():
+    """Reset both scores to 0, update session_start. Labels unchanged."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = _load_score_data()
+        data['streamer'] = 0
+        data['chat'] = 0
+        data['session_start'] = datetime.now().isoformat()
+        _save_score_data(data)
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/spawn-command', methods=['POST', 'OPTIONS'])
 def spawn_command():
@@ -849,13 +1023,21 @@ def spawn_command():
         else:
             with spawn_lock:
                 pending_spawns.pop(request_id, None)
-            return jsonify({'ok': False, 'error': 'Spawn timed out'}), 504
+            err = ('Spawn timed out. Ensure game is the latest build (desktop-3.3.7.jar), '
+                   'streaming is enabled in Settings, and you are in an active run (not title screen).')
+            print(f"Spawn 504: {err}")
+            return jsonify({'ok': False, 'error': err}), 504
         last_spawn_time = time.time()
         if success:
             print(f"Spawn OK: {monster} for {username}")
+            _record_command_event(username, 'spawn', monster, True)
             return jsonify({'ok': True, 'monster': monster})
         err = spawn_error or 'No space to spawn (hero surrounded or no valid tiles)'
+        if err.startswith('Timeout or error:'):
+            err = ('Game did not process spawn in time. Rebuild the game from this project (e.g. gradlew desktop:run), '
+                   'ensure you are in an active run (not title screen), and streaming is enabled in Settings.')
         print(f"Spawn FAIL: {err} ({monster} for {username})")
+        _record_command_event(username, 'spawn', monster, False)
         return jsonify({'ok': False, 'error': err}), 200
     except Exception as e:
         print(f"Spawn 400 exception: {e} (data: {request.get_data(as_text=True)[:200]})")
@@ -911,8 +1093,11 @@ def champion_command():
             return jsonify({'ok': False, 'error': 'Champion spawn timed out'}), 504
         last_spawn_time = time.time()
         if success:
+            print(f"Champion OK: {champion_monster} for {username}")
+            _record_command_event(username, 'champion', champion_monster, True)
             return jsonify({'ok': True, 'monster': champion_monster})
         err = champion_error or 'No space to spawn (hero surrounded or no valid tiles)'
+        _record_command_event(username, 'champion', monster, False)
         return jsonify({'ok': False, 'error': err}), 200
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 400
@@ -961,8 +1146,10 @@ def gold_command():
             return jsonify({'ok': False, 'error': 'Gold drop timed out'}), 504
         if success:
             print(f"Gold OK: {amount} for {username}")
+            _record_command_event(username, 'gold', str(amount), True)
             return jsonify({'ok': True, 'amount': amount})
         err = gold_error or 'No space to drop gold (hero surrounded)'
+        _record_command_event(username, 'gold', str(amount), False)
         return jsonify({'ok': False, 'error': err}), 200
     except Exception as e:
         print(f"Gold 400 exception: {e}")
@@ -1007,8 +1194,10 @@ def gas_command():
             return jsonify({'ok': False, 'error': 'Gas command timed out'}), 504
         if success:
             print(f"Gas OK: {gas_name} for {username}")
+            _record_command_event(username, 'gas', gas_name or '', True)
             return jsonify({'ok': True, 'gas_name': gas_name})
         err = gas_error or 'No valid cell to spawn gas (need visible tiles 2-6 from hero)'
+        _record_command_event(username, 'gas', '', False)
         return jsonify({'ok': False, 'error': err}), 200
     except Exception as e:
         print(f"Gas 400 exception: {e}")
@@ -1059,8 +1248,10 @@ def curse_command():
             return jsonify({'ok': False, 'error': 'Curse timed out'}), 504
         if success:
             print(f"Curse OK: {slot} ({item_name}) for {username}")
+            _record_command_event(username, 'curse', slot, True)
             return jsonify({'ok': True, 'slot': slot, 'item_name': item_name})
         err = curse_error or f'No item in {slot} slot or already cursed'
+        _record_command_event(username, 'curse', slot, False)
         return jsonify({'ok': False, 'error': err}), 200
     except Exception as e:
         print(f"Curse 400 exception: {e}")
@@ -1105,8 +1296,10 @@ def scroll_command():
             return jsonify({'ok': False, 'error': 'Scroll command timed out'}), 504
         if success:
             print(f"Scroll OK: {scroll_name} for {username}")
+            _record_command_event(username, 'scroll', scroll_name or '', True)
             return jsonify({'ok': True, 'scroll_name': scroll_name})
         err = scroll_error or 'Could not use random scroll'
+        _record_command_event(username, 'scroll', '', False)
         return jsonify({'ok': False, 'error': err}), 200
     except Exception as e:
         print(f"Scroll 400 exception: {e}")
@@ -1151,8 +1344,10 @@ def trap_command():
             return jsonify({'ok': False, 'error': 'Trap command timed out'}), 504
         if success:
             print(f"Trap OK: {trap_name} for {username}")
+            _record_command_event(username, 'trap', trap_name or '', True)
             return jsonify({'ok': True, 'trap_name': trap_name})
         err = trap_error or 'No space to place trap'
+        _record_command_event(username, 'trap', '', False)
         return jsonify({'ok': False, 'error': err}), 200
     except Exception as e:
         print(f"Trap 400 exception: {e}")
@@ -1197,8 +1392,10 @@ def transmute_command():
             return jsonify({'ok': False, 'error': 'Transmute command timed out'}), 504
         if success:
             print(f"Transmute OK: {item_name} for {username}")
+            _record_command_event(username, 'transmute', item_name or '', True)
             return jsonify({'ok': True, 'item_name': item_name})
         err = transmute_error or 'No transmutable item'
+        _record_command_event(username, 'transmute', '', False)
         return jsonify({'ok': False, 'error': err}), 200
     except Exception as e:
         print(f"Transmute 400 exception: {e}")
@@ -1243,8 +1440,10 @@ def ward_command():
             return jsonify({'ok': False, 'error': 'Ward command timed out'}), 504
         if success:
             print(f"Ward OK: {ward_name} for {username}")
+            _record_command_event(username, 'ward', ward_name or '', True)
             return jsonify({'ok': True, 'ward_name': ward_name})
         err = ward_error or 'No space for ward'
+        _record_command_event(username, 'ward', '', False)
         return jsonify({'ok': False, 'error': err}), 200
     except Exception as e:
         print(f"Ward 400 exception: {e}")
@@ -1289,8 +1488,10 @@ def summon_bee_command():
             return jsonify({'ok': False, 'error': 'Summon bee command timed out'}), 504
         if success:
             print(f"Summon bee OK: {ally_name} for {username}")
+            _record_command_event(username, 'summon_bee', ally_name or '', True)
             return jsonify({'ok': True, 'ally_name': ally_name})
         err = summon_bee_error or 'No space for bee'
+        _record_command_event(username, 'summon_bee', '', False)
         return jsonify({'ok': False, 'error': err}), 200
     except Exception as e:
         print(f"Summon bee 400 exception: {e}")
@@ -1335,8 +1536,10 @@ def buff_command():
             return jsonify({'ok': False, 'error': 'Buff command timed out'}), 504
         if success:
             print(f"Buff OK: {buff_name} for {username}")
+            _record_command_event(username, 'buff', buff_name or '', True)
             return jsonify({'ok': True, 'buff_name': buff_name})
         err = buff_error or 'Could not apply random buff'
+        _record_command_event(username, 'buff', '', False)
         return jsonify({'ok': False, 'error': err}), 200
     except Exception as e:
         print(f"Buff 400 exception: {e}")
@@ -1381,8 +1584,10 @@ def debuff_command():
             return jsonify({'ok': False, 'error': 'Debuff command timed out'}), 504
         if success:
             print(f"Debuff OK: {debuff_name} for {username}")
+            _record_command_event(username, 'debuff', debuff_name or '', True)
             return jsonify({'ok': True, 'debuff_name': debuff_name})
         err = debuff_error or 'Could not apply random debuff'
+        _record_command_event(username, 'debuff', '', False)
         return jsonify({'ok': False, 'error': err}), 200
     except Exception as e:
         print(f"Debuff 400 exception: {e}")
@@ -1430,8 +1635,10 @@ def wand_command():
             return jsonify({'ok': False, 'error': 'Wand command timed out'}), 504
         if success:
             print(f"Wand OK: {effect_name} (rarity={rarity}) for {username}")
+            _record_command_event(username, 'wand', effect_name or '', True)
             return jsonify({'ok': True, 'effect_name': effect_name, 'rarity': rarity})
         err = wand_error or 'Could not trigger cursed wand effect'
+        _record_command_event(username, 'wand', '', False)
         return jsonify({'ok': False, 'error': err}), 200
     except Exception as e:
         print(f"Wand 400 exception: {e}")
@@ -1462,9 +1669,39 @@ def double_points_remaining():
         return jsonify({"active": False, "error": str(e)}), 500, resp_headers
 
 
+@app.route('/api/double-points-start', methods=['POST', 'OPTIONS'])
+def double_points_start():
+    """Start 2x points for N minutes. Body: { minutes: 5 } (1–1440)."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        body = request.get_json(force=True, silent=True) or {}
+        minutes = body.get('minutes', body.get('mins', 5))
+        minutes = max(1, min(1440, int(minutes) if minutes is not None else 5))
+        end_ts = int(time.time()) + minutes * 60
+        with open(DOUBLE_POINTS_END_FILE, 'w', encoding='utf-8') as f:
+            f.write(str(end_ts))
+            f.flush()
+            os.fsync(f.fileno())
+        return jsonify({"ok": True, "minutes": minutes, "end_ts": end_ts})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/activity-commands')
+def activity_commands():
+    """Return command events for the overlay activity feed. Query param: since=ms (return events with time > since)."""
+    try:
+        since = request.args.get('since', type=int) or 0
+        with command_events_lock:
+            out = [e for e in recent_command_events if e['time'] > since]
+        return jsonify({'events': out})
+    except Exception as e:
+        return jsonify({'error': str(e), 'events': []}), 500
+
+
 @app.route('/api/status')
 def get_status():
-    """Check if the server is running and has data"""
     with data_lock:
         return jsonify({
             'running': True,
@@ -1494,7 +1731,10 @@ if __name__ == '__main__':
     if game_info:
         with data_lock:
             current_game_data = game_info
-    
+
+    # Ensure streamer_chat_score.txt exists for OBS Read from file
+    _save_score_data(_load_score_data())
+
     print("\n" + "="*50)
     print("SPD Overlay Server Starting...")
     print("="*50)
@@ -1506,7 +1746,18 @@ if __name__ == '__main__':
     if USE_OBS_ITEM_INFO_RELAY and websocket:
         print(f"OBS Item Info Relay: {OBS_WS_URL} (item_info_open / item_info_closed → Advanced Scene Switcher)")
     print(f"Chat spawn: POST /api/spawn-command {{\"monster\": \"rat\"}} (cooldown: {SPAWN_COOLDOWN_SEC}s)")
+    print(f"Connection test: GET /api/game-ping (returns version if game connected)")
+    print(f"Streamer vs Chat: {STREAMER_CHAT_SCORE_TXT} (OBS Read from file)")
     print("="*50 + "\n")
-    
+
+    # Suppress request logs for high-frequency polling endpoints (easier to see commands)
+    class _QuietPollFilter(logging.Filter):
+        def filter(self, record):
+            msg = record.getMessage()
+            return ('/game_summary' not in msg and
+                    '/api/double-points-remaining' not in msg and
+                    '/api/game-data' not in msg)
+    logging.getLogger('werkzeug').addFilter(_QuietPollFilter())
+
     # Run Flask server
     app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)

@@ -43,6 +43,7 @@ import com.shatteredpixel.shatteredpixeldungeon.sprites.CharSprite;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.GooSprite;
 import com.shatteredpixel.shatteredpixeldungeon.ui.BossHealthBar;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
 import com.watabou.utils.Bundle;
 import com.watabou.utils.GameMath;
 import com.watabou.utils.PathFinder;
@@ -281,7 +282,7 @@ public class Goo extends Mob {
 
 	@Override
 	public void die( Object cause ) {
-		
+		StreamingEvents.bossSlainDepthPending = Dungeon.depth;
 		super.die( cause );
 		
 		Dungeon.level.unseal();

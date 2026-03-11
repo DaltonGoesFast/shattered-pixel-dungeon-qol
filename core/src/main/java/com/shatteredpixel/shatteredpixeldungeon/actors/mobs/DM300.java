@@ -63,6 +63,7 @@ import com.shatteredpixel.shatteredpixeldungeon.sprites.CharSprite;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.DM300Sprite;
 import com.shatteredpixel.shatteredpixeldungeon.ui.BossHealthBar;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
 import com.watabou.noosa.Game;
 import com.watabou.noosa.audio.Music;
 import com.watabou.noosa.audio.Sample;
@@ -570,7 +571,7 @@ public class DM300 extends Mob {
 
 	@Override
 	public void die( Object cause ) {
-
+		StreamingEvents.bossSlainDepthPending = Dungeon.depth;
 		super.die( cause );
 
 		GameScene.bossSlain();

@@ -69,6 +69,7 @@ import com.shatteredpixel.shatteredpixeldungeon.sprites.TenguSprite;
 import com.shatteredpixel.shatteredpixeldungeon.tiles.DungeonTilemap;
 import com.shatteredpixel.shatteredpixeldungeon.ui.BossHealthBar;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
 import com.watabou.noosa.audio.Sample;
 import com.watabou.noosa.particles.Emitter;
 import com.watabou.utils.BArray;
@@ -216,6 +217,7 @@ public class Tengu extends Mob {
 		}
 		
 		GameScene.bossSlain();
+		StreamingEvents.bossSlainDepthPending = Dungeon.depth;
 		super.die( cause );
 		
 		Badges.validateBossSlain();

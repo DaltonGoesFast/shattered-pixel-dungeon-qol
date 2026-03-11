@@ -11,6 +11,9 @@ class SPDSaveParser:
     def __init__(self, save_directory: str):
         self.save_directory = Path(save_directory)
         self.last_modified_times = {}
+        self._last_parse_error = None  # (path, message) for throttle
+        self._last_parse_error_time = 0.0
+        self._parse_error_throttle_sec = 60.0
         
     def find_latest_save(self) -> Optional[Path]:
         """Find the most recently modified game save file"""
@@ -28,6 +31,17 @@ class SPDSaveParser:
             
         # Return the most recently modified save file
         return max(save_files, key=lambda p: p.stat().st_mtime)
+
+    def _saves_by_newest(self) -> list:
+        """Return all game.dat paths sorted by mtime newest first (for fallback when latest is unparseable)."""
+        save_files = []
+        for game_dir in self.save_directory.glob("game*"):
+            if game_dir.is_dir():
+                game_dat = game_dir / "game.dat"
+                if game_dat.exists():
+                    save_files.append(game_dat)
+        save_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+        return save_files
     
     def parse_save_file(self, save_path: Path) -> Optional[Dict[str, Any]]:
         """Parse a gzipped JSON save file"""
@@ -36,7 +50,14 @@ class SPDSaveParser:
                 data = json.load(f)
             return data
         except Exception as e:
-            print(f"Error parsing save file {save_path}: {e}")
+            key = (str(save_path), type(e).__name__)
+            now = time.time()
+            if self._last_parse_error == key and (now - self._last_parse_error_time) < self._parse_error_throttle_sec:
+                pass  # throttle repeated same error
+            else:
+                self._last_parse_error = key
+                self._last_parse_error_time = now
+                print(f"Error parsing save file {save_path}: {e}")
             return None
 
     def get_level_data(self, save_path: Path, depth: int) -> Optional[Dict[str, Any]]:
@@ -333,19 +354,15 @@ class SPDSaveParser:
         return identification
     
     def get_current_game_info(self) -> Optional[Dict[str, Any]]:
-        """Get information from the most recent save file"""
-        latest_save = self.find_latest_save()
-        if not latest_save:
-            return None
-        
-        save_data = self.parse_save_file(latest_save)
-        if not save_data:
-            return None
-        
-        depth = save_data.get('depth', 1)
-        level_data = self.get_level_data(latest_save, depth)
-        
-        return self.extract_game_info(save_data, level_data)
+        """Get information from the most recent parseable save file (tries newest first)."""
+        for latest_save in self._saves_by_newest():
+            save_data = self.parse_save_file(latest_save)
+            if not save_data:
+                continue
+            depth = save_data.get('depth', 1)
+            level_data = self.get_level_data(latest_save, depth)
+            return self.extract_game_info(save_data, level_data)
+        return None
     
     def has_save_updated(self, save_path: Path) -> bool:
         """Check if a save file has been modified since last check"""

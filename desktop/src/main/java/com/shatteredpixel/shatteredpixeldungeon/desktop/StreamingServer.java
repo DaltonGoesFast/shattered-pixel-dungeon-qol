@@ -16,10 +16,12 @@ package com.shatteredpixel.shatteredpixeldungeon.desktop;
 import com.badlogic.gdx.Gdx;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.shatteredpixel.shatteredpixeldungeon.utils.GameStateSnapshot;
 
 import org.java_websocket.server.WebSocketServer;
 
 import java.net.InetSocketAddress;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -29,6 +31,7 @@ public class StreamingServer extends WebSocketServer {
 
 	private static final int DEFAULT_PORT = 5001;
 
+	private static final Gson GSON = new Gson();
 	private final AtomicReference<String> lastPayload = new AtomicReference<>("{}");
 
 	public StreamingServer(int port) {
@@ -49,10 +52,40 @@ public class StreamingServer extends WebSocketServer {
 		if (json != null && !json.isEmpty()) broadcast(json);
 	}
 
+	/** Broadcast a streaming event (hero_died, boss_slain) to all connected clients. */
+	public void broadcastEvent(String type, Map<String, Object> extra) {
+		JsonObject obj = new JsonObject();
+		obj.addProperty("type", type);
+		obj.addProperty("source", "shattered-pixel-dungeon");
+		if (extra != null) {
+			for (Map.Entry<String, Object> e : extra.entrySet()) {
+				Object v = e.getValue();
+				if (v instanceof Number) obj.addProperty(e.getKey(), (Number) v);
+				else if (v instanceof Boolean) obj.addProperty(e.getKey(), (Boolean) v);
+				else if (v instanceof String) obj.addProperty(e.getKey(), (String) v);
+			}
+		}
+		broadcast(obj.toString());
+	}
+
 	@Override
 	public void onOpen(org.java_websocket.WebSocket conn, org.java_websocket.handshake.ClientHandshake handshake) {
-		String json = lastPayload.get();
-		if (json != null && !json.isEmpty()) conn.send(json);
+		// Send a fresh snapshot from the game thread so new clients get current run, not stale lastPayload
+		if (Gdx.app != null) {
+			Gdx.app.postRunnable(() -> {
+				try {
+					Map<String, Object> snapshot = GameStateSnapshot.build();
+					String json = GSON.toJson(snapshot);
+					if (json != null && !json.isEmpty()) conn.send(json);
+				} catch (Throwable t) {
+					String json = lastPayload.get();
+					if (json != null && !json.isEmpty()) conn.send(json);
+				}
+			});
+		} else {
+			String json = lastPayload.get();
+			if (json != null && !json.isEmpty()) conn.send(json);
+		}
 	}
 
 	@Override
@@ -68,12 +101,26 @@ public class StreamingServer extends WebSocketServer {
 			String username = obj.has("username") ? obj.get("username").getAsString() : null;
 			String usernameFinal = (username != null && !username.isEmpty()) ? username.trim() : null;
 
-			if ("spawn".equals(cmd)) {
+			if ("ping".equals(cmd)) {
+				if (requestId != null && !requestId.isEmpty()) {
+					JsonObject resp = new JsonObject();
+					resp.addProperty("type", "ping_result");
+					resp.addProperty("request_id", requestId);
+					resp.addProperty("success", true);
+					resp.addProperty("version", "QoL-3.3.7");
+					broadcast(resp.toString());
+				}
+			} else if ("spawn".equals(cmd)) {
 				String monster = obj.has("monster") ? obj.get("monster").getAsString() : null;
 				if (monster == null || monster.isEmpty()) return;
 				String monsterFinal = monster.trim().toLowerCase();
 				Gdx.app.postRunnable(() -> {
-					String err = StreamingCommandHandler.handleSpawn(monsterFinal, usernameFinal);
+					String err = null;
+					try {
+						err = StreamingCommandHandler.handleSpawn(monsterFinal, usernameFinal);
+					} catch (Throwable t) {
+						err = (t.getMessage() != null) ? t.getMessage() : "Unknown error";
+					}
 					boolean ok = (err == null);
 					if (requestId != null && !requestId.isEmpty()) {
 						JsonObject resp = new JsonObject();
@@ -81,7 +128,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("request_id", requestId);
 						resp.addProperty("success", ok);
 						if (err != null) resp.addProperty("error", err);
-						conn.send(resp.toString());
+						broadcast(resp.toString());
 					}
 				});
 			} else if ("champion".equals(cmd)) {
@@ -89,7 +136,12 @@ public class StreamingServer extends WebSocketServer {
 				if (monster == null || monster.isEmpty()) return;
 				String monsterFinal = monster.trim().toLowerCase();
 				Gdx.app.postRunnable(() -> {
-					String err = StreamingCommandHandler.handleSpawnChampion(monsterFinal, usernameFinal);
+					String err = null;
+					try {
+						err = StreamingCommandHandler.handleSpawnChampion(monsterFinal, usernameFinal);
+					} catch (Throwable t) {
+						err = (t.getMessage() != null) ? t.getMessage() : "Unknown error";
+					}
 					boolean ok = (err == null);
 					if (requestId != null && !requestId.isEmpty()) {
 						JsonObject resp = new JsonObject();
@@ -98,14 +150,19 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (err != null) resp.addProperty("error", err);
 						if (ok) resp.addProperty("monster", monsterFinal);
-						conn.send(resp.toString());
+						broadcast(resp.toString());
 					}
 				});
 			} else if ("gold".equals(cmd)) {
 				int amount = obj.has("amount") ? obj.get("amount").getAsInt() : 5;
 				int amountFinal = Math.max(1, Math.min(100, amount));
 				Gdx.app.postRunnable(() -> {
-					String err = StreamingCommandHandler.handleDropGold(amountFinal, usernameFinal);
+					String err = null;
+					try {
+						err = StreamingCommandHandler.handleDropGold(amountFinal, usernameFinal);
+					} catch (Throwable t) {
+						err = (t.getMessage() != null) ? t.getMessage() : "Unknown error";
+					}
 					boolean ok = (err == null);
 					if (requestId != null && !requestId.isEmpty()) {
 						JsonObject resp = new JsonObject();
@@ -113,7 +170,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("request_id", requestId);
 						resp.addProperty("success", ok);
 						if (err != null) resp.addProperty("error", err);
-						conn.send(resp.toString());
+						broadcast(resp.toString());
 					}
 				});
 			} else if ("gas".equals(cmd)) {
@@ -129,7 +186,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (gasName != null) resp.addProperty("gas_name", gasName);
 						if (err != null) resp.addProperty("error", err);
-						conn.send(resp.toString());
+						broadcast(resp.toString());
 					}
 				});
 			} else if ("curse".equals(cmd)) {
@@ -148,7 +205,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (itemName != null) resp.addProperty("item_name", itemName);
 						if (err != null) resp.addProperty("error", err);
-						conn.send(resp.toString());
+						broadcast(resp.toString());
 					}
 				});
 			} else if ("scroll".equals(cmd)) {
@@ -164,7 +221,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (scrollName != null) resp.addProperty("scroll_name", scrollName);
 						if (err != null) resp.addProperty("error", err);
-						conn.send(resp.toString());
+						broadcast(resp.toString());
 					}
 				});
 			} else if ("wand".equals(cmd)) {
@@ -186,7 +243,7 @@ public class StreamingServer extends WebSocketServer {
 							if (effectName != null) resp.addProperty("effect_name", effectName);
 							resp.addProperty("rarity", rarity);
 							if (err != null) resp.addProperty("error", err);
-							conn.send(resp.toString());
+							broadcast(resp.toString());
 						}
 					});
 				});
@@ -203,7 +260,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (buffName != null) resp.addProperty("buff_name", buffName);
 						if (err != null) resp.addProperty("error", err);
-						conn.send(resp.toString());
+						broadcast(resp.toString());
 					}
 				});
 			} else if ("debuff".equals(cmd)) {
@@ -219,7 +276,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (debuffName != null) resp.addProperty("debuff_name", debuffName);
 						if (err != null) resp.addProperty("error", err);
-						conn.send(resp.toString());
+						broadcast(resp.toString());
 					}
 				});
 			} else if ("trap".equals(cmd)) {
@@ -235,7 +292,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (trapName != null) resp.addProperty("trap_name", trapName);
 						if (err != null) resp.addProperty("error", err);
-						conn.send(resp.toString());
+						broadcast(resp.toString());
 					}
 				});
 			} else if ("transmute".equals(cmd)) {
@@ -251,7 +308,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (itemName != null) resp.addProperty("item_name", itemName);
 						if (err != null) resp.addProperty("error", err);
-						conn.send(resp.toString());
+						broadcast(resp.toString());
 					}
 				});
 			} else if ("summon_bee".equals(cmd)) {
@@ -267,7 +324,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (allyName != null) resp.addProperty("ally_name", allyName);
 						if (err != null) resp.addProperty("error", err);
-						conn.send(resp.toString());
+						broadcast(resp.toString());
 					}
 				});
 			} else if ("ward".equals(cmd)) {
@@ -283,7 +340,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (wardName != null) resp.addProperty("ward_name", wardName);
 						if (err != null) resp.addProperty("error", err);
-						conn.send(resp.toString());
+						broadcast(resp.toString());
 					}
 				});
 			}

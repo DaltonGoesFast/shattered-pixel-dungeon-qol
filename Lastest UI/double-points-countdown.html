@@ -50,7 +50,7 @@
       });
     }
     update();
-    setInterval(update, 1000);
+    setInterval(update, 1000);  // 1 second (smooth countdown in OBS)
     document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") update(); });
   </script>
 </body>

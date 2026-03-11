@@ -168,7 +168,7 @@ SLOT_HELP = "weapon, armor, ring, artifact, misc (middle slot)"
 FALLBACK_RATES = {
     "USD": 1.0, "EUR": 1.08, "GBP": 1.27, "CAD": 0.74, "AUD": 0.65,
     "JPY": 0.0067, "MXN": 0.058, "BRL": 0.20, "INR": 0.012,
-    "KRW": 0.00075, "CHF": 1.13, "PLN": 0.25, "SEK": 0.095, "ARS": 0.0053,
+    "KRW": 0.00075, "CHF": 1.13, "PLN": 0.25, "SEK": 0.095, "ARS": 0.00075,  # 1 ARS ≈ 0.00075 USD (1 USD ≈ 1333 ARS)
 }
 
 
@@ -573,6 +573,8 @@ def cmd_gas(args):
 
 
 def cmd_scroll(args):
+    if is_spend_disabled():
+        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
     if len(args) < 1:
         return SPAWN_RESULT_FILE, "Usage: !scroll (uses a random scroll like +10 Unstable Spellbook)"
     username = args[0]

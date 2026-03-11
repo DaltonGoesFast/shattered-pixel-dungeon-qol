@@ -170,6 +170,7 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.BuffIndicator;
 import com.shatteredpixel.shatteredpixeldungeon.ui.QuickSlotButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.StatusPane;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndHero;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndResurrect;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndTradeItem;
@@ -2253,6 +2254,7 @@ public class Hero extends Char {
 		Game.runOnRenderThread(new Callback() {
 			@Override
 			public void call() {
+				StreamingEvents.heroDiedPending = true;
 				GameScene.gameOver();
 				Sample.INSTANCE.play( Assets.Sounds.DEATH );
 			}

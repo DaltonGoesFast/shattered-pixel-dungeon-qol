@@ -1908,6 +1908,8 @@ public class CPHInline
 
 **Stream Deck setup:** Create an "Action Switch" or similar. Assign Spend ON to the ON state and Spend OFF to the OFF state. When the switch is ON, spending is enabled; when OFF, spending is disabled.
 
+**Coverage:** All spend commands in `points_command.py` (spawn, champion, gold, curse, gas, scroll, trap, transmute, bee, ward, buff, debuff, wand) check for `spend_disabled.txt` and return "Spending is currently disabled by the streamer." when the file exists. If you add new spend commands to the script, add the same `is_spend_disabled()` check at the start of the handler.
+
 ---
 
 ## Action 21: Earn Points (Super Chat / Cheer)

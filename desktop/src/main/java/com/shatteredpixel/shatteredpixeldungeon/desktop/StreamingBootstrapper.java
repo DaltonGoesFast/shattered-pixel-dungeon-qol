@@ -16,6 +16,7 @@ package com.shatteredpixel.shatteredpixeldungeon.desktop;
 import com.badlogic.gdx.Gdx;
 import com.google.gson.Gson;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GameStateSnapshot;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
 
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -61,6 +62,15 @@ public final class StreamingBootstrapper {
 						String json = GSON.toJson(snapshot);
 						s.setLastPayload(json);
 						s.broadcastPayload();
+						if (StreamingEvents.heroDiedPending) {
+							s.broadcastEvent("hero_died", null);
+							StreamingEvents.heroDiedPending = false;
+						}
+						if (StreamingEvents.bossSlainDepthPending >= 0) {
+							int depth = StreamingEvents.bossSlainDepthPending;
+							StreamingEvents.bossSlainDepthPending = -1;
+							s.broadcastEvent("boss_slain", Map.of("depth", depth));
+						}
 					} catch (Exception e) {
 						if (e.getMessage() != null) System.err.println("[Streaming] " + e.getMessage());
 					}

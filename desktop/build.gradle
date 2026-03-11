@@ -12,6 +12,16 @@ processResources {
     from new File(project(':desktop').projectDir,"/src/main/assets")
 }
 
+jar {
+    manifest {
+        attributes 'Main-Class': appMainClass
+        attributes 'Specification-Title': appName
+        attributes 'Implementation-Title': appPackageName
+        attributes 'Specification-Version': appVersionName
+        attributes 'Implementation-Version': appVersionCode
+    }
+}
+
 def osName = System.getProperty('os.name').toLowerCase(Locale.ROOT)
 
 tasks.register('debug', JavaExec) {
