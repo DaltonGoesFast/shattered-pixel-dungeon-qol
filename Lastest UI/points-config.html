@@ -243,6 +243,20 @@
       background: var(--spd-danger);
     }
     button.cancel-free-btn:hover { background: var(--spd-danger-hover); }
+    .discount-checks {
+      display: flex;
+      gap: 0.75rem;
+      margin-left: 0.5rem;
+      font-size: 0.8rem;
+      color: var(--spd-muted-on-surface);
+    }
+    .discount-checks label {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      min-width: 0;
+      cursor: pointer;
+    }
     .free-countdown {
       font-size: 0.85rem;
       color: var(--spd-success);
@@ -369,100 +383,165 @@
   <div class="col-left" id="colLeft">
   <section id="section-general" data-section="general">
     <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>General costs</h2>
+    <p class="sub" style="margin-bottom: 0.5rem; font-size: 0.85rem;">Helper/Hurter: check to apply role discount (see Helpers vs Hurters for %).</p>
     <div class="row free-mins-row" style="margin-bottom:0.75rem;padding-bottom:0.75rem;border-bottom:1px solid var(--spd-border);">
       <label for="freeMins">Free for (mins):</label>
       <input type="number" id="freeMins" min="1" max="1440" value="5" style="width:64px;">
     </div>
     <div class="costs-scroll">
-    <div class="row" data-cost-key="cost_per_gold">
+    <div class="row" data-cost-key="cost_per_gold" data-cmd="gold">
       <label for="cost_per_gold">Gold (per 1):</label>
       <input type="number" id="cost_per_gold" min="1" value="5">
       <button type="button" class="free-btn">Free</button>
       <span class="free-countdown" style="display:none;"></span>
       <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
+      <span class="discount-checks">
+        <label><input type="checkbox" class="discount-helper" data-cmd="gold"> Helper</label>
+        <label><input type="checkbox" class="discount-hurter" data-cmd="gold"> Hurter</label>
+      </span>
     </div>
-    <div class="row" data-cost-key="cost_per_curse">
+    <div class="row" data-cost-key="cost_per_curse" data-cmd="curse">
       <label for="cost_per_curse">Curse:</label>
       <input type="number" id="cost_per_curse" min="1" value="200">
       <button type="button" class="free-btn">Free</button>
       <span class="free-countdown" style="display:none;"></span>
       <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
+      <span class="discount-checks">
+        <label><input type="checkbox" class="discount-helper" data-cmd="curse"> Helper</label>
+        <label><input type="checkbox" class="discount-hurter" data-cmd="curse"> Hurter</label>
+      </span>
     </div>
-    <div class="row" data-cost-key="cost_per_gas">
+    <div class="row" data-cost-key="cost_per_gas" data-cmd="gas">
       <label for="cost_per_gas">Gas:</label>
       <input type="number" id="cost_per_gas" min="1" value="75">
       <button type="button" class="free-btn">Free</button>
       <span class="free-countdown" style="display:none;"></span>
       <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
+      <span class="discount-checks">
+        <label><input type="checkbox" class="discount-helper" data-cmd="gas"> Helper</label>
+        <label><input type="checkbox" class="discount-hurter" data-cmd="gas"> Hurter</label>
+      </span>
     </div>
-    <div class="row" data-cost-key="cost_per_scroll">
+    <div class="row" data-cost-key="cost_per_scroll" data-cmd="scroll">
       <label for="cost_per_scroll">Random scroll:</label>
       <input type="number" id="cost_per_scroll" min="1" value="100">
       <button type="button" class="free-btn">Free</button>
       <span class="free-countdown" style="display:none;"></span>
       <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
+      <span class="discount-checks">
+        <label><input type="checkbox" class="discount-helper" data-cmd="scroll"> Helper</label>
+        <label><input type="checkbox" class="discount-hurter" data-cmd="scroll"> Hurter</label>
+      </span>
     </div>
-    <div class="row" data-cost-key="cost_per_trap">
+    <div class="row" data-cost-key="cost_per_trap" data-cmd="trap">
       <label for="cost_per_trap">Trap:</label>
       <input type="number" id="cost_per_trap" min="1" value="50">
       <button type="button" class="free-btn">Free</button>
+      <span class="free-countdown" style="display:none;"></span>
+      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
+      <span class="discount-checks">
+        <label><input type="checkbox" class="discount-helper" data-cmd="trap"> Helper</label>
+        <label><input type="checkbox" class="discount-hurter" data-cmd="trap"> Hurter</label>
+      </span>
     </div>
-    <div class="row" data-cost-key="cost_per_transmute">
+    <div class="row" data-cost-key="cost_per_transmute" data-cmd="transmute">
       <label for="cost_per_transmute">Transmute:</label>
       <input type="number" id="cost_per_transmute" min="1" value="150">
       <button type="button" class="free-btn">Free</button>
       <span class="free-countdown" style="display:none;"></span>
       <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
+      <span class="discount-checks">
+        <label><input type="checkbox" class="discount-helper" data-cmd="transmute"> Helper</label>
+        <label><input type="checkbox" class="discount-hurter" data-cmd="transmute"> Hurter</label>
+      </span>
     </div>
-    <div class="row" data-cost-key="cost_per_ally_bee">
+    <div class="row" data-cost-key="cost_per_ally_bee" data-cmd="bee">
       <label for="cost_per_ally_bee">Bee:</label>
       <input type="number" id="cost_per_ally_bee" min="1" value="75">
       <button type="button" class="free-btn">Free</button>
+      <span class="free-countdown" style="display:none;"></span>
+      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
+      <span class="discount-checks">
+        <label><input type="checkbox" class="discount-helper" data-cmd="bee"> Helper</label>
+        <label><input type="checkbox" class="discount-hurter" data-cmd="bee"> Hurter</label>
+      </span>
     </div>
-    <div class="row" data-cost-key="cost_per_ward">
+    <div class="row" data-cost-key="cost_per_ward" data-cmd="ward">
       <label for="cost_per_ward">Ward:</label>
       <input type="number" id="cost_per_ward" min="1" value="30">
       <button type="button" class="free-btn">Free</button>
       <span class="free-countdown" style="display:none;"></span>
       <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
+      <span class="discount-checks">
+        <label><input type="checkbox" class="discount-helper" data-cmd="ward"> Helper</label>
+        <label><input type="checkbox" class="discount-hurter" data-cmd="ward"> Hurter</label>
+      </span>
     </div>
-    <div class="row" data-cost-key="cost_per_buff">
+    <div class="row" data-cost-key="cost_per_buff" data-cmd="buff">
       <label for="cost_per_buff">Random buff:</label>
       <input type="number" id="cost_per_buff" min="1" value="75">
       <button type="button" class="free-btn">Free</button>
+      <span class="free-countdown" style="display:none;"></span>
+      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
+      <span class="discount-checks">
+        <label><input type="checkbox" class="discount-helper" data-cmd="buff"> Helper</label>
+        <label><input type="checkbox" class="discount-hurter" data-cmd="buff"> Hurter</label>
+      </span>
     </div>
-    <div class="row" data-cost-key="cost_per_debuff">
+    <div class="row" data-cost-key="cost_per_debuff" data-cmd="debuff">
       <label for="cost_per_debuff">Random debuff:</label>
       <input type="number" id="cost_per_debuff" min="1" value="50">
       <button type="button" class="free-btn">Free</button>
       <span class="free-countdown" style="display:none;"></span>
       <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
+      <span class="discount-checks">
+        <label><input type="checkbox" class="discount-helper" data-cmd="debuff"> Helper</label>
+        <label><input type="checkbox" class="discount-hurter" data-cmd="debuff"> Hurter</label>
+      </span>
     </div>
-    <div class="row" data-cost-key="cost_per_wand_common">
+    <div class="row" data-cost-key="cost_per_wand_common" data-cmd="wand">
       <label for="cost_per_wand_common">Wand (common):</label>
       <input type="number" id="cost_per_wand_common" min="1" value="50">
       <button type="button" class="free-btn">Free</button>
       <span class="free-countdown" style="display:none;"></span>
       <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
+      <span class="discount-checks">
+        <label><input type="checkbox" class="discount-helper" data-cmd="wand"> Helper</label>
+        <label><input type="checkbox" class="discount-hurter" data-cmd="wand"> Hurter</label>
+      </span>
     </div>
-    <div class="row" data-cost-key="cost_per_wand_uncommon">
+    <div class="row" data-cost-key="cost_per_wand_uncommon" data-cmd="wand">
       <label for="cost_per_wand_uncommon">Wand (uncommon):</label>
       <input type="number" id="cost_per_wand_uncommon" min="1" value="100">
       <button type="button" class="free-btn">Free</button>
+      <span class="free-countdown" style="display:none;"></span>
+      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
+      <span class="discount-checks">
+        <label><input type="checkbox" class="discount-helper" data-cmd="wand"> Helper</label>
+        <label><input type="checkbox" class="discount-hurter" data-cmd="wand"> Hurter</label>
+      </span>
     </div>
-    <div class="row" data-cost-key="cost_per_wand_rare">
+    <div class="row" data-cost-key="cost_per_wand_rare" data-cmd="wand">
       <label for="cost_per_wand_rare">Wand (rare):</label>
       <input type="number" id="cost_per_wand_rare" min="1" value="200">
       <button type="button" class="free-btn">Free</button>
       <span class="free-countdown" style="display:none;"></span>
       <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
+      <span class="discount-checks">
+        <label><input type="checkbox" class="discount-helper" data-cmd="wand"> Helper</label>
+        <label><input type="checkbox" class="discount-hurter" data-cmd="wand"> Hurter</label>
+      </span>
     </div>
-    <div class="row" data-cost-key="cost_per_wand_veryrare">
+    <div class="row" data-cost-key="cost_per_wand_veryrare" data-cmd="wand">
       <label for="cost_per_wand_veryrare">Wand (very rare):</label>
       <input type="number" id="cost_per_wand_veryrare" min="1" value="400">
       <button type="button" class="free-btn">Free</button>
       <span class="free-countdown" style="display:none;"></span>
       <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
+      <span class="discount-checks">
+        <label><input type="checkbox" class="discount-helper" data-cmd="wand"> Helper</label>
+        <label><input type="checkbox" class="discount-hurter" data-cmd="wand"> Hurter</label>
+      </span>
     </div>
     <div class="row" data-cost-key="default_monster_cost">
       <label for="default_monster_cost">Default monster:</label>
@@ -499,6 +578,9 @@
       <button id="clearNonDonor" style="background:var(--spd-btn-secondary);">Delete all points</button>
       <button id="clearAll" style="background:var(--spd-danger);">Delete all donor points</button>
       <button id="exportViewerCsv" style="background:var(--spd-btn-secondary);" title="Download viewer points as CSV">Export CSV</button>
+      <button id="importViewerCsv" style="background:var(--spd-btn-secondary);" title="Import viewer points from CSV">Import CSV</button>
+      <input type="file" id="importViewerCsvFile" accept=".csv" style="display:none;">
+      <button id="pruneInactive" style="background:var(--spd-btn-secondary);" title="Remove users inactive 2+ days with &lt;101 donor pts">Prune inactive</button>
     </div>
     <div class="vp-list-wrapper" style="position:relative;">
       <div id="viewer_points_list" style="height: 420px; max-height: 70vh; overflow-y: auto;"></div>
@@ -564,6 +646,78 @@
       <span id="doublePointsCountdown" class="free-countdown" style="margin-left:8px;">—</span>
     </div>
   </section>
+  <section id="section-helpers-hurters" data-section="helpers_hurters">
+    <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>Helpers vs Hurters</h2>
+    <p class="sub" style="margin-bottom: 0.75rem;">ON/OFF is controlled via Stream Deck (Helpers/Hurters toggle). The settings below apply when the system is ON. Check Helper/Hurter next to each cost to apply the discount.</p>
+    <div class="row" style="margin-bottom:0.5rem;">
+      <label for="points_per_helper_on_boss">Points per helper when boss slain:</label>
+      <input type="number" id="points_per_helper_on_boss" min="0" value="10" style="width:64px;">
+    </div>
+    <div class="row" style="margin-bottom:0.5rem;">
+      <label for="points_per_hurter_on_death">Points per hurter when hero dies:</label>
+      <input type="number" id="points_per_hurter_on_death" min="0" value="10" style="width:64px;">
+    </div>
+    <div class="row" style="margin-bottom:0.5rem;">
+      <label for="helper_discount_percent">Helper discount %:</label>
+      <input type="number" id="helper_discount_percent" min="0" max="100" value="50" style="width:64px;">
+    </div>
+    <div class="row" style="margin-bottom:0.5rem;">
+      <label for="hurter_discount_percent">Hurter discount %:</label>
+      <input type="number" id="hurter_discount_percent" min="0" max="100" value="50" style="width:64px;">
+    </div>
+    <div class="row" style="margin-bottom:0.5rem;">
+      <label for="cost_to_switch_side">Cost to switch side (0 = free):</label>
+      <input type="number" id="cost_to_switch_side" min="0" value="50" style="width:64px;">
+    </div>
+    <div class="row" data-cost-key="cost_per_heal" data-cmd="heal" style="margin-bottom:0.5rem;">
+      <label for="cost_per_heal">Heal:</label>
+      <input type="number" id="cost_per_heal" min="1" value="100" style="width:64px;">
+      <span class="discount-checks">
+        <label><input type="checkbox" class="discount-helper" data-cmd="heal"> Helper</label>
+        <label><input type="checkbox" class="discount-hurter" data-cmd="heal"> Hurter</label>
+      </span>
+    </div>
+    <div class="row" data-cost-key="cost_per_cleanse" data-cmd="cleanse" style="margin-bottom:0.5rem;">
+      <label for="cost_per_cleanse">Cleanse:</label>
+      <input type="number" id="cost_per_cleanse" min="1" value="150" style="width:64px;">
+      <span class="discount-checks">
+        <label><input type="checkbox" class="discount-helper" data-cmd="cleanse"> Helper</label>
+        <label><input type="checkbox" class="discount-hurter" data-cmd="cleanse"> Hurter</label>
+      </span>
+    </div>
+    <div class="row" data-cost-key="cost_per_dew" data-cmd="dew" style="margin-bottom:0.5rem;">
+      <label for="cost_per_dew">Dew:</label>
+      <input type="number" id="cost_per_dew" min="1" value="30" style="width:64px;">
+      <span class="discount-checks">
+        <label><input type="checkbox" class="discount-helper" data-cmd="dew"> Helper</label>
+        <label><input type="checkbox" class="discount-hurter" data-cmd="dew"> Hurter</label>
+      </span>
+    </div>
+    <div class="row" data-cost-key="cost_per_hex" data-cmd="hex" style="margin-bottom:0.5rem;">
+      <label for="cost_per_hex">Hex:</label>
+      <input type="number" id="cost_per_hex" min="1" value="75" style="width:64px;">
+      <span class="discount-checks">
+        <label><input type="checkbox" class="discount-helper" data-cmd="hex"> Helper</label>
+        <label><input type="checkbox" class="discount-hurter" data-cmd="hex"> Hurter</label>
+      </span>
+    </div>
+    <div class="row" data-cost-key="cost_per_degrade" data-cmd="degrade" style="margin-bottom:0.5rem;">
+      <label for="cost_per_degrade">Degrade:</label>
+      <input type="number" id="cost_per_degrade" min="1" value="100" style="width:64px;">
+      <span class="discount-checks">
+        <label><input type="checkbox" class="discount-helper" data-cmd="degrade"> Helper</label>
+        <label><input type="checkbox" class="discount-hurter" data-cmd="degrade"> Hurter</label>
+      </span>
+    </div>
+    <div class="row" data-cost-key="cost_per_sabotage" data-cmd="sabotage" style="margin-bottom:0.5rem;">
+      <label for="cost_per_sabotage">Sabotage:</label>
+      <input type="number" id="cost_per_sabotage" min="1" value="75" style="width:64px;">
+      <span class="discount-checks">
+        <label><input type="checkbox" class="discount-helper" data-cmd="sabotage"> Helper</label>
+        <label><input type="checkbox" class="discount-hurter" data-cmd="sabotage"> Hurter</label>
+      </span>
+    </div>
+  </section>
   <section id="section-activity" data-section="activity">
     <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>Activity</h2>
     <details id="activityDetails" open style="margin-top:0.25rem;">
@@ -610,6 +764,7 @@
       <div class="config-row"><label><input type="checkbox" id="cfg-section-viewer" checked> Viewer points</label></div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-game" checked> Game data (WebSocket)</label></div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-score" checked> Streamer vs Chat Score</label></div>
+      <div class="config-row"><label><input type="checkbox" id="cfg-section-helpers-hurters" checked> Helpers vs Hurters</label></div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-activity" checked> Activity</label></div>
       <div class="btns">
         <button id="overallConfigReset">Reset</button>
@@ -767,6 +922,27 @@
           document.getElementById('cost_per_wand_rare').value = data.cost_per_wand_rare ?? 200;
           document.getElementById('cost_per_wand_veryrare').value = data.cost_per_wand_veryrare ?? 400;
           document.getElementById('default_monster_cost').value = data.default_monster_cost ?? 100;
+          const setIf = (id, val, def) => { const e = document.getElementById(id); if (e) e.value = val ?? def; };
+          setIf('points_per_helper_on_boss', data.points_per_helper_on_boss, 10);
+          setIf('points_per_hurter_on_death', data.points_per_hurter_on_death, 10);
+          setIf('helper_discount_percent', data.helper_discount_percent, 50);
+          setIf('hurter_discount_percent', data.hurter_discount_percent, 50);
+          const helperCmds = data.helper_discount_commands || ['ward', 'bee', 'buff'];
+          const hurterCmds = data.hurter_discount_commands || ['debuff', 'curse', 'trap', 'gas'];
+          document.querySelectorAll('.row[data-cmd]').forEach(row => {
+            const cmd = row.dataset.cmd;
+            const h = row.querySelector('.discount-helper');
+            const ht = row.querySelector('.discount-hurter');
+            if (h) h.checked = helperCmds.includes(cmd);
+            if (ht) ht.checked = hurterCmds.includes(cmd);
+          });
+          setIf('cost_to_switch_side', data.cost_to_switch_side, 50);
+          setIf('cost_per_heal', data.cost_per_heal, 100);
+          setIf('cost_per_cleanse', data.cost_per_cleanse, 150);
+          setIf('cost_per_dew', data.cost_per_dew, 30);
+          setIf('cost_per_hex', data.cost_per_hex, 75);
+          setIf('cost_per_degrade', data.cost_per_degrade, 100);
+          setIf('cost_per_sabotage', data.cost_per_sabotage, 75);
           const monsters = data.cost_per_monster || {};
           const container = document.getElementById('monsters');
           container.innerHTML = '';
@@ -835,6 +1011,27 @@
         cost_per_wand_veryrare: parseInt(document.getElementById('cost_per_wand_veryrare').value, 10) || 400,
         default_monster_cost: parseInt(document.getElementById('default_monster_cost').value, 10) || 100,
         cost_per_monster: costPerMonster,
+        points_per_helper_on_boss: parseInt(document.getElementById('points_per_helper_on_boss')?.value, 10) || 10,
+        points_per_hurter_on_death: parseInt(document.getElementById('points_per_hurter_on_death')?.value, 10) || 10,
+        helper_discount_percent: parseInt(document.getElementById('helper_discount_percent')?.value, 10) || 50,
+        hurter_discount_percent: parseInt(document.getElementById('hurter_discount_percent')?.value, 10) || 50,
+        helper_discount_commands: (() => {
+          const cmds = new Set();
+          document.querySelectorAll('.discount-helper:checked').forEach(cb => cmds.add(cb.dataset.cmd));
+          return Array.from(cmds);
+        })(),
+        hurter_discount_commands: (() => {
+          const cmds = new Set();
+          document.querySelectorAll('.discount-hurter:checked').forEach(cb => cmds.add(cb.dataset.cmd));
+          return Array.from(cmds);
+        })(),
+        cost_to_switch_side: parseInt(document.getElementById('cost_to_switch_side')?.value, 10) ?? 50,
+        cost_per_heal: parseInt(document.getElementById('cost_per_heal')?.value, 10) || 100,
+        cost_per_cleanse: parseInt(document.getElementById('cost_per_cleanse')?.value, 10) || 150,
+        cost_per_dew: parseInt(document.getElementById('cost_per_dew')?.value, 10) || 30,
+        cost_per_hex: parseInt(document.getElementById('cost_per_hex')?.value, 10) || 75,
+        cost_per_degrade: parseInt(document.getElementById('cost_per_degrade')?.value, 10) || 100,
+        cost_per_sabotage: parseInt(document.getElementById('cost_per_sabotage')?.value, 10) || 75,
       };
       fetch('/api/points-config', {
         method: 'POST',
@@ -905,13 +1102,14 @@
       fetch('/api/viewer-points')
         .then(r => r.json())
         .then(data => {
-          const rows = [['username', 'points', 'donor_pts', 'last']];
+          const rows = [['username', 'points', 'donor_pts', 'last', 'role']];
           Object.keys(data || {}).forEach(username => {
             const d = data[username];
             const points = (d && typeof d.points === 'number') ? d.points : 0;
             const donorPts = (d && typeof d.donationPts === 'number') ? d.donationPts : 0;
             const last = (d && d.last != null) ? String(d.last) : '';
-            rows.push([username, String(points), String(donorPts), last]);
+            const role = (d && (d.role === 'helper' || d.role === 'hurter')) ? d.role : '';
+            rows.push([username, String(points), String(donorPts), last, role]);
           });
           const csv = rows.map(row => row.map(cell => /[,"\n]/.test(cell) ? '"' + cell.replace(/"/g, '""') + '"' : cell).join(',')).join('\n');
           const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
@@ -924,6 +1122,73 @@
           logActivity('Viewer points CSV exported');
         })
         .catch(e => showMsg('Export failed: ' + e.message, false));
+    }
+
+    function parseCsvLine(line) {
+      const out = [];
+      let cur = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (c === '"') {
+          if (inQuotes && line[i + 1] === '"') { cur += '"'; i++; }
+          else inQuotes = !inQuotes;
+        } else if ((c === ',' && !inQuotes) || c === '\n') {
+          out.push(cur);
+          cur = '';
+          if (c === '\n') break;
+        } else cur += c;
+      }
+      out.push(cur);
+      return out;
+    }
+
+    function importViewerCsv() {
+      document.getElementById('importViewerCsvFile').click();
+    }
+
+    function handleImportViewerCsvFile(e) {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      e.target.value = '';
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const text = reader.result;
+          const lines = text.split(/\r?\n/).filter(l => l.trim());
+          if (lines.length < 2) { showMsg('CSV must have header + at least one row', false); return; }
+          const header = parseCsvLine(lines[0].replace(/\r/g, ''));
+          const headerLower = header.map(h => (h || '').toLowerCase().trim());
+          const idxUser = headerLower.findIndex(h => h === 'username' || h === 'user');
+          const idxPts = headerLower.findIndex(h => h === 'points' || h === 'pts');
+          const idxDonor = headerLower.findIndex(h => h === 'donor_pts' || h === 'donor' || h === 'donation');
+          const idxLast = headerLower.findIndex(h => h === 'last');
+          const idxRole = headerLower.findIndex(h => h === 'role');
+          if (idxUser < 0 || idxPts < 0) { showMsg('CSV must have username and points columns', false); return; }
+          const users = [];
+          for (let i = 1; i < lines.length; i++) {
+            const cells = parseCsvLine(lines[i].replace(/\r/g, ''));
+            const username = (cells[idxUser] || '').trim();
+            if (!username) continue;
+            const pts = parseInt(cells[idxPts] || '0', 10);
+            const donor = idxDonor >= 0 ? parseInt(cells[idxDonor] || '0', 10) : 0;
+            const last = idxLast >= 0 ? parseInt(cells[idxLast] || '0', 10) : 0;
+            const role = idxRole >= 0 && (cells[idxRole] || '').trim().toLowerCase() === 'helper' ? 'helper' : (idxRole >= 0 && (cells[idxRole] || '').trim().toLowerCase() === 'hurter' ? 'hurter' : '');
+            users.push({ username, points: Math.max(0, pts || 0), donationPts: Math.max(0, donor || 0), last: isNaN(last) ? 0 : last, role });
+          }
+          if (users.length === 0) { showMsg('No valid rows to import', false); return; }
+          fetch('/api/viewer-points/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ users, merge: true }) })
+            .then(r => r.json())
+            .then(d => {
+              if (d.error) throw new Error(d.error);
+              showMsg(`Imported ${d.count || users.length} users`, true);
+              loadViewerPoints(true);
+              logActivity('VP: imported ' + (d.count || users.length) + ' CSV');
+            })
+            .catch(err => showMsg('Import failed: ' + err.message, false));
+        } catch (err) { showMsg('Import failed: ' + err.message, false); }
+      };
+      reader.readAsText(file, 'UTF-8');
     }
 
     const PRESETS_STORAGE = 'spd_presets';
@@ -1017,14 +1282,14 @@
     const VP_REFRESH_STORAGE = 'vp_refresh_sec';
     const VP_REFRESH_DEFAULT = 10;
     const OVERALL_CONFIG_STORAGE = 'overlay_layout_config';
-    const OVERALL_CONFIG_DEFAULT = { columns: 3, sections: { general: true, monsters: true, viewer: true, game: true, score: true, activity: true }, order: ['general', 'monsters', 'viewer', 'game', 'score'], columnCounts: [2, 1, 2], monsterColumns: 2, monsterSectionWidth: 540 };
+    const OVERALL_CONFIG_DEFAULT = { columns: 3, sections: { general: true, monsters: true, viewer: true, game: true, score: true, helpers_hurters: true, activity: true }, order: ['general', 'monsters', 'viewer', 'game', 'score', 'helpers_hurters'], columnCounts: [2, 1, 3], monsterColumns: 2, monsterSectionWidth: 540 };
     function getOverallConfig() {
       try {
         const s = localStorage.getItem(OVERALL_CONFIG_STORAGE);
         if (s) {
           const c = JSON.parse(s);
           if (c && typeof c.columns === 'number' && c.sections) {
-            if (!Array.isArray(c.order)) c.order = ['general', 'monsters', 'viewer', 'game', 'score'];
+            if (!Array.isArray(c.order)) c.order = ['general', 'monsters', 'viewer', 'game', 'score', 'helpers_hurters'];
             if (!Array.isArray(c.columnCounts) || c.columnCounts.length !== 3) c.columnCounts = [2, 1, 2];
             if (c.monsterColumns == null) c.monsterColumns = 2;
             if (c.monsterSectionWidth == null) c.monsterSectionWidth = 420;
@@ -1057,7 +1322,7 @@
         grid.classList.add('col-' + Math.max(1, Math.min(3, cfg.columns)));
         applyColumnWidths();
       }
-      ['general', 'monsters', 'viewer', 'game', 'score', 'activity'].forEach(id => {
+      ['general', 'monsters', 'viewer', 'game', 'score', 'helpers_hurters', 'activity'].forEach(id => {
         const el = document.getElementById('section-' + id);
         if (el) el.style.display = (cfg.sections[id] !== false) ? '' : 'none';
       });
@@ -1284,8 +1549,10 @@
           }
           const donationPts = (d) => (d.donationPts != null ? d.donationPts : 0);
           const chatPts = (d) => Math.max(0, (d.points || 0) - donationPts(d));
-          container.innerHTML = '<table style="width:100%;border-collapse:collapse;"><thead><tr><th style="width:36px;"><input type="checkbox" id="vpSelectAll" title="Select all visible"></th><th style="text-align:left;padding:4px 8px;">User</th><th style="text-align:right;padding:4px 8px;">Points</th><th style="text-align:right;padding:4px 8px;">Donor</th><th></th></tr></thead><tbody>' +
-            viewerPointsData.map(([u, d]) => `<tr data-user="${escapeHtml(u)}"><td style="padding:4px 8px;"><input type="checkbox" class="vp-row-select"></td><td style="padding:4px 8px;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(u)}">${escapeHtml(u)}</td><td style="padding:4px 8px;"><input type="number" class="edit-pts" value="${chatPts(d)}" min="0" style="width:90px;min-width:50px;padding:2px 4px;box-sizing:border-box;"></td><td style="padding:4px 8px;"><input type="number" class="edit-donor" value="${donationPts(d)}" min="0" style="width:90px;min-width:50px;padding:2px 4px;box-sizing:border-box;"></td><td style="padding:4px 8px;"><button class="save-row" style="padding:2px 8px;font-size:0.85rem;">Save</button> <button class="del-row" style="padding:2px 8px;font-size:0.85rem;background:var(--spd-danger);">Del</button></td></tr>`).join('') +
+          const roleVal = (d) => (d.role === 'helper' || d.role === 'hurter') ? d.role : '';
+          const roleSelect = (d) => `<select class="edit-role" style="padding:2px 4px;font-size:0.85rem;min-width:80px;background:var(--spd-viewer-list);color:var(--spd-text-on-viewer-list);border:1px solid var(--spd-border);border-radius:4px;"><option value=""${roleVal(d)===''?' selected':''}>—</option><option value="helper"${roleVal(d)==='helper'?' selected':''}>helper</option><option value="hurter"${roleVal(d)==='hurter'?' selected':''}>hurter</option></select>`;
+          container.innerHTML = '<table style="width:100%;border-collapse:collapse;"><thead><tr><th style="width:36px;"><input type="checkbox" id="vpSelectAll" title="Select all visible"></th><th style="text-align:left;padding:4px 8px;">User</th><th style="text-align:right;padding:4px 8px;">Points</th><th style="text-align:right;padding:4px 8px;">Donor</th><th style="text-align:center;padding:4px 8px;">Role</th><th></th></tr></thead><tbody>' +
+            viewerPointsData.map(([u, d]) => `<tr data-user="${escapeHtml(u)}"><td style="padding:4px 8px;"><input type="checkbox" class="vp-row-select"></td><td style="padding:4px 8px;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(u)}">${escapeHtml(u)}</td><td style="padding:4px 8px;"><input type="number" class="edit-pts" value="${chatPts(d)}" min="0" style="width:90px;min-width:50px;padding:2px 4px;box-sizing:border-box;"></td><td style="padding:4px 8px;"><input type="number" class="edit-donor" value="${donationPts(d)}" min="0" style="width:90px;min-width:50px;padding:2px 4px;box-sizing:border-box;"></td><td style="padding:4px 8px;text-align:center;">${roleSelect(d)}</td><td style="padding:4px 8px;"><button class="save-row" style="padding:2px 8px;font-size:0.85rem;">Save</button> <button class="del-row" style="padding:2px 8px;font-size:0.85rem;background:var(--spd-danger);">Del</button></td></tr>`).join('') +
             '</tbody></table>';
           filterViewerPoints();
           const selectAllEl = document.getElementById('vpSelectAll');
@@ -1302,10 +1569,13 @@
               const user = tr.dataset.user;
               const chat = parseInt(tr.querySelector('.edit-pts').value, 10);
               const donor = parseInt(tr.querySelector('.edit-donor').value, 10);
+              const roleEl = tr.querySelector('.edit-role');
+              const role = roleEl ? roleEl.value : '';
               if (isNaN(chat) || chat < 0) { showMsg('Invalid points', false); return; }
               if (isNaN(donor) || donor < 0) { showMsg('Invalid donor points', false); return; }
               const totalPoints = chat + donor;
-              fetch('/api/viewer-points', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, points: totalPoints, donationPts: donor }) })
+              const payload = { username: user, points: totalPoints, donationPts: donor, role: role || '' };
+              fetch('/api/viewer-points', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
                 .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg(user + ' updated', true); loadViewerPoints(true); logActivity('VP: updated ' + user); })
                 .catch(e => showMsg('Failed: ' + e.message, false));
             });
@@ -1415,6 +1685,12 @@
     });
 
     document.getElementById('save').addEventListener('click', save);
+    document.body.addEventListener('change', (e) => {
+      const cb = e.target.closest('.discount-helper, .discount-hurter');
+      if (!cb || cb.dataset.cmd !== 'wand') return;
+      const cls = cb.classList.contains('discount-helper') ? 'discount-helper' : 'discount-hurter';
+      document.querySelectorAll('.' + cls + '[data-cmd="wand"]').forEach(c => { c.checked = cb.checked; });
+    });
     document.getElementById('exportConfig').addEventListener('click', exportConfig);
     document.getElementById('importConfig').addEventListener('click', () => document.getElementById('importConfigFile').click());
     document.getElementById('importConfigFile').addEventListener('change', (e) => {
@@ -1462,12 +1738,29 @@
         .catch(e => showMsg('Failed: ' + e.message, false));
     });
     document.getElementById('set_points').addEventListener('click', () => {
+      const selected = Array.from(document.querySelectorAll('.vp-row-select:checked')).map(cb => cb.closest('tr').dataset.user);
       const username = document.getElementById('vp_search').value.trim();
-      if (!username) {
-        showMsg('Enter a username to set', false);
+      const users = selected.length > 0 ? selected : (username ? [username.toLowerCase()] : []);
+      const chat = parseInt(document.getElementById('new_points').value, 10);
+      const donor = parseInt(document.getElementById('new_donation').value, 10) || 0;
+      if (users.length === 0) {
+        showMsg('Select users or enter a username', false);
         return;
       }
-      addViewerUser();
+      if (isNaN(chat) || chat < 0 || isNaN(donor) || donor < 0) {
+        showMsg('Enter valid points and donor values', false);
+        return;
+      }
+      const totalPts = Math.max(0, chat) + Math.max(0, donor);
+      const donorPts = Math.min(Math.max(0, donor), totalPts);
+      fetch('/api/viewer-points/bulk/set', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ points: totalPts, donationPts: donorPts, users }),
+      })
+        .then(r => r.json())
+        .then(d => { if (d.error) throw new Error(d.error); showMsg(`Set ${d.count} users to ${totalPts} pts`, true); loadViewerPoints(true); logActivity('VP: set ' + (d.count || 0) + ' users'); })
+        .catch(e => showMsg('Failed: ' + e.message, false));
     });
     document.getElementById('chatToDonor').addEventListener('click', () => {
       const selected = Array.from(document.querySelectorAll('.vp-row-select:checked')).map(cb => cb.closest('tr').dataset.user);
@@ -1499,6 +1792,15 @@
         .catch(e => showMsg('Failed: ' + e.message, false));
     });
     document.getElementById('exportViewerCsv').addEventListener('click', exportViewerCsv);
+    document.getElementById('importViewerCsv').addEventListener('click', importViewerCsv);
+    document.getElementById('importViewerCsvFile').addEventListener('change', handleImportViewerCsvFile);
+    document.getElementById('pruneInactive').addEventListener('click', () => {
+      if (!confirm('Remove users who haven\'t earned in 2+ days and have <101 donor points?')) return;
+      fetch('/api/viewer-points/prune', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ days: 2, minDonor: 101 }) })
+        .then(r => r.json())
+        .then(d => { if (d.error) throw new Error(d.error); showMsg('Pruned ' + (d.count || 0) + ' inactive users', true); loadViewerPoints(true); logActivity('VP: pruned ' + (d.count || 0)); })
+        .catch(e => showMsg('Prune failed: ' + e.message, false));
+    });
     ['score_streamer_label', 'score_chat_label', 'score_streamer', 'score_chat'].forEach(id => {
       document.getElementById(id).addEventListener('input', updateScorePreview);
     });
@@ -1545,6 +1847,7 @@
       document.getElementById('cfg-section-viewer').checked = cfg.sections.viewer !== false;
       document.getElementById('cfg-section-game').checked = cfg.sections.game !== false;
       document.getElementById('cfg-section-score').checked = cfg.sections.score !== false;
+      document.getElementById('cfg-section-helpers-hurters').checked = cfg.sections.helpers_hurters !== false;
       document.getElementById('cfg-section-activity').checked = cfg.sections.activity !== false;
       document.getElementById('overallConfigModal').classList.add('open');
     });
@@ -1563,6 +1866,7 @@
           viewer: document.getElementById('cfg-section-viewer').checked,
           game: document.getElementById('cfg-section-game').checked,
           score: document.getElementById('cfg-section-score').checked,
+          helpers_hurters: document.getElementById('cfg-section-helpers-hurters').checked,
           activity: document.getElementById('cfg-section-activity').checked,
         },
         order,
@@ -1581,11 +1885,12 @@
       document.getElementById('cfg-section-viewer').checked = true;
       document.getElementById('cfg-section-game').checked = true;
       document.getElementById('cfg-section-score').checked = true;
+      document.getElementById('cfg-section-helpers-hurters').checked = true;
       document.getElementById('cfg-section-activity').checked = true;
     });
     document.getElementById('overallConfigRestoreLayout').addEventListener('click', () => {
       const cfg = getOverallConfig();
-      cfg.order = ['general', 'monsters', 'viewer', 'game', 'score'];
+      cfg.order = ['general', 'monsters', 'viewer', 'game', 'score', 'helpers_hurters'];
       cfg.columnCounts = [2, 1, 2];
       saveOverallConfig(cfg);
       document.getElementById('overallConfigModal').classList.remove('open');

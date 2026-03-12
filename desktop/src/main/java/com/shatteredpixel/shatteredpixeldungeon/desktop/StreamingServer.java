@@ -343,6 +343,102 @@ public class StreamingServer extends WebSocketServer {
 						broadcast(resp.toString());
 					}
 				});
+			} else if ("heal".equals(cmd)) {
+				Gdx.app.postRunnable(() -> {
+					String result = StreamingCommandHandler.handleChatHeal(usernameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String buffName = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "heal_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (buffName != null) resp.addProperty("buff_name", buffName);
+						if (err != null) resp.addProperty("error", err);
+						broadcast(resp.toString());
+					}
+				});
+			} else if ("cleanse".equals(cmd)) {
+				Gdx.app.postRunnable(() -> {
+					String result = StreamingCommandHandler.handleChatCleanse(usernameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String buffName = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "cleanse_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (buffName != null) resp.addProperty("buff_name", buffName);
+						if (err != null) resp.addProperty("error", err);
+						broadcast(resp.toString());
+					}
+				});
+			} else if ("dew".equals(cmd)) {
+				Gdx.app.postRunnable(() -> {
+					String result = StreamingCommandHandler.handleChatDew(usernameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String itemName = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "dew_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (itemName != null) resp.addProperty("item_name", itemName);
+						if (err != null) resp.addProperty("error", err);
+						broadcast(resp.toString());
+					}
+				});
+			} else if ("hex".equals(cmd)) {
+				Gdx.app.postRunnable(() -> {
+					String result = StreamingCommandHandler.handleChatHex(usernameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String debuffName = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "hex_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (debuffName != null) resp.addProperty("debuff_name", debuffName);
+						if (err != null) resp.addProperty("error", err);
+						broadcast(resp.toString());
+					}
+				});
+			} else if ("degrade".equals(cmd)) {
+				Gdx.app.postRunnable(() -> {
+					String result = StreamingCommandHandler.handleChatDegrade(usernameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String debuffName = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "degrade_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (debuffName != null) resp.addProperty("debuff_name", debuffName);
+						if (err != null) resp.addProperty("error", err);
+						broadcast(resp.toString());
+					}
+				});
+			} else if ("sabotage".equals(cmd)) {
+				Gdx.app.postRunnable(() -> {
+					String result = StreamingCommandHandler.handleChatSabotage(usernameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String buffName = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "sabotage_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (buffName != null) resp.addProperty("buff_name", buffName);
+						if (err != null) resp.addProperty("error", err);
+						broadcast(resp.toString());
+					}
+				});
 			}
 		} catch (Exception ignored) {}
 	}

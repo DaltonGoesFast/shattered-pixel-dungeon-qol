@@ -60,7 +60,9 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ChatSpawned;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Cripple;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Daze;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Haste;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Degrade;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Healing;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Hex;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Invisibility;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Levitation;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.MindVision;
@@ -71,6 +73,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Slow;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SpawnScaled;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Vulnerable;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Weakness;
+import com.shatteredpixel.shatteredpixeldungeon.items.Dewdrop;
 import com.shatteredpixel.shatteredpixeldungeon.items.EquipableItem;
 import com.shatteredpixel.shatteredpixeldungeon.items.Gold;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
@@ -843,6 +846,142 @@ public final class StreamingCommandHandler {
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		GLog.n(Messages.get(StreamingCommandHandler.class, "chat_debuff"), chatter, debuffName);
 		return debuffName;
+	}
+
+	/** Helper-exclusive: Heal hero ~15% HP. Returns null on success, ERR:... on failure. */
+	public static String handleChatHeal(String username) {
+		if (Dungeon.hero == null || Dungeon.level == null)
+			return "ERR:Not in an active run (title/menu)";
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+			return "ERR:Not in an active run (title/menu)";
+		if (!Dungeon.hero.isAlive())
+			return "ERR:Hero is dead";
+
+		int totalHeal = Math.max(1, Math.round(Dungeon.hero.HT * 0.15f));
+		int perTick = Math.max(1, totalHeal / 10);
+		Healing h = Buff.affect(Dungeon.hero, Healing.class);
+		h.setHeal(totalHeal, 0, perTick);
+
+		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
+		GLog.p(Messages.get(StreamingCommandHandler.class, "chat_buff"), chatter, "Healing");
+		return "Healing";
+	}
+
+	/** Helper-exclusive: Remove one random negative buff. Returns buff name on success, ERR:... on failure. */
+	public static String handleChatCleanse(String username) {
+		if (Dungeon.hero == null || Dungeon.level == null)
+			return "ERR:Not in an active run (title/menu)";
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+			return "ERR:Not in an active run (title/menu)";
+		if (!Dungeon.hero.isAlive())
+			return "ERR:Hero is dead";
+
+		ArrayList<Buff> negatives = new ArrayList<>();
+		for (Buff b : Dungeon.hero.buffs()) {
+			if (b.type == Buff.buffType.NEGATIVE) negatives.add(b);
+		}
+		if (negatives.isEmpty())
+			return "ERR:No debuff to remove";
+
+		Buff toRemove = Random.element(negatives);
+		String buffName = Messages.titleCase(toRemove.getClass().getSimpleName());
+		toRemove.detach();
+
+		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
+		GLog.p(Messages.get(StreamingCommandHandler.class, "chat_cleanse"), chatter, buffName);
+		return buffName;
+	}
+
+	/** Helper-exclusive: Drop dewdrop near hero. Returns "Dewdrop" on success, ERR:... on failure. */
+	public static String handleChatDew(String username) {
+		if (Dungeon.hero == null || Dungeon.level == null)
+			return "ERR:Not in an active run (title/menu)";
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+			return "ERR:Not in an active run (title/menu)";
+		if (!Dungeon.hero.isAlive())
+			return "ERR:Hero is dead";
+
+		int heroPos = Dungeon.hero.pos;
+		boolean[] spawnPassable = new boolean[Dungeon.level.length()];
+		for (int i = 0; i < spawnPassable.length; i++) {
+			spawnPassable[i] = Dungeon.level.passable[i] || Dungeon.level.avoid[i];
+		}
+		PathFinder.buildDistanceMap(heroPos, spawnPassable, SPAWN_RADIUS);
+
+		ArrayList<Integer> candidates = new ArrayList<>();
+		for (int p = 0; p < Dungeon.level.length(); p++) {
+			int d = PathFinder.distance[p];
+			if (d < 1 || d > SPAWN_RADIUS) continue;
+			if (Actor.findChar(p) != null) continue;
+			if (!Dungeon.level.passable[p] && !Dungeon.level.avoid[p]) continue;
+			candidates.add(p);
+		}
+		if (candidates.isEmpty())
+			return "ERR:No space to drop dewdrop (hero surrounded)";
+
+		int cell = Random.element(candidates);
+		Dungeon.level.drop(new Dewdrop(), cell).sprite.drop();
+
+		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
+		GLog.h(Messages.get(StreamingCommandHandler.class, "chat_dew"), chatter);
+		return "Dewdrop";
+	}
+
+	/** Hurter-exclusive: Apply Hex debuff. Returns "Hex" on success, ERR:... on failure. */
+	public static String handleChatHex(String username) {
+		if (Dungeon.hero == null || Dungeon.level == null)
+			return "ERR:Not in an active run (title/menu)";
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+			return "ERR:Not in an active run (title/menu)";
+		if (!Dungeon.hero.isAlive())
+			return "ERR:Hero is dead";
+
+		Buff.affect(Dungeon.hero, Hex.class, Hex.DURATION);
+
+		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
+		GLog.n(Messages.get(StreamingCommandHandler.class, "chat_hex"), chatter);
+		return "Hex";
+	}
+
+	/** Hurter-exclusive: Apply Degrade debuff. Returns "Degrade" on success, ERR:... on failure. */
+	public static String handleChatDegrade(String username) {
+		if (Dungeon.hero == null || Dungeon.level == null)
+			return "ERR:Not in an active run (title/menu)";
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+			return "ERR:Not in an active run (title/menu)";
+		if (!Dungeon.hero.isAlive())
+			return "ERR:Hero is dead";
+
+		Buff.affect(Dungeon.hero, Degrade.class, Degrade.DURATION);
+
+		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
+		GLog.n(Messages.get(StreamingCommandHandler.class, "chat_degrade"), chatter);
+		return "Degrade";
+	}
+
+	/** Hurter-exclusive: Remove one random positive buff. Returns buff name on success, ERR:... on failure. */
+	public static String handleChatSabotage(String username) {
+		if (Dungeon.hero == null || Dungeon.level == null)
+			return "ERR:Not in an active run (title/menu)";
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+			return "ERR:Not in an active run (title/menu)";
+		if (!Dungeon.hero.isAlive())
+			return "ERR:Hero is dead";
+
+		ArrayList<Buff> positives = new ArrayList<>();
+		for (Buff b : Dungeon.hero.buffs()) {
+			if (b.type == Buff.buffType.POSITIVE) positives.add(b);
+		}
+		if (positives.isEmpty())
+			return "ERR:No buff to remove";
+
+		Buff toRemove = Random.element(positives);
+		String buffName = Messages.titleCase(toRemove.getClass().getSimpleName());
+		toRemove.detach();
+
+		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
+		GLog.n(Messages.get(StreamingCommandHandler.class, "chat_sabotage"), chatter, buffName);
+		return buffName;
 	}
 
 	/** Phase 2: full monster list. Returns null for unknown. */

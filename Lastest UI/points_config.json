@@ -1,4 +1,6 @@
 {
+  "points_per_helper_on_boss": 100,
+  "points_per_hurter_on_death": 100,
   "cost_per_gold": 5,
   "cost_per_curse": 200,
   "cost_per_gas": 75,
@@ -39,5 +41,26 @@
     "succubus": 60,
     "eye": 70,
     "scorpio": 80
-  }
+  },
+  "helper_discount_percent": 50,
+  "hurter_discount_percent": 50,
+  "helper_discount_commands": [
+    "bee",
+    "ward",
+    "buff"
+  ],
+  "hurter_discount_commands": [
+    "curse",
+    "gas",
+    "trap",
+    "debuff"
+  ],
+  "cost_to_switch_side": 150,
+  "cost_per_heal": 50,
+  "cost_per_cleanse": 50,
+  "cost_per_dew": 10,
+  "cost_per_hex": 75,
+  "cost_per_degrade": 75,
+  "cost_per_sabotage": 75,
+  "command_allowed_roles": {}
 }

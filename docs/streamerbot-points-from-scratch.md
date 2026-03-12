@@ -16,34 +16,50 @@ Before implementing, ensure:
 
 ## Implementation Order
 
-1. Action 01: Earn Points (on message) — gets users into the file
-2. Action 03: First Words — optional, add to your existing action
-3. Action 04: Check Points (!points) — viewers can check balance
-4. Action 05: Top Points (!toppoints) — show top 3 point holders
-5. Action 06: Spawn Monster (!spawn) — spend points to spawn
-6. Action 07: Spawn Champion (!champion) — spend points to spawn a champion version of a monster (2× base cost, no zone discount)
-7. Action 08: Drop Gold (!gold) — spend points to drop gold near hero
-8. Action 09: Curse Item (!curse) — spend points to curse equipped item
-9. Action 10: Spawn Random Gas (!gas) — spend points to spawn random gas
-10. Action 11: Random Scroll (!scroll) — spend points to use a random scroll (like +10 Unstable Spellbook)
-11. Action 12: Place Trap (!trap) — spend points to place a random visible trap nearby
-12. Action 13: Transmute (!transmute) — spend points to transmute a random transmutable item (bag or equipped)
-13. Action 14: Bee (!bee) — spend points to summon an allied bee (50 turns)
-14. Action 15: Ward (!ward) — spend points to summon a ward (scales with depth; upgrades existing if same tile)
-15. Action 16: Random Buff (!buff) — spend points to apply a random buff (Haste, Healing, Barrier, etc.)
-16. Action 17: Random Debuff (!debuff) — spend points to apply a random debuff (Blindness, Slow, Roots, etc.)
-17. Action 18: Cursed Wand Effect (!wand) — spend points to trigger a random cursed wand effect (cost varies by rarity)
-18. Action 02: Earn Points (passive) — optional, for viewers already in file
-19. Action 19: Double Points (!doublepoints) — optional, 2x points for N minutes
-20. Action 20: Spend OFF / Spend ON — optional, Stream Deck switch to disable/enable spend commands
-21. Action 21: Super Chat / Cheer — optional, 1 pt per $0.01
-22. Action 22: Reset Points — optional, clear points each stream
+**Action numbering matches Streamer.bot.** Keep actions in sync with this doc.
+
+| # | Action | Trigger | Purpose |
+|---|--------|---------|---------|
+| 01 | Earn Points (on chat) | Message Received | +1 per message (30s cooldown) |
+| 02 | Earn Points (passive) | Present Viewers | +1 per tick for users already in file |
+| 03 | First Words Bonus | (add to First Words) | +5 on first chat |
+| 04 | Check Points | !points | Show viewer their balance |
+| 05 | Top Points | !toppoints | Show top 3 point holders |
+| 06 | Spawn Monster | !spawn | Spend points to spawn monster |
+| 07 | Spawn Champion | !champion | Spend points to spawn champion (2× base) |
+| 08 | Drop Gold | !gold | Spend points to drop gold |
+| 09 | Curse Item | !curse | Spend points to curse equipped item |
+| 10 | Spawn Random Gas | !gas | Spend points to spawn random gas |
+| 11 | Random Scroll | !scroll | Spend points to use random scroll |
+| 12 | Place Trap | !trap | Spend points to place random trap |
+| 13 | Transmute | !transmute | Spend points to transmute item |
+| 14 | Bee | !bee | Spend points to summon allied bee |
+| 15 | Ward | !ward | Spend points to summon ward |
+| 16 | Random Buff | !buff | Spend points to apply random buff |
+| 17 | Random Debuff | !debuff | Spend points to apply random debuff |
+| 18 | Cursed Wand Effect | !wand | Spend points to trigger cursed wand effect |
+| 19 | Double Points | !doublepoints | Streamer only: 2× points for N minutes |
+| 20 | Earn Points (Cheer) | Twitch Cheer | 1 pt per bit |
+| 21 | Earn Points (Super Chat) | YouTube Super Chat | 1 pt per $0.01 |
+| 22 | Reset Points | Stream Started | Clear non-donor points |
+| 23 | Spend OFF | Hotkey (Stream Deck OFF) | Disable spend commands |
+| 24 | Spend ON | Hotkey (Stream Deck ON) | Enable spend commands |
+| 25 | Helpers/Hurters OFF | Hotkey (Stream Deck OFF) | Disable helpers vs hurters |
+| 26 | Helpers/Hurters ON | Hotkey (Stream Deck ON) | Enable helpers vs hurters |
+| 27 | !myside | !myside | Remind user their side (no cost) |
+| 28 | !switch | !switch | Switch helper/hurter side (cost configurable) |
+| 29 | !heal | !heal | Helper: heal hero ~15% HP |
+| 30 | !cleanse | !cleanse | Helper: remove one random debuff |
+| 31 | !dew | !dew | Helper: drop dewdrop near hero |
+| 32 | !hex | !hex | Hurter: apply Hex debuff |
+| 33 | !degrade | !degrade | Hurter: apply Degrade debuff |
+| 34 | !sabotage | !sabotage | Hurter: remove one random buff |
 
 ---
 
 ## YouTube Support
 
-- **Commands (!spawn, !champion, !gold, !curse, !gas, !scroll, !trap, !transmute, !bee, !ward, !buff, !debuff, !wand, !points, !toppoints):** When creating the command, enable **both Twitch and YouTube** as sources so one action handles both platforms.
+- **Commands (!spawn, !champion, !gold, !curse, !gas, !scroll, !trap, !transmute, !bee, !ward, !buff, !debuff, !wand, !points, !toppoints, !myside, !switch, !heal, !cleanse, !dew, !hex, !degrade, !sabotage):** When creating the command, enable **both Twitch and YouTube** as sources so one action handles both platforms.
 - **Earn Points (message):** Add **Message Received** from YouTube → Triggers to the same action, or create a duplicate action with the YouTube trigger.
 - **Earn Points (passive):** Add **Present Viewers** from YouTube → Triggers (YouTube uses chat-activity threshold; no live viewer list).
 - **Response messages:** Use the **commandSource pattern** below so a single action sends to the correct chat.
@@ -92,6 +108,14 @@ Use **one action per command** that works for both Twitch and YouTube. After che
 | !buff | `%userName% gave you %buffName%! You have %userPointsRemaining% points left.` |
 | !debuff | `%userName% afflicted you with %debuffName%! You have %userPointsRemaining% points left.` |
 | !wand | `%userName% triggered a cursed wand effect: %wandEffectName%! You have %userPointsRemaining% points left.` |
+| !myside | `%spawnResult%` (result is the full message, e.g. "You're on the helper side!") |
+| !switch | `%userName% switched to %newSide%! You have %userPointsRemaining% points left.` (C# sets `newSide` from parts[1]) |
+| !heal | `%userName% healed you! You have %userPointsRemaining% points left.` |
+| !cleanse | `%userName% cleansed %allyName%! You have %userPointsRemaining% points left.` |
+| !dew | `%userName% dropped a dewdrop! You have %userPointsRemaining% points left.` |
+| !hex | `%userName% hexed you! You have %userPointsRemaining% points left.` |
+| !degrade | `%userName% degraded you! You have %userPointsRemaining% points left.` |
+| !sabotage | `%userName% sabotaged %allyName%! You have %userPointsRemaining% points left.` |
 
 ---
 
@@ -103,8 +127,10 @@ Points are stored in (update the path in all C# code if your project is elsewher
 ```
 C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt
 ```
-Format: one line per user: `username|points|lastEarnTimestamp|donationPts` (donationPts from Super Chat/Cheer; 3-column lines treated as donationPts=0)
+Format: one line per user: `username|points|lastEarnTimestamp|donationPts|role` (5 columns). `role` is `helper` or `hurter` (assigned alternating on first chat); legacy 4-column lines have no role until next earn. 3-column lines treated as donationPts=0.
 The file is created automatically when the first action runs.
+
+**Helpers vs Hurters:** `helper_hurter_counter.txt` in the same folder stores an integer for alternating role assignment (0=helper, 1=hurter, 2=helper, …). Reset Points sets it to 0.
 
 **Double points:** Stored in `double_points_end.txt` (Unix timestamp when 2x ends; `0` = off). Created when you first use `!doublepoints`.
 
@@ -142,6 +168,8 @@ public class CPHInline
 {
     const string FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt";
     const string LOCK_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt.lock";
+    const string COUNTER_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\helper_hurter_counter.txt";
+    const string ASSIGNED_ROLE_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\assigned_role.txt";
     const string DOUBLE_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\double_points_end.txt";
     const string TOP_FARDER_FILE = @"C:\Users\dalto\Documents\OBS files\textread\leader.txt";  // Format: "Top Farder: USERNAME - 45"
     const int POINTS_PER_MESSAGE = 1;
@@ -165,23 +193,40 @@ public class CPHInline
                 long unixNow = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds;
 
                 var data = ReadAll();
-            int pts = 0;
-            long lastEarn = 0;
-            if (data.ContainsKey(key))
-            {
-                pts = data[key].Item1;
-                lastEarn = data[key].Item2;
-            }
-            int donationPts = data.ContainsKey(key) ? data[key].Item3 : 0;
+                int pts = 0;
+                long lastEarn = 0;
+                int donationPts = 0;
+                string role = "";
+                if (data.ContainsKey(key))
+                {
+                    pts = data[key].Item1;
+                    lastEarn = data[key].Item2;
+                    donationPts = data[key].Item3;
+                    role = data[key].Item4 ?? "";
+                }
 
-            if (COOLDOWN_SEC > 0 && lastEarn > 0 && unixNow - lastEarn < COOLDOWN_SEC)
-                return false;
+                if (COOLDOWN_SEC > 0 && lastEarn > 0 && unixNow - lastEarn < COOLDOWN_SEC)
+                    return false;
 
-            int mult = (IsDoublePointsActive(unixNow) ? 2 : 1) * (IsTopFarder(key) ? 2 : 1) * (IsSubscriberOrMember() ? 2 : 1);
-            int toAdd = POINTS_PER_MESSAGE * mult;
-            pts += toAdd;
-                data[key] = new Tuple<int, long, int>(pts, unixNow, donationPts);
+                // Helpers vs Hurters: assign role for new users or legacy 4-col (no role)
+                bool justAssigned = false;
+                if (string.IsNullOrEmpty(role) || (role != "helper" && role != "hurter"))
+                {
+                    int counter = 0;
+                    if (File.Exists(COUNTER_FILE) && int.TryParse(File.ReadAllText(COUNTER_FILE).Trim(), out int c))
+                        counter = c;
+                    role = (counter % 2 == 0) ? "helper" : "hurter";
+                    File.WriteAllText(COUNTER_FILE, (counter + 1).ToString());
+                    justAssigned = true;
+                }
+
+                int mult = (IsDoublePointsActive(unixNow) ? 2 : 1) * (IsTopFarder(key) ? 2 : 1) * (IsSubscriberOrMember() ? 2 : 1);
+                int toAdd = POINTS_PER_MESSAGE * mult;
+                pts += toAdd;
+                data[key] = Tuple.Create(pts, unixNow, donationPts, role);
                 WriteAll(data);
+                // Optional: write assigned_role.txt so a follow-up action can send "You're on the helper/hurter side!" to the user
+                if (justAssigned) try { File.WriteAllText(ASSIGNED_ROLE_FILE, user + "|" + role); } catch { }
                 return true;
             }
             finally { ReleasePointsLock(); }
@@ -209,9 +254,9 @@ public class CPHInline
         try { if (File.Exists(LOCK_FILE)) File.Delete(LOCK_FILE); } catch { }
     }
 
-    Dictionary<string, Tuple<int, long, int>> ReadAll()
+    Dictionary<string, Tuple<int, long, int, string>> ReadAll()
     {
-        var result = new Dictionary<string, Tuple<int, long, int>>(StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, Tuple<int, long, int, string>>(StringComparer.OrdinalIgnoreCase);
         if (!File.Exists(FILE)) return result;
         try
         {
@@ -225,7 +270,8 @@ public class CPHInline
                     if (int.TryParse(parts[1].Trim(), out p) && long.TryParse(parts[2].Trim(), out l))
                     {
                         if (parts.Length >= 4) int.TryParse(parts[3].Trim(), out d);
-                        result[k] = new Tuple<int, long, int>(p, l, d);
+                        string role = (parts.Length >= 5 && (parts[4] == "helper" || parts[4] == "hurter")) ? parts[4] : "";
+                        result[k] = Tuple.Create(p, l, d, role);
                     }
                 }
             }
@@ -234,11 +280,14 @@ public class CPHInline
         return result;
     }
 
-    void WriteAll(Dictionary<string, Tuple<int, long, int>> data)
+    void WriteAll(Dictionary<string, Tuple<int, long, int, string>> data)
     {
         var lines = new List<string>();
         foreach (var kv in data)
-            lines.Add(kv.Key + "|" + kv.Value.Item1 + "|" + kv.Value.Item2 + "|" + kv.Value.Item3);
+        {
+            string role = (kv.Value.Item4 == "helper" || kv.Value.Item4 == "hurter") ? kv.Value.Item4 : "";
+            lines.Add(kv.Key + "|" + kv.Value.Item1 + "|" + kv.Value.Item2 + "|" + kv.Value.Item3 + "|" + role);
+        }
         File.WriteAllLines(FILE, lines.ToArray());
     }
 
@@ -282,6 +331,50 @@ public class CPHInline
     }
 }
 ```
+
+**Optional – First-message side announcement:** When a user is assigned a helper/hurter role for the first time, the C# writes `assigned_role.txt` with `username|helper` or `username|hurter`. Add the following sub-actions **after** the Earn Points C# (Action 01) or First Words C# (Action 03) to message the user using the commandSource pattern:
+
+**Sub-actions (in order):**
+
+1. **If File Exists** → `Lastest UI/assigned_role.txt` → **True** branch only (leave False empty):
+   - **Execute C# Code (Inline)** — read the file, parse `username|role`, set `%assignedRoleUsername%` and `%assignedRoleSide%`, then delete the file:
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\assigned_role.txt";
+
+    public bool Execute()
+    {
+        if (!File.Exists(FILE)) return true;
+        try
+        {
+            string content = File.ReadAllText(FILE).Trim();
+            File.Delete(FILE);
+            var parts = content.Split('|');
+            if (parts.Length >= 2)
+            {
+                string username = parts[0].Trim();
+                string role = parts[1].Trim().ToLowerInvariant();
+                CPH.SetArgument("assignedRoleUsername", username);
+                CPH.SetArgument("assignedRoleSide", role);
+            }
+        }
+        catch (Exception ex) { CPH.LogInfo("Assigned role: " + ex.Message); }
+        return true;
+    }
+}
+```
+
+   - **Conditional:** `if ("%assignedRoleUsername%" Not Equals "")` → **True** branch:
+     - **If** `("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%assignedRoleUsername%, you're on the %assignedRoleSide% side!`
+     - **If** `("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%assignedRoleUsername%, you're on the %assignedRoleSide% side!`
+     - Leave **False Result** empty for both platform checks.
+
+**Note:** `commandSource` is typically set for Command Triggered events. For **Message Received** or **First Words**, Streamer.bot may use `platform` or `broadcastPlatform` instead. If `commandSource` is empty, try `%platform%` or create separate actions per platform (one for Twitch Message Received, one for YouTube Message Received) and send only to that platform.
 
 ---
 
@@ -338,7 +431,8 @@ public class CPHInline
                 int toAdd = POINTS_PER_TICK * mult;
                 pts += toAdd;
                 int donationPts = data[key].Item3;
-                data[key] = new Tuple<int, long, int>(pts, unixNow, donationPts);
+                string role = data[key].Item4 ?? "";
+                data[key] = Tuple.Create(pts, unixNow, donationPts, role);
                 WriteAll(data);
                 return true;
             }
@@ -367,9 +461,9 @@ public class CPHInline
         try { if (File.Exists(LOCK_FILE)) File.Delete(LOCK_FILE); } catch { }
     }
 
-    Dictionary<string, Tuple<int, long, int>> ReadAll()
+    Dictionary<string, Tuple<int, long, int, string>> ReadAll()
     {
-        var result = new Dictionary<string, Tuple<int, long, int>>(StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, Tuple<int, long, int, string>>(StringComparer.OrdinalIgnoreCase);
         if (!File.Exists(FILE)) return result;
         try
         {
@@ -383,7 +477,8 @@ public class CPHInline
                     if (int.TryParse(parts[1].Trim(), out p) && long.TryParse(parts[2].Trim(), out l))
                     {
                         if (parts.Length >= 4) int.TryParse(parts[3].Trim(), out d);
-                        result[k] = new Tuple<int, long, int>(p, l, d);
+                        string role = (parts.Length >= 5 && (parts[4] == "helper" || parts[4] == "hurter")) ? parts[4] : "";
+                        result[k] = Tuple.Create(p, l, d, role);
                     }
                 }
             }
@@ -392,11 +487,14 @@ public class CPHInline
         return result;
     }
 
-    void WriteAll(Dictionary<string, Tuple<int, long, int>> data)
+    void WriteAll(Dictionary<string, Tuple<int, long, int, string>> data)
     {
         var lines = new List<string>();
         foreach (var kv in data)
-            lines.Add(kv.Key + "|" + kv.Value.Item1 + "|" + kv.Value.Item2 + "|" + kv.Value.Item3);
+        {
+            string role = (kv.Value.Item4 == "helper" || kv.Value.Item4 == "hurter") ? kv.Value.Item4 : "";
+            lines.Add(kv.Key + "|" + kv.Value.Item1 + "|" + kv.Value.Item2 + "|" + kv.Value.Item3 + "|" + role);
+        }
         File.WriteAllLines(FILE, lines.ToArray());
     }
 
@@ -477,10 +575,11 @@ public class CPHInline
                 string key = user.ToLowerInvariant();
                 int pts = data.ContainsKey(key) ? data[key].Item1 : 0;
                 int donationPts = data.ContainsKey(key) ? data[key].Item3 : 0;
+                string role = data.ContainsKey(key) ? (data[key].Item4 ?? "") : "";
                 int mult = (IsDoublePointsActive(unixNow) ? 2 : 1) * (IsTopFarder(key) ? 2 : 1) * (IsSubscriberOrMember() ? 2 : 1);
                 int toAdd = FIRST_WORDS_BONUS * mult;
                 pts += toAdd;
-                data[key] = new Tuple<int, long, int>(pts, unixNow, donationPts);
+                data[key] = Tuple.Create(pts, unixNow, donationPts, role);
                 WriteAll(data);
                 return true;
             }
@@ -509,9 +608,9 @@ public class CPHInline
         try { if (File.Exists(LOCK_FILE)) File.Delete(LOCK_FILE); } catch { }
     }
 
-    Dictionary<string, Tuple<int, long, int>> ReadAll()
+    Dictionary<string, Tuple<int, long, int, string>> ReadAll()
     {
-        var result = new Dictionary<string, Tuple<int, long, int>>(StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, Tuple<int, long, int, string>>(StringComparer.OrdinalIgnoreCase);
         if (!File.Exists(FILE)) return result;
         try
         {
@@ -525,7 +624,8 @@ public class CPHInline
                     if (int.TryParse(parts[1].Trim(), out p) && long.TryParse(parts[2].Trim(), out l))
                     {
                         if (parts.Length >= 4) int.TryParse(parts[3].Trim(), out d);
-                        result[k] = new Tuple<int, long, int>(p, l, d);
+                        string role = (parts.Length >= 5 && (parts[4] == "helper" || parts[4] == "hurter")) ? parts[4] : "";
+                        result[k] = Tuple.Create(p, l, d, role);
                     }
                 }
             }
@@ -534,11 +634,14 @@ public class CPHInline
         return result;
     }
 
-    void WriteAll(Dictionary<string, Tuple<int, long, int>> data)
+    void WriteAll(Dictionary<string, Tuple<int, long, int, string>> data)
     {
         var lines = new List<string>();
         foreach (var kv in data)
-            lines.Add(kv.Key + "|" + kv.Value.Item1 + "|" + kv.Value.Item2 + "|" + kv.Value.Item3);
+        {
+            string role = (kv.Value.Item4 == "helper" || kv.Value.Item4 == "hurter") ? kv.Value.Item4 : "";
+            lines.Add(kv.Key + "|" + kv.Value.Item1 + "|" + kv.Value.Item2 + "|" + kv.Value.Item3 + "|" + role);
+        }
         File.WriteAllLines(FILE, lines.ToArray());
     }
 
@@ -650,9 +753,9 @@ public class CPHInline
         try { if (File.Exists(LOCK_FILE)) File.Delete(LOCK_FILE); } catch { }
     }
 
-    Dictionary<string, Tuple<int, long, int>> ReadAll()
+    Dictionary<string, Tuple<int, long, int, string>> ReadAll()
     {
-        var result = new Dictionary<string, Tuple<int, long, int>>(StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, Tuple<int, long, int, string>>(StringComparer.OrdinalIgnoreCase);
         if (!File.Exists(FILE)) return result;
         try
         {
@@ -666,7 +769,8 @@ public class CPHInline
                     if (int.TryParse(parts[1].Trim(), out p) && long.TryParse(parts[2].Trim(), out l))
                     {
                         if (parts.Length >= 4) int.TryParse(parts[3].Trim(), out d);
-                        result[k] = new Tuple<int, long, int>(p, l, d);
+                        string role = (parts.Length >= 5 && (parts[4] == "helper" || parts[4] == "hurter")) ? parts[4] : "";
+                        result[k] = Tuple.Create(p, l, d, role);
                     }
                 }
             }
@@ -1857,7 +1961,159 @@ public class CPHInline
 
 ---
 
-## Action 20: Spend OFF / Spend ON (Stream Deck switch)
+## Action 20: Earn Points (Cheer)
+
+**Rate:** 100 bits = $1 = 100 points. **When !doublepoints is active, Cheer points are doubled.**
+
+**Add this action to your points queue** (same blocking queue as earn/spend) to avoid race conditions.
+
+**Trigger:** Twitch → Triggers → Cheer
+
+**Sub-Action:** Run Program
+- **Program:** `python`
+- **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" cheer %bits% %userName%`
+- **Working directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+
+**Note:** Anonymous cheers are skipped (no username to credit).
+
+---
+
+## Action 21: Earn Points (Super Chat)
+
+**Rate:** 1 point per $0.01 USD. Uses the [Frankfurter API](https://www.frankfurter.app/) for currency conversion (no API key). **When !doublepoints is active, Super Chat points are doubled.**
+
+**Add this action to your points queue** (same blocking queue as earn/spend) to avoid race conditions.
+
+### YouTube Super Chat (Setup from Scratch)
+
+1. **Create a new action** (e.g. "Super Chat Points").
+2. **Add trigger:** YouTube → Triggers → **Super Chat**.
+3. **Add sub-action:** Run Program
+   - **Program:** `python` (or full path to `python.exe`, e.g. `C:\Python313\python.exe`)
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" superchat %microAmount% %currencyCode% %userName%`
+   - **Working directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+4. **Add this action to your points queue** (same queue as earn/spend).
+
+**Streamer.bot Super Chat variables:** `%microAmount%` (e.g. 1000000 = $1), `%currencyCode%` (e.g. USD), `%userName%` (login) or `%user%` (display name). If `%userName%` is empty for real Super Chats, try `%user%` instead in the Arguments.
+
+**Optional:** Add a C# step to read `donation_result.txt` (format: `ok|150` = 150 points earned). Split by `|`, use second part for a thank-you message: `Thanks for the super chat! You earned %points% points!`
+
+#### Troubleshooting: Test Trigger works, real Super Chats don't
+
+- **YouTube platform:** Ensure YouTube is connected in Streamer.bot (Settings → Platforms → YouTube). Reconnect if needed.
+- **Variable names:** If `%userName%` is empty for real events, change the last argument to `%user%` (display name).
+- **Debug logging:** Create an empty file `superchat_debug.txt` in `Lastest UI`. The next Super Chat will append a log line to `superchat_debug.log` with the exact args received. Remove the file when done debugging.
+
+---
+
+## Action 22: Reset Points (every stream)
+
+**Trigger:** Stream Started (Twitch → Triggers → Stream Started). For YouTube, use the equivalent "Stream Online" or "Stream Started" trigger.
+
+**Sub-Action:** Execute C# Code (Inline)
+
+Clears non-donor points when you go live. Donors (Super Chat / Cheer) keep their donation amount; everyone else starts fresh.
+
+```csharp
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading;
+
+public class CPHInline
+{
+    const string FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt";
+    const string LOCK_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt.lock";
+    const string COUNTER_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\helper_hurter_counter.txt";
+
+    public bool Execute()
+    {
+        try
+        {
+            if (!AcquirePointsLock()) return false;
+            try
+            {
+                var data = ReadAll();
+                var toWrite = new Dictionary<string, Tuple<int, long, int, string>>(StringComparer.OrdinalIgnoreCase);
+                foreach (var kv in data)
+                {
+                    int donationPts = kv.Value.Item3;
+                    string role = kv.Value.Item4 ?? "";
+                    if (donationPts > 0)
+                        toWrite[kv.Key] = Tuple.Create(donationPts, 0L, donationPts, role);
+                }
+                WriteAll(toWrite);
+                // Reset Helpers vs Hurters counter for new stream
+                try { File.WriteAllText(COUNTER_FILE, "0"); } catch { }
+                return true;
+            }
+            finally { ReleasePointsLock(); }
+        }
+        catch (Exception ex) { CPH.LogInfo("Reset points: " + ex.Message); return false; }
+    }
+
+    Dictionary<string, Tuple<int, long, int, string>> ReadAll()
+    {
+        var result = new Dictionary<string, Tuple<int, long, int, string>>(StringComparer.OrdinalIgnoreCase);
+        if (!File.Exists(FILE)) return result;
+        try
+        {
+            foreach (string line in File.ReadAllLines(FILE))
+            {
+                string[] parts = line.Split('|');
+                if (parts.Length >= 3)
+                {
+                    string k = parts[0].Trim();
+                    int p; long l; int d = 0;
+                    if (int.TryParse(parts[1].Trim(), out p) && long.TryParse(parts[2].Trim(), out l))
+                    {
+                        if (parts.Length >= 4) int.TryParse(parts[3].Trim(), out d);
+                        string role = (parts.Length >= 5 && (parts[4] == "helper" || parts[4] == "hurter")) ? parts[4] : "";
+                        result[k] = Tuple.Create(p, l, d, role);
+                    }
+                }
+            }
+        }
+        catch { }
+        return result;
+    }
+
+    void WriteAll(Dictionary<string, Tuple<int, long, int, string>> data)
+    {
+        var lines = new List<string>();
+        foreach (var kv in data)
+        {
+            string role = (kv.Value.Item4 == "helper" || kv.Value.Item4 == "hurter") ? kv.Value.Item4 : "";
+            lines.Add(kv.Key + "|" + kv.Value.Item1 + "|" + kv.Value.Item2 + "|" + kv.Value.Item3 + "|" + role);
+        }
+        File.WriteAllLines(FILE, lines.ToArray());
+    }
+
+    bool AcquirePointsLock()
+    {
+        for (int i = 0; i < 200; i++)
+        {
+            try
+            {
+                using (var fs = new FileStream(LOCK_FILE, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                    fs.WriteByte(0);
+                return true;
+            }
+            catch (IOException) { Thread.Sleep(50); }
+        }
+        return false;
+    }
+
+    void ReleasePointsLock()
+    {
+        try { if (File.Exists(LOCK_FILE)) File.Delete(LOCK_FILE); } catch { }
+    }
+}
+```
+
+---
+
+## Action 23: Spend OFF / Action 24: Spend ON (Stream Deck switch)
 
 **Purpose:** Two separate actions for Stream Deck "action switches" — when the switch is ON, trigger Spend ON (enable spending); when OFF, trigger Spend OFF (disable spending). Users can still earn points; they just can't spend them when disabled.
 
@@ -1908,145 +2164,569 @@ public class CPHInline
 
 **Stream Deck setup:** Create an "Action Switch" or similar. Assign Spend ON to the ON state and Spend OFF to the OFF state. When the switch is ON, spending is enabled; when OFF, spending is disabled.
 
-**Coverage:** All spend commands in `points_command.py` (spawn, champion, gold, curse, gas, scroll, trap, transmute, bee, ward, buff, debuff, wand) check for `spend_disabled.txt` and return "Spending is currently disabled by the streamer." when the file exists. If you add new spend commands to the script, add the same `is_spend_disabled()` check at the start of the handler.
+**Coverage:** All spend commands in `points_command.py` (spawn, champion, gold, curse, gas, scroll, trap, transmute, bee, ward, buff, debuff, wand, heal, cleanse, dew, hex, degrade, sabotage, switch) check for `spend_disabled.txt` and return "Spending is currently disabled by the streamer." when the file exists. If you add new spend commands to the script, add the same `is_spend_disabled()` check at the start of the handler.
 
 ---
 
-## Action 21: Earn Points (Super Chat / Cheer)
+## Action 25: Helpers/Hurters OFF / Action 26: Helpers/Hurters ON (Stream Deck switch)
 
-**Rate:** 1 point per $0.01 USD. Super Chats use the [Frankfurter API](https://www.frankfurter.app/) for currency conversion (no API key). Twitch bits: 100 bits = $1 = 100 points. **When !doublepoints is active, Super Chat and Cheer points are doubled** (same as chat earn).
+**Purpose:** Same pattern as Spend OFF/ON. When Helpers/Hurters is OFF, the system treats everyone as "both" (no role-based point earning on boss/death, no discounts, !switch returns "Helpers/Hurters is currently turned off."). When ON, full helpers vs hurters behavior.
 
-**Add both actions to your points queue** (same blocking queue as earn/spend) to avoid race conditions.
+### Helpers/Hurters OFF action
 
-### YouTube Super Chat (Setup from Scratch)
-
-1. **Create a new action** (e.g. "Super Chat Points").
-2. **Add trigger:** YouTube → Triggers → **Super Chat**.
-3. **Add sub-action:** Run Program
-   - **Program:** `python` (or full path to `python.exe`, e.g. `C:\Python313\python.exe`)
-   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" superchat %microAmount% %currencyCode% %userName%`
-   - **Working directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
-4. **Add this action to your points queue** (same queue as earn/spend).
-
-**Streamer.bot Super Chat variables:** `%microAmount%` (e.g. 1000000 = $1), `%currencyCode%` (e.g. USD), `%userName%` (login) or `%user%` (display name). If `%userName%` is empty for real Super Chats, try `%user%` instead in the Arguments.
-
-**Optional:** Add a C# step to read `donation_result.txt` (format: `ok|150` = 150 points earned). Split by `|`, use second part for a thank-you message: `Thanks for the super chat! You earned %points% points!`
-
-#### Troubleshooting: Test Trigger works, real Super Chats don't
-
-- **YouTube platform:** Ensure YouTube is connected in Streamer.bot (Settings → Platforms → YouTube). Reconnect if needed.
-- **Variable names:** If `%userName%` is empty for real events, change the last argument to `%user%` (display name).
-- **Debug logging:** Create an empty file `superchat_debug.txt` in `Lastest UI`. The next Super Chat will append a log line to `superchat_debug.log` with the exact args received. Remove the file when done debugging.
-
-### Twitch Cheer
-
-**Trigger:** Twitch → Triggers → Cheer
-
-**Sub-Action:** Run Program
-- **Program:** `python`
-- **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" cheer %bits% %userName%`
-- **Working directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
-
-**Note:** Anonymous cheers are skipped (no username to credit).
-
----
-
-## Action 22: Reset Points (every stream)
-
-**Trigger:** Stream Started (Twitch → Triggers → Stream Started). For YouTube, use the equivalent "Stream Online" or "Stream Started" trigger.
+**Trigger:** Hotkey (Stream Deck switch → OFF state)
 
 **Sub-Action:** Execute C# Code (Inline)
 
-Clears non-donor points when you go live. Donors (Super Chat / Cheer) keep their donation amount; everyone else starts fresh.
-
 ```csharp
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Threading;
 
 public class CPHInline
 {
-    const string FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt";
-    const string LOCK_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt.lock";
+    const string FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\helpers_hurters_disabled.txt";
 
     public bool Execute()
     {
-        try
-        {
-            if (!AcquirePointsLock()) return false;
-            try
-            {
-                var data = ReadAll();
-                var toWrite = new Dictionary<string, Tuple<int, long, int>>(StringComparer.OrdinalIgnoreCase);
-                foreach (var kv in data)
-                {
-                    int donationPts = kv.Value.Item3;
-                    if (donationPts > 0)
-                        toWrite[kv.Key] = new Tuple<int, long, int>(donationPts, 0, donationPts);
-                }
-                WriteAll(toWrite);
-                return true;
-            }
-            finally { ReleasePointsLock(); }
-        }
-        catch (Exception ex) { CPH.LogInfo("Reset points: " + ex.Message); return false; }
-    }
-
-    Dictionary<string, Tuple<int, long, int>> ReadAll()
-    {
-        var result = new Dictionary<string, Tuple<int, long, int>>(StringComparer.OrdinalIgnoreCase);
-        if (!File.Exists(FILE)) return result;
-        try
-        {
-            foreach (string line in File.ReadAllLines(FILE))
-            {
-                string[] parts = line.Split('|');
-                if (parts.Length >= 3)
-                {
-                    string k = parts[0].Trim();
-                    int p; long l; int d = 0;
-                    if (int.TryParse(parts[1].Trim(), out p) && long.TryParse(parts[2].Trim(), out l))
-                    {
-                        if (parts.Length >= 4) int.TryParse(parts[3].Trim(), out d);
-                        result[k] = new Tuple<int, long, int>(p, l, d);
-                    }
-                }
-            }
-        }
-        catch { }
-        return result;
-    }
-
-    void WriteAll(Dictionary<string, Tuple<int, long, int>> data)
-    {
-        var lines = new List<string>();
-        foreach (var kv in data)
-            lines.Add(kv.Key + "|" + kv.Value.Item1 + "|" + kv.Value.Item2 + "|" + kv.Value.Item3);
-        File.WriteAllLines(FILE, lines.ToArray());
-    }
-
-    bool AcquirePointsLock()
-    {
-        for (int i = 0; i < 200; i++)
-        {
-            try
-            {
-                using (var fs = new FileStream(LOCK_FILE, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-                    fs.WriteByte(0);
-                return true;
-            }
-            catch (IOException) { Thread.Sleep(50); }
-        }
-        return false;
-    }
-
-    void ReleasePointsLock()
-    {
-        try { if (File.Exists(LOCK_FILE)) File.Delete(LOCK_FILE); } catch { }
+        File.WriteAllText(FILE, "1");
+        return true;
     }
 }
 ```
+
+### Helpers/Hurters ON action
+
+**Trigger:** Hotkey (Stream Deck switch → ON state)
+
+**Sub-Action:** Execute C# Code (Inline)
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\helpers_hurters_disabled.txt";
+
+    public bool Execute()
+    {
+        if (File.Exists(FILE))
+            File.Delete(FILE);
+        return true;
+    }
+}
+```
+
+**Stream Deck setup:** Create a second Action Switch. Assign Helpers/Hurters ON to the ON state and Helpers/Hurters OFF to the OFF state.
+
+---
+
+## Action 27: !myside
+
+**Trigger:** Command Triggered → `!myside` (enable **both Twitch and YouTube** as sources)
+
+**Usage:** `!myside` — reminds the user their assigned side (helper or hurter). **No cost.** Requires Helpers vs Hurters to be ON; if OFF, returns "Helpers/Hurters is currently turned off."
+
+**Sub-Actions (in order):**
+
+1. **Run a Program**
+   - **Target:** `python`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" myside %userName%`
+   - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait maximum:** `10` seconds
+
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`:
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string RESULT_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spawn_result.txt";
+
+    public bool Execute()
+    {
+        string result = "No result file - is overlay server running?";
+        try
+        {
+            if (File.Exists(RESULT_FILE))
+            {
+                result = File.ReadAllText(RESULT_FILE).Trim();
+                File.Delete(RESULT_FILE);
+            }
+        }
+        catch (Exception ex) { result = ex.Message; }
+        CPH.SetArgument("spawnResult", result);
+        return true;
+    }
+}
+```
+
+3. **Conditional:** Use commandSource pattern to send `%spawnResult%` to chat (no ok/error branch — result is the full message):
+   - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+   - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+   - Leave **False Result** empty for both.
+
+**Add to the same blocking queue** as other commands.
+
+---
+
+## Action 28: !switch
+
+**Trigger:** Command Triggered → `!switch`
+
+**Usage:** `!switch` — switch from helper to hurter or vice versa. Cost configurable (default 50 pts). Requires Helpers vs Hurters ON.
+
+**Sub-Actions (in order):**
+
+1. **Run a Program**
+   - **Target:** `python`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" switch %userName%`
+   - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait maximum:** `10` seconds
+
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`, `%newSide%`, `%userPointsRemaining%`:
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string RESULT_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spawn_result.txt";
+
+    public bool Execute()
+    {
+        string result = "No result file - is overlay server running?";
+        string newSide = "";
+        string userPointsRemaining = "";
+        try
+        {
+            if (File.Exists(RESULT_FILE))
+            {
+                result = File.ReadAllText(RESULT_FILE).Trim();
+                File.Delete(RESULT_FILE);
+                var parts = result.Split('|');
+                if (parts.Length >= 3 && int.TryParse(parts[parts.Length - 1].Trim(), out _))
+                {
+                    userPointsRemaining = parts[parts.Length - 1].Trim();
+                    newSide = parts.Length >= 2 ? parts[1].Trim() : "";
+                    result = parts[0].Trim();
+                }
+                else if (parts.Length >= 2)
+                {
+                    newSide = parts[1].Trim();
+                    result = parts[0].Trim();
+                }
+            }
+        }
+        catch (Exception ex) { result = ex.Message; }
+        CPH.SetArgument("spawnResult", result);
+        CPH.SetArgument("newSide", newSide);
+        CPH.SetArgument("userPointsRemaining", userPointsRemaining);
+        return true;
+    }
+}
+```
+
+3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
+   - **True branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% switched to %newSide%! You have %userPointsRemaining% points left.`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% switched to %newSide%! You have %userPointsRemaining% points left.`
+     - Leave **False Result** empty for both.
+   - **False branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+     - Leave **False Result** empty for both.
+
+---
+
+## Action 29: !heal (Helper only)
+
+**Trigger:** Command Triggered → `!heal`
+
+**Usage:** `!heal` — **Helper only.** Heals hero ~15% HP. Cost configurable (default 100 pts). Helper discount applies.
+
+**Sub-Actions (in order):**
+
+1. **Run a Program**
+   - **Target:** `python`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" heal %userName%`
+   - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait maximum:** `10` seconds
+
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`, `%userPointsRemaining%`:
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string RESULT_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spawn_result.txt";
+
+    public bool Execute()
+    {
+        string result = "No result file - is overlay server running?";
+        string userPointsRemaining = "";
+        try
+        {
+            if (File.Exists(RESULT_FILE))
+            {
+                result = File.ReadAllText(RESULT_FILE).Trim();
+                File.Delete(RESULT_FILE);
+                var parts = result.Split('|');
+                if (parts.Length >= 3 && int.TryParse(parts[parts.Length - 1].Trim(), out _))
+                {
+                    userPointsRemaining = parts[parts.Length - 1].Trim();
+                    result = parts[0].Trim();
+                }
+            }
+        }
+        catch (Exception ex) { result = ex.Message; }
+        CPH.SetArgument("spawnResult", result);
+        CPH.SetArgument("userPointsRemaining", userPointsRemaining);
+        return true;
+    }
+}
+```
+
+3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
+   - **True branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% healed you! You have %userPointsRemaining% points left.`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% healed you! You have %userPointsRemaining% points left.`
+     - Leave **False Result** empty for both.
+   - **False branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+     - Leave **False Result** empty for both.
+
+---
+
+## Action 30: !cleanse (Helper only)
+
+**Trigger:** Command Triggered → `!cleanse`
+
+**Usage:** `!cleanse` — **Helper only.** Removes one random debuff from the hero. Cost configurable (default 150 pts).
+
+**Sub-Actions (in order):**
+
+1. **Run a Program**
+   - **Target:** `python`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" cleanse %userName%`
+   - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait maximum:** `10` seconds
+
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`, `%allyName%`, `%userPointsRemaining%`:
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string RESULT_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spawn_result.txt";
+
+    public bool Execute()
+    {
+        string result = "No result file - is overlay server running?";
+        string itemName = "";
+        string userPointsRemaining = "";
+        try
+        {
+            if (File.Exists(RESULT_FILE))
+            {
+                result = File.ReadAllText(RESULT_FILE).Trim();
+                File.Delete(RESULT_FILE);
+                var parts = result.Split('|');
+                if (parts.Length >= 3 && int.TryParse(parts[parts.Length - 1].Trim(), out _))
+                {
+                    userPointsRemaining = parts[parts.Length - 1].Trim();
+                    itemName = parts.Length >= 2 ? parts[1].Trim() : "";
+                    result = parts[0].Trim();
+                }
+                else if (parts.Length >= 2)
+                {
+                    itemName = parts[1].Trim();
+                    result = parts[0].Trim();
+                }
+            }
+        }
+        catch (Exception ex) { result = ex.Message; }
+        CPH.SetArgument("spawnResult", result);
+        CPH.SetArgument("allyName", itemName);
+        CPH.SetArgument("userPointsRemaining", userPointsRemaining);
+        return true;
+    }
+}
+```
+
+3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
+   - **True branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% cleansed %allyName%! You have %userPointsRemaining% points left.`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% cleansed %allyName%! You have %userPointsRemaining% points left.`
+     - Leave **False Result** empty for both.
+   - **False branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+     - Leave **False Result** empty for both.
+
+---
+
+## Action 31: !dew (Helper only)
+
+**Trigger:** Command Triggered → `!dew`
+
+**Usage:** `!dew` — **Helper only.** Drops a dewdrop near the hero. Cost configurable (default 30 pts).
+
+**Sub-Actions (in order):**
+
+1. **Run a Program**
+   - **Target:** `python`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" dew %userName%`
+   - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait maximum:** `10` seconds
+
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`, `%userPointsRemaining%`:
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string RESULT_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spawn_result.txt";
+
+    public bool Execute()
+    {
+        string result = "No result file - is overlay server running?";
+        string userPointsRemaining = "";
+        try
+        {
+            if (File.Exists(RESULT_FILE))
+            {
+                result = File.ReadAllText(RESULT_FILE).Trim();
+                File.Delete(RESULT_FILE);
+                var parts = result.Split('|');
+                if (parts.Length >= 3 && int.TryParse(parts[parts.Length - 1].Trim(), out _))
+                {
+                    userPointsRemaining = parts[parts.Length - 1].Trim();
+                    result = parts[0].Trim();
+                }
+            }
+        }
+        catch (Exception ex) { result = ex.Message; }
+        CPH.SetArgument("spawnResult", result);
+        CPH.SetArgument("userPointsRemaining", userPointsRemaining);
+        return true;
+    }
+}
+```
+
+3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
+   - **True branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% dropped a dewdrop! You have %userPointsRemaining% points left.`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% dropped a dewdrop! You have %userPointsRemaining% points left.`
+     - Leave **False Result** empty for both.
+   - **False branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+     - Leave **False Result** empty for both.
+
+---
+
+## Action 32: !hex (Hurter only)
+
+**Trigger:** Command Triggered → `!hex`
+
+**Usage:** `!hex` — **Hurter only.** Applies Hex debuff to the hero. Cost configurable (default 75 pts).
+
+**Sub-Actions (in order):**
+
+1. **Run a Program**
+   - **Target:** `python`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" hex %userName%`
+   - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait maximum:** `10` seconds
+
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`, `%userPointsRemaining%`:
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string RESULT_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spawn_result.txt";
+
+    public bool Execute()
+    {
+        string result = "No result file - is overlay server running?";
+        string userPointsRemaining = "";
+        try
+        {
+            if (File.Exists(RESULT_FILE))
+            {
+                result = File.ReadAllText(RESULT_FILE).Trim();
+                File.Delete(RESULT_FILE);
+                var parts = result.Split('|');
+                if (parts.Length >= 3 && int.TryParse(parts[parts.Length - 1].Trim(), out _))
+                {
+                    userPointsRemaining = parts[parts.Length - 1].Trim();
+                    result = parts[0].Trim();
+                }
+            }
+        }
+        catch (Exception ex) { result = ex.Message; }
+        CPH.SetArgument("spawnResult", result);
+        CPH.SetArgument("userPointsRemaining", userPointsRemaining);
+        return true;
+    }
+}
+```
+
+3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
+   - **True branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% hexed you! You have %userPointsRemaining% points left.`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% hexed you! You have %userPointsRemaining% points left.`
+     - Leave **False Result** empty for both.
+   - **False branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+     - Leave **False Result** empty for both.
+
+---
+
+## Action 33: !degrade (Hurter only)
+
+**Trigger:** Command Triggered → `!degrade`
+
+**Usage:** `!degrade` — **Hurter only.** Applies Degrade debuff to the hero. Cost configurable (default 100 pts).
+
+**Sub-Actions (in order):**
+
+1. **Run a Program**
+   - **Target:** `python`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" degrade %userName%`
+   - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait maximum:** `10` seconds
+
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`, `%userPointsRemaining%`:
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string RESULT_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spawn_result.txt";
+
+    public bool Execute()
+    {
+        string result = "No result file - is overlay server running?";
+        string userPointsRemaining = "";
+        try
+        {
+            if (File.Exists(RESULT_FILE))
+            {
+                result = File.ReadAllText(RESULT_FILE).Trim();
+                File.Delete(RESULT_FILE);
+                var parts = result.Split('|');
+                if (parts.Length >= 3 && int.TryParse(parts[parts.Length - 1].Trim(), out _))
+                {
+                    userPointsRemaining = parts[parts.Length - 1].Trim();
+                    result = parts[0].Trim();
+                }
+            }
+        }
+        catch (Exception ex) { result = ex.Message; }
+        CPH.SetArgument("spawnResult", result);
+        CPH.SetArgument("userPointsRemaining", userPointsRemaining);
+        return true;
+    }
+}
+```
+
+3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
+   - **True branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% degraded you! You have %userPointsRemaining% points left.`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% degraded you! You have %userPointsRemaining% points left.`
+     - Leave **False Result** empty for both.
+   - **False branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+     - Leave **False Result** empty for both.
+
+---
+
+## Action 34: !sabotage (Hurter only)
+
+**Trigger:** Command Triggered → `!sabotage`
+
+**Usage:** `!sabotage` — **Hurter only.** Removes one random buff from the hero. Cost configurable (default 75 pts).
+
+**Sub-Actions (in order):**
+
+1. **Run a Program**
+   - **Target:** `python`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" sabotage %userName%`
+   - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait maximum:** `10` seconds
+
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`, `%allyName%`, `%userPointsRemaining%`:
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string RESULT_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spawn_result.txt";
+
+    public bool Execute()
+    {
+        string result = "No result file - is overlay server running?";
+        string itemName = "";
+        string userPointsRemaining = "";
+        try
+        {
+            if (File.Exists(RESULT_FILE))
+            {
+                result = File.ReadAllText(RESULT_FILE).Trim();
+                File.Delete(RESULT_FILE);
+                var parts = result.Split('|');
+                if (parts.Length >= 3 && int.TryParse(parts[parts.Length - 1].Trim(), out _))
+                {
+                    userPointsRemaining = parts[parts.Length - 1].Trim();
+                    itemName = parts.Length >= 2 ? parts[1].Trim() : "";
+                    result = parts[0].Trim();
+                }
+                else if (parts.Length >= 2)
+                {
+                    itemName = parts[1].Trim();
+                    result = parts[0].Trim();
+                }
+            }
+        }
+        catch (Exception ex) { result = ex.Message; }
+        CPH.SetArgument("spawnResult", result);
+        CPH.SetArgument("allyName", itemName);
+        CPH.SetArgument("userPointsRemaining", userPointsRemaining);
+        return true;
+    }
+}
+```
+
+3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
+   - **True branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% sabotaged %allyName%! You have %userPointsRemaining% points left.`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% sabotaged %allyName%! You have %userPointsRemaining% points left.`
+     - Leave **False Result** empty for both.
+   - **False branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+     - Leave **False Result** empty for both.
 
 ---
 
@@ -2069,6 +2749,14 @@ public class CPHInline
 | **!debuff** | `!debuff` | 50 pts | Apply a random debuff (Blindness, Slow, Roots, Daze, etc.). Excludes Paralysis, Burning, Poison. |
 | **!wand** | `!wand common` (tier required) | 50–400 pts | Trigger a cursed wand effect. Tier required: common, uncommon, rare, or veryrare. |
 | **!doublepoints** | `!doublepoints <minutes>` | — | **Streamer only.** 2× points for N minutes (max 120). `!doublepoints 5` for 5 min. |
+| **!myside** | `!myside` | Free | Remind user their side (helper/hurter). Requires Helpers vs Hurters ON. |
+| **!switch** | `!switch` | Configurable (default 50) | Switch helper ↔ hurter. Requires Helpers vs Hurters ON. |
+| **!heal** | `!heal` | Configurable (default 100) | **Helper only.** Heal hero ~15% HP. |
+| **!cleanse** | `!cleanse` | Configurable (default 150) | **Helper only.** Remove one random debuff. |
+| **!dew** | `!dew` | Configurable (default 30) | **Helper only.** Drop dewdrop near hero. |
+| **!hex** | `!hex` | Configurable (default 75) | **Hurter only.** Apply Hex debuff. |
+| **!degrade** | `!degrade` | Configurable (default 100) | **Hurter only.** Apply Degrade debuff. |
+| **!sabotage** | `!sabotage` | Configurable (default 75) | **Hurter only.** Remove one random buff. |
 
 **Spawn costs (base):** rat 5, albino/snake/gnoll 10, crab/slime/swarm 15, thief/skeleton/dm100 20, guard/necromancer/spinner 25, bat/brute 30, shaman 35, ghoul/elemental 40, warlock 45, monk/golem 50, succubus 60, eye 70, scorpio 80. Unknown monsters default to 100. Edit `points_config.json` or use the config UI to change.
 
@@ -2076,30 +2764,42 @@ public class CPHInline
 
 ## Summary
 
-| Action       | Trigger           | Purpose                                      |
-|-------------|-------------------|----------------------------------------------|
-| Earn Points | Message Received  | +1 per message (30s cooldown; 2x double points; 2x top farder; 2x sub/member) |
-| Earn Points (passive) | Present Viewers | +1 per tick (60s cooldown; 2x double points; 2x top farder; 2x sub/member) |
-| First Words Bonus     | (add to your First Words action) | +5 on first chat (2x double points; 2x top farder; 2x sub/member) |
-| Check Points| !points           | Show viewer their balance                    |
-| Top Points  | !toppoints        | Show top 3 point holders in chat              |
-| Spawn Monster| !spawn           | Deduct points (cost varies by monster)       |
-| Spawn Champion | !champion      | Spawn champion version of monster (2× base cost, no discount) |
-| Drop Gold    | !gold <amount>  | Spend points to drop gold (2 pts/gold, amount required) |
-| Curse Item   | !curse         | Spend points to curse a random equipped item (200 pts) |
-| Spawn Gas    | !gas           | Spend points to spawn random gas (Chaotic Censer +3, 75 pts) |
-| Random Scroll | !scroll        | Spend points to use a random scroll (like +10 Unstable Spellbook, 100 pts) |
-| Place Trap    | !trap          | Spend points to place a random visible trap nearby (50 pts) |
-| Transmute     | !transmute    | Spend points to transmute a random transmutable item from bag or equipped (150 pts) |
-| Bee     | !bee     | Spend points to summon an allied bee for 50 turns (75 pts) |
-| Ward    | !ward    | Spend points to summon a ward (30 pts, scales with depth; upgrades existing if same tile) |
-| Random Buff   | !buff          | Spend points to apply a random buff (75 pts, e.g. Haste, Healing, Barrier) |
-| Random Debuff | !debuff        | Spend points to apply a random debuff (50 pts, e.g. Blindness, Slow, Roots) |
-| Cursed Wand   | !wand          | Spend points to trigger a random cursed wand effect (50–400 pts by rarity) |
-| Super Chat Points | YouTube Super Chat | 1 pt per $0.01 (currency converted via Frankfurter API); 2x when !doublepoints active |
-| Cheer Points | Twitch Cheer | 1 pt per bit (100 bits = $1 = 100 pts); 2x when !doublepoints active |
-| Double Points | !doublepoints (streamer only) | 2x points for N minutes: `!doublepoints 5` |
-| Reset Points| Stream Started    | Clear non-donor points; donors keep donation amount |
+| # | Action | Trigger | Purpose |
+|---|--------|---------|---------|
+| 01 | Earn Points (on chat) | Message Received | +1 per message (30s cooldown; 2x double/top farder/sub) |
+| 02 | Earn Points (passive) | Present Viewers | +1 per tick (60s cooldown) |
+| 03 | First Words Bonus | (add to First Words) | +5 on first chat |
+| 04 | Check Points | !points | Show viewer their balance |
+| 05 | Top Points | !toppoints | Show top 3 point holders |
+| 06 | Spawn Monster | !spawn | Spend points (cost varies by monster) |
+| 07 | Spawn Champion | !champion | Spawn champion (2× base, no discount) |
+| 08 | Drop Gold | !gold | Spend points to drop gold |
+| 09 | Curse Item | !curse | Spend points to curse equipped item |
+| 10 | Spawn Gas | !gas | Spend points to spawn random gas |
+| 11 | Random Scroll | !scroll | Spend points to use random scroll |
+| 12 | Place Trap | !trap | Spend points to place trap |
+| 13 | Transmute | !transmute | Spend points to transmute item |
+| 14 | Bee | !bee | Spend points to summon allied bee |
+| 15 | Ward | !ward | Spend points to summon ward |
+| 16 | Random Buff | !buff | Spend points to apply random buff |
+| 17 | Random Debuff | !debuff | Spend points to apply random debuff |
+| 18 | Cursed Wand | !wand | Spend points for cursed wand effect |
+| 19 | Double Points | !doublepoints | Streamer only: 2× points for N min |
+| 20 | Earn Points (Cheer) | Twitch Cheer | 1 pt per bit |
+| 21 | Earn Points (Super Chat) | YouTube Super Chat | 1 pt per $0.01 |
+| 22 | Reset Points | Stream Started | Clear non-donor points |
+| 23 | Spend OFF | Hotkey | Disable spend commands |
+| 24 | Spend ON | Hotkey | Enable spend commands |
+| 25 | Helpers/Hurters OFF | Hotkey | Disable helpers vs hurters |
+| 26 | Helpers/Hurters ON | Hotkey | Enable helpers vs hurters |
+| 27 | !myside | !myside | Remind user their side (free) |
+| 28 | !switch | !switch | Switch helper/hurter (cost configurable) |
+| 29 | !heal | !heal | Helper: heal hero ~15% HP |
+| 30 | !cleanse | !cleanse | Helper: remove one debuff |
+| 31 | !dew | !dew | Helper: drop dewdrop |
+| 32 | !hex | !hex | Hurter: apply Hex debuff |
+| 33 | !degrade | !degrade | Hurter: apply Degrade debuff |
+| 34 | !sabotage | !sabotage | Hurter: remove one buff |
 
 ---
 

@@ -53,6 +53,7 @@ VIEWER_POINTS_LOCK_FILE = VIEWER_POINTS_FILE + ".lock"
 DOUBLE_POINTS_COUNTDOWN_FILE = os.path.join(SCRIPT_DIR, "double_points_countdown.txt")
 STREAMER_CHAT_SCORE_FILE = os.path.join(SCRIPT_DIR, "streamer_chat_score.json")
 STREAMER_CHAT_SCORE_TXT = os.path.join(SCRIPT_DIR, "streamer_chat_score.txt")
+HELPERS_HURTERS_DISABLED_FILE = os.path.join(SCRIPT_DIR, "helpers_hurters_disabled.txt")
 
 # Game WebSocket: receive live stream from game and serve via HTTP /api/game-data and game_summary.json
 GAME_WS_URL = "ws://127.0.0.1:5001"   # Game streaming port (default in game Settings; change if you set a different port)
@@ -83,6 +84,8 @@ last_ws_update_time = 0.0   # when we last got data from game WS; parser skips o
 last_item_info_open = None
 obs_message_queue = queue.Queue()
 game_ws_received_count = 0
+last_ignored_source_log_time = 0.0
+IGNORED_SOURCE_LOG_INTERVAL = 60.0
 
 # Chat spawn: reference to game WebSocket for sending commands (set when connected)
 game_ws_app = None
@@ -133,6 +136,9 @@ def update_game_data():
                 game_info = parser.get_current_game_info()
                 if game_info:
                     with data_lock:
+                        # Preserve ui from last game WebSocket snapshot so file keeps scene/open_windows
+                        if "ui" in current_game_data:
+                            game_info["ui"] = current_game_data["ui"]
                         current_game_data = game_info
                         
                         # Export text and JSON summaries
@@ -211,6 +217,40 @@ def _handle_score_event(data):
     _save_score_data(score_data)
     print(f"Score event {data.get('type')}: streamer={score_data['streamer']} chat={score_data['chat']}")
 
+    # Helpers vs Hurters: add points by role when system is ON
+    if os.path.exists(HELPERS_HURTERS_DISABLED_FILE):
+        return
+    pts_per_helper = 10
+    pts_per_hurter = 10
+    try:
+        if os.path.exists(POINTS_CONFIG_FILE):
+            with open(POINTS_CONFIG_FILE, encoding='utf-8') as f:
+                cfg = json.load(f)
+            pts_per_helper = int(cfg.get('points_per_helper_on_boss', pts_per_helper))
+            pts_per_hurter = int(cfg.get('points_per_hurter_on_death', pts_per_hurter))
+    except (json.JSONDecodeError, OSError, TypeError, ValueError):
+        pass
+
+    target_role = 'helper' if data.get('type') == 'boss_slain' else 'hurter'
+    pts_to_add = pts_per_helper if target_role == 'helper' else pts_per_hurter
+    if pts_to_add <= 0:
+        return
+
+    if not _acquire_viewer_points_lock():
+        print("Score event: could not acquire viewer_points lock for role-based points")
+        return
+    try:
+        raw = _read_viewer_points_raw()
+        for k, v in raw.items():
+            role = v[3] if len(v) >= 4 else ''
+            if role == target_role:
+                pts, last, donation_pts, role_val = v[0], v[1], v[2], v[3] if len(v) >= 4 else ''
+                raw[k] = (pts + pts_to_add, last, donation_pts, role_val)
+        _write_viewer_points_raw(raw)
+        print(f"Score event: added {pts_to_add} pts to {target_role}s")
+    finally:
+        _release_viewer_points_lock()
+
 
 def _game_ws_on_message(ws, message):
     """Handle message from game WebSocket: update live data (same JSON shape as inspector)."""
@@ -218,7 +258,7 @@ def _game_ws_on_message(ws, message):
     try:
         data = json.loads(message)
         # Handle spawn/gold result (game reports success/failure)
-        if data.get('type') in ('ping_result', 'spawn_result', 'champion_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result', 'trap_result', 'transmute_result', 'summon_bee_result', 'ward_result'):
+        if data.get('type') in ('ping_result', 'spawn_result', 'champion_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result', 'trap_result', 'transmute_result', 'summon_bee_result', 'ward_result', 'heal_result', 'cleanse_result', 'dew_result', 'hex_result', 'degrade_result', 'sabotage_result'):
             rid = data.get('request_id')
             ok = data.get('success', False)
             if rid:
@@ -275,6 +315,30 @@ def _game_ws_on_message(ws, message):
                             pending_spawns[rid]['ward_name'] = data.get('ward_name')
                         if data.get('type') == 'ward_result' and data.get('error'):
                             pending_spawns[rid]['error'] = data.get('error')
+                        if data.get('type') == 'heal_result' and data.get('buff_name'):
+                            pending_spawns[rid]['buff_name'] = data.get('buff_name')
+                        if data.get('type') == 'heal_result' and data.get('error'):
+                            pending_spawns[rid]['error'] = data.get('error')
+                        if data.get('type') == 'cleanse_result' and data.get('buff_name'):
+                            pending_spawns[rid]['buff_name'] = data.get('buff_name')
+                        if data.get('type') == 'cleanse_result' and data.get('error'):
+                            pending_spawns[rid]['error'] = data.get('error')
+                        if data.get('type') == 'dew_result' and data.get('item_name'):
+                            pending_spawns[rid]['item_name'] = data.get('item_name')
+                        if data.get('type') == 'dew_result' and data.get('error'):
+                            pending_spawns[rid]['error'] = data.get('error')
+                        if data.get('type') == 'hex_result' and data.get('debuff_name'):
+                            pending_spawns[rid]['debuff_name'] = data.get('debuff_name')
+                        if data.get('type') == 'hex_result' and data.get('error'):
+                            pending_spawns[rid]['error'] = data.get('error')
+                        if data.get('type') == 'degrade_result' and data.get('debuff_name'):
+                            pending_spawns[rid]['debuff_name'] = data.get('debuff_name')
+                        if data.get('type') == 'degrade_result' and data.get('error'):
+                            pending_spawns[rid]['error'] = data.get('error')
+                        if data.get('type') == 'sabotage_result' and data.get('buff_name'):
+                            pending_spawns[rid]['buff_name'] = data.get('buff_name')
+                        if data.get('type') == 'sabotage_result' and data.get('error'):
+                            pending_spawns[rid]['error'] = data.get('error')
                         pending_spawns[rid]['event'].set()
             print(f"Game {data.get('type')}: request_id={rid} success={ok}")
             return
@@ -282,6 +346,12 @@ def _game_ws_on_message(ws, message):
             _handle_score_event(data)
             return
         if data.get('source') != 'shattered-pixel-dungeon':
+            global last_ignored_source_log_time
+            now = time.time()
+            if now - last_ignored_source_log_time >= IGNORED_SOURCE_LOG_INTERVAL:
+                last_ignored_source_log_time = now
+                keys = list(data.keys()) if isinstance(data, dict) else []
+                print(f"Game message ignored (missing or wrong source); keys: {keys}")
             return
         game_ws_received_count += 1
         last_ws_update_time = time.time()
@@ -305,7 +375,11 @@ def _game_ws_on_message(ws, message):
             ui = data.get('ui') or {}
             open_windows = ui.get('open_windows') or []
             item_info_open = 'item_info' in open_windows
-            if last_item_info_open is not None and item_info_open != last_item_info_open:
+            if last_item_info_open is None:
+                # First valid snapshot - send current state so ASS starts in correct state
+                msg = 'item_info_open' if item_info_open else 'item_info_closed'
+                _send_obs_message(msg)
+            elif item_info_open != last_item_info_open:
                 msg = 'item_info_open' if item_info_open else 'item_info_closed'
                 _send_obs_message(msg)
             last_item_info_open = item_info_open
@@ -477,8 +551,24 @@ def points_config_api():
             if os.path.exists(POINTS_CONFIG_FILE):
                 with open(POINTS_CONFIG_FILE, encoding='utf-8') as f:
                     data = json.load(f)
+                data.setdefault("points_per_helper_on_boss", 10)
+                data.setdefault("points_per_hurter_on_death", 10)
+                data.setdefault("helper_discount_percent", 50)
+                data.setdefault("hurter_discount_percent", 50)
+                data.setdefault("helper_discount_commands", ["ward", "bee", "buff"])
+                data.setdefault("hurter_discount_commands", ["debuff", "curse", "trap", "gas"])
+                data.setdefault("cost_to_switch_side", 50)
+                data.setdefault("cost_per_heal", 100)
+                data.setdefault("cost_per_cleanse", 150)
+                data.setdefault("cost_per_dew", 30)
+                data.setdefault("cost_per_hex", 75)
+                data.setdefault("cost_per_degrade", 100)
+                data.setdefault("cost_per_sabotage", 75)
+                data.setdefault("command_allowed_roles", {})
             else:
                 data = {
+                    "points_per_helper_on_boss": 10,
+                    "points_per_hurter_on_death": 10,
                     "cost_per_gold": 5,
                     "cost_per_curse": 200,
                     "cost_per_gas": 75,
@@ -501,6 +591,18 @@ def points_config_api():
                         "necromancer": 25, "ghoul": 40, "elemental": 40, "warlock": 45,
                         "monk": 50, "golem": 50, "succubus": 60, "eye": 70, "scorpio": 80,
                     },
+                    "helper_discount_percent": 50,
+                    "hurter_discount_percent": 50,
+                    "helper_discount_commands": ["ward", "bee", "buff"],
+                    "hurter_discount_commands": ["debuff", "curse", "trap", "gas"],
+                    "cost_to_switch_side": 50,
+                    "cost_per_heal": 100,
+                    "cost_per_cleanse": 150,
+                    "cost_per_dew": 30,
+                    "cost_per_hex": 75,
+                    "cost_per_degrade": 100,
+                    "cost_per_sabotage": 75,
+                    "command_allowed_roles": {},
                 }
             free_until = {}
             if os.path.exists(FREE_UNTIL_FILE):
@@ -518,6 +620,8 @@ def points_config_api():
         data = request.get_json(force=True, silent=True) or {}
         # Validate and sanitize
         cfg = {
+            "points_per_helper_on_boss": max(0, int(data.get("points_per_helper_on_boss", 10))),
+            "points_per_hurter_on_death": max(0, int(data.get("points_per_hurter_on_death", 10))),
             "cost_per_gold": max(1, int(data.get("cost_per_gold", 5))),
             "cost_per_curse": max(1, int(data.get("cost_per_curse", 200))),
             "cost_per_gas": max(1, int(data.get("cost_per_gas", 75))),
@@ -534,6 +638,18 @@ def points_config_api():
             "cost_per_wand_veryrare": max(1, int(data.get("cost_per_wand_veryrare", 400))),
             "default_monster_cost": max(1, int(data.get("default_monster_cost", 100))),
             "cost_per_monster": {},
+            "helper_discount_percent": max(0, min(100, int(data.get("helper_discount_percent", 50)))),
+            "hurter_discount_percent": max(0, min(100, int(data.get("hurter_discount_percent", 50)))),
+            "helper_discount_commands": data.get("helper_discount_commands") or ["ward", "bee", "buff"],
+            "hurter_discount_commands": data.get("hurter_discount_commands") or ["debuff", "curse", "trap", "gas"],
+            "cost_to_switch_side": max(0, int(data.get("cost_to_switch_side", 50))),
+            "cost_per_heal": max(1, int(data.get("cost_per_heal", 100))),
+            "cost_per_cleanse": max(1, int(data.get("cost_per_cleanse", 150))),
+            "cost_per_dew": max(1, int(data.get("cost_per_dew", 30))),
+            "cost_per_hex": max(1, int(data.get("cost_per_hex", 75))),
+            "cost_per_degrade": max(1, int(data.get("cost_per_degrade", 100))),
+            "cost_per_sabotage": max(1, int(data.get("cost_per_sabotage", 75))),
+            "command_allowed_roles": data.get("command_allowed_roles") or {},
         }
         for k, v in (data.get("cost_per_monster") or {}).items():
             try:
@@ -615,24 +731,16 @@ def viewer_points_api():
         if not _acquire_viewer_points_lock():
             return jsonify({"error": "Points file busy"}), 503
         try:
+            raw = _read_viewer_points_raw()
             data = {}
-            if os.path.exists(VIEWER_POINTS_FILE):
-                try:
-                    with open(VIEWER_POINTS_FILE, encoding='utf-8') as f:
-                        for line in f:
-                            parts = line.strip().split('|')
-                            if len(parts) >= 3:
-                                try:
-                                    donation_pts = int(parts[3]) if len(parts) >= 4 else 0
-                                    data[parts[0].lower()] = {
-                                        'points': int(parts[1]),
-                                        'last': int(parts[2]),
-                                        'donationPts': donation_pts,
-                                    }
-                                except ValueError:
-                                    pass
-                except Exception as e:
-                    return jsonify({"error": str(e)}), 500
+            for k, v in raw.items():
+                role = v[3] if len(v) >= 4 else ''
+                data[k] = {
+                    'points': v[0],
+                    'last': v[1],
+                    'donationPts': v[2],
+                    'role': role or '',
+                }
             return jsonify(data)
         finally:
             _release_viewer_points_lock()
@@ -645,32 +753,24 @@ def viewer_points_api():
             donation_pts = max(0, int(body.get('donationPts') or body.get('donation_pts') or 0))
         else:
             donation_pts = None
+        role_raw = (body.get('role') or '').strip().lower()
+        role = role_raw if role_raw in ('helper', 'hurter') else ''
         if not username:
             return jsonify({"error": "username required"}), 400
         if not _acquire_viewer_points_lock():
             return jsonify({"error": "Points file busy, try again"}), 503
         try:
-            data = {}
-            if os.path.exists(VIEWER_POINTS_FILE):
-                with open(VIEWER_POINTS_FILE, encoding='utf-8') as f:
-                    for line in f:
-                        parts = line.strip().split('|')
-                        if len(parts) >= 3:
-                            try:
-                                dp = int(parts[3]) if len(parts) >= 4 else 0
-                                data[parts[0].lower()] = (int(parts[1]), int(parts[2]), dp)
-                            except ValueError:
-                                pass
-            existing = data.get(username.lower(), (0, 0, 0))
+            data = _read_viewer_points_raw()
+            existing = data.get(username.lower(), (0, 0, 0, ''))
+            pts, last, dp, existing_role = existing[0], existing[1], existing[2], (existing[3] if len(existing) >= 4 else '')
             if donation_pts is None:
-                donation_pts = existing[2]
+                donation_pts = dp
             donation_pts = min(donation_pts, max(0, points))
             new_pts = max(max(0, points), donation_pts)
-            data[username.lower()] = (new_pts, existing[1], donation_pts)
-            lines = [f"{k}|{v[0]}|{v[1]}|{v[2]}" for k, v in data.items()]
-            with open(VIEWER_POINTS_FILE, 'w', encoding='utf-8') as f:
-                f.write('\n'.join(lines))
-            return jsonify({"ok": True, "username": username, "points": data[username.lower()][0]})
+            new_role = role if 'role' in body else existing_role
+            data[username.lower()] = (new_pts, last, donation_pts, new_role)
+            _write_viewer_points_raw(data)
+            return jsonify({"ok": True, "username": username, "points": new_pts})
         finally:
             _release_viewer_points_lock()
     except ValueError as e:
@@ -680,7 +780,7 @@ def viewer_points_api():
 
 
 def _read_viewer_points_raw():
-    """Read viewer_points file as dict[key] = (pts, last, donation_pts). Returns {} if not exists."""
+    """Read viewer_points file as dict[key] = (pts, last, donation_pts, role). Returns {} if not exists."""
     data = {}
     if not os.path.exists(VIEWER_POINTS_FILE):
         return data
@@ -690,16 +790,83 @@ def _read_viewer_points_raw():
             if len(parts) >= 3:
                 try:
                     donation_pts = int(parts[3]) if len(parts) >= 4 else 0
-                    data[parts[0].lower()] = (int(parts[1]), int(parts[2]), donation_pts)
-                except ValueError:
+                    role = (parts[4].strip() or '') if len(parts) >= 5 else ''
+                    if role not in ('helper', 'hurter'):
+                        role = ''
+                    data[parts[0].lower()] = (int(parts[1]), int(parts[2]), donation_pts, role)
+                except (ValueError, IndexError):
                     pass
     return data
 
 
 def _write_viewer_points_raw(data):
-    lines = [f"{k}|{v[0]}|{v[1]}|{v[2]}" for k, v in data.items()]
+    def _row(k, v):
+        role = (v[3] or '') if len(v) >= 4 else ''
+        return f"{k}|{v[0]}|{v[1]}|{v[2]}|{role}"
+    lines = [_row(k, v) for k, v in data.items()]
     with open(VIEWER_POINTS_FILE, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
+
+
+@app.route('/api/viewer-points/import', methods=['POST', 'OPTIONS'])
+def viewer_points_import():
+    """Bulk import viewer points from JSON. Body: { users: [{username, points, donationPts?, last?, role?}, ...], merge: bool }."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    body = request.get_json(force=True, silent=True) or {}
+    users = body.get('users')
+    if not isinstance(users, list):
+        return jsonify({"error": "users array required"}), 400
+    merge = body.get('merge', True)
+    if not _acquire_viewer_points_lock():
+        return jsonify({"error": "Points file busy, try again"}), 503
+    try:
+        data = {} if not merge else _read_viewer_points_raw()
+        count = 0
+        for u in users:
+            if not isinstance(u, dict):
+                continue
+            username = (u.get('username') or '').strip()
+            if not username:
+                continue
+            pts = max(0, int(u.get('points', 0)))
+            donor = max(0, int(u.get('donationPts') or u.get('donation_pts', 0)))
+            donor = min(donor, pts)
+            last = int(u.get('last', 0))
+            role_raw = (u.get('role') or '').strip().lower()
+            role = role_raw if role_raw in ('helper', 'hurter') else ''
+            data[username.lower()] = (pts, last, donor, role)
+            count += 1
+        _write_viewer_points_raw(data)
+        return jsonify({"ok": True, "count": count})
+    finally:
+        _release_viewer_points_lock()
+
+
+@app.route('/api/viewer-points/prune', methods=['POST', 'OPTIONS'])
+def viewer_points_prune():
+    """Remove users who haven't earned in N+ days AND have < minDonor donor points. Body: { days: 2, minDonor: 101 }."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    body = request.get_json(force=True, silent=True) or {}
+    days = max(1, int(body.get('days', 2)))
+    min_donor = max(0, int(body.get('minDonor', body.get('min_donor', 101))))
+    cutoff = int(time.time()) - days * 24 * 60 * 60
+    if not _acquire_viewer_points_lock():
+        return jsonify({"error": "Points file busy, try again"}), 503
+    try:
+        data = _read_viewer_points_raw()
+        to_remove = []
+        for k, v in data.items():
+            pts, last, donation_pts, role = v[0], v[1], v[2], (v[3] if len(v) >= 4 else '')
+            if donation_pts < min_donor and last < cutoff:
+                to_remove.append(k)
+        for k in to_remove:
+            del data[k]
+        _write_viewer_points_raw(data)
+        return jsonify({"ok": True, "count": len(to_remove)})
+    finally:
+        _release_viewer_points_lock()
 
 
 @app.route('/api/viewer-points/clear-non-donor', methods=['POST', 'OPTIONS'])
@@ -712,10 +879,39 @@ def viewer_points_clear_non_donor():
     try:
         data = _read_viewer_points_raw()
         for k in data:
-            pts, last, donation_pts = data[k]
-            data[k] = (donation_pts, 0, donation_pts)
+            pts, last, donation_pts, role = data[k][0], data[k][1], data[k][2], (data[k][3] if len(data[k]) >= 4 else '')
+            data[k] = (donation_pts, 0, donation_pts, role)
         _write_viewer_points_raw(data)
         return jsonify({"ok": True})
+    finally:
+        _release_viewer_points_lock()
+
+
+@app.route('/api/viewer-points/bulk/set', methods=['POST', 'OPTIONS'])
+def viewer_points_bulk_set():
+    """Set points and donationPts for specified users (replace, not add). Body: { points, donationPts?, users }."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    body = request.get_json(force=True, silent=True) or {}
+    pts = max(0, int(body.get('points', 0)))
+    donor = max(0, int(body.get('donationPts') or body.get('donation_pts', 0)))
+    donor = min(donor, pts)
+    users_filter = body.get('users')
+    if not users_filter or not isinstance(users_filter, list):
+        return jsonify({"error": "users array required"}), 400
+    users_filter = [str(u).strip().lower() for u in users_filter if u and str(u).strip()]
+    if not users_filter:
+        return jsonify({"error": "at least one user required"}), 400
+    if not _acquire_viewer_points_lock():
+        return jsonify({"error": "Points file busy, try again"}), 503
+    try:
+        data = _read_viewer_points_raw()
+        for k in users_filter:
+            v = data.get(k, (0, 0, 0, ''))
+            last, role = v[1], (v[3] if len(v) >= 4 else '')
+            data[k] = (pts, last, donor, role)
+        _write_viewer_points_raw(data)
+        return jsonify({"ok": True, "count": len(users_filter)})
     finally:
         _release_viewer_points_lock()
 
@@ -739,8 +935,10 @@ def viewer_points_bulk_add():
         data = _read_viewer_points_raw()
         keys = users_filter if users_filter else list(data.keys())
         for k in keys:
-            pts, last, donation_pts = data.get(k, (0, 0, 0))
-            data[k] = (pts + chat_add, last, donation_pts + donor_add)
+            v = data.get(k, (0, 0, 0, ''))
+            pts, last, donation_pts = v[0], v[1], v[2]
+            role = v[3] if len(v) >= 4 else ''
+            data[k] = (pts + chat_add, last, donation_pts + donor_add, role)
         _write_viewer_points_raw(data)
         return jsonify({"ok": True, "count": len(keys)})
     finally:
@@ -766,10 +964,11 @@ def viewer_points_chat_to_donor():
         for k in users_filter:
             if k not in data:
                 continue
-            pts, last, donation_pts = data[k]
+            v = data[k]
+            pts, last, donation_pts, role = v[0], v[1], v[2], (v[3] if len(v) >= 4 else '')
             chat_pts = max(0, pts - donation_pts)
             if chat_pts > 0:
-                data[k] = (pts, last, donation_pts + chat_pts)
+                data[k] = (pts, last, donation_pts + chat_pts, role)
                 count += 1
         _write_viewer_points_raw(data)
         return jsonify({"ok": True, "count": count})
@@ -787,9 +986,10 @@ def viewer_points_clear_donor_only():
     try:
         data = _read_viewer_points_raw()
         for k in data:
-            pts, last, donation_pts = data[k]
+            v = data[k]
+            pts, last, donation_pts, role = v[0], v[1], v[2], (v[3] if len(v) >= 4 else '')
             chat_only = max(0, pts - donation_pts)
-            data[k] = (chat_only, last, 0)
+            data[k] = (chat_only, last, 0, role)
         _write_viewer_points_raw(data)
         return jsonify({"ok": True})
     finally:
@@ -806,7 +1006,7 @@ def viewer_points_clear_all():
     try:
         data = _read_viewer_points_raw()
         for k in data:
-            data[k] = (0, 0, 0)
+            data[k] = (0, 0, 0, '')
         _write_viewer_points_raw(data)
         return jsonify({"ok": True})
     finally:
@@ -824,20 +1024,10 @@ def viewer_points_delete(username):
     if not _acquire_viewer_points_lock():
         return jsonify({"error": "Points file busy, try again"}), 503
     try:
-        data = {}
-        if os.path.exists(VIEWER_POINTS_FILE):
-            with open(VIEWER_POINTS_FILE, encoding='utf-8') as f:
-                for line in f:
-                    parts = line.strip().split('|')
-                    if len(parts) >= 3 and parts[0].lower() != username.lower():
-                        try:
-                            donation_pts = int(parts[3]) if len(parts) >= 4 else 0
-                            data[parts[0].lower()] = (int(parts[1]), int(parts[2]), donation_pts)
-                        except ValueError:
-                            pass
-        lines = [f"{k}|{v[0]}|{v[1]}|{v[2]}" for k, v in data.items()]
-        with open(VIEWER_POINTS_FILE, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(lines))
+        data = _read_viewer_points_raw()
+        if username.lower() in data:
+            del data[username.lower()]
+            _write_viewer_points_raw(data)
         return jsonify({"ok": True})
     finally:
         _release_viewer_points_lock()
@@ -1592,6 +1782,89 @@ def debuff_command():
     except Exception as e:
         print(f"Debuff 400 exception: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 400
+
+
+def _forward_helper_command(cmd, result_key, default_err):
+    """Forward a helper/hurter command to game. result_key: buff_name, debuff_name, or item_name."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        if not data and request.form:
+            data = request.form.to_dict()
+        username = (data.get('username') or '').strip() or None
+        if not game_ws_app:
+            return jsonify({'ok': False, 'error': 'Game not connected'}), 503
+        request_id = str(uuid.uuid4())
+        ev = threading.Event()
+        with spawn_lock:
+            pending_spawns[request_id] = {'event': ev, 'success': False}
+        try:
+            payload = {'command': cmd, 'request_id': request_id}
+            if username:
+                payload['username'] = username
+            print(f"{cmd} send to game: request_id={request_id}")
+            game_ws_app.send(json.dumps(payload))
+        except Exception as e:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': str(e)}), 503
+        if ev.wait(timeout=SPAWN_RESULT_TIMEOUT):
+            with spawn_lock:
+                pending = pending_spawns.pop(request_id, {})
+                success = pending.get('success', False)
+                result_val = pending.get(result_key, '')
+                err_val = pending.get('error')
+        else:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': f'{cmd} command timed out'}), 504
+        if success:
+            print(f"{cmd} OK: {result_val} for {username}")
+            _record_command_event(username, cmd, result_val or '', True)
+            return jsonify({'ok': True, result_key: result_val})
+        err = err_val or default_err
+        _record_command_event(username, cmd, '', False)
+        return jsonify({'ok': False, 'error': err}), 200
+    except Exception as e:
+        print(f"{cmd} 400 exception: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 400
+
+
+@app.route('/api/heal-command', methods=['POST', 'OPTIONS'])
+def heal_command():
+    """Helper-exclusive: heal hero ~15% HP."""
+    return _forward_helper_command('heal', 'buff_name', 'Heal failed')
+
+
+@app.route('/api/cleanse-command', methods=['POST', 'OPTIONS'])
+def cleanse_command():
+    """Helper-exclusive: remove one random negative buff."""
+    return _forward_helper_command('cleanse', 'buff_name', 'No debuff to remove')
+
+
+@app.route('/api/dew-command', methods=['POST', 'OPTIONS'])
+def dew_command():
+    """Helper-exclusive: drop dewdrop near hero."""
+    return _forward_helper_command('dew', 'item_name', 'No space for dewdrop')
+
+
+@app.route('/api/hex-command', methods=['POST', 'OPTIONS'])
+def hex_command():
+    """Hurter-exclusive: apply Hex debuff."""
+    return _forward_helper_command('hex', 'debuff_name', 'Hex failed')
+
+
+@app.route('/api/degrade-command', methods=['POST', 'OPTIONS'])
+def degrade_command():
+    """Hurter-exclusive: apply Degrade debuff."""
+    return _forward_helper_command('degrade', 'debuff_name', 'Degrade failed')
+
+
+@app.route('/api/sabotage-command', methods=['POST', 'OPTIONS'])
+def sabotage_command():
+    """Hurter-exclusive: remove one random positive buff."""
+    return _forward_helper_command('sabotage', 'buff_name', 'No buff to remove')
 
 
 @app.route('/api/wand-command', methods=['POST', 'OPTIONS'])

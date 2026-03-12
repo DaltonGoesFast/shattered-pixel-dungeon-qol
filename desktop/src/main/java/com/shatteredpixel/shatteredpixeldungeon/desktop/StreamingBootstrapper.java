@@ -18,6 +18,8 @@ import com.google.gson.Gson;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GameStateSnapshot;
 import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -72,7 +74,16 @@ public final class StreamingBootstrapper {
 							s.broadcastEvent("boss_slain", Map.of("depth", depth));
 						}
 					} catch (Exception e) {
-						if (e.getMessage() != null) System.err.println("[Streaming] " + e.getMessage());
+						e.printStackTrace();
+						Map<String, Object> fallback = new LinkedHashMap<>();
+						fallback.put("source", "shattered-pixel-dungeon");
+						Map<String, Object> ui = new LinkedHashMap<>();
+						ui.put("scene", "unknown");
+						ui.put("open_windows", Collections.emptyList());
+						fallback.put("ui", ui);
+						String json = GSON.toJson(fallback);
+						s.setLastPayload(json);
+						s.broadcastPayload();
 					}
 				});
 			}

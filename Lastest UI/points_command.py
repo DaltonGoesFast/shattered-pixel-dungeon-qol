@@ -38,6 +38,7 @@ DONATION_RESULT_FILE = os.path.join(SCRIPT_DIR, "donation_result.txt")
 CONFIG_FILE = os.path.join(SCRIPT_DIR, "points_config.json")
 FREE_UNTIL_FILE = os.path.join(SCRIPT_DIR, "free_until.json")
 SPEND_DISABLED_FILE = os.path.join(SCRIPT_DIR, "spend_disabled.txt")
+HELPERS_HURTERS_DISABLED_FILE = os.path.join(SCRIPT_DIR, "helpers_hurters_disabled.txt")
 GAME_DATA_URL = "http://127.0.0.1:5000/api/game-data"
 DOUBLE_POINTS_END_FILE = os.path.join(SCRIPT_DIR, "double_points_end.txt")
 
@@ -45,6 +46,11 @@ DOUBLE_POINTS_END_FILE = os.path.join(SCRIPT_DIR, "double_points_end.txt")
 def is_spend_disabled():
     """True if streamer has disabled spending (e.g. via Stream Deck toggle)."""
     return os.path.exists(SPEND_DISABLED_FILE)
+
+
+def is_helpers_hurters_disabled():
+    """True if Helpers vs Hurters system is turned off (e.g. via Stream Deck toggle)."""
+    return os.path.exists(HELPERS_HURTERS_DISABLED_FILE)
 
 
 def is_double_points_active():
@@ -75,6 +81,18 @@ NATIVE_DEPTH = {
 def load_config():
     """Load costs from points_config.json. Falls back to defaults if missing/invalid."""
     defaults = {
+        "helper_discount_percent": 50,
+        "hurter_discount_percent": 50,
+        "helper_discount_commands": ["ward", "bee", "buff"],
+        "hurter_discount_commands": ["debuff", "curse", "trap", "gas"],
+        "cost_to_switch_side": 50,
+        "cost_per_heal": 100,
+        "cost_per_cleanse": 150,
+        "cost_per_dew": 30,
+        "cost_per_hex": 75,
+        "cost_per_degrade": 100,
+        "cost_per_sabotage": 75,
+        "command_allowed_roles": {},
         "cost_per_gold": 5,
         "cost_per_curse": 200,
         "cost_per_gas": 75,
@@ -109,7 +127,17 @@ def load_config():
                 monsters[k] = int(v)
             except (ValueError, TypeError):
                 pass
+        helper_discount_cmds = cfg.get("helper_discount_commands")
+        if not isinstance(helper_discount_cmds, list):
+            helper_discount_cmds = defaults["helper_discount_commands"]
+        hurter_discount_cmds = cfg.get("hurter_discount_commands")
+        if not isinstance(hurter_discount_cmds, list):
+            hurter_discount_cmds = defaults["hurter_discount_commands"]
         return {
+            "helper_discount_percent": max(0, min(100, int(cfg.get("helper_discount_percent", defaults["helper_discount_percent"])))),
+            "hurter_discount_percent": max(0, min(100, int(cfg.get("hurter_discount_percent", defaults["hurter_discount_percent"])))),
+            "helper_discount_commands": helper_discount_cmds,
+            "hurter_discount_commands": hurter_discount_cmds,
             "cost_per_gold": int(cfg.get("cost_per_gold", defaults["cost_per_gold"])),
             "cost_per_curse": int(cfg.get("cost_per_curse", defaults["cost_per_curse"])),
             "cost_per_gas": int(cfg.get("cost_per_gas", defaults["cost_per_gas"])),
@@ -126,6 +154,14 @@ def load_config():
             "cost_per_wand_veryrare": int(cfg.get("cost_per_wand_veryrare", defaults["cost_per_wand_veryrare"])),
             "default_monster_cost": int(cfg.get("default_monster_cost", defaults["default_monster_cost"])),
             "cost_per_monster": monsters,
+            "cost_to_switch_side": max(0, int(cfg.get("cost_to_switch_side", defaults["cost_to_switch_side"]))),
+            "cost_per_heal": max(1, int(cfg.get("cost_per_heal", defaults["cost_per_heal"]))),
+            "cost_per_cleanse": max(1, int(cfg.get("cost_per_cleanse", defaults["cost_per_cleanse"]))),
+            "cost_per_dew": max(1, int(cfg.get("cost_per_dew", defaults["cost_per_dew"]))),
+            "cost_per_hex": max(1, int(cfg.get("cost_per_hex", defaults["cost_per_hex"]))),
+            "cost_per_degrade": max(1, int(cfg.get("cost_per_degrade", defaults["cost_per_degrade"]))),
+            "cost_per_sabotage": max(1, int(cfg.get("cost_per_sabotage", defaults["cost_per_sabotage"]))),
+            "command_allowed_roles": cfg.get("command_allowed_roles") or {},
         }
     except Exception:
         return defaults
@@ -154,6 +190,53 @@ def is_cost_free(cost_key):
 def effective_cost(cost_key, base_cost):
     """Return 0 if cost is free, else base_cost."""
     return 0 if is_cost_free(cost_key) else base_cost
+
+
+DEFAULT_ALLOWED_ROLES = {
+    "heal": "helper", "cleanse": "helper", "dew": "helper",
+    "hex": "hurter", "degrade": "hurter", "sabotage": "hurter",
+}
+
+
+def check_command_access(command_id, role):
+    """Return (True, None) if allowed, else (False, error_msg). When helpers/hurters disabled, treat as both."""
+    if is_helpers_hurters_disabled():
+        if command_id == "switch":
+            return False, "Helpers/Hurters is currently turned off."
+        return True, None
+    allowed = get_config().get("command_allowed_roles") or {}
+    val = allowed.get(command_id, DEFAULT_ALLOWED_ROLES.get(command_id, "both"))
+    if val == "disabled":
+        return False, "This command is currently disabled."
+    if val == "both":
+        return True, None
+    if not role or (role != "helper" and role != "hurter"):
+        return False, "Chat once to get a side, then you can use this command."
+    if val == "helper" and role == "hurter":
+        return False, "Only helpers can use !" + command_id + "."
+    if val == "hurter" and role == "helper":
+        return False, "Only hurters can use !" + command_id + "."
+    return True, None
+
+
+def apply_role_discount(base_cost, command_id, role):
+    """Apply helper/hurter discount if system is ON and user has matching role. Spawn is always neutral."""
+    if command_id == "spawn":
+        return base_cost
+    if is_helpers_hurters_disabled():
+        return base_cost
+    cfg = get_config()
+    helper_pct = cfg.get("helper_discount_percent", 50)
+    hurter_pct = cfg.get("hurter_discount_percent", 50)
+    helper_cmds = cfg.get("helper_discount_commands") or ["ward", "bee", "buff"]
+    hurter_cmds = cfg.get("hurter_discount_commands") or ["debuff", "curse", "trap", "gas"]
+    if role == "helper" and command_id in helper_cmds:
+        discounted = base_cost - (base_cost * helper_pct // 100)
+        return max(1, discounted)
+    if role == "hurter" and command_id in hurter_cmds:
+        discounted = base_cost - (base_cost * hurter_pct // 100)
+        return max(1, discounted)
+    return base_cost
 VALID_MONSTERS = frozenset([
     "rat", "albino", "snake", "gnoll", "crab", "slime", "swarm", "thief",
     "skeleton", "bat", "brute", "shaman", "spinner", "dm100", "guard",
@@ -210,6 +293,7 @@ def points_lock():
 
 
 def read_points():
+    """Read viewer_points. Returns dict[username] = (pts, last, donation_pts, role). role is 'helper'|'hurter'|'' for legacy."""
     data = {}
     if os.path.exists(POINTS_FILE):
         with open(POINTS_FILE, encoding="utf-8") as f:
@@ -218,14 +302,21 @@ def read_points():
                 if len(parts) >= 3:
                     try:
                         donation_pts = int(parts[3]) if len(parts) >= 4 else 0
-                        data[parts[0].lower()] = (int(parts[1]), int(parts[2]), donation_pts)
-                    except ValueError:
+                        role = (parts[4].strip() or "") if len(parts) >= 5 else ""
+                        if role not in ("helper", "hurter"):
+                            role = ""
+                        data[parts[0].lower()] = (int(parts[1]), int(parts[2]), donation_pts, role)
+                    except (ValueError, IndexError):
                         pass
     return data
 
 
 def write_points(data):
-    lines = [f"{k}|{v[0]}|{v[1]}|{v[2]}" for k, v in data.items()]
+    """Write viewer_points. data[username] = (pts, last, donation_pts, role)."""
+    def _row(k, v):
+        role = (v[3] or "") if len(v) >= 4 else ""
+        return f"{k}|{v[0]}|{v[1]}|{v[2]}|{role}"
+    lines = [_row(k, v) for k, v in data.items()]
     with open(POINTS_FILE, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
@@ -286,6 +377,16 @@ def deduct_points(pts: int, donation_pts: int, cost: int):
     return (new_total, new_donation_pts)
 
 
+def _get_user_data(data, key):
+    """Get (pts, last, donation_pts, role) from data. Handles legacy 3-tuple."""
+    existing = data.get(key, (0, 0, 0, ""))
+    pts = existing[0] if len(existing) >= 1 else 0
+    last = existing[1] if len(existing) >= 2 else 0
+    donation_pts = existing[2] if len(existing) >= 3 else 0
+    role = existing[3] if len(existing) >= 4 else ""
+    return (pts, last, donation_pts, role)
+
+
 def cmd_spawn(args):
     if is_spend_disabled():
         return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
@@ -296,12 +397,16 @@ def cmd_spawn(args):
     if monster not in VALID_MONSTERS:
         return SPAWN_RESULT_FILE, f"Unknown monster: {monster}"
 
-    cost = effective_cost("cost_per_monster." + monster, compute_spawn_cost(monster))
+    base_cost = effective_cost("cost_per_monster." + monster, compute_spawn_cost(monster))
     key = username.lower()
     try:
         with points_lock():
             data = read_points()
-            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            ok, err = check_command_access("spawn", role)
+            if not ok:
+                return SPAWN_RESULT_FILE, err
+            cost = apply_role_discount(base_cost, "spawn", role)
             total = effective_total(pts, donation_pts)
             if total < cost:
                 return SPAWN_RESULT_FILE, f"Not enough points! Need {cost}, you have {total}."
@@ -333,7 +438,7 @@ def cmd_spawn(args):
                 return SPAWN_RESULT_FILE, "Spawn failed. " + (msg if msg else "Check overlay server and try again.")
 
             new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation)
+            data[key] = (new_pts, last, new_donation, role)
             write_points(data)
             return SPAWN_RESULT_FILE, f"ok|{new_pts}"
     except TimeoutError:
@@ -350,12 +455,16 @@ def cmd_champion(args):
     if monster not in VALID_MONSTERS:
         return SPAWN_RESULT_FILE, f"Unknown monster: {monster}"
 
-    cost = effective_cost("cost_per_monster." + monster, compute_champion_cost(monster))
+    base_cost = effective_cost("cost_per_monster." + monster, compute_champion_cost(monster))
     key = username.lower()
     try:
         with points_lock():
             data = read_points()
-            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            ok, err = check_command_access("champion", role)
+            if not ok:
+                return SPAWN_RESULT_FILE, err
+            cost = apply_role_discount(base_cost, "champion", role)
             total = effective_total(pts, donation_pts)
             if total < cost:
                 return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} for champion {monster}, you have {total}."
@@ -387,7 +496,7 @@ def cmd_champion(args):
                 return SPAWN_RESULT_FILE, "Champion spawn failed. " + (msg if msg else "Check overlay server and try again.")
 
             new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation)
+            data[key] = (new_pts, last, new_donation, role)
             write_points(data)
             return SPAWN_RESULT_FILE, "ok|" + body.get("monster", monster) + f"|{new_pts}"
     except TimeoutError:
@@ -407,12 +516,16 @@ def cmd_gold(args):
         return SPAWN_RESULT_FILE, "Amount must be 1-100. Example: !gold 10"
     username = args[1]
 
-    cost = effective_cost("cost_per_gold", amount * get_config()["cost_per_gold"])
+    base_cost = effective_cost("cost_per_gold", amount * get_config()["cost_per_gold"])
     key = username.lower()
     try:
         with points_lock():
             data = read_points()
-            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            ok, err = check_command_access("gold", role)
+            if not ok:
+                return SPAWN_RESULT_FILE, err
+            cost = apply_role_discount(base_cost, "gold", role)
             total = effective_total(pts, donation_pts)
             if total < cost:
                 return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} for {amount} gold, you have {total}."
@@ -444,7 +557,7 @@ def cmd_gold(args):
                 return SPAWN_RESULT_FILE, "Gold drop failed. " + (msg if msg else "Check overlay server and try again.")
 
             new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation)
+            data[key] = (new_pts, last, new_donation, role)
             write_points(data)
             return SPAWN_RESULT_FILE, f"ok|{amount}|{new_pts}"
     except TimeoutError:
@@ -466,12 +579,16 @@ def cmd_curse(args):
         return SPAWN_RESULT_FILE, "Usage: !curse (curses a random equipped item)"
     username = args[0]
 
-    cost = effective_cost("cost_per_curse", get_config()["cost_per_curse"])
+    base_cost = effective_cost("cost_per_curse", get_config()["cost_per_curse"])
     key = username.lower()
     try:
         with points_lock():
             data = read_points()
-            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            ok, err = check_command_access("curse", role)
+            if not ok:
+                return SPAWN_RESULT_FILE, err
+            cost = apply_role_discount(base_cost, "curse", role)
             total = effective_total(pts, donation_pts)
             if total < cost:
                 return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to curse, you have {total}."
@@ -497,7 +614,7 @@ def cmd_curse(args):
                             return SPAWN_RESULT_FILE, "Curse failed (server error). Is the overlay running?"
                         if body.get("ok"):
                             new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-                            data[key] = (new_pts, last, new_donation)
+                            data[key] = (new_pts, last, new_donation, role)
                             write_points(data)
                             item_name = body.get("item_name", slot)
                             return SPAWN_RESULT_FILE, f"ok|{item_name}|{new_pts}"
@@ -527,12 +644,16 @@ def cmd_gas(args):
         return SPAWN_RESULT_FILE, "Usage: !gas (spawns random gas near you)"
     username = args[0]
 
-    cost = get_config()["cost_per_gas"]
+    base_cost = effective_cost("cost_per_gas", get_config()["cost_per_gas"])
     key = username.lower()
     try:
         with points_lock():
             data = read_points()
-            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            ok, err = check_command_access("gas", role)
+            if not ok:
+                return SPAWN_RESULT_FILE, err
+            cost = apply_role_discount(base_cost, "gas", role)
             total = effective_total(pts, donation_pts)
             if total < cost:
                 return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to spew gas, you have {total}."
@@ -564,7 +685,7 @@ def cmd_gas(args):
                 return SPAWN_RESULT_FILE, "Gas spawn failed. " + (msg if msg else "Check overlay server and try again.")
 
             new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation)
+            data[key] = (new_pts, last, new_donation, role)
             write_points(data)
             gas_name = body.get("gas_name", "gas")
             return SPAWN_RESULT_FILE, f"ok|{gas_name}|{new_pts}"
@@ -579,12 +700,16 @@ def cmd_scroll(args):
         return SPAWN_RESULT_FILE, "Usage: !scroll (uses a random scroll like +10 Unstable Spellbook)"
     username = args[0]
 
-    cost = effective_cost("cost_per_scroll", get_config()["cost_per_scroll"])
+    base_cost = effective_cost("cost_per_scroll", get_config()["cost_per_scroll"])
     key = username.lower()
     try:
         with points_lock():
             data = read_points()
-            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            ok, err = check_command_access("scroll", role)
+            if not ok:
+                return SPAWN_RESULT_FILE, err
+            cost = apply_role_discount(base_cost, "scroll", role)
             total = effective_total(pts, donation_pts)
             if total < cost:
                 return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} for random scroll, you have {total}."
@@ -616,7 +741,7 @@ def cmd_scroll(args):
                 return SPAWN_RESULT_FILE, "Scroll command failed. " + (msg if msg else "Check overlay server and try again.")
 
             new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation)
+            data[key] = (new_pts, last, new_donation, role)
             write_points(data)
             scroll_name = body.get("scroll_name", "scroll")
             return SPAWN_RESULT_FILE, f"ok|{scroll_name}|{new_pts}"
@@ -631,12 +756,16 @@ def cmd_trap(args):
         return SPAWN_RESULT_FILE, "Usage: !trap (places a random visible trap near you)"
     username = args[0]
 
-    cost = effective_cost("cost_per_trap", get_config()["cost_per_trap"])
+    base_cost = effective_cost("cost_per_trap", get_config()["cost_per_trap"])
     key = username.lower()
     try:
         with points_lock():
             data = read_points()
-            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            ok, err = check_command_access("trap", role)
+            if not ok:
+                return SPAWN_RESULT_FILE, err
+            cost = apply_role_discount(base_cost, "trap", role)
             total = effective_total(pts, donation_pts)
             if total < cost:
                 return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to place a trap, you have {total}."
@@ -668,7 +797,7 @@ def cmd_trap(args):
                 return SPAWN_RESULT_FILE, "Trap command failed. " + (msg if msg else "Check overlay server and try again.")
 
             new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation)
+            data[key] = (new_pts, last, new_donation, role)
             write_points(data)
             trap_name = body.get("trap_name", "trap")
             return SPAWN_RESULT_FILE, f"ok|{trap_name}|{new_pts}"
@@ -683,12 +812,16 @@ def cmd_transmute(args):
         return SPAWN_RESULT_FILE, "Usage: !transmute (transmutes a random transmutable item from bag or equipped)"
     username = args[0]
 
-    cost = effective_cost("cost_per_transmute", get_config()["cost_per_transmute"])
+    base_cost = effective_cost("cost_per_transmute", get_config()["cost_per_transmute"])
     key = username.lower()
     try:
         with points_lock():
             data = read_points()
-            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            ok, err = check_command_access("transmute", role)
+            if not ok:
+                return SPAWN_RESULT_FILE, err
+            cost = apply_role_discount(base_cost, "transmute", role)
             total = effective_total(pts, donation_pts)
             if total < cost:
                 return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to transmute, you have {total}."
@@ -720,7 +853,7 @@ def cmd_transmute(args):
                 return SPAWN_RESULT_FILE, "Transmute command failed. " + (msg if msg else "Check overlay server and try again.")
 
             new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation)
+            data[key] = (new_pts, last, new_donation, role)
             write_points(data)
             item_name = body.get("item_name", "item")
             return SPAWN_RESULT_FILE, f"ok|{item_name}|{new_pts}"
@@ -735,12 +868,16 @@ def cmd_ally_bee(args):
         return SPAWN_RESULT_FILE, "Usage: !bee (summons an allied bee for 50 turns, 75 pts)"
     username = args[0]
 
-    cost = get_config()["cost_per_ally_bee"]
+    base_cost = effective_cost("cost_per_ally_bee", get_config()["cost_per_ally_bee"])
     key = username.lower()
     try:
         with points_lock():
             data = read_points()
-            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            ok, err = check_command_access("bee", role)
+            if not ok:
+                return SPAWN_RESULT_FILE, err
+            cost = apply_role_discount(base_cost, "bee", role)
             total = effective_total(pts, donation_pts)
             if total < cost:
                 return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to summon a bee, you have {total}."
@@ -772,7 +909,7 @@ def cmd_ally_bee(args):
                 return SPAWN_RESULT_FILE, "Summon bee failed. " + (msg if msg else "Check overlay server and try again.")
 
             new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation)
+            data[key] = (new_pts, last, new_donation, role)
             write_points(data)
             ally_name = body.get("ally_name", "Bee")
             return SPAWN_RESULT_FILE, f"ok|{ally_name}|{new_pts}"
@@ -787,12 +924,16 @@ def cmd_ward(args):
         return SPAWN_RESULT_FILE, "Usage: !ward (summons a ward, 30 pts, scales with depth)"
     username = args[0]
 
-    cost = effective_cost("cost_per_ward", get_config()["cost_per_ward"])
+    base_cost = effective_cost("cost_per_ward", get_config()["cost_per_ward"])
     key = username.lower()
     try:
         with points_lock():
             data = read_points()
-            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            ok, err = check_command_access("ward", role)
+            if not ok:
+                return SPAWN_RESULT_FILE, err
+            cost = apply_role_discount(base_cost, "ward", role)
             total = effective_total(pts, donation_pts)
             if total < cost:
                 return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to summon a ward, you have {total}."
@@ -824,7 +965,7 @@ def cmd_ward(args):
                 return SPAWN_RESULT_FILE, "Summon ward failed. " + (msg if msg else "Check overlay server and try again.")
 
             new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation)
+            data[key] = (new_pts, last, new_donation, role)
             write_points(data)
             ward_name = body.get("ward_name", "Ward")
             return SPAWN_RESULT_FILE, f"ok|{ward_name}|{new_pts}"
@@ -839,12 +980,16 @@ def cmd_buff(args):
         return SPAWN_RESULT_FILE, "Usage: !buff (gives a random buff)"
     username = args[0]
 
-    cost = get_config()["cost_per_buff"]
+    base_cost = effective_cost("cost_per_buff", get_config()["cost_per_buff"])
     key = username.lower()
     try:
         with points_lock():
             data = read_points()
-            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            ok, err = check_command_access("buff", role)
+            if not ok:
+                return SPAWN_RESULT_FILE, err
+            cost = apply_role_discount(base_cost, "buff", role)
             total = effective_total(pts, donation_pts)
             if total < cost:
                 return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} for random buff, you have {total}."
@@ -876,7 +1021,7 @@ def cmd_buff(args):
                 return SPAWN_RESULT_FILE, "Buff command failed. " + (msg if msg else "Check overlay server and try again.")
 
             new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation)
+            data[key] = (new_pts, last, new_donation, role)
             write_points(data)
             buff_name = body.get("buff_name", "buff")
             return SPAWN_RESULT_FILE, f"ok|{buff_name}|{new_pts}"
@@ -891,12 +1036,16 @@ def cmd_debuff(args):
         return SPAWN_RESULT_FILE, "Usage: !debuff (gives a random debuff)"
     username = args[0]
 
-    cost = effective_cost("cost_per_debuff", get_config()["cost_per_debuff"])
+    base_cost = effective_cost("cost_per_debuff", get_config()["cost_per_debuff"])
     key = username.lower()
     try:
         with points_lock():
             data = read_points()
-            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            ok, err = check_command_access("debuff", role)
+            if not ok:
+                return SPAWN_RESULT_FILE, err
+            cost = apply_role_discount(base_cost, "debuff", role)
             total = effective_total(pts, donation_pts)
             if total < cost:
                 return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} for random debuff, you have {total}."
@@ -928,7 +1077,7 @@ def cmd_debuff(args):
                 return SPAWN_RESULT_FILE, "Debuff command failed. " + (msg if msg else "Check overlay server and try again.")
 
             new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation)
+            data[key] = (new_pts, last, new_donation, role)
             write_points(data)
             debuff_name = body.get("debuff_name", "debuff")
             return SPAWN_RESULT_FILE, f"ok|{debuff_name}|{new_pts}"
@@ -983,9 +1132,9 @@ def cmd_wand(args):
 
     cfg = get_config()
     if tier >= 0:
-        cost_check = _wand_effective_cost(cfg, tier)
+        base_cost_check = _wand_effective_cost(cfg, tier)
     else:
-        cost_check = max(
+        base_cost_check = max(
             _wand_effective_cost(cfg, 0),
             _wand_effective_cost(cfg, 1),
             _wand_effective_cost(cfg, 2),
@@ -995,7 +1144,11 @@ def cmd_wand(args):
     try:
         with points_lock():
             data = read_points()
-            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            ok, err = check_command_access("wand", role)
+            if not ok:
+                return SPAWN_RESULT_FILE, err
+            cost_check = apply_role_discount(base_cost_check, "wand", role)
             total = effective_total(pts, donation_pts)
             if total < cost_check:
                 return SPAWN_RESULT_FILE, f"Not enough points! Need {cost_check}, you have {total}."
@@ -1029,9 +1182,10 @@ def cmd_wand(args):
                 return SPAWN_RESULT_FILE, "Wand command failed. " + (msg if msg else "Check overlay server and try again.")
 
             rarity = body.get("rarity", 0)
-            cost = _wand_effective_cost(cfg, rarity)
+            base_cost = _wand_effective_cost(cfg, rarity)
+            cost = apply_role_discount(base_cost, "wand", role)
             new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation)
+            data[key] = (new_pts, last, new_donation, role)
             write_points(data)
             effect_name = body.get("effect_name", "effect")
             return SPAWN_RESULT_FILE, f"ok|{effect_name}|{new_pts}"
@@ -1082,9 +1236,9 @@ def cmd_superchat(args):
     try:
         with points_lock():
             data = read_points()
-            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            pts, last, donation_pts, role = _get_user_data(data, key)
             pts += to_add
-            data[key] = (pts, last, donation_pts + to_add)
+            data[key] = (pts, last, donation_pts + to_add, role)
             write_points(data)
         return DONATION_RESULT_FILE, f"ok|{to_add}"
     except TimeoutError:
@@ -1111,13 +1265,293 @@ def cmd_cheer(args):
     try:
         with points_lock():
             data = read_points()
-            pts, last, donation_pts = data.get(key, (0, 0, 0))
+            pts, last, donation_pts, role = _get_user_data(data, key)
             pts += to_add
-            data[key] = (pts, last, donation_pts + to_add)
+            data[key] = (pts, last, donation_pts + to_add, role)
             write_points(data)
         return DONATION_RESULT_FILE, f"ok|{to_add}"
     except TimeoutError:
         return DONATION_RESULT_FILE, "Points file busy. Please try again in a moment."
+
+
+def cmd_heal(args):
+    if is_spend_disabled():
+        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
+    if len(args) < 1:
+        return SPAWN_RESULT_FILE, "Usage: !heal (heals hero ~15% HP)"
+    username = args[0]
+    key = username.lower()
+    try:
+        with points_lock():
+            data = read_points()
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            ok, err = check_command_access("heal", role)
+            if not ok:
+                return SPAWN_RESULT_FILE, err
+            base_cost = effective_cost("cost_per_heal", get_config()["cost_per_heal"])
+            cost = apply_role_discount(base_cost, "heal", role)
+            total = effective_total(pts, donation_pts)
+            if total < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to heal, you have {total}."
+
+            url = "http://127.0.0.1:5000/api/heal-command"
+            payload = {"username": username}
+            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+            req.add_header("Content-Type", "application/json")
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    body = json.loads(resp.read().decode())
+                    if not body.get("ok"):
+                        return SPAWN_RESULT_FILE, body.get("error", "Heal failed")
+            except Exception as e:
+                return SPAWN_RESULT_FILE, _http_error_msg(e, "Heal timed out. Is the game running?")
+            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
+            data[key] = (new_pts, last, new_donation, role)
+            write_points(data)
+            return SPAWN_RESULT_FILE, f"ok|Healing|{new_pts}"
+    except TimeoutError:
+        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+
+
+def cmd_cleanse(args):
+    if is_spend_disabled():
+        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
+    if len(args) < 1:
+        return SPAWN_RESULT_FILE, "Usage: !cleanse (removes one random debuff)"
+    username = args[0]
+    key = username.lower()
+    try:
+        with points_lock():
+            data = read_points()
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            ok, err = check_command_access("cleanse", role)
+            if not ok:
+                return SPAWN_RESULT_FILE, err
+            base_cost = effective_cost("cost_per_cleanse", get_config()["cost_per_cleanse"])
+            cost = apply_role_discount(base_cost, "cleanse", role)
+            total = effective_total(pts, donation_pts)
+            if total < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to cleanse, you have {total}."
+
+            url = "http://127.0.0.1:5000/api/cleanse-command"
+            payload = {"username": username}
+            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+            req.add_header("Content-Type", "application/json")
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    body = json.loads(resp.read().decode())
+                    if not body.get("ok"):
+                        return SPAWN_RESULT_FILE, body.get("error", "Cleanse failed")
+                    buff_name = body.get("buff_name", "debuff")
+            except Exception as e:
+                return SPAWN_RESULT_FILE, _http_error_msg(e, "Cleanse timed out. Is the game running?")
+            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
+            data[key] = (new_pts, last, new_donation, role)
+            write_points(data)
+            return SPAWN_RESULT_FILE, f"ok|{buff_name}|{new_pts}"
+    except TimeoutError:
+        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+
+
+def cmd_dew(args):
+    if is_spend_disabled():
+        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
+    if len(args) < 1:
+        return SPAWN_RESULT_FILE, "Usage: !dew (drops a dewdrop near hero)"
+    username = args[0]
+    key = username.lower()
+    try:
+        with points_lock():
+            data = read_points()
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            ok, err = check_command_access("dew", role)
+            if not ok:
+                return SPAWN_RESULT_FILE, err
+            base_cost = effective_cost("cost_per_dew", get_config()["cost_per_dew"])
+            cost = apply_role_discount(base_cost, "dew", role)
+            total = effective_total(pts, donation_pts)
+            if total < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} for dewdrop, you have {total}."
+
+            url = "http://127.0.0.1:5000/api/dew-command"
+            payload = {"username": username}
+            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+            req.add_header("Content-Type", "application/json")
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    body = json.loads(resp.read().decode())
+                    if not body.get("ok"):
+                        return SPAWN_RESULT_FILE, body.get("error", "Dew failed")
+            except Exception as e:
+                return SPAWN_RESULT_FILE, _http_error_msg(e, "Dew timed out. Is the game running?")
+            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
+            data[key] = (new_pts, last, new_donation, role)
+            write_points(data)
+            return SPAWN_RESULT_FILE, f"ok|Dewdrop|{new_pts}"
+    except TimeoutError:
+        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+
+
+def cmd_hex(args):
+    if is_spend_disabled():
+        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
+    if len(args) < 1:
+        return SPAWN_RESULT_FILE, "Usage: !hex (applies Hex debuff)"
+    username = args[0]
+    key = username.lower()
+    try:
+        with points_lock():
+            data = read_points()
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            ok, err = check_command_access("hex", role)
+            if not ok:
+                return SPAWN_RESULT_FILE, err
+            base_cost = effective_cost("cost_per_hex", get_config()["cost_per_hex"])
+            cost = apply_role_discount(base_cost, "hex", role)
+            total = effective_total(pts, donation_pts)
+            if total < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to hex, you have {total}."
+
+            url = "http://127.0.0.1:5000/api/hex-command"
+            payload = {"username": username}
+            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+            req.add_header("Content-Type", "application/json")
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    body = json.loads(resp.read().decode())
+                    if not body.get("ok"):
+                        return SPAWN_RESULT_FILE, body.get("error", "Hex failed")
+            except Exception as e:
+                return SPAWN_RESULT_FILE, _http_error_msg(e, "Hex timed out. Is the game running?")
+            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
+            data[key] = (new_pts, last, new_donation, role)
+            write_points(data)
+            return SPAWN_RESULT_FILE, f"ok|Hex|{new_pts}"
+    except TimeoutError:
+        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+
+
+def cmd_degrade(args):
+    if is_spend_disabled():
+        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
+    if len(args) < 1:
+        return SPAWN_RESULT_FILE, "Usage: !degrade (applies Degrade debuff)"
+    username = args[0]
+    key = username.lower()
+    try:
+        with points_lock():
+            data = read_points()
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            ok, err = check_command_access("degrade", role)
+            if not ok:
+                return SPAWN_RESULT_FILE, err
+            base_cost = effective_cost("cost_per_degrade", get_config()["cost_per_degrade"])
+            cost = apply_role_discount(base_cost, "degrade", role)
+            total = effective_total(pts, donation_pts)
+            if total < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to degrade, you have {total}."
+
+            url = "http://127.0.0.1:5000/api/degrade-command"
+            payload = {"username": username}
+            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+            req.add_header("Content-Type", "application/json")
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    body = json.loads(resp.read().decode())
+                    if not body.get("ok"):
+                        return SPAWN_RESULT_FILE, body.get("error", "Degrade failed")
+            except Exception as e:
+                return SPAWN_RESULT_FILE, _http_error_msg(e, "Degrade timed out. Is the game running?")
+            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
+            data[key] = (new_pts, last, new_donation, role)
+            write_points(data)
+            return SPAWN_RESULT_FILE, f"ok|Degrade|{new_pts}"
+    except TimeoutError:
+        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+
+
+def cmd_sabotage(args):
+    if is_spend_disabled():
+        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
+    if len(args) < 1:
+        return SPAWN_RESULT_FILE, "Usage: !sabotage (removes one random buff)"
+    username = args[0]
+    key = username.lower()
+    try:
+        with points_lock():
+            data = read_points()
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            ok, err = check_command_access("sabotage", role)
+            if not ok:
+                return SPAWN_RESULT_FILE, err
+            base_cost = effective_cost("cost_per_sabotage", get_config()["cost_per_sabotage"])
+            cost = apply_role_discount(base_cost, "sabotage", role)
+            total = effective_total(pts, donation_pts)
+            if total < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to sabotage, you have {total}."
+
+            url = "http://127.0.0.1:5000/api/sabotage-command"
+            payload = {"username": username}
+            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+            req.add_header("Content-Type", "application/json")
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    body = json.loads(resp.read().decode())
+                    if not body.get("ok"):
+                        return SPAWN_RESULT_FILE, body.get("error", "Sabotage failed")
+                    buff_name = body.get("buff_name", "buff")
+            except Exception as e:
+                return SPAWN_RESULT_FILE, _http_error_msg(e, "Sabotage timed out. Is the game running?")
+            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
+            data[key] = (new_pts, last, new_donation, role)
+            write_points(data)
+            return SPAWN_RESULT_FILE, f"ok|{buff_name}|{new_pts}"
+    except TimeoutError:
+        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+
+
+def cmd_switch(args):
+    if is_spend_disabled():
+        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
+    if is_helpers_hurters_disabled():
+        return SPAWN_RESULT_FILE, "Helpers/Hurters is currently turned off."
+    if len(args) < 1:
+        return SPAWN_RESULT_FILE, "Usage: !switch (switch helper/hurter side)"
+    username = args[0]
+    key = username.lower()
+    try:
+        with points_lock():
+            data = read_points()
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            if not role or (role != "helper" and role != "hurter"):
+                return SPAWN_RESULT_FILE, "You don't have a side yet. Chat once to be assigned."
+            cost = get_config()["cost_to_switch_side"]
+            total = effective_total(pts, donation_pts)
+            if cost > 0 and total < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to switch side, you have {total}."
+            new_role = "hurter" if role == "helper" else "helper"
+            if cost > 0:
+                new_pts, new_donation = deduct_points(pts, donation_pts, cost)
+                data[key] = (new_pts, last, new_donation, new_role)
+            else:
+                data[key] = (pts, last, donation_pts, new_role)
+                new_pts = pts
+            write_points(data)
+            return SPAWN_RESULT_FILE, f"ok|{new_role}|{new_pts}"
+    except TimeoutError:
+        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+
+
+def cmd_myside(args):
+    if len(args) < 1:
+        return SPAWN_RESULT_FILE, "Usage: !myside"
+    username = args[0]
+    key = username.lower()
+    data = read_points()
+    pts, last, donation_pts, role = _get_user_data(data, key)
+    if not role or (role != "helper" and role != "hurter"):
+        return SPAWN_RESULT_FILE, f"{username}, chat once to get a side, then use !myside to see it."
+    return SPAWN_RESULT_FILE, f"{username}, you're on the {role} side!"
 
 
 COMMANDS = {
@@ -1134,6 +1568,14 @@ COMMANDS = {
     "buff": cmd_buff,
     "debuff": cmd_debuff,
     "wand": cmd_wand,
+    "heal": cmd_heal,
+    "cleanse": cmd_cleanse,
+    "dew": cmd_dew,
+    "hex": cmd_hex,
+    "degrade": cmd_degrade,
+    "sabotage": cmd_sabotage,
+    "switch": cmd_switch,
+    "myside": cmd_myside,
     "superchat": cmd_superchat,
     "cheer": cmd_cheer,
 }
@@ -1143,7 +1585,7 @@ def main():
     args = [a.strip() for a in sys.argv[1:] if a.strip()]
     if len(args) < 1:
         with open(SPAWN_RESULT_FILE, "w", encoding="utf-8") as f:
-            f.write("Usage: points_command.py <spawn|champion|gold|curse|gas|scroll|trap|transmute|bee|ward|buff|debuff|wand|superchat|cheer> [args...]")
+            f.write("Usage: points_command.py <spawn|champion|gold|curse|gas|scroll|trap|transmute|bee|ward|buff|debuff|wand|heal|cleanse|dew|hex|degrade|sabotage|switch|myside|superchat|cheer> [args...]")
         sys.exit(0)
 
     cmd = args[0].lower()

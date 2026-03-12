@@ -4,6 +4,10 @@ Spend points to mess with the run! Earn points by chatting (1 per message, 30s c
 
 ---
 
+**HELPERS vs HURTERS** — Chat once to be assigned a side! Helpers earn bonus points when the streamer kills a boss; hurters earn when the hero dies. Each side gets 50% off certain commands (helpers: bee, ward, buff; hurters: curse, gas, trap, debuff). **!myside** shows your side. **!switch** costs 150 pts and has a long cooldown — choose wisely!
+
+---
+
 **!points** — Check your balance
 
 **!toppoints** / **!leaderboard** — Top 3 point holders
@@ -12,7 +16,7 @@ Spend points to mess with the run! Earn points by chatting (1 per message, 30s c
 
 **!champion** (monster) — Spawn a champion version of that monster (2× base cost, no discount). Random champion type. Examples: !champion rat, !champion eye
 
-**!gold** (amount) — Drop gold near the hero (2 pts per gold, 1–100). Example: !gold 25
+**!gold** (amount) — Drop gold near the hero (5 pts per gold, 1–100). Example: !gold 25
 
 **!curse** — Curse a random equipped item (200 pts)
 
@@ -26,13 +30,19 @@ Spend points to mess with the run! Earn points by chatting (1 per message, 30s c
 
 **!bee** — Summon an allied bee for 50 turns (75 pts). Fights for you like honeyed healing!
 
-**!ward** — Summon a ward (30 pts). Scales with depth; upgrades existing ward if same tile.
+**!ward** — Summon a ward (9 pts). Scales with depth; upgrades existing ward if same tile.
 
 **!buff** — Apply a random buff (75 pts). Haste, Healing, Barrier, Invisibility, and more!
 
 **!debuff** — Apply a random debuff (50 pts). Blindness, Slow, Roots, Daze, and more!
 
 **!wand** (tier) — Trigger a cursed wand effect. Tier required: common (50 pts), uncommon (100 pts), rare (200 pts), or veryrare (400 pts). Burn, freeze, teleport, gas, sheep, and more!
+
+**Helper only:** !heal (50 pts), !cleanse (50 pts), !dew (10 pts)
+
+**Hurter only:** !hex (75 pts), !degrade (75 pts), !sabotage (75 pts)
+
+**!switch** — Switch helper ↔ hurter (150 pts, long cooldown)
 
 ---
 

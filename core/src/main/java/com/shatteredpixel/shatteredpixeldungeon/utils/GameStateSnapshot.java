@@ -68,7 +68,15 @@ public class GameStateSnapshot {
 	public static Map<String, Object> build() {
 		Map<String, Object> out = new LinkedHashMap<>();
 		out.put("source", SOURCE_ID);
-		out.put("ui", buildUI());
+		Map<String, Object> ui;
+		try {
+			ui = buildUI();
+		} catch (Exception e) {
+			ui = new LinkedHashMap<>();
+			ui.put("scene", "unknown");
+			ui.put("open_windows", new ArrayList<>());
+		}
+		out.put("ui", ui);
 		if (Dungeon.hero == null || Dungeon.level == null) {
 			return out;
 		}
