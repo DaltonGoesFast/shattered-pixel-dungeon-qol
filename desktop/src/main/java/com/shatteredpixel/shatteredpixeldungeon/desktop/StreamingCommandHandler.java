@@ -38,6 +38,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Gnoll;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Golem;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Guard;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.MobSpawner;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Monk;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Necromancer;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Rat;
@@ -54,7 +55,10 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Warlock;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Adrenaline;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Barrier;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Blindness;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.AllyBuff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Corruption;
+import com.shatteredpixel.shatteredpixeldungeon.ui.BuffIndicator;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ChampionEnemy;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ChatSpawned;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Cripple;
@@ -143,10 +147,12 @@ import com.watabou.utils.PathFinder;
 import com.watabou.utils.Random;
 import com.watabou.utils.Reflection;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.ArrayList;
 import java.util.Map;
+import java.util.Queue;
 
 /**
  * Handles spawn commands received via the streaming WebSocket (e.g. from chat).
@@ -157,6 +163,9 @@ public final class StreamingCommandHandler {
 	private static final float SPAWN_DELAY = 0f;  // 0 = spawn immediately (was 2f)
 	private static final int SPAWN_RADIUS = 4;  // tiles away from hero (1–4)
 	private static final float MIN_HP_SCALE = 0.25f;  // minimum HP when spawning late-game mobs early
+
+	/** Queue of usernames for stacked !heal: when one heal finishes, the next is applied. */
+	private static final Queue<String> healQueue = new ArrayDeque<>();
 
 	/** Earliest depth each monster appears (from MobSpawner). Used to scale HP when spawned in earlier areas. */
 	private static final Map<String, Integer> NATIVE_DEPTH = new HashMap<>();
@@ -182,6 +191,8 @@ public final class StreamingCommandHandler {
 
 		Class<? extends Mob> mobClass = "elemental".equals(monsterName)
 				? Elemental.random()
+				: "shaman".equals(monsterName)
+				? Shaman.random()
 				: mobClassForName(monsterName);
 		if (mobClass == null)
 			return "Unknown monster";
@@ -279,6 +290,8 @@ public final class StreamingCommandHandler {
 
 		Class<? extends Mob> mobClass = "elemental".equals(monsterName)
 				? Elemental.random()
+				: "shaman".equals(monsterName)
+				? Shaman.random()
 				: mobClassForName(monsterName);
 		if (mobClass == null)
 			return "Unknown monster";
@@ -848,7 +861,7 @@ public final class StreamingCommandHandler {
 		return debuffName;
 	}
 
-	/** Helper-exclusive: Heal hero ~15% HP. Returns null on success, ERR:... on failure. */
+	/** Helper-exclusive: Heal hero ~15% HP. Returns null on success, ERR:... on failure. Stacks: when one heal is active, others are queued and activate when it finishes. */
 	public static String handleChatHeal(String username) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
@@ -857,14 +870,41 @@ public final class StreamingCommandHandler {
 		if (!Dungeon.hero.isAlive())
 			return "ERR:Hero is dead";
 
+		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
+		if (Dungeon.hero.buff(Healing.class) != null) {
+			healQueue.add(chatter);
+			Buff.affect(Dungeon.hero, HealQueueProcessor.class);
+			GLog.p(Messages.get(StreamingCommandHandler.class, "chat_heal_queued"), chatter, healQueue.size());
+			return "Healing";
+		}
+
+		applyChatHeal(chatter);
+		return "Healing";
+	}
+
+	/** Apply one heal immediately. Called from handleChatHeal or processNextQueuedHeal. */
+	private static void applyChatHeal(String chatter) {
 		int totalHeal = Math.max(1, Math.round(Dungeon.hero.HT * 0.15f));
 		int perTick = Math.max(1, totalHeal / 10);
 		Healing h = Buff.affect(Dungeon.hero, Healing.class);
 		h.setHeal(totalHeal, 0, perTick);
-
-		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		GLog.p(Messages.get(StreamingCommandHandler.class, "chat_buff"), chatter, "Healing");
-		return "Healing";
+	}
+
+	/** Process next queued heal when current Healing buff finishes. Called by HealQueueProcessor. */
+	public static void processNextQueuedHeal() {
+		if (Dungeon.hero == null || !Dungeon.hero.isAlive()) {
+			healQueue.clear();
+			return;
+		}
+		if (healQueue.isEmpty()) return;
+		String chatter = healQueue.poll();
+		applyChatHeal(chatter);
+	}
+
+	/** Whether there are heals waiting in the queue. */
+	public static boolean hasQueuedHeals() {
+		return !healQueue.isEmpty();
 	}
 
 	/** Helper-exclusive: Remove one random negative buff. Returns buff name on success, ERR:... on failure. */
@@ -927,6 +967,69 @@ public final class StreamingCommandHandler {
 		return "Dewdrop";
 	}
 
+	/** Helper-exclusive: Summon a corrupted (allied) enemy from the current biome. Boss floors allowed. Returns mob name on success, ERR:... on failure. */
+	public static String handleChatCorruptAlly(String username) {
+		if (Dungeon.hero == null || Dungeon.level == null)
+			return "ERR:Not in an active run (title/menu)";
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+			return "ERR:Not in an active run (title/menu)";
+		if (!Dungeon.hero.isAlive())
+			return "ERR:Hero is dead";
+
+		ArrayList<Class<? extends Mob>> rotation = MobSpawner.getMobRotation(Dungeon.depth);
+		ArrayList<Class<? extends Mob>> corruptible = new ArrayList<>();
+		for (Class<? extends Mob> cl : rotation) {
+			Mob test = Reflection.newInstance(cl);
+			if (test != null && !test.isImmune(Corruption.class))
+				corruptible.add(cl);
+		}
+		if (corruptible.isEmpty())
+			return "ERR:No corruptible mob in this biome";
+
+		Class<? extends Mob> mobClass = Random.element(corruptible);
+		Mob mob = Reflection.newInstance(mobClass);
+		if (mob == null)
+			return "ERR:Failed to create mob";
+
+		Buff.affect(mob, ChatSpawned.class);
+
+		int heroPos = Dungeon.hero.pos;
+		boolean[] spawnPassable = new boolean[Dungeon.level.length()];
+		for (int i = 0; i < spawnPassable.length; i++) {
+			spawnPassable[i] = Dungeon.level.passable[i] || Dungeon.level.avoid[i];
+		}
+		PathFinder.buildDistanceMap(heroPos, spawnPassable, SPAWN_RADIUS);
+
+		ArrayList<Integer> candidates = new ArrayList<>();
+		for (int p = 0; p < Dungeon.level.length(); p++) {
+			int d = PathFinder.distance[p];
+			if (d < 1 || d > SPAWN_RADIUS) continue;
+			if (Actor.findChar(p) != null) continue;
+			if (!Dungeon.level.passable[p] && !Dungeon.level.avoid[p]) continue;
+			if (Char.hasProp(mob, Char.Property.LARGE) && !Dungeon.level.openSpace[p]) continue;
+			candidates.add(p);
+		}
+		if (candidates.isEmpty())
+			return "ERR:No space to spawn (hero surrounded or no valid tiles)";
+
+		int cell = Random.element(candidates);
+		if (mob.state != mob.PASSIVE) {
+			mob.state = mob.WANDERING;
+		}
+		mob.pos = cell;
+		GameScene.add(mob, SPAWN_DELAY);
+		ScrollOfTeleportation.appear(mob, cell);
+		Dungeon.level.occupyCell(mob);
+
+		Corruption.corruptionHeal(mob);
+		AllyBuff.affectAndLoot(mob, Dungeon.hero, Corruption.class);
+
+		String mobName = mob.name();
+		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
+		GLog.p(Messages.get(StreamingCommandHandler.class, "chat_corrupt_ally"), chatter, mobName);
+		return mobName;
+	}
+
 	/** Hurter-exclusive: Apply Hex debuff. Returns "Hex" on success, ERR:... on failure. */
 	public static String handleChatHex(String username) {
 		if (Dungeon.hero == null || Dungeon.level == null)
@@ -970,10 +1073,10 @@ public final class StreamingCommandHandler {
 
 		ArrayList<Buff> positives = new ArrayList<>();
 		for (Buff b : Dungeon.hero.buffs()) {
-			if (b.type == Buff.buffType.POSITIVE) positives.add(b);
+			if (b.type == Buff.buffType.POSITIVE && b.icon() != BuffIndicator.NONE) positives.add(b);
 		}
 		if (positives.isEmpty())
-			return "ERR:No buff to remove";
+			return "ERR:No visible buff to remove";
 
 		Buff toRemove = Random.element(positives);
 		String buffName = Messages.titleCase(toRemove.getClass().getSimpleName());

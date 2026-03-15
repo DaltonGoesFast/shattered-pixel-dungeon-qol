@@ -220,6 +220,7 @@ public class MenuPane extends Component {
 		obsMaskDepthChallenges.x = maskLeft;
 		obsMaskDepthChallenges.y = y;
 		obsMaskDepthChallenges.size(maskRight - maskLeft, maskBottom - y);
+		obsMaskDepthChallenges.visible = SPDSettings.obsChromaMasks();
 
 		danger.setPos( x + WIDTH - danger.width(), y + bg.height + 1 );
 		float rightEdge = camera.width;
@@ -227,6 +228,12 @@ public class MenuPane extends Component {
 			rightEdge = camera.width - ((PixelScene) Game.scene()).getCommonInsets().right;
 		}
 		danger.setSize( rightEdge - danger.left(), danger.height());
+	}
+
+	@Override
+	public void update() {
+		super.update();
+		obsMaskDepthChallenges.visible = SPDSettings.obsChromaMasks();
 	}
 
 	public void pickup(Item item, int cell) {

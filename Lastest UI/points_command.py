@@ -12,6 +12,7 @@ Usage:
   transmute: python points_command.py transmute <username>
   bee:       python points_command.py bee <username>  (summon allied bee, 75 pts, 50 turns)
   ward:      python points_command.py ward <username>  (summon ward, 30 pts, scales with depth)
+  corruptally: python points_command.py corruptally <username>  (helper-only: summon corrupted ally from biome)
   buff:     python points_command.py buff <username>
   debuff:   python points_command.py debuff <username>
   wand:     python points_command.py wand <common|uncommon|rare|veryrare> <username>  (tier required)
@@ -83,12 +84,13 @@ def load_config():
     defaults = {
         "helper_discount_percent": 50,
         "hurter_discount_percent": 50,
-        "helper_discount_commands": ["ward", "bee", "buff"],
+        "helper_discount_commands": ["ward", "bee", "buff", "corrupt_ally"],
         "hurter_discount_commands": ["debuff", "curse", "trap", "gas"],
         "cost_to_switch_side": 50,
         "cost_per_heal": 100,
         "cost_per_cleanse": 150,
         "cost_per_dew": 30,
+        "cost_per_corrupt_ally": 100,
         "cost_per_hex": 75,
         "cost_per_degrade": 100,
         "cost_per_sabotage": 75,
@@ -158,6 +160,7 @@ def load_config():
             "cost_per_heal": max(1, int(cfg.get("cost_per_heal", defaults["cost_per_heal"]))),
             "cost_per_cleanse": max(1, int(cfg.get("cost_per_cleanse", defaults["cost_per_cleanse"]))),
             "cost_per_dew": max(1, int(cfg.get("cost_per_dew", defaults["cost_per_dew"]))),
+            "cost_per_corrupt_ally": max(1, int(cfg.get("cost_per_corrupt_ally", defaults["cost_per_corrupt_ally"]))),
             "cost_per_hex": max(1, int(cfg.get("cost_per_hex", defaults["cost_per_hex"]))),
             "cost_per_degrade": max(1, int(cfg.get("cost_per_degrade", defaults["cost_per_degrade"]))),
             "cost_per_sabotage": max(1, int(cfg.get("cost_per_sabotage", defaults["cost_per_sabotage"]))),
@@ -193,7 +196,7 @@ def effective_cost(cost_key, base_cost):
 
 
 DEFAULT_ALLOWED_ROLES = {
-    "heal": "helper", "cleanse": "helper", "dew": "helper",
+    "heal": "helper", "cleanse": "helper", "dew": "helper", "corrupt_ally": "helper",
     "hex": "hurter", "degrade": "hurter", "sabotage": "hurter",
 }
 
@@ -1392,6 +1395,46 @@ def cmd_dew(args):
         return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
 
+def cmd_corrupt_ally(args):
+    if is_spend_disabled():
+        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
+    if len(args) < 1:
+        return SPAWN_RESULT_FILE, "Usage: !corruptally (summons a corrupted ally from the current biome)"
+    username = args[0]
+    key = username.lower()
+    try:
+        with points_lock():
+            data = read_points()
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            ok, err = check_command_access("corrupt_ally", role)
+            if not ok:
+                return SPAWN_RESULT_FILE, err
+            base_cost = effective_cost("cost_per_corrupt_ally", get_config()["cost_per_corrupt_ally"])
+            cost = apply_role_discount(base_cost, "corrupt_ally", role)
+            total = effective_total(pts, donation_pts)
+            if total < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to summon corrupted ally, you have {total}."
+
+            url = "http://127.0.0.1:5000/api/corrupt-ally-command"
+            payload = {"username": username}
+            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+            req.add_header("Content-Type", "application/json")
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    body = json.loads(resp.read().decode())
+                    if not body.get("ok"):
+                        return SPAWN_RESULT_FILE, body.get("error", "Corrupt ally failed")
+                    mob_name = body.get("mob_name", "ally")
+            except Exception as e:
+                return SPAWN_RESULT_FILE, _http_error_msg(e, "Corrupt ally timed out. Is the game running?")
+            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
+            data[key] = (new_pts, last, new_donation, role)
+            write_points(data)
+            return SPAWN_RESULT_FILE, f"ok|{mob_name}|{new_pts}"
+    except TimeoutError:
+        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+
+
 def cmd_hex(args):
     if is_spend_disabled():
         return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
@@ -1571,6 +1614,7 @@ COMMANDS = {
     "heal": cmd_heal,
     "cleanse": cmd_cleanse,
     "dew": cmd_dew,
+    "corruptally": cmd_corrupt_ally,
     "hex": cmd_hex,
     "degrade": cmd_degrade,
     "sabotage": cmd_sabotage,
@@ -1585,7 +1629,7 @@ def main():
     args = [a.strip() for a in sys.argv[1:] if a.strip()]
     if len(args) < 1:
         with open(SPAWN_RESULT_FILE, "w", encoding="utf-8") as f:
-            f.write("Usage: points_command.py <spawn|champion|gold|curse|gas|scroll|trap|transmute|bee|ward|buff|debuff|wand|heal|cleanse|dew|hex|degrade|sabotage|switch|myside|superchat|cheer> [args...]")
+            f.write("Usage: points_command.py <spawn|champion|gold|curse|gas|scroll|trap|transmute|bee|ward|corruptally|buff|debuff|wand|heal|cleanse|dew|hex|degrade|sabotage|switch|myside|superchat|cheer> [args...]")
         sys.exit(0)
 
     cmd = args[0].lower()

@@ -24,6 +24,7 @@ package com.shatteredpixel.shatteredpixeldungeon.ui;
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.SPDAction;
+import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.effects.CircleArc;
@@ -299,6 +300,7 @@ public class StatusPane extends Component {
 			obsMaskHpBuffs.y = y;
 			obsMaskHpBuffs.size(maskRight - maskLeft, maskBottom - y);
 		}
+		obsMaskHpBuffs.visible = SPDSettings.obsChromaMasks();
 
 		counter.point(busy.center());
 	}
@@ -312,7 +314,8 @@ public class StatusPane extends Component {
 	@Override
 	public void update() {
 		super.update();
-		
+		obsMaskHpBuffs.visible = SPDSettings.obsChromaMasks();
+
 		int health = Dungeon.hero.HP;
 		int shield = Dungeon.hero.shielding();
 		int max = Dungeon.hero.HT;

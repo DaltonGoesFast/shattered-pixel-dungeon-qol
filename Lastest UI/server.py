@@ -258,7 +258,7 @@ def _game_ws_on_message(ws, message):
     try:
         data = json.loads(message)
         # Handle spawn/gold result (game reports success/failure)
-        if data.get('type') in ('ping_result', 'spawn_result', 'champion_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result', 'trap_result', 'transmute_result', 'summon_bee_result', 'ward_result', 'heal_result', 'cleanse_result', 'dew_result', 'hex_result', 'degrade_result', 'sabotage_result'):
+        if data.get('type') in ('ping_result', 'spawn_result', 'champion_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result', 'trap_result', 'transmute_result', 'summon_bee_result', 'ward_result', 'heal_result', 'cleanse_result', 'dew_result', 'corrupt_ally_result', 'hex_result', 'degrade_result', 'sabotage_result'):
             rid = data.get('request_id')
             ok = data.get('success', False)
             if rid:
@@ -326,6 +326,10 @@ def _game_ws_on_message(ws, message):
                         if data.get('type') == 'dew_result' and data.get('item_name'):
                             pending_spawns[rid]['item_name'] = data.get('item_name')
                         if data.get('type') == 'dew_result' and data.get('error'):
+                            pending_spawns[rid]['error'] = data.get('error')
+                        if data.get('type') == 'corrupt_ally_result' and data.get('mob_name'):
+                            pending_spawns[rid]['mob_name'] = data.get('mob_name')
+                        if data.get('type') == 'corrupt_ally_result' and data.get('error'):
                             pending_spawns[rid]['error'] = data.get('error')
                         if data.get('type') == 'hex_result' and data.get('debuff_name'):
                             pending_spawns[rid]['debuff_name'] = data.get('debuff_name')
@@ -561,6 +565,7 @@ def points_config_api():
                 data.setdefault("cost_per_heal", 100)
                 data.setdefault("cost_per_cleanse", 150)
                 data.setdefault("cost_per_dew", 30)
+                data.setdefault("cost_per_corrupt_ally", 100)
                 data.setdefault("cost_per_hex", 75)
                 data.setdefault("cost_per_degrade", 100)
                 data.setdefault("cost_per_sabotage", 75)
@@ -599,6 +604,7 @@ def points_config_api():
                     "cost_per_heal": 100,
                     "cost_per_cleanse": 150,
                     "cost_per_dew": 30,
+                    "cost_per_corrupt_ally": 100,
                     "cost_per_hex": 75,
                     "cost_per_degrade": 100,
                     "cost_per_sabotage": 75,
@@ -646,6 +652,7 @@ def points_config_api():
             "cost_per_heal": max(1, int(data.get("cost_per_heal", 100))),
             "cost_per_cleanse": max(1, int(data.get("cost_per_cleanse", 150))),
             "cost_per_dew": max(1, int(data.get("cost_per_dew", 30))),
+            "cost_per_corrupt_ally": max(1, int(data.get("cost_per_corrupt_ally", 100))),
             "cost_per_hex": max(1, int(data.get("cost_per_hex", 75))),
             "cost_per_degrade": max(1, int(data.get("cost_per_degrade", 100))),
             "cost_per_sabotage": max(1, int(data.get("cost_per_sabotage", 75))),
@@ -947,7 +954,7 @@ def viewer_points_bulk_add():
 
 @app.route('/api/viewer-points/bulk/chat-to-donor', methods=['POST', 'OPTIONS'])
 def viewer_points_chat_to_donor():
-    """Convert chat points to donor points for specified users. pts stays same, donation_pts = pts."""
+    """Convert chat points to donor points for specified users. pts stays same. percent (1-100) of chat pts moved to donor; default 100."""
     if request.method == 'OPTIONS':
         return '', 204
     body = request.get_json(force=True, silent=True) or {}
@@ -956,6 +963,11 @@ def viewer_points_chat_to_donor():
         users_filter = [str(u).strip().lower() for u in users_filter if u and str(u).strip()]
     if not users_filter:
         return jsonify({"error": "users required"}), 400
+    try:
+        raw = body.get('percent', 100)
+        percent = max(1, min(100, int(float(raw)) if raw is not None else 100))
+    except (TypeError, ValueError):
+        percent = 100
     if not _acquire_viewer_points_lock():
         return jsonify({"error": "Points file busy, try again"}), 503
     try:
@@ -968,7 +980,34 @@ def viewer_points_chat_to_donor():
             pts, last, donation_pts, role = v[0], v[1], v[2], (v[3] if len(v) >= 4 else '')
             chat_pts = max(0, pts - donation_pts)
             if chat_pts > 0:
-                data[k] = (pts, last, donation_pts + chat_pts, role)
+                transfer = int(round(chat_pts * percent / 100))
+                if transfer > 0:
+                    data[k] = (pts, last, donation_pts + transfer, role)
+                    count += 1
+        _write_viewer_points_raw(data)
+        return jsonify({"ok": True, "count": count})
+    finally:
+        _release_viewer_points_lock()
+
+
+@app.route('/api/viewer-points/bulk/swap-roles', methods=['POST', 'OPTIONS'])
+def viewer_points_bulk_swap_roles():
+    """Swap all users' roles: helper -> hurter, hurter -> helper. Users with no role stay unchanged."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    if not _acquire_viewer_points_lock():
+        return jsonify({"error": "Points file busy, try again"}), 503
+    try:
+        data = _read_viewer_points_raw()
+        count = 0
+        for k in data:
+            v = data[k]
+            pts, last, donation_pts, role = v[0], v[1], v[2], (v[3] if len(v) >= 4 else '')
+            if role == 'helper':
+                data[k] = (pts, last, donation_pts, 'hurter')
+                count += 1
+            elif role == 'hurter':
+                data[k] = (pts, last, donation_pts, 'helper')
                 count += 1
         _write_viewer_points_raw(data)
         return jsonify({"ok": True, "count": count})
@@ -1864,7 +1903,55 @@ def degrade_command():
 @app.route('/api/sabotage-command', methods=['POST', 'OPTIONS'])
 def sabotage_command():
     """Hurter-exclusive: remove one random positive buff."""
-    return _forward_helper_command('sabotage', 'buff_name', 'No buff to remove')
+    return _forward_helper_command('sabotage', 'buff_name', 'No visible buff to remove')
+
+
+@app.route('/api/corrupt-ally-command', methods=['POST', 'OPTIONS'])
+def corrupt_ally_command():
+    """Helper-exclusive: summon a corrupted (allied) enemy from the current biome. Boss floors allowed."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        if not data and request.form:
+            data = request.form.to_dict()
+        username = (data.get('username') or '').strip() or None
+        if not game_ws_app:
+            return jsonify({'ok': False, 'error': 'Game not connected'}), 503
+        request_id = str(uuid.uuid4())
+        ev = threading.Event()
+        with spawn_lock:
+            pending_spawns[request_id] = {'event': ev, 'success': False}
+        try:
+            payload = {'command': 'corrupt_ally', 'request_id': request_id}
+            if username:
+                payload['username'] = username
+            print(f"Corrupt ally send to game: request_id={request_id}")
+            game_ws_app.send(json.dumps(payload))
+        except Exception as e:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': str(e)}), 503
+        if ev.wait(timeout=SPAWN_RESULT_TIMEOUT):
+            with spawn_lock:
+                pending = pending_spawns.pop(request_id, {})
+                success = pending.get('success', False)
+                mob_name = pending.get('mob_name', '')
+                corrupt_ally_error = pending.get('error')
+        else:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': 'Corrupt ally command timed out'}), 504
+        if success:
+            print(f"Corrupt ally OK: {mob_name} for {username}")
+            _record_command_event(username, 'corrupt_ally', mob_name or '', True)
+            return jsonify({'ok': True, 'mob_name': mob_name})
+        err = corrupt_ally_error or 'No space to spawn or no corruptible mob'
+        _record_command_event(username, 'corrupt_ally', '', False)
+        return jsonify({'ok': False, 'error': err}), 200
+    except Exception as e:
+        print(f"Corrupt ally 400 exception: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 400
 
 
 @app.route('/api/wand-command', methods=['POST', 'OPTIONS'])

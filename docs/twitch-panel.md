@@ -38,7 +38,7 @@ Spend points to mess with the run! Earn points by chatting (1 per message, 30s c
 
 **!wand** (tier) — Trigger a cursed wand effect. Tier required: common (50 pts), uncommon (100 pts), rare (200 pts), or veryrare (400 pts). Burn, freeze, teleport, gas, sheep, and more!
 
-**Helper only:** !heal (50 pts), !cleanse (50 pts), !dew (10 pts)
+**Helper only:** !heal (50 pts), !cleanse (50 pts), !dew (10 pts), !corruptally (100 pts — summons a corrupted ally from the current biome, boss floors allowed)
 
 **Hurter only:** !hex (75 pts), !degrade (75 pts), !sabotage (75 pts)
 

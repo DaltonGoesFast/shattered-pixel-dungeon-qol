@@ -307,9 +307,11 @@ public abstract class Actor implements Bundlable {
 					interrupted = interrupted || Thread.interrupted();
 					
 					if (interrupted){
-						current = null;
 						interrupted = false;
 					}
+					// Clear current so processing() is false and GameScene will notify us to continue.
+					// Otherwise we deadlock when an actor returns false (e.g. HealQueueProcessor detaches).
+					current = null;
 
 					//signals to the gamescene that actor processing is finished for now
 					Thread.currentThread().notify();

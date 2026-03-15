@@ -574,7 +574,8 @@
       <label>Donor <input type="number" id="new_donation" placeholder="Donor" min="0" value="0"></label>
       <button id="add_points">Add</button>
       <button id="set_points">Set</button>
-      <button id="chatToDonor" style="background:var(--spd-btn-secondary);" title="Convert selected users' chat points to donor points">Chat → Donor</button>
+      <label title="% of chat points to convert to donor"><input type="number" id="chatToDonorPercent" min="1" max="100" value="100" style="width:56px;padding:2px 4px;">%</label>
+      <button type="button" id="chatToDonor" style="background:var(--spd-btn-secondary);" title="Convert selected users' chat points to donor points">Chat → Donor</button>
       <button id="clearNonDonor" style="background:var(--spd-btn-secondary);">Delete all points</button>
       <button id="clearAll" style="background:var(--spd-danger);">Delete all donor points</button>
       <button id="exportViewerCsv" style="background:var(--spd-btn-secondary);" title="Download viewer points as CSV">Export CSV</button>
@@ -669,6 +670,10 @@
       <label for="cost_to_switch_side">Cost to switch side (0 = free):</label>
       <input type="number" id="cost_to_switch_side" min="0" value="50" style="width:64px;">
     </div>
+    <div class="row" style="margin-bottom:0.75rem;padding-bottom:0.75rem;border-bottom:1px solid var(--spd-border);">
+      <span id="roleCountDisplay" style="font-size:0.9rem;color:var(--spd-muted-on-surface);">Helpers: — | Hurters: —</span>
+      <button type="button" id="swapAllRoles" style="margin-left:12px;padding:4px 12px;font-size:0.85rem;background:var(--spd-btn-secondary);" title="Swap all helpers to hurters and hurters to helpers">Swap all roles</button>
+    </div>
     <div class="row" data-cost-key="cost_per_heal" data-cmd="heal" style="margin-bottom:0.5rem;">
       <label for="cost_per_heal">Heal:</label>
       <input type="number" id="cost_per_heal" min="1" value="100" style="width:64px;">
@@ -691,6 +696,14 @@
       <span class="discount-checks">
         <label><input type="checkbox" class="discount-helper" data-cmd="dew"> Helper</label>
         <label><input type="checkbox" class="discount-hurter" data-cmd="dew"> Hurter</label>
+      </span>
+    </div>
+    <div class="row" data-cost-key="cost_per_corrupt_ally" data-cmd="corrupt_ally" style="margin-bottom:0.5rem;">
+      <label for="cost_per_corrupt_ally">Corrupt ally:</label>
+      <input type="number" id="cost_per_corrupt_ally" min="1" value="100" style="width:64px;">
+      <span class="discount-checks">
+        <label><input type="checkbox" class="discount-helper" data-cmd="corrupt_ally"> Helper</label>
+        <label><input type="checkbox" class="discount-hurter" data-cmd="corrupt_ally"> Hurter</label>
       </span>
     </div>
     <div class="row" data-cost-key="cost_per_hex" data-cmd="hex" style="margin-bottom:0.5rem;">
@@ -940,6 +953,7 @@
           setIf('cost_per_heal', data.cost_per_heal, 100);
           setIf('cost_per_cleanse', data.cost_per_cleanse, 150);
           setIf('cost_per_dew', data.cost_per_dew, 30);
+          setIf('cost_per_corrupt_ally', data.cost_per_corrupt_ally, 100);
           setIf('cost_per_hex', data.cost_per_hex, 75);
           setIf('cost_per_degrade', data.cost_per_degrade, 100);
           setIf('cost_per_sabotage', data.cost_per_sabotage, 75);
@@ -1029,6 +1043,7 @@
         cost_per_heal: parseInt(document.getElementById('cost_per_heal')?.value, 10) || 100,
         cost_per_cleanse: parseInt(document.getElementById('cost_per_cleanse')?.value, 10) || 150,
         cost_per_dew: parseInt(document.getElementById('cost_per_dew')?.value, 10) || 30,
+        cost_per_corrupt_ally: parseInt(document.getElementById('cost_per_corrupt_ally')?.value, 10) || 100,
         cost_per_hex: parseInt(document.getElementById('cost_per_hex')?.value, 10) || 75,
         cost_per_degrade: parseInt(document.getElementById('cost_per_degrade')?.value, 10) || 100,
         cost_per_sabotage: parseInt(document.getElementById('cost_per_sabotage')?.value, 10) || 75,
@@ -1521,6 +1536,16 @@
     }
 
     let viewerPointsData = [];
+    function updateRoleCount() {
+      const el = document.getElementById('roleCountDisplay');
+      if (!el) return;
+      let helpers = 0, hurters = 0;
+      viewerPointsData.forEach(([, d]) => {
+        if (d.role === 'helper') helpers++;
+        else if (d.role === 'hurter') hurters++;
+      });
+      el.textContent = 'Helpers: ' + helpers + ' | Hurters: ' + hurters;
+    }
     function filterViewerPoints() {
       const q = (document.getElementById('vp_search').value || '').trim().toLowerCase();
       const rows = document.querySelectorAll('#viewer_points_list tbody tr');
@@ -1539,6 +1564,7 @@
         .then(r => r.json())
         .then(data => {
           viewerPointsData = Object.entries(data).sort((a, b) => b[1].points - a[1].points);
+          updateRoleCount();
           const container = document.getElementById('viewer_points_list');
           const updatedEl = document.getElementById('vpUpdated');
           if (updatedEl) { updatedEl.textContent = '(updated just now)'; }
@@ -1762,7 +1788,8 @@
         .then(d => { if (d.error) throw new Error(d.error); showMsg(`Set ${d.count} users to ${totalPts} pts`, true); loadViewerPoints(true); logActivity('VP: set ' + (d.count || 0) + ' users'); })
         .catch(e => showMsg('Failed: ' + e.message, false));
     });
-    document.getElementById('chatToDonor').addEventListener('click', () => {
+    document.getElementById('chatToDonor').addEventListener('click', (e) => {
+      e.preventDefault();
       const selected = Array.from(document.querySelectorAll('.vp-row-select:checked')).map(cb => cb.closest('tr').dataset.user);
       const username = document.getElementById('vp_search').value.trim();
       const users = selected.length > 0 ? selected : (username ? [username.toLowerCase()] : []);
@@ -1770,13 +1797,15 @@
         showMsg('Select users or enter a username', false);
         return;
       }
+      const pctEl = document.getElementById('chatToDonorPercent');
+      const pct = Math.max(1, Math.min(100, parseInt(pctEl && pctEl.value, 10) || 100));
       fetch('/api/viewer-points/bulk/chat-to-donor', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ users }),
+        body: JSON.stringify({ users, percent: pct }),
       })
         .then(r => r.json())
-        .then(d => { if (d.error) throw new Error(d.error); showMsg(`Converted chat→donor for ${d.count} users`, true); loadViewerPoints(true); logActivity('VP: Chat→Donor ' + (d.count || 0) + ' users'); })
+        .then(d => { if (d.error) throw new Error(d.error); showMsg(`Converted ${pct}% chat→donor for ${d.count} users`, true); loadViewerPoints(true); logActivity('VP: Chat→Donor ' + pct + '% for ' + (d.count || 0) + ' users'); })
         .catch(e => showMsg('Failed: ' + e.message, false));
     });
     document.getElementById('clearNonDonor').addEventListener('click', () => {
@@ -1794,6 +1823,13 @@
     document.getElementById('exportViewerCsv').addEventListener('click', exportViewerCsv);
     document.getElementById('importViewerCsv').addEventListener('click', importViewerCsv);
     document.getElementById('importViewerCsvFile').addEventListener('change', handleImportViewerCsvFile);
+    document.getElementById('swapAllRoles').addEventListener('click', () => {
+      if (!confirm('Swap all helpers to hurters and hurters to helpers?')) return;
+      fetch('/api/viewer-points/bulk/swap-roles', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => { if (d.error) throw new Error(d.error); showMsg('Swapped ' + (d.count || 0) + ' roles', true); loadViewerPoints(true); logActivity('VP: swapped ' + (d.count || 0) + ' roles'); })
+        .catch(e => showMsg('Swap failed: ' + e.message, false));
+    });
     document.getElementById('pruneInactive').addEventListener('click', () => {
       if (!confirm('Remove users who haven\'t earned in 2+ days and have <101 donor points?')) return;
       fetch('/api/viewer-points/prune', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ days: 2, minDonor: 101 }) })

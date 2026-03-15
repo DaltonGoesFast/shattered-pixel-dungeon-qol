@@ -175,6 +175,8 @@ public class GameScene extends PixelScene {
 	private BossHealthBar boss;
 
 	private GameLog log;
+	/** Solid black box behind log for OBS chroma-key masking */
+	private SkinnedBlock logBg;
 
 	private static CellSelector cellSelector;
 	
@@ -501,6 +503,10 @@ public class GameScene extends PixelScene {
 		attack = new AttackIndicator();
 		attack.camera = uiCamera;
 		add( attack );
+
+		logBg = new SkinnedBlock(1, 1, TextureCache.createSolid(0xFF000000));
+		logBg.camera = uiCamera;
+		add(logBg);
 
 		log = new GameLog();
 		log.camera = uiCamera;
@@ -865,6 +871,10 @@ public class GameScene extends PixelScene {
 			return;
 		}
 
+		if (logBg != null) {
+			logBg.visible = SPDSettings.obsChromaMasks();
+		}
+
 		super.update();
 
 		if (notifyDelay > 0) notifyDelay -= Game.elapsed;
@@ -1003,19 +1013,33 @@ public class GameScene extends PixelScene {
 		float statusY = uiCamera.height - statusHeight - insets.bottom;
 		float logY = uiSize == 0 ? (toolbarY - 2) : (statusY - 2);
 
+		float logX, logWidth;
 		if (uiSize == 0){
 			if (tagsOnLeft) {
-				scene.log.setRect(tagWidth, logY, uiCamera.width - tagWidth - insets.right, 0);
+				logX = tagWidth;
+				logWidth = uiCamera.width - tagWidth - insets.right;
+				scene.log.setRect(logX, logY, logWidth, 0);
 			} else {
-				scene.log.setRect(insets.left, logY, uiCamera.width - tagWidth - insets.left, 0);
+				logX = insets.left;
+				logWidth = uiCamera.width - tagWidth - insets.left;
+				scene.log.setRect(logX, logY, logWidth, 0);
 			}
 		} else {
 			if (tagsOnLeft) {
-				scene.log.setRect(tagWidth, logY, 160 - tagWidth, 0);
+				logX = tagWidth;
+				logWidth = 160 - tagWidth;
+				scene.log.setRect(logX, logY, logWidth, 0);
 			} else {
-				scene.log.setRect(insets.left, logY, 160 - insets.left, 0);
+				logX = insets.left;
+				logWidth = 160 - insets.left;
+				scene.log.setRect(logX, logY, logWidth, 0);
 			}
 		}
+		float logBgHeight = uiSize == 0 ? 27 : 45; // 75% of original 36/60
+		scene.logBg.x = logX;
+		scene.logBg.y = logY - logBgHeight + 6; // nudge down so bottom of text sits in front of box
+		scene.logBg.size(logWidth, logBgHeight);
+		scene.logBg.visible = SPDSettings.obsChromaMasks();
 
 		// Tag strip position from same formulas (toolbar top or status top when tags on left and full UI)
 		float pos = toolbarY;

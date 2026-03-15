@@ -2730,6 +2730,78 @@ public class CPHInline
 
 ---
 
+## Action 35: !corruptally (Helper only)
+
+**Trigger:** Command Triggered → `!corruptally`
+
+**Usage:** `!corruptally` — **Helper only.** Summons a corrupted (allied) enemy from the current biome to fight for you. Boss floors allowed. Cost configurable (default 100 pts). Helper discount applies.
+
+**Sub-Actions (in order):**
+
+1. **Run a Program**
+   - **Target:** `python`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" corruptally %userName%`
+   - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait maximum:** `10` seconds
+
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`, `%mobName%`, `%userPointsRemaining%`:
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string RESULT_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spawn_result.txt";
+
+    public bool Execute()
+    {
+        string result = "No result file - is overlay server running?";
+        string mobName = "";
+        string userPointsRemaining = "";
+        try
+        {
+            if (File.Exists(RESULT_FILE))
+            {
+                result = File.ReadAllText(RESULT_FILE).Trim();
+                File.Delete(RESULT_FILE);
+                var parts = result.Split('|');
+                if (parts.Length >= 3 && int.TryParse(parts[parts.Length - 1].Trim(), out _))
+                {
+                    userPointsRemaining = parts[parts.Length - 1].Trim();
+                    mobName = parts.Length >= 2 ? parts[1].Trim() : "";
+                    result = parts[0].Trim();
+                }
+                else if (parts.Length >= 2)
+                {
+                    mobName = parts[1].Trim();
+                    result = parts[0].Trim();
+                }
+            }
+        }
+        catch (Exception ex) { result = ex.Message; }
+        CPH.SetArgument("spawnResult", result);
+        CPH.SetArgument("mobName", mobName);
+        CPH.SetArgument("userPointsRemaining", userPointsRemaining);
+        return true;
+    }
+}
+```
+
+3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
+   - **True branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% summoned a corrupted %mobName% to fight for you! You have %userPointsRemaining% points left.`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% summoned a corrupted %mobName% to fight for you! You have %userPointsRemaining% points left.`
+     - Leave **False Result** empty for both.
+   - **False branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+     - Leave **False Result** empty for both.
+
+**Add to the same blocking queue** as other helper commands.
+
+---
+
 ## Commands Quick Reference
 
 | Command | Usage | Cost | Description |
@@ -2754,6 +2826,7 @@ public class CPHInline
 | **!heal** | `!heal` | Configurable (default 100) | **Helper only.** Heal hero ~15% HP. |
 | **!cleanse** | `!cleanse` | Configurable (default 150) | **Helper only.** Remove one random debuff. |
 | **!dew** | `!dew` | Configurable (default 30) | **Helper only.** Drop dewdrop near hero. |
+| **!corruptally** | `!corruptally` | Configurable (default 100) | **Helper only.** Summon a corrupted ally from the current biome. Boss floors allowed. |
 | **!hex** | `!hex` | Configurable (default 75) | **Hurter only.** Apply Hex debuff. |
 | **!degrade** | `!degrade` | Configurable (default 100) | **Hurter only.** Apply Degrade debuff. |
 | **!sabotage** | `!sabotage` | Configurable (default 75) | **Hurter only.** Remove one random buff. |
@@ -2800,6 +2873,7 @@ public class CPHInline
 | 32 | !hex | !hex | Hurter: apply Hex debuff |
 | 33 | !degrade | !degrade | Hurter: apply Degrade debuff |
 | 34 | !sabotage | !sabotage | Hurter: remove one buff |
+| 35 | !corruptally | !corruptally | Helper: summon corrupted ally from biome |
 
 ---
 
