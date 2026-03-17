@@ -199,6 +199,8 @@ public class Ghoul extends Mob {
 					Buff.prolong(this, SacrificialFire.Marked.class, timesDowned*5);
 				} else if (buff.revivePersists) {
 					//don't remove
+				} else if (buff instanceof SpawnScaled) {
+					//preserve so ghoul revives with damage/DR scaling intact (e.g. chat-spawned on early floor)
 				} else {
 					buff.detach();
 				}

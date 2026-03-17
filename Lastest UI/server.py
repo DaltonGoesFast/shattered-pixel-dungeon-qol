@@ -258,7 +258,7 @@ def _game_ws_on_message(ws, message):
     try:
         data = json.loads(message)
         # Handle spawn/gold result (game reports success/failure)
-        if data.get('type') in ('ping_result', 'spawn_result', 'champion_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result', 'trap_result', 'transmute_result', 'summon_bee_result', 'ward_result', 'heal_result', 'cleanse_result', 'dew_result', 'hex_result', 'degrade_result', 'sabotage_result'):
+        if data.get('type') in ('ping_result', 'spawn_result', 'champion_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result', 'trap_result', 'transmute_result', 'summon_bee_result', 'ward_result', 'heal_result', 'cleanse_result', 'dew_result', 'corrupt_ally_result', 'hex_result', 'degrade_result', 'sabotage_result'):
             rid = data.get('request_id')
             ok = data.get('success', False)
             if rid:
@@ -326,6 +326,10 @@ def _game_ws_on_message(ws, message):
                         if data.get('type') == 'dew_result' and data.get('item_name'):
                             pending_spawns[rid]['item_name'] = data.get('item_name')
                         if data.get('type') == 'dew_result' and data.get('error'):
+                            pending_spawns[rid]['error'] = data.get('error')
+                        if data.get('type') == 'corrupt_ally_result' and data.get('mob_name'):
+                            pending_spawns[rid]['mob_name'] = data.get('mob_name')
+                        if data.get('type') == 'corrupt_ally_result' and data.get('error'):
                             pending_spawns[rid]['error'] = data.get('error')
                         if data.get('type') == 'hex_result' and data.get('debuff_name'):
                             pending_spawns[rid]['debuff_name'] = data.get('debuff_name')
@@ -1847,6 +1851,12 @@ def cleanse_command():
 def dew_command():
     """Helper-exclusive: drop dewdrop near hero."""
     return _forward_helper_command('dew', 'item_name', 'No space for dewdrop')
+
+
+@app.route('/api/corrupt-ally-command', methods=['POST', 'OPTIONS'])
+def corrupt_ally_command():
+    """Helper-exclusive: summon corrupted ally from current biome."""
+    return _forward_helper_command('corrupt_ally', 'mob_name', 'Corrupt ally failed')
 
 
 @app.route('/api/hex-command', methods=['POST', 'OPTIONS'])

@@ -495,6 +495,7 @@ public class SPDSettings extends GameSettings {
 	//WebSocket streaming (desktop only; for OBS, Streamer.bot, etc.)
 	public static final String KEY_STREAMING_ENABLED = "streaming_enabled";
 	public static final String KEY_STREAMING_PORT    = "streaming_port";
+	public static final String KEY_OBS_CHROMA_MASKS  = "obs_chroma_masks";
 
 	public static void streamingEnabled( boolean value ) {
 		put( KEY_STREAMING_ENABLED, value );
@@ -510,5 +511,13 @@ public class SPDSettings extends GameSettings {
 
 	public static int streamingPort() {
 		return getInt( KEY_STREAMING_PORT, 5001, 5000, 5010 );
+	}
+
+	public static void obsChromaMasks( boolean value ) {
+		put( KEY_OBS_CHROMA_MASKS, value );
+	}
+
+	public static boolean obsChromaMasks() {
+		return getBoolean( KEY_OBS_CHROMA_MASKS, false );
 	}
 }

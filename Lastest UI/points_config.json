@@ -59,6 +59,7 @@
   "cost_per_heal": 50,
   "cost_per_cleanse": 50,
   "cost_per_dew": 10,
+  "cost_per_corrupt_ally": 100,
   "cost_per_hex": 75,
   "cost_per_degrade": 75,
   "cost_per_sabotage": 75,

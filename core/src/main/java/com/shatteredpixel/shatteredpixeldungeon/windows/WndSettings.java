@@ -830,6 +830,7 @@ public class WndSettings extends WndTabbed {
 		ColorBlock sepStreaming;
 		CheckBox chkStreaming;
 		OptionSlider optStreamingPort;
+		CheckBox chkObsChromaMasks;
 
 		@Override
 		protected void createChildren() {
@@ -909,6 +910,15 @@ public class WndSettings extends WndTabbed {
 				};
 				optStreamingPort.setSelectedValue(SPDSettings.streamingPort());
 				add(optStreamingPort);
+				chkObsChromaMasks = new CheckBox(Messages.get(this, "obs_chroma_masks")) {
+					@Override
+					protected void onClick() {
+						super.onClick();
+						SPDSettings.obsChromaMasks(checked());
+					}
+				};
+				chkObsChromaMasks.checked(SPDSettings.obsChromaMasks());
+				add(chkObsChromaMasks);
 			}
 		}
 
@@ -950,6 +960,8 @@ public class WndSettings extends WndTabbed {
 				pos = chkStreaming.bottom();
 				optStreamingPort.setRect(0, pos + GAP, width, SLIDER_HEIGHT);
 				pos = optStreamingPort.bottom();
+				chkObsChromaMasks.setRect(0, pos + GAP, width, BTN_HEIGHT);
+				pos = chkObsChromaMasks.bottom();
 			}
 
 			height = pos;

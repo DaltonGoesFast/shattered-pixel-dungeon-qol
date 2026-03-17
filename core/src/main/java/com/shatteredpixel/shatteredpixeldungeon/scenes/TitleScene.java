@@ -107,20 +107,21 @@ public class TitleScene extends PixelScene {
 		title = BannerSprites.get( landscape() ? BannerSprites.Type.TITLE_LAND : BannerSprites.Type.TITLE_PORT);
 		add( title );
 
-		float topRegion = Math.max(title.height - 6, h*0.45f);
+		// Use original logo-height-based minimum so menu buttons stay in original positions
+		float origMinHeight = landscape() ? 51 : 94;  // was 57-6 and 100-6 for original logo
+		float topRegion = Math.max(origMinHeight, h*0.45f);
 
 		title.x = insets.left + (w - title.width()) / 2f;
 		title.y = insets.top + 2 + (topRegion - title.height()) / 2f;
 
 		align(title);
 
-		if (landscape()){
-			leftFB = placeTorch(title.x + 30, title.y + 35);
-			rightFB = placeTorch(title.x + title.width - 30, title.y + 35);
-		} else {
-			leftFB = placeTorch(title.x + 16, title.y + 70);
-			rightFB = placeTorch(title.x + title.width - 16, title.y + 70);
-		}
+		// Flames flank the logo on each side, mid-height to avoid overlap with text
+		float flameY = title.y + 42;
+		float leftFlameX = title.x - 15;
+		float rightFlameX = title.x + title.width + 15;
+		leftFB = placeTorch(leftFlameX, flameY);
+		rightFB = placeTorch(rightFlameX, flameY);
 
 		signs = new Image(BannerSprites.get( landscape() ? BannerSprites.Type.TITLE_GLOW_LAND : BannerSprites.Type.TITLE_GLOW_PORT)){
 			private float time = 0;

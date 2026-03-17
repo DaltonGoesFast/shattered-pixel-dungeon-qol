@@ -391,6 +391,22 @@ public class StreamingServer extends WebSocketServer {
 						broadcast(resp.toString());
 					}
 				});
+			} else if ("corrupt_ally".equals(cmd)) {
+				Gdx.app.postRunnable(() -> {
+					String result = StreamingCommandHandler.handleChatCorruptAlly(usernameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String mobName = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "corrupt_ally_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (mobName != null) resp.addProperty("mob_name", mobName);
+						if (err != null) resp.addProperty("error", err);
+						broadcast(resp.toString());
+					}
+				});
 			} else if ("hex".equals(cmd)) {
 				Gdx.app.postRunnable(() -> {
 					String result = StreamingCommandHandler.handleChatHex(usernameFinal);
