@@ -6,20 +6,21 @@ Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also g
 
 ## Helpers vs Hurters
 
-When enabled, chatters are assigned alternating roles on first chat: **helper** or **hurter**. Helpers earn bonus points when you kill a boss; hurters earn when you die. Each side gets **50% off** certain commands: helpers on bee, ward, buff; hurters on curse, gas, trap, debuff. **!myside** shows your current side. **!switch** costs 150 pts and has a long cooldown — choose wisely!
+When enabled, chatters are assigned alternating roles on first chat: **helper** or **hurter**. Helpers earn bonus points when you kill a boss; hurters earn when you die. Each side gets **50% off** certain commands: helpers on bee, ward, buff; hurters on curse, gas, trap, debuff. **!myside** shows your current side. **!switch** costs 100 pts and has a long cooldown — choose wisely!
 
 | Command | Description |
 |---------|-------------|
 | **!myside** | Remind yourself which side (helper/hurter) you're on. No cost. |
-| **!switch** | Switch from helper to hurter or vice versa. 150 pts, long cooldown. |
+| **!switch** | Switch from helper to hurter or vice versa. 100 pts, long cooldown. |
 
 **Helper-exclusive commands:**
 
 | Command | Description |
 |---------|-------------|
-| **!heal** | Heal hero ~15% HP (50 pts). |
-| **!cleanse** | Remove one random debuff (50 pts). |
-| **!dew** | Drop a dewdrop near the hero (10 pts). |
+| **!heal** | Heal hero ~15% HP (25 pts). |
+| **!cleanse** | Remove one random debuff (25 pts). |
+| **!dew** | Drop a dewdrop near the hero (5 pts). |
+| **!corruptally** | **Helper only.** Summon a corrupted ally from the current biome (40 pts). |
 
 **Hurter-exclusive commands:**
 
@@ -47,7 +48,7 @@ When enabled, chatters are assigned alternating roles on first chat: **helper** 
 | **!scroll** | Use a random scroll (100 pts). Like +10 Unstable Spellbook — 50% chance for exotic version! |
 | **!trap** | Place a random visible trap 1–4 tiles from the hero (50 pts). Pool of 27 traps (instant-death/high-damage blacklisted). |
 | **!transmute** | Transmute a random transmutable item from bag or equipped (150 pts). Same rules as Scroll of Transmutation. |
-| **!bee** | Summon an allied bee next to the hero for 50 turns (75 pts). Fights for you like Elixir of Honeyed Healing. |
+| **!bee** | Summon an allied bee next to the hero for 50 turns (30 pts). Fights for you like Elixir of Honeyed Healing. |
 | **!ward** | Summon a ward near the hero (9 pts). Level scales with depth: +0 sewers, +3 prison, +5 caves, +7 city, +8 halls. Upgrades existing ward if same tile. |
 | **!buff** | Apply a random buff (75 pts). Haste, Healing, Barrier, Invisibility, Levitation, and more! |
 | **!debuff** | Apply a random debuff (50 pts). Blindness, Slow, Roots, Daze, Weakness, and more! |

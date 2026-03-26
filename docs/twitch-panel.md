@@ -4,7 +4,7 @@ Spend points to mess with the run! Earn points by chatting (1 per message, 30s c
 
 ---
 
-**HELPERS vs HURTERS** — Chat once to be assigned a side! Helpers earn bonus points when the streamer kills a boss; hurters earn when the hero dies. Each side gets 50% off certain commands (helpers: bee, ward, buff; hurters: curse, gas, trap, debuff). **!myside** shows your side. **!switch** costs 150 pts and has a long cooldown — choose wisely!
+**HELPERS vs HURTERS** — Chat once to be assigned a side! Helpers earn bonus points when the streamer kills a boss; hurters earn when the hero dies. Each side gets 50% off certain commands (helpers: bee, ward, buff; hurters: curse, gas, trap, debuff). **!myside** shows your side. **!switch** costs 100 pts and has a long cooldown — choose wisely!
 
 ---
 
@@ -28,7 +28,7 @@ Spend points to mess with the run! Earn points by chatting (1 per message, 30s c
 
 **!transmute** — Transmute a random transmutable item from bag or equipped (150 pts). Same rules as Scroll of Transmutation.
 
-**!bee** — Summon an allied bee for 50 turns (75 pts). Fights for you like honeyed healing!
+**!bee** — Summon an allied bee for 50 turns (30 pts). Fights for you like honeyed healing!
 
 **!ward** — Summon a ward (9 pts). Scales with depth; upgrades existing ward if same tile.
 
@@ -38,11 +38,11 @@ Spend points to mess with the run! Earn points by chatting (1 per message, 30s c
 
 **!wand** (tier) — Trigger a cursed wand effect. Tier required: common (50 pts), uncommon (100 pts), rare (200 pts), or veryrare (400 pts). Burn, freeze, teleport, gas, sheep, and more!
 
-**Helper only:** !heal (50 pts), !cleanse (50 pts), !dew (10 pts), !corruptally (100 pts — summons a corrupted ally from the current biome, boss floors allowed)
+**Helper only:** !heal (25 pts), !cleanse (25 pts), !dew (5 pts), !corruptally (40 pts — summons a corrupted ally from the current biome, boss floors allowed)
 
 **Hurter only:** !hex (75 pts), !degrade (75 pts), !sabotage (75 pts)
 
-**!switch** — Switch helper ↔ hurter (150 pts, long cooldown)
+**!switch** — Switch helper ↔ hurter (100 pts, long cooldown)
 
 ---
 

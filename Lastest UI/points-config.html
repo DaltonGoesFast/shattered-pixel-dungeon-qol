@@ -576,6 +576,8 @@
       <button id="set_points">Set</button>
       <label title="Percent of chat-only points to move to donor">Chat→Donor % <input type="number" id="chatToDonorPercent" min="0" max="100" value="100" style="width:52px;padding:2px 4px;"></label>
       <button id="chatToDonor" style="background:var(--spd-btn-secondary);" title="Convert a percentage of selected users' chat points to donor points">Chat → Donor</button>
+      <span id="vpRoleCounts" style="font-size:0.85rem;color:var(--spd-muted-on-surface);" title="All viewers with a role">Helpers: — | Hurters: —</span>
+      <button id="vpBalanceRoles" type="button" style="background:var(--spd-btn-secondary);" title="Randomly equalize helper/hurter among selected rows (only users already helper or hurter)">Balance roles (selected)</button>
       <button id="clearNonDonor" style="background:var(--spd-btn-secondary);">Delete all points</button>
       <button id="clearAll" style="background:var(--spd-danger);">Delete all donor points</button>
       <button id="exportViewerCsv" style="background:var(--spd-btn-secondary);" title="Download viewer points as CSV">Export CSV</button>
@@ -665,6 +667,10 @@
       <input type="number" id="points_per_hurter_on_death" min="0" value="10" style="width:64px;">
     </div>
     <div class="row" style="margin-bottom:0.5rem;">
+      <label for="points_per_helper_on_new_floor">Points per helper on new floor (descend only):</label>
+      <input type="number" id="points_per_helper_on_new_floor" min="0" value="0" style="width:64px;" title="0 = off. Awards all helpers when dungeon depth increases (not when ascending).">
+    </div>
+    <div class="row" style="margin-bottom:0.5rem;">
       <label for="helper_discount_percent">Helper discount %:</label>
       <input type="number" id="helper_discount_percent" min="0" max="100" value="50" style="width:64px;">
     </div>
@@ -702,7 +708,7 @@
     </div>
     <div class="row" data-cost-key="cost_per_corrupt_ally" data-cmd="corrupt_ally" style="margin-bottom:0.5rem;">
       <label for="cost_per_corrupt_ally">Corrupt ally:</label>
-      <input type="number" id="cost_per_corrupt_ally" min="1" value="100" style="width:64px;">
+      <input type="number" id="cost_per_corrupt_ally" min="1" value="40" style="width:64px;">
       <span class="discount-checks">
         <label><input type="checkbox" class="discount-helper" data-cmd="corrupt_ally"> Helper</label>
         <label><input type="checkbox" class="discount-hurter" data-cmd="corrupt_ally"> Hurter</label>
@@ -939,6 +945,7 @@
           document.getElementById('default_monster_cost').value = data.default_monster_cost ?? 100;
           const setIf = (id, val, def) => { const e = document.getElementById(id); if (e) e.value = val ?? def; };
           setIf('points_per_helper_on_boss', data.points_per_helper_on_boss, 10);
+          setIf('points_per_helper_on_new_floor', data.points_per_helper_on_new_floor, 0);
           setIf('points_per_hurter_on_death', data.points_per_hurter_on_death, 10);
           setIf('helper_discount_percent', data.helper_discount_percent, 50);
           setIf('hurter_discount_percent', data.hurter_discount_percent, 50);
@@ -955,7 +962,7 @@
           setIf('cost_per_heal', data.cost_per_heal, 100);
           setIf('cost_per_cleanse', data.cost_per_cleanse, 150);
           setIf('cost_per_dew', data.cost_per_dew, 30);
-          setIf('cost_per_corrupt_ally', data.cost_per_corrupt_ally, 100);
+          setIf('cost_per_corrupt_ally', data.cost_per_corrupt_ally, 40);
           setIf('cost_per_hex', data.cost_per_hex, 75);
           setIf('cost_per_degrade', data.cost_per_degrade, 100);
           setIf('cost_per_sabotage', data.cost_per_sabotage, 75);
@@ -1028,6 +1035,7 @@
         default_monster_cost: parseInt(document.getElementById('default_monster_cost').value, 10) || 100,
         cost_per_monster: costPerMonster,
         points_per_helper_on_boss: parseInt(document.getElementById('points_per_helper_on_boss')?.value, 10) || 10,
+        points_per_helper_on_new_floor: Math.max(0, parseInt(document.getElementById('points_per_helper_on_new_floor')?.value, 10) || 0),
         points_per_hurter_on_death: parseInt(document.getElementById('points_per_hurter_on_death')?.value, 10) || 10,
         helper_discount_percent: parseInt(document.getElementById('helper_discount_percent')?.value, 10) || 50,
         hurter_discount_percent: parseInt(document.getElementById('hurter_discount_percent')?.value, 10) || 50,
@@ -1045,7 +1053,7 @@
         cost_per_heal: parseInt(document.getElementById('cost_per_heal')?.value, 10) || 100,
         cost_per_cleanse: parseInt(document.getElementById('cost_per_cleanse')?.value, 10) || 150,
         cost_per_dew: parseInt(document.getElementById('cost_per_dew')?.value, 10) || 30,
-        cost_per_corrupt_ally: parseInt(document.getElementById('cost_per_corrupt_ally')?.value, 10) || 100,
+        cost_per_corrupt_ally: parseInt(document.getElementById('cost_per_corrupt_ally')?.value, 10) || 40,
         cost_per_hex: parseInt(document.getElementById('cost_per_hex')?.value, 10) || 75,
         cost_per_degrade: parseInt(document.getElementById('cost_per_degrade')?.value, 10) || 100,
         cost_per_sabotage: parseInt(document.getElementById('cost_per_sabotage')?.value, 10) || 75,
@@ -1556,6 +1564,13 @@
         .then(r => r.json())
         .then(data => {
           viewerPointsData = Object.entries(data).sort((a, b) => b[1].points - a[1].points);
+          let nh = 0, nhu = 0;
+          viewerPointsData.forEach(([, d]) => {
+            if (d.role === 'helper') nh++;
+            else if (d.role === 'hurter') nhu++;
+          });
+          const vprc = document.getElementById('vpRoleCounts');
+          if (vprc) vprc.textContent = 'Helpers: ' + nh + ' | Hurters: ' + nhu;
           const container = document.getElementById('viewer_points_list');
           const updatedEl = document.getElementById('vpUpdated');
           if (updatedEl) { updatedEl.textContent = '(updated just now)'; }
@@ -1799,6 +1814,31 @@
       })
         .then(r => r.json())
         .then(d => { if (d.error) throw new Error(d.error); showMsg(`Converted ${pct}% chat→donor for ${d.count} users`, true); loadViewerPoints(true); logActivity('VP: Chat→Donor ' + pct + '% ' + (d.count || 0) + ' users'); })
+        .catch(e => showMsg('Failed: ' + e.message, false));
+    });
+    document.getElementById('vpBalanceRoles').addEventListener('click', () => {
+      const names = [];
+      document.querySelectorAll('#viewer_points_list tbody tr').forEach(tr => {
+        if (tr.style.display === 'none') return;
+        const cb = tr.querySelector('.vp-row-select');
+        if (cb && cb.checked && tr.dataset.user) names.push(tr.dataset.user);
+      });
+      if (!names.length) {
+        showMsg('Select at least one row with helper/hurter to rebalance', false);
+        return;
+      }
+      fetch('/api/viewer-points/rebalance-roles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usernames: names }),
+      })
+        .then(r => r.json())
+        .then(d => {
+          if (d.error) throw new Error(d.error);
+          showMsg('Balanced: ' + d.helpers + ' helpers, ' + d.hurters + ' hurters (' + d.updated + ' users)', true);
+          loadViewerPoints(true);
+          logActivity('VP: balanced roles ' + d.updated + ' users');
+        })
         .catch(e => showMsg('Failed: ' + e.message, false));
     });
     document.getElementById('clearNonDonor').addEventListener('click', () => {

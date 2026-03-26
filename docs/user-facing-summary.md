@@ -16,13 +16,17 @@ COMMANDS:
 - !points — Check your balance
 - !toppoints / !leaderboard — Top 3 point holders
 - !spawn (monster) — Spawn a monster (cost varies). Half price when spawned beyond its native area (e.g. sewer mobs in prison+). Examples: !spawn rat, !spawn bat, !spawn scorpio
-- !gold (amount) — Drop gold near the hero (2 pts per gold, 1–100). Example: !gold 25
+- !gold (amount) — Drop gold near the hero (5 pts per gold, 1–100). Example: !gold 25
 - !curse — Curse a random equipped item (200 pts)
 - !gas — Spawn random gas (75 pts). Toxic, confusion, storm clouds, inferno, and more!
 - !scroll — Use a random scroll (100 pts). Like +10 Unstable Spellbook — 50% chance for exotic version!
+- !trap / !transmute / !bee / !ward — See overlay for costs (e.g. trap 50, transmute 150, bee 30, ward 9)
 - !buff — Apply a random buff (75 pts). Haste, Healing, Barrier, Invisibility, and more!
 - !debuff — Apply a random debuff (50 pts). Blindness, Slow, Roots, Daze, and more!
-- !wand (tier) — Trigger a cursed wand effect. Tier required: common, uncommon, rare, or veryrare. Burn, freeze, teleport, gas, sheep, and more!
+- !wand (tier) — Trigger a cursed wand effect. Tier required: common (50), uncommon (100), rare (200), veryrare (400). Burn, freeze, teleport, gas, sheep, and more!
+- !heal / !cleanse / !dew / !corruptally — Helper only: 25 / 25 / 5 / 40 pts
+- !hex / !degrade / !sabotage — Hurter only: 75 / 75 / 75 pts
+- !switch — 100 pts, long cooldown
 
 Monster costs (base): rat 5 | albino/snake/gnoll 10 | crab/slime/swarm 15 | thief/skeleton/dm100 20 | guard/necromancer/spinner 25 | bat/brute 30 | shaman 35 | ghoul/elemental 40 | warlock 45 | monk/golem 50 | succubus 60 | eye 70 | scorpio 80
 

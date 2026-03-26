@@ -8,6 +8,7 @@ import queue
 import uuid
 import threading
 import time
+import random
 from datetime import datetime
 
 try:
@@ -86,6 +87,9 @@ obs_message_queue = queue.Queue()
 game_ws_received_count = 0
 last_ignored_source_log_time = 0.0
 IGNORED_SOURCE_LOG_INTERVAL = 60.0
+
+# Track dungeon depth from game snapshots (descend-only helper floor rewards)
+last_game_depth = None
 
 # Chat spawn: reference to game WebSocket for sending commands (set when connected)
 game_ws_app = None
@@ -207,6 +211,30 @@ def _save_score_data(data):
         print(f"Error saving streamer_chat_score: {e}")
 
 
+def _award_points_to_role(target_role, pts_to_add, log_label=''):
+    """Add pts_to_add to all viewers with the given helper/hurter role. No-op if helpers/hurters disabled or pts_to_add <= 0."""
+    if pts_to_add <= 0:
+        return
+    if os.path.exists(HELPERS_HURTERS_DISABLED_FILE):
+        return
+    if target_role not in ('helper', 'hurter'):
+        return
+    if not _acquire_viewer_points_lock():
+        print(f"{log_label or 'Role points'}: could not acquire viewer_points lock")
+        return
+    try:
+        raw = _read_viewer_points_raw()
+        for k, v in raw.items():
+            role = v[3] if len(v) >= 4 else ''
+            if role == target_role:
+                pts, last, donation_pts, role_val = v[0], v[1], v[2], v[3] if len(v) >= 4 else ''
+                raw[k] = (pts + pts_to_add, last, donation_pts, role_val)
+        _write_viewer_points_raw(raw)
+        print(f"{log_label or 'Role points'}: added {pts_to_add} pts to {target_role}s")
+    finally:
+        _release_viewer_points_lock()
+
+
 def _handle_score_event(data):
     """Handle hero_died or boss_slain from game WebSocket."""
     score_data = _load_score_data()
@@ -217,9 +245,6 @@ def _handle_score_event(data):
     _save_score_data(score_data)
     print(f"Score event {data.get('type')}: streamer={score_data['streamer']} chat={score_data['chat']}")
 
-    # Helpers vs Hurters: add points by role when system is ON
-    if os.path.exists(HELPERS_HURTERS_DISABLED_FILE):
-        return
     pts_per_helper = 10
     pts_per_hurter = 10
     try:
@@ -233,28 +258,12 @@ def _handle_score_event(data):
 
     target_role = 'helper' if data.get('type') == 'boss_slain' else 'hurter'
     pts_to_add = pts_per_helper if target_role == 'helper' else pts_per_hurter
-    if pts_to_add <= 0:
-        return
-
-    if not _acquire_viewer_points_lock():
-        print("Score event: could not acquire viewer_points lock for role-based points")
-        return
-    try:
-        raw = _read_viewer_points_raw()
-        for k, v in raw.items():
-            role = v[3] if len(v) >= 4 else ''
-            if role == target_role:
-                pts, last, donation_pts, role_val = v[0], v[1], v[2], v[3] if len(v) >= 4 else ''
-                raw[k] = (pts + pts_to_add, last, donation_pts, role_val)
-        _write_viewer_points_raw(raw)
-        print(f"Score event: added {pts_to_add} pts to {target_role}s")
-    finally:
-        _release_viewer_points_lock()
+    _award_points_to_role(target_role, pts_to_add, log_label='Score event')
 
 
 def _game_ws_on_message(ws, message):
     """Handle message from game WebSocket: update live data (same JSON shape as inspector)."""
-    global current_game_data, last_ws_update_time, last_item_info_open, game_ws_received_count
+    global current_game_data, last_ws_update_time, last_item_info_open, game_ws_received_count, last_game_depth
     try:
         data = json.loads(message)
         # Handle spawn/gold result (game reports success/failure)
@@ -374,6 +383,30 @@ def _game_ws_on_message(ws, message):
                 os.fsync(f.fileno())
         except Exception as e:
             print(f"Error writing game_summary from WS: {e}")
+        # Descend-only: award helpers when dungeon depth increases (game scene only)
+        ui = data.get('ui') or {}
+        scene = ui.get('scene')
+        depth_raw = (data.get('stats') or {}).get('depth')
+        depth = None
+        if depth_raw is not None:
+            try:
+                depth = int(depth_raw)
+            except (TypeError, ValueError):
+                depth = None
+        if scene == 'game' and depth is not None:
+            pts_floor = 0
+            try:
+                if os.path.exists(POINTS_CONFIG_FILE):
+                    with open(POINTS_CONFIG_FILE, encoding='utf-8') as f:
+                        _cfg_floor = json.load(f)
+                    pts_floor = max(0, int(_cfg_floor.get('points_per_helper_on_new_floor', 0)))
+            except (json.JSONDecodeError, OSError, TypeError, ValueError):
+                pass
+            if last_game_depth is not None and depth > last_game_depth:
+                _award_points_to_role('helper', pts_floor, log_label='New floor (descend)')
+            last_game_depth = depth
+        else:
+            last_game_depth = None
         # OBS Advanced Scene Switcher: send item_info_open / item_info_closed when state changes
         if USE_OBS_ITEM_INFO_RELAY:
             ui = data.get('ui') or {}
@@ -556,6 +589,7 @@ def points_config_api():
                 with open(POINTS_CONFIG_FILE, encoding='utf-8') as f:
                     data = json.load(f)
                 data.setdefault("points_per_helper_on_boss", 10)
+                data.setdefault("points_per_helper_on_new_floor", 0)
                 data.setdefault("points_per_hurter_on_death", 10)
                 data.setdefault("helper_discount_percent", 50)
                 data.setdefault("hurter_discount_percent", 50)
@@ -568,10 +602,12 @@ def points_config_api():
                 data.setdefault("cost_per_hex", 75)
                 data.setdefault("cost_per_degrade", 100)
                 data.setdefault("cost_per_sabotage", 75)
+                data.setdefault("cost_per_corrupt_ally", 100)
                 data.setdefault("command_allowed_roles", {})
             else:
                 data = {
                     "points_per_helper_on_boss": 10,
+                    "points_per_helper_on_new_floor": 0,
                     "points_per_hurter_on_death": 10,
                     "cost_per_gold": 5,
                     "cost_per_curse": 200,
@@ -606,6 +642,7 @@ def points_config_api():
                     "cost_per_hex": 75,
                     "cost_per_degrade": 100,
                     "cost_per_sabotage": 75,
+                    "cost_per_corrupt_ally": 100,
                     "command_allowed_roles": {},
                 }
             free_until = {}
@@ -625,6 +662,7 @@ def points_config_api():
         # Validate and sanitize
         cfg = {
             "points_per_helper_on_boss": max(0, int(data.get("points_per_helper_on_boss", 10))),
+            "points_per_helper_on_new_floor": max(0, int(data.get("points_per_helper_on_new_floor", 0))),
             "points_per_hurter_on_death": max(0, int(data.get("points_per_hurter_on_death", 10))),
             "cost_per_gold": max(1, int(data.get("cost_per_gold", 5))),
             "cost_per_curse": max(1, int(data.get("cost_per_curse", 200))),
@@ -653,6 +691,7 @@ def points_config_api():
             "cost_per_hex": max(1, int(data.get("cost_per_hex", 75))),
             "cost_per_degrade": max(1, int(data.get("cost_per_degrade", 100))),
             "cost_per_sabotage": max(1, int(data.get("cost_per_sabotage", 75))),
+            "cost_per_corrupt_ally": max(1, int(data.get("cost_per_corrupt_ally", 100))),
             "command_allowed_roles": data.get("command_allowed_roles") or {},
         }
         for k, v in (data.get("cost_per_monster") or {}).items():
@@ -1042,6 +1081,47 @@ def viewer_points_clear_all():
             data[k] = (0, 0, 0, '')
         _write_viewer_points_raw(data)
         return jsonify({"ok": True})
+    finally:
+        _release_viewer_points_lock()
+
+
+@app.route('/api/viewer-points/rebalance-roles', methods=['POST', 'OPTIONS'])
+def viewer_points_rebalance_roles():
+    """Randomly reassign helper/hurter among selected users so counts differ by at most one.
+    Body: { \"usernames\": [\"user1\", ...] } — only users who exist and have role helper or hurter are updated."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    body = request.get_json(force=True, silent=True) or {}
+    raw_users = body.get('usernames') or body.get('users') or []
+    if not isinstance(raw_users, list) or not raw_users:
+        return jsonify({"error": "usernames array required"}), 400
+    pool = [str(u).strip().lower() for u in raw_users if u and str(u).strip()]
+    pool = list(dict.fromkeys(pool))
+    if not pool:
+        return jsonify({"error": "at least one username required"}), 400
+    if not _acquire_viewer_points_lock():
+        return jsonify({"error": "Points file busy, try again"}), 503
+    try:
+        data = _read_viewer_points_raw()
+        role_holders = []
+        for u in pool:
+            if u not in data:
+                continue
+            v = data[u]
+            role = v[3] if len(v) >= 4 else ''
+            if role in ('helper', 'hurter'):
+                role_holders.append(u)
+        if not role_holders:
+            return jsonify({"error": "No selected users with helper or hurter role"}), 400
+        random.shuffle(role_holders)
+        n_helpers = (len(role_holders) + 1) // 2
+        for i, u in enumerate(role_holders):
+            v = data[u]
+            new_role = 'helper' if i < n_helpers else 'hurter'
+            data[u] = (v[0], v[1], v[2], new_role)
+        _write_viewer_points_raw(data)
+        n_hurters = len(role_holders) - n_helpers
+        return jsonify({"ok": True, "updated": len(role_holders), "helpers": n_helpers, "hurters": n_hurters})
     finally:
         _release_viewer_points_lock()
 
