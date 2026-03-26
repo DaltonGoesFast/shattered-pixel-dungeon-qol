@@ -1,4 +1,4 @@
-# Shattered Pixel Dungeon — QoL & stream-interaction mod
+# Shattered Pixel Dungeon — QoL & Shatter the Streamer mod
 
 This repo is a fork of **Shattered Pixel Dungeon** focused on **quality-of-life UI**, **optional visibility into fights**, and **game-facing rules** for chat-driven actions when you run the **desktop** build with the streaming integration. The Android/iOS builds still benefit from the in-game UI changes; external commands require the desktop WebSocket path.
 
