@@ -1,17 +1,60 @@
-QoL mod of SPD
+# Shattered Pixel Dungeon — QoL & stream-interaction mod
+
+This repo is a fork of **Shattered Pixel Dungeon** focused on **quality-of-life UI**, **optional visibility into fights**, and **game-facing rules** for chat-driven actions when you run the **desktop** build with the streaming integration. The Android/iOS builds still benefit from the in-game UI changes; external commands require the desktop WebSocket path.
 
 **Collaborating?** See [CONTRIBUTING.md](CONTRIBUTING.md) for git branching and the [streaming setup guide](docs/streaming-setup-guide.md) to emulate the live stream environment.
 
-Current Features:
+---
 
-Press Tilde key to swap to 2nd quickslot hotbar
+## Mod changes (gameplay + QoL)
 
-Boss style HP bar for currently targeted Enemies
+### UI and controls
 
-Tile selection indicator 
+- **Dual quickslot set:** Swap between two full quickslot bars with the **Quickslot swap** action (bindable in **Settings → Controls**; many keymaps use **`~`**). Turn the feature on or off under interface-related game settings (`quickslot_swapper`, on by default).
+- **Tile selection indicator:** Highlights the tile you are targeting / interacting with. Toggle via **Settings** (`tile_indicator`, on by default).
+- **Item note marker:** Items that have a **custom note** show a **note icon** in inventory lists so you can spot tagged gear at a glance.
+- **Boss-style HP bar:** A wide boss-health style bar can track combatants. By default the game can show this style of bar more broadly (**boss bar on all enemies** setting is on by default; turn it off in settings if you only want vanilla-style presentation). Major bosses still hook the bar for phase / bleed styling where the base game does.
 
-Inventory Icon to denote items with a custom note
+### Enemies spawned via chat / streaming (desktop)
 
+When a spawn or champion command reaches a live run through the streaming server:
+
+- **ChatSpawned marking:** Enemies get the **`ChatSpawned`** buff — **region-scaled XP** when killed (by dungeon chapter instead of the mob’s raw base XP, so early floors aren’t flooded with late-game XP) and a **visible dark “champion-style” aura** (cosmetic).
+- **Out-of-depth tuning:** Spawning something **above** the current floor’s native area applies **`SpawnScaled`** — HP is scaled down toward the current depth, and **outgoing damage and effective armor** are scaled down further so the fight stays closer to fair.
+- **Cross-region spawn stagger:** Spawning a mob **far above** its home chapter can apply **short paralysis** on arrival (duration scales with how far “up” you pulled it), giving a beat to reposition.
+- **Variant rolls:** `!spawn shaman` / champions pick a **random Red / Blue / Purple** shaman; `elemental` similarly rolls an elemental variant. **Champion** spawns add a **random champion modifier** (e.g. Blazing, Antimagic, Growing) at **double the normal point cost** and **without** the “native zone half off” discount used by plain spawns (see [COMMANDS.md](COMMANDS.md)).
+- **Spawn point discount (overlay):** Ordinary **`!spawn`** can cost **half** when the mob is requested on a **deeper chapter than its native home** (e.g. sewer-tier mobs on prison+). **`!champion`** does not use that discount.
+- **Ghoul splits:** Ghoul children spawned from a chat-spawned ghoul **inherit** `ChatSpawned` (and `SpawnScaled` when relevant) so behavior stays consistent.
+
+### Helpers vs hurters (when the points system enables roles)
+
+- First-time chatters can be assigned **helper** or **hurter**; helpers get **bonus points on boss kills**, hurters on **hero death** (exact rates live in the overlay config).
+- **Side discounts:** Helpers get **50% off** `!bee`, `!ward`, `!buff` (and their discount applies to **`!corruptally`**). Hurters get **50% off** `!curse`, `!gas`, `!trap`, `!debuff`.
+- **Side-specific commands:** Helpers: **`!heal`**, **`!cleanse`**, **`!dew`**, **`!corruptally`** (summons a **corrupted ally** from the **current biome**, boss floors allowed). Hurters: **`!hex`**, **`!degrade`**, **`!sabotage`** — removes a **random positive buff that has a visible icon** (silent / iconless buffs are not eligible).
+- **Role switch:** **`!switch`** costs points and uses a **long cooldown** (overlay-configurable).
+
+### Other run-affecting chat actions (summary)
+
+Full syntax and tables live in **[COMMANDS.md](COMMANDS.md)**. At a glance, viewers can spend points to:
+
+- Spawn normal or **champion** mobs, drop **gold**, apply **curse** to a random equipped item, spawn **gas** or **traps**, fire a random **scroll** or **cursed wand** tier, **transmute** an item, summon **bees** / **wards**, shuffle **buffs** and **debuffs**, and (streamer-only) run **`!doublepoints`**.
+
+Point costs in the tables are the **defaults**; the overlay can override them.
+
+### What is configurable (without rebuilding the game)
+
+- **Per-command costs,** role discounts, helper/hurter exclusivity, and overlay behavior (see `Lastest UI` config / overlay).
+- **Game settings:** tile indicator, quickslot swapper, boss bar on all enemies, and other SPD interface toggles.
+
+---
+
+## Where to read more
+
+- **[COMMANDS.md](COMMANDS.md)** — authoritative command list, monster costs, helper/hurter rules, and Streamer.bot notes.
+- **[docs/user-facing-summary.md](docs/user-facing-summary.md)** — short copy you can paste for panels / descriptions.
+- **[docs/streaming-setup-guide.md](docs/streaming-setup-guide.md)** — full desktop + overlay wiring.
+
+---
 
 # Shattered Pixel Dungeon
 
