@@ -14,6 +14,23 @@ Before implementing, ensure:
 
 ---
 
+## Streamer.bot checklist (changes you make in the bot)
+
+Use this list when updating an **existing** setup. Game code fixes (corrupt `!ally` XP/loot, invalid `!gold 0`, cursed wand not costing a turn) need **no** Streamer.bot edits.
+
+| What | Why | Where to look |
+|------|-----|----------------|
+| **`!switch` cooldown only on success** | Built-in command cooldown runs even when the user cannot afford to switch, so they wait for nothing. | This doc: [Action 28: !switch](#action-28-switch) — **Remove trigger cooldown**, then **recommended 3-step** layout; on success use [cooldown C#](#apply-cooldown-via-c-streamerbot-api) if you have no “Set Command Cooldown” menu item. Do **not** paste **!spawn** / Monster Spawner C# for results or cooldown. |
+| **Cheer + Super Chat optional args** | So bits / Super Chat get the same **stacking 2×** as chat (!doublepoints, sub/member, optional top farder). Without the extra args, only global double points applies. | This doc: [Action 20](#action-20-earn-points-cheer), [Action 21](#action-21-earn-points-super-chat), [argument reference](#cheer--super-chat--argument-reference). |
+| **Chat → donor by %** | Transfer part of chat-only points into donor points from the overlay. | Open **points-config** in the browser (`/points-config`): set **Chat→Donor %** next to the button, then **Chat → Donor**. Not a Streamer.bot change. |
+
+**Files the Python script writes (for your paths):**
+
+- `Lastest UI/spawn_result.txt` — result of spend commands (often deleted by the next C# step).
+- `Lastest UI/switch_side_last.txt` — single character: `1` = last `switch` succeeded, `0` = failed (used for cooldown logic).
+
+---
+
 ## Implementation Order
 
 **Action numbering matches Streamer.bot.** Keep actions in sync with this doc.
@@ -39,8 +56,8 @@ Before implementing, ensure:
 | 17 | Random Debuff | !debuff | Spend points to apply random debuff |
 | 18 | Cursed Wand Effect | !wand | Spend points to trigger cursed wand effect |
 | 19 | Double Points | !doublepoints | Streamer only: 2× points for N minutes |
-| 20 | Earn Points (Cheer) | Twitch Cheer | 1 pt per bit |
-| 21 | Earn Points (Super Chat) | YouTube Super Chat | 1 pt per $0.01 |
+| 20 | Earn Points (Cheer) | Twitch Cheer | 1 pt per bit; optional args for stacked 2× |
+| 21 | Earn Points (Super Chat) | YouTube Super Chat | 1 pt per $0.01; same optional args |
 | 22 | Reset Points | Stream Started | Clear non-donor points |
 | 23 | Spend OFF | Hotkey (Stream Deck OFF) | Disable spend commands |
 | 24 | Spend ON | Hotkey (Stream Deck ON) | Enable spend commands |
@@ -1963,7 +1980,7 @@ public class CPHInline
 
 ## Action 20: Earn Points (Cheer)
 
-**Rate:** 100 bits = $1 = 100 points. **When !doublepoints is active, Cheer points are doubled.**
+**Rate:** 100 bits = $1 = 100 points base. **Stacks** with !doublepoints, subscriber/member 2×, and optional top-farder (same as chat earning) when you pass the optional CLI args below.
 
 **Add this action to your points queue** (same blocking queue as earn/spend) to avoid race conditions.
 
@@ -1971,16 +1988,23 @@ public class CPHInline
 
 **Sub-Action:** Run Program
 - **Program:** `python`
-- **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" cheer %bits% %userName%`
+- **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" cheer %bits% %userName% %isSubscribed% %userIsSponsor% 0`
 - **Working directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
 
-**Note:** Anonymous cheers are skipped (no username to credit).
+**Note:** Anonymous cheers are skipped (no username to credit). Trailing `0` is **topFarder** (use `1` if your C# sets a top-farder flag). Omit extra args entirely to default all flags off (only global double points still applies from the file).
+
+### Cheer — what to change if you already had this action
+
+1. Open your **Cheer** action → **Run Program** sub-action.
+2. Replace the **Arguments** field with the line above (same path to `points_command.py`, ending with `%isSubscribed% %userIsSponsor% 0`).
+3. **Save.** Next cheer: subscriber 2× applies when Twitch sets `isSubscribed`; `userIsSponsor` is usually unused on Twitch (empty/false is fine).
+4. If you use a **top farder** bonus in chat: change the final `0` to a variable or `1` from your own logic (must be last argument).
 
 ---
 
 ## Action 21: Earn Points (Super Chat)
 
-**Rate:** 1 point per $0.01 USD. Uses the [Frankfurter API](https://www.frankfurter.app/) for currency conversion (no API key). **When !doublepoints is active, Super Chat points are doubled.**
+**Rate:** 1 point per $0.01 USD base. Uses the [Frankfurter API](https://www.frankfurter.app/) for currency conversion (no API key). **Stacks** with !doublepoints, subscriber/member 2×, and optional top-farder when you pass optional trailing args (see Arguments below).
 
 **Add this action to your points queue** (same blocking queue as earn/spend) to avoid race conditions.
 
@@ -1990,11 +2014,18 @@ public class CPHInline
 2. **Add trigger:** YouTube → Triggers → **Super Chat**.
 3. **Add sub-action:** Run Program
    - **Program:** `python` (or full path to `python.exe`, e.g. `C:\Python313\python.exe`)
-   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" superchat %microAmount% %currencyCode% %userName%`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" superchat %microAmount% %currencyCode% %userName% %isSubscribed% %userIsSponsor% 0`
    - **Working directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
 4. **Add this action to your points queue** (same queue as earn/spend).
 
-**Streamer.bot Super Chat variables:** `%microAmount%` (e.g. 1000000 = $1), `%currencyCode%` (e.g. USD), `%userName%` (login) or `%user%` (display name). If `%userName%` is empty for real Super Chats, try `%user%` instead in the Arguments.
+**Streamer.bot Super Chat variables:** `%microAmount%` (e.g. 1000000 = $1), `%currencyCode%` (e.g. USD), `%userName%` (login) or `%user%` (display name). If `%userName%` is empty for real Super Chats, try `%user%` instead in the Arguments. Optional trailing args: `%isSubscribed%`, `%userIsSponsor%`, then `0` or `1` for **topFarder** (omit all three to default off; global double points still applies).
+
+### Super Chat — what to change if you already had this action
+
+1. Open your **Super Chat** action → **Run Program** sub-action.
+2. Replace the **Arguments** field with the line in step 3 above (must include `%isSubscribed% %userIsSponsor% 0` at the end, or your chosen top-farder value instead of `0`).
+3. On **YouTube**, channel membership is typically reflected in **`userIsSponsor`** (not Twitch’s `isSubscribed`). Passing both variables lets one action line work when you mirror triggers later.
+4. **Save.**
 
 **Optional:** Add a C# step to read `donation_result.txt` (format: `ok|150` = 150 points earned). Split by `|`, use second part for a thank-you message: `Thanks for the super chat! You earned %points% points!`
 
@@ -2003,6 +2034,29 @@ public class CPHInline
 - **YouTube platform:** Ensure YouTube is connected in Streamer.bot (Settings → Platforms → YouTube). Reconnect if needed.
 - **Variable names:** If `%userName%` is empty for real events, change the last argument to `%user%` (display name).
 - **Debug logging:** Create an empty file `superchat_debug.txt` in `Lastest UI`. The next Super Chat will append a log line to `superchat_debug.log` with the exact args received. Remove the file when done debugging.
+
+---
+
+## Cheer / Super Chat — argument reference
+
+`points_command.py` applies multipliers in this **order** (each step doubles when active): global **!doublepoints** → **subscriber OR channel member** → **top farder**.
+
+| Position | Meaning | Typical Streamer.bot value |
+|----------|---------|----------------------------|
+| **Cheer:** 3rd arg after `cheer` | `isSubscribed` | `%isSubscribed%` (Twitch) |
+| **Cheer:** 4th | `userIsSponsor` | `%userIsSponsor%` (often unused on Twitch; safe to pass) |
+| **Cheer:** 5th (last optional) | `topFarder` | `0` or `1` |
+| **Super Chat:** 4th arg after `superchat` | `isSubscribed` | `%isSubscribed%` |
+| **Super Chat:** 5th | `userIsSponsor` | `%userIsSponsor%` (YouTube member) |
+| **Super Chat:** 6th (last optional) | `topFarder` | `0` or `1` |
+
+**Cheer** full argument order: `cheer <bits> <username> [isSubscribed] [userIsSponsor] [topFarder]`.
+
+**Super Chat** full argument order: `superchat <microAmount> <currencyCode> <username> [isSubscribed] [userIsSponsor] [topFarder]`.
+
+- If you **omit** the optional args entirely, only **global double points** (when `!doublepoints` is active) multiplies donation points; sub/member/top farder do not.
+- Empty or unknown strings for flags are treated as **off** (same as `0`).
+- Adjust the **file paths** in all **Arguments** and C# `const` strings if your `Lastest UI` folder is not under the path used in this doc.
 
 ---
 
@@ -2115,7 +2169,7 @@ public class CPHInline
 
 ## Action 23: Spend OFF / Action 24: Spend ON (Stream Deck switch)
 
-**Purpose:** Two separate actions for Stream Deck "action switches" — when the switch is ON, trigger Spend ON (enable spending); when OFF, trigger Spend OFF (disable spending). Users can still earn points; they just can't spend them when disabled.
+**Purpose:** Two separate actions for Stream Deck "action switches" — when the switch is ON, trigger Spend ON (enable spending); when OFF, trigger Spend OFF (disable spending). Users can still earn points; they just can't use most spend commands when disabled. **`!switch` still works** while spend is off (side change / configured point cost still applies).
 
 ### Spend OFF action
 
@@ -2164,7 +2218,7 @@ public class CPHInline
 
 **Stream Deck setup:** Create an "Action Switch" or similar. Assign Spend ON to the ON state and Spend OFF to the OFF state. When the switch is ON, spending is enabled; when OFF, spending is disabled.
 
-**Coverage:** All spend commands in `points_command.py` (spawn, champion, gold, curse, gas, scroll, trap, transmute, bee, ward, buff, debuff, wand, heal, cleanse, dew, hex, degrade, sabotage, switch) check for `spend_disabled.txt` and return "Spending is currently disabled by the streamer." when the file exists. If you add new spend commands to the script, add the same `is_spend_disabled()` check at the start of the handler.
+**Coverage:** Spend commands in `points_command.py` (spawn, champion, gold, curse, gas, scroll, trap, transmute, bee, ward, buff, debuff, wand, heal, cleanse, dew, hex, degrade, sabotage) check for `spend_disabled.txt` and return "Spending is currently disabled by the streamer." when the file exists. **`!switch` is intentionally excluded** so viewers can change helper/hurter side while spending on other commands is paused. If you add new spend commands to the script, add the same `is_spend_disabled()` check at the start of the handler.
 
 ---
 
@@ -2278,15 +2332,121 @@ public class CPHInline
 
 **Usage:** `!switch` — switch from helper to hurter or vice versa. Cost configurable (default 50 pts). Requires Helpers vs Hurters ON.
 
-**Sub-Actions (in order):**
+### Remove trigger cooldown (important)
+
+If **`!switch`** has a **Cooldown** set on the **command** (or trigger) in Streamer.bot, it runs on **every** invocation—including “not enough points” and other failures. Viewers then wait the full cooldown even though nothing happened.
+
+1. Open the **`!switch`** command / action in Streamer.bot.
+2. Find **Cooldown** (or equivalent) on the command or trigger and **disable it** or set it to **0** / none.
+3. Apply cooldown **only on success** in the **True** branch below — either Streamer.bot’s cooldown sub-action (if your version has it) or **Execute C#** using `CPH.CommandAddToGlobalCooldown` / `CommandAddToUserCooldown` ([see below](#apply-cooldown-via-c-streamerbot-api)).
+
+---
+
+### Common mistake: wrong C# block
+
+**Do not** use the **!spawn** / “Monster Spawner” Execute Code block on `!switch`. That code expects a different `spawn_result.txt` format and will not set `%newSide%` / `%userPointsRemaining%` correctly. It also will **not** set `%applySwitchCooldown%` unless you pasted the **small** `switch_side_last.txt` reader—copying the wrong block breaks the whole action.
+
+If you use `%applySwitchCooldown%`, step 2 **must** be only the small C# that reads `switch_side_last.txt` (see optional layout below)—not spawn code.
+
+---
+
+### Recommended layout (3 sub-actions — simplest)
+
+Cooldown only when the switch **actually succeeded**, without `%applySwitchCooldown%` or an extra `If` before chat.
 
 1. **Run a Program**
    - **Target:** `python`
    - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" switch %userName%`
    - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
-   - **Wait maximum:** `10` seconds
+   - **Wait maximum:** `10` seconds  
 
-2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`, `%newSide%`, `%userPointsRemaining%`:
+2. **Execute C# Code** — paste **only** the shared **!switch** C# block in the next section below (reads and deletes `spawn_result.txt`, sets `%spawnResult%`, `%newSide%`, `%userPointsRemaining%`).
+
+3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
+   - **True branch (success):** In this order:
+     1. **Apply cooldown** — see [Apply cooldown via C#](#apply-cooldown-via-c-streamerbot-api) below. Under **Commands →** you may only see **Get/Set Command State** (no separate “Set Command Cooldown” item); that is normal — use **Execute C# Code** with the official `CPH` methods there, **not** the !spawn / Monster Spawner script.
+     2. Nested **commandSource** messages (same as before):
+        - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% switched to %newSide%! You have %userPointsRemaining% points left.`
+        - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% switched to %newSide%! You have %userPointsRemaining% points left.`
+        - Leave **False Result** empty for both platform checks.
+   - **False branch (failure):** Error messages only — **no** cooldown:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+     - Leave **False Result** empty for both.
+
+### Apply cooldown via C# (Streamer.bot API)
+
+Streamer.bot documents these on [CommandAddToGlobalCooldown](https://docs.streamer.bot/api/csharp/methods/core/commands/command-add-to-global-cooldown) and [CommandAddToUserCooldown](https://docs.streamer.bot/api/csharp/methods/core/commands/command-add-to-user-cooldown). **This is the intended way** to start a cooldown from an action when there is no “Set Command Cooldown” sub-action in your menu.
+
+**Get the command ID:** In Streamer.bot, open **Core → Commands**, select your **`!switch`** command (the one tied to this action), and copy its **ID** / GUID from the command details (exact location varies by version; it may be under advanced/edit or right-click → copy id).
+
+**Global cooldown** (nobody can use `!switch` for N seconds after a successful switch):
+
+```csharp
+using System;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        // Paste your !switch command’s GUID from Streamer.bot (Core → Commands)
+        string commandId = "00000000-0000-0000-0000-000000000000";
+        int seconds = 300; // 5 minutes
+        CPH.CommandAddToGlobalCooldown(commandId, seconds);
+        return true;
+    }
+}
+```
+
+**Per-user cooldown** (only the chatter who switched is blocked). If this “does nothing,” see **Troubleshooting: cooldown has no effect** below.
+
+**Recommended: try user cooldown, fall back to global** so a failed `userId` / `userType` / `Platform` parse does not silently skip cooldown (`Enum.TryParse` is **case-sensitive** unless you pass `true` for ignore-case):
+
+```csharp
+using System;
+using Streamer.bot.Plugin.Interface.Enums;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        string commandId = "00000000-0000-0000-0000-000000000000";
+        int seconds = 300;
+
+        bool hasUser = CPH.TryGetArg("userId", out string userId) && !string.IsNullOrEmpty(userId);
+        bool hasType = CPH.TryGetArg("userType", out string userType) && !string.IsNullOrEmpty(userType);
+
+        if (hasUser && hasType && Enum.TryParse(userType, true, out Platform platform))
+        {
+            CPH.CommandAddToUserCooldown(commandId, userId, platform, seconds);
+            CPH.LogInfo("switch cooldown: user " + seconds + "s");
+            return true;
+        }
+
+        CPH.LogInfo("switch cooldown: user args missing or bad userType; using global. Check Test Trigger for userId/userType.");
+        CPH.CommandAddToGlobalCooldown(commandId, seconds);
+        return true;
+    }
+}
+```
+
+**Troubleshooting: cooldown has no effect**
+
+1. **User cooldown disabled on the command:** In **Core → Commands**, open your **`!switch`** command and set **User Cooldown** to a **non-zero** value (e.g. `1` second is enough). If user cooldown is **0 / off**, `CommandAddToUserCooldown` may run (your log will show the inline “cooldown” step) but **nothing blocks** the next chat use. Same idea for **Global Cooldown** if you use `CommandAddToGlobalCooldown` — enable global cooldown on that command with a non-zero value so the engine tracks timers.
+2. **Wrong command ID:** `commandId` must be the **Command** GUID from **Core → Commands** (the Switch command row), **not** the Action ID from the action list. In logs, `Action 28: Switch Side` has action id `feb295f4-…` — that is **not** the id to paste into `CommandAddToGlobalCooldown` / `CommandAddToUserCooldown`.
+3. **Testing as the broadcaster:** Streamer.bot **does not apply command cooldowns to the broadcaster account**. Test with a **mod account**, **alt**, or a **viewer** in chat.
+4. **Silent failure (old snippet):** If `userId` / `userType` are empty or `Platform` fails to parse, use the **fallback** block above (global cooldown if user path fails).
+5. **Variable names:** Run **Test Trigger** on this command and confirm arguments exist. If your build uses different names, adjust `TryGetArg` keys to match (e.g. `platform` vs `userType`).
+
+**Reading your log:** Lines like `InlineCode :: Running … 'Switch Sides 3 step'` then `… 'cooldown'` mean the C# **did** run. If `!switch` still queues again seconds later anyway, Streamer.bot’s own cooldown gate may not be blocking (version/settings). **`points_command.py` enforces a per-user cooldown after a successful switch** using `Lastest UI/switch_success_cooldown.json` and config key **`switch_success_cooldown_seconds`** (default **300**). Failed attempts do not extend that timer. Set the key to **0** in `points_config.json` to disable Python-side cooldown and rely only on Streamer.bot.
+
+If you use **two command names** (`!switch` and `!switchside`) as **two separate** Streamer.bot commands, repeat the `CommandAddTo…` call with **each** command’s ID, or merge aliases into one command if the app allows.
+
+---
+
+### Shared C# for !switch (read `spawn_result.txt`)
+
+Use this **exact** block as step 2 in the recommended layout (or as step 4 in the optional layout). Adjust `RESULT_FILE` if your `Lastest UI` path differs.
 
 ```csharp
 using System;
@@ -2330,15 +2490,57 @@ public class CPHInline
 }
 ```
 
-3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
-   - **True branch:** Use commandSource pattern:
-     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% switched to %newSide%! You have %userPointsRemaining% points left.`
-     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% switched to %newSide%! You have %userPointsRemaining% points left.`
-     - Leave **False Result** empty for both.
-   - **False branch:** Use commandSource pattern:
-     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
-     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
-     - Leave **False Result** empty for both.
+---
+
+### Optional layout (5 steps — `switch_side_last.txt`)
+
+Use this if you want the cooldown decision **before** the spawn_result C# runs (e.g. extra paranoia about another command touching `spawn_result.txt` on a shared queue). Python still writes both files each run.
+
+1. **Run a Program** — same as recommended step 1.
+
+2. **Execute C# Code (inline)** — read `switch_side_last.txt` only:
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string SWITCH_LAST = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\switch_side_last.txt";
+
+    public bool Execute()
+    {
+        string flag = "0";
+        try
+        {
+            if (File.Exists(SWITCH_LAST))
+            {
+                var t = File.ReadAllText(SWITCH_LAST).Trim();
+                if (t == "1") flag = "1";
+            }
+        }
+        catch { }
+        CPH.SetArgument("applySwitchCooldown", flag);
+        return true;
+    }
+}
+```
+
+3. **Conditional:** `if ("%applySwitchCooldown%" Equals "1")`
+   - **True branch:** **Execute C#** using [Apply cooldown via C#](#apply-cooldown-via-c-streamerbot-api) (or a cooldown sub-action if your build has one) for **`!switch`**.  
+   - **False branch:** leave empty.
+
+4. **Execute C# Code** — same shared **!switch** C# block as in the section above.
+
+5. **Conditional:** `if ("%spawnResult%" Equals "ok")` — success vs error **chat** messages only (same nested `commandSource` pattern as recommended step 3; do **not** add a second cooldown here if you already did steps 3–4).
+
+---
+
+### !switch — quick checklist
+
+- [ ] Command/trigger **cooldown disabled** for `!switch` / `!switchside` (apply cooldown **only on success** via C# `CommandAddTo…` or a cooldown sub-action if present).
+- [ ] **Recommended:** Sub-actions = **Python → !switch C# only → If spawnResult ok → True: cooldown C# then chat** (no Monster Spawner C#, no stray `%applySwitchCooldown%` unless you use the optional 5-step layout).
+- [ ] **Optional 5-step:** Sub-actions = **Python → small switch_side_last C# → If applySwitchCooldown → cooldown C# → !switch C# → chat conditional** (step 2 must be the **small** file reader, not spawn code).
 
 ---
 
@@ -2744,7 +2946,9 @@ public class CPHInline
    - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
    - **Wait maximum:** `10` seconds
 
-2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`, `%mobName%`, `%userPointsRemaining%`:
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`, `%allyName%`, `%mobName%` (same value), `%userPointsRemaining%`:
+
+If your success message uses `%allyName%` (like cleanse/sabotage), the C# **must** call `SetArgument("allyName", …)`. The block below sets **both** `allyName` and `mobName` so either placeholder works.
 
 ```csharp
 using System;
@@ -2782,6 +2986,7 @@ public class CPHInline
         catch (Exception ex) { result = ex.Message; }
         CPH.SetArgument("spawnResult", result);
         CPH.SetArgument("mobName", mobName);
+        CPH.SetArgument("allyName", mobName);
         CPH.SetArgument("userPointsRemaining", userPointsRemaining);
         return true;
     }
@@ -2790,8 +2995,8 @@ public class CPHInline
 
 3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
    - **True branch:** Use commandSource pattern:
-     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% summoned a corrupted %mobName% to fight for you! You have %userPointsRemaining% points left.`
-     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% summoned a corrupted %mobName% to fight for you! You have %userPointsRemaining% points left.`
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% summoned a corrupted %allyName% to fight for you! You have %userPointsRemaining% points left.`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% summoned a corrupted %allyName% to fight for you! You have %userPointsRemaining% points left.`
      - Leave **False Result** empty for both.
    - **False branch:** Use commandSource pattern:
      - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
@@ -2858,8 +3063,8 @@ public class CPHInline
 | 17 | Random Debuff | !debuff | Spend points to apply random debuff |
 | 18 | Cursed Wand | !wand | Spend points for cursed wand effect |
 | 19 | Double Points | !doublepoints | Streamer only: 2× points for N min |
-| 20 | Earn Points (Cheer) | Twitch Cheer | 1 pt per bit |
-| 21 | Earn Points (Super Chat) | YouTube Super Chat | 1 pt per $0.01 |
+| 20 | Earn Points (Cheer) | Twitch Cheer | 1 pt per bit; optional args for stacked 2× |
+| 21 | Earn Points (Super Chat) | YouTube Super Chat | 1 pt per $0.01; same optional args |
 | 22 | Reset Points | Stream Started | Clear non-donor points |
 | 23 | Spend OFF | Hotkey | Disable spend commands |
 | 24 | Spend ON | Hotkey | Enable spend commands |

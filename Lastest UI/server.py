@@ -849,12 +849,26 @@ def viewer_points_import():
 
 @app.route('/api/viewer-points/prune', methods=['POST', 'OPTIONS'])
 def viewer_points_prune():
-    """Remove users who haven't earned in N+ days AND have < minDonor donor points. Body: { days: 2, minDonor: 101 }."""
+    """Remove users inactive N+ days with donor below minDonor; optionally also max chat-only pts (total − donor).
+    Body: { days: 2, minDonor: 101, maxChatPts?: number } — omit maxChatPts to ignore chat (legacy behavior)."""
     if request.method == 'OPTIONS':
         return '', 204
     body = request.get_json(force=True, silent=True) or {}
-    days = max(1, int(body.get('days', 2)))
-    min_donor = max(0, int(body.get('minDonor', body.get('min_donor', 101))))
+    try:
+        days = max(1, int(body.get('days', 2)))
+    except (TypeError, ValueError):
+        return jsonify({"error": "days must be an integer ≥ 1"}), 400
+    try:
+        min_donor = max(0, int(body.get('minDonor', body.get('min_donor', 101))))
+    except (TypeError, ValueError):
+        return jsonify({"error": "minDonor must be an integer ≥ 0"}), 400
+    max_chat_raw = body.get('maxChatPts', body.get('max_chat_pts'))
+    max_chat_pts = None
+    if max_chat_raw is not None and max_chat_raw != '':
+        try:
+            max_chat_pts = max(0, int(max_chat_raw))
+        except (TypeError, ValueError):
+            return jsonify({"error": "maxChatPts must be a non-negative integer"}), 400
     cutoff = int(time.time()) - days * 24 * 60 * 60
     if not _acquire_viewer_points_lock():
         return jsonify({"error": "Points file busy, try again"}), 503
@@ -863,8 +877,15 @@ def viewer_points_prune():
         to_remove = []
         for k, v in data.items():
             pts, last, donation_pts, role = v[0], v[1], v[2], (v[3] if len(v) >= 4 else '')
-            if donation_pts < min_donor and last < cutoff:
-                to_remove.append(k)
+            if last >= cutoff:
+                continue
+            if donation_pts >= min_donor:
+                continue
+            if max_chat_pts is not None:
+                chat_only = max(0, int(pts) - int(donation_pts))
+                if chat_only > max_chat_pts:
+                    continue
+            to_remove.append(k)
         for k in to_remove:
             del data[k]
         _write_viewer_points_raw(data)
@@ -951,7 +972,7 @@ def viewer_points_bulk_add():
 
 @app.route('/api/viewer-points/bulk/chat-to-donor', methods=['POST', 'OPTIONS'])
 def viewer_points_chat_to_donor():
-    """Convert chat points to donor points for specified users. pts stays same, donation_pts = pts."""
+    """Move a percentage of chat-only points into donation_pts (default 100%)."""
     if request.method == 'OPTIONS':
         return '', 204
     body = request.get_json(force=True, silent=True) or {}
@@ -960,6 +981,13 @@ def viewer_points_chat_to_donor():
         users_filter = [str(u).strip().lower() for u in users_filter if u and str(u).strip()]
     if not users_filter:
         return jsonify({"error": "users required"}), 400
+    pct_raw = body.get('percent', 100)
+    try:
+        percent = int(pct_raw)
+    except (TypeError, ValueError):
+        return jsonify({"error": "percent must be an integer"}), 400
+    if percent < 0 or percent > 100:
+        return jsonify({"error": "percent must be 0–100"}), 400
     if not _acquire_viewer_points_lock():
         return jsonify({"error": "Points file busy, try again"}), 503
     try:
@@ -971,8 +999,9 @@ def viewer_points_chat_to_donor():
             v = data[k]
             pts, last, donation_pts, role = v[0], v[1], v[2], (v[3] if len(v) >= 4 else '')
             chat_pts = max(0, pts - donation_pts)
-            if chat_pts > 0:
-                data[k] = (pts, last, donation_pts + chat_pts, role)
+            move = (chat_pts * percent) // 100
+            if move > 0:
+                data[k] = (pts, last, donation_pts + move, role)
                 count += 1
         _write_viewer_points_raw(data)
         return jsonify({"ok": True, "count": count})
@@ -1310,8 +1339,9 @@ def gold_command():
         try:
             amount = int(amount) if amount is not None else 5
         except (TypeError, ValueError):
-            amount = 5
-        amount = max(1, min(100, amount))
+            return jsonify({'ok': False, 'error': 'Amount must be 1-100'}), 200
+        if amount < 1 or amount > 100:
+            return jsonify({'ok': False, 'error': 'Amount must be 1-100'}), 200
         username = (data.get('username') or '').strip() or None
         if not game_ws_app:
             return jsonify({'ok': False, 'error': 'Game not connected'}), 503

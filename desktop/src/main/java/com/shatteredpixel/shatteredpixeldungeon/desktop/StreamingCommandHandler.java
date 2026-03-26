@@ -54,7 +54,6 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Thief;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Warlock;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Adrenaline;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Barrier;
-import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.AllyBuff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Blindness;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Corruption;
@@ -715,6 +714,8 @@ public final class StreamingCommandHandler {
 				effect.effect(wand, Dungeon.hero, bolt, positiveOnly);
 				String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 				GLog.w(Messages.get(StreamingCommandHandler.class, "chat_wand"), chatter, effectName);
+				Dungeon.hero.spend(-1f);
+				Talent.onArtifactUsed(Dungeon.hero);
 				callback.onResult(true, effectName, rarity, null);
 			}
 		});
@@ -990,7 +991,7 @@ public final class StreamingCommandHandler {
 		Dungeon.level.occupyCell(mob);
 
 		Corruption.corruptionHeal(mob);
-		AllyBuff.affectAndLoot(mob, Dungeon.hero, Corruption.class);
+		Buff.affect(mob, Corruption.class);
 
 		String mobName = mob.name();
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";

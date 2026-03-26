@@ -16,8 +16,8 @@ Usage:
   buff:     python points_command.py buff <username>
   debuff:   python points_command.py debuff <username>
   wand:     python points_command.py wand <common|uncommon|rare|veryrare> <username>  (tier required)
-  superchat: python points_command.py superchat <microAmount> <currencyCode> <username>
-  cheer:    python points_command.py cheer <bits> <username>
+  superchat: python points_command.py superchat <microAmount> <currencyCode> <username> [isSubscribed 0|1] [userIsSponsor 0|1] [topFarder 0|1]
+  cheer:    python points_command.py cheer <bits> <username> [isSubscribed 0|1] [userIsSponsor 0|1] [topFarder 0|1]
 
 All spend commands write to spawn_result.txt (ok or ok|extra|pts). The last value is remaining points. Donation writes to donation_result.txt.
 """
@@ -42,6 +42,8 @@ SPEND_DISABLED_FILE = os.path.join(SCRIPT_DIR, "spend_disabled.txt")
 HELPERS_HURTERS_DISABLED_FILE = os.path.join(SCRIPT_DIR, "helpers_hurters_disabled.txt")
 GAME_DATA_URL = "http://127.0.0.1:5000/api/game-data"
 DOUBLE_POINTS_END_FILE = os.path.join(SCRIPT_DIR, "double_points_end.txt")
+SWITCH_SIDE_LAST_FILE = os.path.join(SCRIPT_DIR, "switch_side_last.txt")
+SWITCH_SUCCESS_COOLDOWN_FILE = os.path.join(SCRIPT_DIR, "switch_success_cooldown.json")
 
 
 def is_spend_disabled():
@@ -70,6 +72,63 @@ def is_double_points_active():
     except (ValueError, OSError):
         return False
 
+
+def _arg_bool(s, default=False):
+    """Parse 0/1, true/false, yes/no from Streamer.bot CLI args."""
+    if s is None:
+        return default
+    t = str(s).strip().lower()
+    if not t:
+        return default
+    return t in ("1", "true", "yes", "on")
+
+
+def donation_earn_multiplier(is_subscribed=False, is_sponsor=False, top_farder=False):
+    """Stack global 2×, subscriber/member 2×, and optional top-farder 2× (matches chat earning)."""
+    m = 1
+    if is_double_points_active():
+        m *= 2
+    if is_subscribed or is_sponsor:
+        m *= 2
+    if top_farder:
+        m *= 2
+    return m
+
+
+def _write_switch_side_last(ok):
+    try:
+        with open(SWITCH_SIDE_LAST_FILE, "w", encoding="utf-8") as f:
+            f.write("1" if ok else "0")
+    except OSError:
+        pass
+
+
+def _read_switch_success_cooldown_map():
+    try:
+        if not os.path.exists(SWITCH_SUCCESS_COOLDOWN_FILE):
+            return {}
+        with open(SWITCH_SUCCESS_COOLDOWN_FILE, encoding="utf-8") as f:
+            raw = json.load(f)
+        if not isinstance(raw, dict):
+            return {}
+        return {str(k).lower(): float(v) for k, v in raw.items() if v is not None}
+    except (json.JSONDecodeError, OSError, TypeError, ValueError):
+        return {}
+
+
+def _write_switch_success_cooldown_map(m):
+    try:
+        with open(SWITCH_SUCCESS_COOLDOWN_FILE, "w", encoding="utf-8") as f:
+            json.dump(m, f, indent=0)
+    except OSError:
+        pass
+
+
+def _switch_success_cooldown_seconds_left(key, cdmap):
+    until = float(cdmap.get(key, 0) or 0)
+    return max(0, int(round(until - time.time())))
+
+
 NATIVE_DEPTH = {
     "rat": 1, "albino": 1, "snake": 1, "gnoll": 2, "crab": 3, "slime": 4,
     "swarm": 3, "thief": 4, "skeleton": 6, "dm100": 7, "guard": 7,
@@ -87,6 +146,7 @@ def load_config():
         "helper_discount_commands": ["ward", "bee", "buff", "corrupt_ally"],
         "hurter_discount_commands": ["debuff", "curse", "trap", "gas"],
         "cost_to_switch_side": 50,
+        "switch_success_cooldown_seconds": 300,
         "cost_per_heal": 100,
         "cost_per_cleanse": 150,
         "cost_per_dew": 30,
@@ -157,6 +217,7 @@ def load_config():
             "default_monster_cost": int(cfg.get("default_monster_cost", defaults["default_monster_cost"])),
             "cost_per_monster": monsters,
             "cost_to_switch_side": max(0, int(cfg.get("cost_to_switch_side", defaults["cost_to_switch_side"]))),
+            "switch_success_cooldown_seconds": max(0, int(cfg.get("switch_success_cooldown_seconds", defaults["switch_success_cooldown_seconds"]))),
             "cost_per_heal": max(1, int(cfg.get("cost_per_heal", defaults["cost_per_heal"]))),
             "cost_per_cleanse": max(1, int(cfg.get("cost_per_cleanse", defaults["cost_per_cleanse"]))),
             "cost_per_dew": max(1, int(cfg.get("cost_per_dew", defaults["cost_per_dew"]))),
@@ -1226,6 +1287,9 @@ def cmd_superchat(args):
     username = args[2]
     if not username or username.lower() == "anonymous":
         return DONATION_RESULT_FILE, "skip|0"
+    is_sub = _arg_bool(args[3], False) if len(args) > 3 else False
+    is_sponsor = _arg_bool(args[4], False) if len(args) > 4 else False
+    top_farder = _arg_bool(args[5], False) if len(args) > 5 else False
 
     key = username.lower()
     amount_in_currency = micro_amount / 1_000_000
@@ -1234,8 +1298,7 @@ def cmd_superchat(args):
     to_add = max(0, int(round(amount_usd * 100)))
     if to_add <= 0:
         return DONATION_RESULT_FILE, "ok|0"
-    if is_double_points_active():
-        to_add *= 2
+    to_add *= donation_earn_multiplier(is_sub, is_sponsor, top_farder)
     try:
         with points_lock():
             data = read_points()
@@ -1258,13 +1321,15 @@ def cmd_cheer(args):
     username = args[1]
     if not username or username.lower() == "anonymous":
         return DONATION_RESULT_FILE, "skip|0"
+    is_sub = _arg_bool(args[2], False) if len(args) > 2 else False
+    is_sponsor = _arg_bool(args[3], False) if len(args) > 3 else False
+    top_farder = _arg_bool(args[4], False) if len(args) > 4 else False
 
     key = username.lower()
     to_add = bits
     if to_add <= 0:
         return DONATION_RESULT_FILE, "ok|0"
-    if is_double_points_active():
-        to_add *= 2
+    to_add *= donation_earn_multiplier(is_sub, is_sponsor, top_farder)
     try:
         with points_lock():
             data = read_points()
@@ -1554,23 +1619,34 @@ def cmd_sabotage(args):
 
 
 def cmd_switch(args):
-    if is_spend_disabled():
-        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
+    # !switch is allowed even when spend_disabled.txt is present (role change only; still costs points if configured).
     if is_helpers_hurters_disabled():
+        _write_switch_side_last(False)
         return SPAWN_RESULT_FILE, "Helpers/Hurters is currently turned off."
     if len(args) < 1:
+        _write_switch_side_last(False)
         return SPAWN_RESULT_FILE, "Usage: !switch (switch helper/hurter side)"
     username = args[0]
     key = username.lower()
     try:
         with points_lock():
+            cfg = get_config()
+            cooldown_sec = cfg.get("switch_success_cooldown_seconds", 300)
+            if cooldown_sec > 0:
+                cdmap = _read_switch_success_cooldown_map()
+                left = _switch_success_cooldown_seconds_left(key, cdmap)
+                if left > 0:
+                    _write_switch_side_last(False)
+                    return SPAWN_RESULT_FILE, f"{username}, switch is on cooldown. Try again in {left}s."
             data = read_points()
             pts, last, donation_pts, role = _get_user_data(data, key)
             if not role or (role != "helper" and role != "hurter"):
+                _write_switch_side_last(False)
                 return SPAWN_RESULT_FILE, "You don't have a side yet. Chat once to be assigned."
-            cost = get_config()["cost_to_switch_side"]
+            cost = cfg["cost_to_switch_side"]
             total = effective_total(pts, donation_pts)
             if cost > 0 and total < cost:
+                _write_switch_side_last(False)
                 return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to switch side, you have {total}."
             new_role = "hurter" if role == "helper" else "helper"
             if cost > 0:
@@ -1580,8 +1656,14 @@ def cmd_switch(args):
                 data[key] = (pts, last, donation_pts, new_role)
                 new_pts = pts
             write_points(data)
+            if cooldown_sec > 0:
+                cdmap = _read_switch_success_cooldown_map()
+                cdmap[key] = time.time() + cooldown_sec
+                _write_switch_success_cooldown_map(cdmap)
+            _write_switch_side_last(True)
             return SPAWN_RESULT_FILE, f"ok|{new_role}|{new_pts}"
     except TimeoutError:
+        _write_switch_side_last(False)
         return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
 

@@ -155,13 +155,17 @@ public class StreamingServer extends WebSocketServer {
 				});
 			} else if ("gold".equals(cmd)) {
 				int amount = obj.has("amount") ? obj.get("amount").getAsInt() : 5;
-				int amountFinal = Math.max(1, Math.min(100, amount));
+				final int amountFinal = amount;
 				Gdx.app.postRunnable(() -> {
 					String err = null;
-					try {
-						err = StreamingCommandHandler.handleDropGold(amountFinal, usernameFinal);
-					} catch (Throwable t) {
-						err = (t.getMessage() != null) ? t.getMessage() : "Unknown error";
+					if (amountFinal < 1 || amountFinal > 100) {
+						err = "Amount must be 1-100";
+					} else {
+						try {
+							err = StreamingCommandHandler.handleDropGold(amountFinal, usernameFinal);
+						} catch (Throwable t) {
+							err = (t.getMessage() != null) ? t.getMessage() : "Unknown error";
+						}
 					}
 					boolean ok = (err == null);
 					if (requestId != null && !requestId.isEmpty()) {

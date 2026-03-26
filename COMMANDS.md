@@ -79,3 +79,20 @@ When enabled, chatters are assigned alternating roles on first chat: **helper** 
 **Champion:** 2× base cost (no zone discount). e.g. !champion rat = 10 pts, !champion eye = 140 pts.
 
 *Costs are configurable by the streamer (points config / overlay).*
+
+---
+
+## Streamer.bot (points script)
+
+### `!switch` cooldown only on success
+
+After the **Execute Python** step for `switch`, add a **Conditional** so **Set Command Cooldown** for `!switch` runs only when the command succeeded. Easiest check: the first line of `spawn_result.txt` **starts with** `ok|` (same pattern as other spend commands). For a dedicated flag (avoids rare races if another command overwrites `spawn_result.txt`), use `Lastest UI/switch_side_last.txt`: `1` = success, `0` = failure (written by `cmd_switch` in `points_command.py`).
+
+### Super Chat and Cheer (donation points)
+
+`points_command.py` applies the same stacking multipliers as chat earning: global **!doublepoints** 2×, then **subscriber / member** 2× (`isSubscribed` on Twitch, `userIsSponsor` on YouTube), then optional **top farder** 2×. Pass optional trailing CLI args (default `0`):
+
+- `superchat <microAmount> <currencyCode> <username> [isSubscribed] [userIsSponsor] [topFarder]`
+- `cheer <bits> <username> [isSubscribed] [userIsSponsor] [topFarder]`
+
+Example args from Streamer.bot: `%rawInput0%` … then `%isSubscribed%`, `%userIsSponsor%`, and `0` or `1` for top farder if you compute it in C#.

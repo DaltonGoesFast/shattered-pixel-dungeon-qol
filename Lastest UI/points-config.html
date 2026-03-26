@@ -574,13 +574,20 @@
       <label>Donor <input type="number" id="new_donation" placeholder="Donor" min="0" value="0"></label>
       <button id="add_points">Add</button>
       <button id="set_points">Set</button>
-      <button id="chatToDonor" style="background:var(--spd-btn-secondary);" title="Convert selected users' chat points to donor points">Chat → Donor</button>
+      <label title="Percent of chat-only points to move to donor">Chat→Donor % <input type="number" id="chatToDonorPercent" min="0" max="100" value="100" style="width:52px;padding:2px 4px;"></label>
+      <button id="chatToDonor" style="background:var(--spd-btn-secondary);" title="Convert a percentage of selected users' chat points to donor points">Chat → Donor</button>
       <button id="clearNonDonor" style="background:var(--spd-btn-secondary);">Delete all points</button>
       <button id="clearAll" style="background:var(--spd-danger);">Delete all donor points</button>
       <button id="exportViewerCsv" style="background:var(--spd-btn-secondary);" title="Download viewer points as CSV">Export CSV</button>
       <button id="importViewerCsv" style="background:var(--spd-btn-secondary);" title="Import viewer points from CSV">Import CSV</button>
       <input type="file" id="importViewerCsvFile" accept=".csv" style="display:none;">
-      <button id="pruneInactive" style="background:var(--spd-btn-secondary);" title="Remove users inactive 2+ days with &lt;101 donor pts">Prune inactive</button>
+      <span style="display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:4px;" title="Remove viewers who match all conditions">
+        <span style="color:var(--spd-muted-on-surface);font-size:0.85rem;">Prune:</span>
+        <label style="font-size:0.85rem;">inactive ≥ <input type="number" id="pruneDays" min="1" max="3650" value="2" style="width:44px;padding:2px 4px;"> d</label>
+        <label style="font-size:0.85rem;">donor &lt; <input type="number" id="pruneDonorBelow" min="0" value="101" style="width:52px;padding:2px 4px;"></label>
+        <label style="font-size:0.85rem;">chat-only ≤ <input type="number" id="pruneMaxChat" min="0" placeholder="any" style="width:52px;padding:2px 4px;" title="Leave empty: ignore chat-only points. Otherwise total pts − donor must be ≤ this."></label>
+        <button id="pruneInactive" style="background:var(--spd-btn-secondary);">Prune inactive</button>
+      </span>
     </div>
     <div class="vp-list-wrapper" style="position:relative;">
       <div id="viewer_points_list" style="height: 420px; max-height: 70vh; overflow-y: auto;"></div>
@@ -1780,13 +1787,18 @@
         showMsg('Select users or enter a username', false);
         return;
       }
+      let pct = parseInt(document.getElementById('chatToDonorPercent').value, 10);
+      if (isNaN(pct) || pct < 0 || pct > 100) {
+        showMsg('Chat→Donor % must be 0–100', false);
+        return;
+      }
       fetch('/api/viewer-points/bulk/chat-to-donor', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ users }),
+        body: JSON.stringify({ users, percent: pct }),
       })
         .then(r => r.json())
-        .then(d => { if (d.error) throw new Error(d.error); showMsg(`Converted chat→donor for ${d.count} users`, true); loadViewerPoints(true); logActivity('VP: Chat→Donor ' + (d.count || 0) + ' users'); })
+        .then(d => { if (d.error) throw new Error(d.error); showMsg(`Converted ${pct}% chat→donor for ${d.count} users`, true); loadViewerPoints(true); logActivity('VP: Chat→Donor ' + pct + '% ' + (d.count || 0) + ' users'); })
         .catch(e => showMsg('Failed: ' + e.message, false));
     });
     document.getElementById('clearNonDonor').addEventListener('click', () => {
@@ -1805,10 +1817,37 @@
     document.getElementById('importViewerCsv').addEventListener('click', importViewerCsv);
     document.getElementById('importViewerCsvFile').addEventListener('change', handleImportViewerCsvFile);
     document.getElementById('pruneInactive').addEventListener('click', () => {
-      if (!confirm('Remove users who haven\'t earned in 2+ days and have <101 donor points?')) return;
-      fetch('/api/viewer-points/prune', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ days: 2, minDonor: 101 }) })
+      const days = parseInt(document.getElementById('pruneDays').value, 10);
+      const minDonor = parseInt(document.getElementById('pruneDonorBelow').value, 10);
+      if (isNaN(days) || days < 1) {
+        showMsg('Prune: inactive days must be at least 1', false);
+        return;
+      }
+      if (isNaN(minDonor) || minDonor < 0) {
+        showMsg('Prune: donor threshold must be a number ≥ 0', false);
+        return;
+      }
+      const chatRaw = document.getElementById('pruneMaxChat').value.trim();
+      let maxChatPts = null;
+      if (chatRaw !== '') {
+        maxChatPts = parseInt(chatRaw, 10);
+        if (isNaN(maxChatPts) || maxChatPts < 0) {
+          showMsg('Prune: chat-only max must be empty (any) or a number ≥ 0', false);
+          return;
+        }
+      }
+      const chatDesc = maxChatPts === null ? 'any chat-only' : ('chat-only ≤ ' + maxChatPts);
+      if (!confirm('Remove users inactive ≥ ' + days + ' days, donor pts < ' + minDonor + ', and ' + chatDesc + '?')) return;
+      const body = { days, minDonor };
+      if (maxChatPts !== null) body.maxChatPts = maxChatPts;
+      fetch('/api/viewer-points/prune', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
         .then(r => r.json())
-        .then(d => { if (d.error) throw new Error(d.error); showMsg('Pruned ' + (d.count || 0) + ' inactive users', true); loadViewerPoints(true); logActivity('VP: pruned ' + (d.count || 0)); })
+        .then(d => {
+          if (d.error) throw new Error(d.error);
+          showMsg('Pruned ' + (d.count || 0) + ' users', true);
+          loadViewerPoints(true);
+          logActivity('VP: pruned ' + (d.count || 0) + ' (≥' + days + 'd, donor<' + minDonor + (maxChatPts !== null ? ', chat≤' + maxChatPts : '') + ')');
+        })
         .catch(e => showMsg('Prune failed: ' + e.message, false));
     });
     ['score_streamer_label', 'score_chat_label', 'score_streamer', 'score_chat'].forEach(id => {
