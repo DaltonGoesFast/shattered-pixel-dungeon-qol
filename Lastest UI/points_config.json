@@ -1,7 +1,7 @@
 {
   "points_per_helper_on_boss": 10,
   "points_per_helper_on_new_floor": 10,
-  "points_per_hurter_on_death": 50,
+  "points_per_hurter_on_death": 10,
   "cost_per_gold": 5,
   "cost_per_curse": 200,
   "cost_per_gas": 75,
@@ -56,7 +56,7 @@
     "trap",
     "debuff"
   ],
-  "cost_to_switch_side": 100,
+  "cost_to_switch_side": 0,
   "cost_per_heal": 25,
   "cost_per_cleanse": 25,
   "cost_per_dew": 5,
