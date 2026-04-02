@@ -23,6 +23,7 @@ package com.shatteredpixel.shatteredpixeldungeon.ui;
 
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroSubClass;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
@@ -116,9 +117,7 @@ public class TalentsPane extends ScrollPane {
 			blockText = null;
 		}
 
-		for (int i = panes.size()-1; i >= 0; i--){
-			content.bringToFront(panes.get(i));
-		}
+		// Natural z-order: later tiers on top (reversed bringToFront hid tier 2+ tooltips under tier 1).
 	}
 
 	@Override
@@ -180,7 +179,7 @@ public class TalentsPane extends ScrollPane {
 
 			if (mode == TalentButton.Mode.UPGRADE) {
 				setupStars();
-				if (Dungeon.hero.talentPointsAvailable(tier) > 0){
+				if (!SPDSettings.autoTalentPlan() && Dungeon.hero.talentPointsAvailable(tier) > 0){
 
 					random = new IconButton(Icons.SHUFFLE.get()){
 						@Override
@@ -317,6 +316,14 @@ public class TalentsPane extends ScrollPane {
 
 			height = buttons.get(0).bottom() - y;
 
+		}
+
+		void refreshTierDisplay() {
+			for (TalentButton b : buttons) {
+				b.syncFromHero();
+			}
+			setupStars();
+			layout();
 		}
 
 	}

@@ -384,6 +384,7 @@ public class WndSettings extends WndTabbed {
 		CheckBox chkFlipTags;
 		CheckBox chkCenterOnCycleNoEnemies;
 		CheckBox chkBossBarAllEnemies;
+		CheckBox chkAutoTalentPlan;
 		ColorBlock sep2;
 		CheckBox chkFont;
 		CheckBox chkVibrate;
@@ -602,6 +603,16 @@ public class WndSettings extends WndTabbed {
 			chkBossBarAllEnemies.checked(SPDSettings.bossBarAllEnemies());
 			add(chkBossBarAllEnemies);
 
+			chkAutoTalentPlan = new CheckBox(Messages.get(this, "auto_talent_plan")) {
+				@Override
+				protected void onClick() {
+					super.onClick();
+					SPDSettings.autoTalentPlan(checked());
+				}
+			};
+			chkAutoTalentPlan.checked(SPDSettings.autoTalentPlan());
+			add(chkAutoTalentPlan);
+
 			sep2 = new ColorBlock(1, 1, 0xFF000000);
 			add(sep2);
 
@@ -679,6 +690,9 @@ public class WndSettings extends WndTabbed {
 
 			chkBossBarAllEnemies.setRect(0, height + GAP, width, BTN_HEIGHT);
 			height = chkBossBarAllEnemies.bottom();
+
+			chkAutoTalentPlan.setRect(0, height + GAP, width, BTN_HEIGHT);
+			height = chkAutoTalentPlan.bottom();
 
 			sep2.size(width, 1);
 			sep2.y = height + GAP;

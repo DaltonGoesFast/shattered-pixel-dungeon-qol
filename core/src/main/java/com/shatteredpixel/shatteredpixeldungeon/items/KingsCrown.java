@@ -25,6 +25,7 @@ import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
+import com.shatteredpixel.shatteredpixeldungeon.utils.TalentAutoPlan;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.abilities.ArmorAbility;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.abilities.Ratmogrify;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Speck;
@@ -119,8 +120,10 @@ public class KingsCrown extends Item {
 			}
 		}
 
+		hero.talentAutoOrderTier4 = null;
 		hero.armorAbility = ability;
 		Talent.initArmorTalents(hero);
+		TalentAutoPlan.tryApply( hero );
 
 		hero.sprite.operate( hero.pos );
 		Sample.INSTANCE.play( Assets.Sounds.MASTERY );

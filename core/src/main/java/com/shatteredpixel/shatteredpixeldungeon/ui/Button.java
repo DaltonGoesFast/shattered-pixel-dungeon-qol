@@ -29,6 +29,7 @@ import com.watabou.input.KeyEvent;
 import com.watabou.input.PointerEvent;
 import com.watabou.noosa.Camera;
 import com.watabou.noosa.Game;
+import com.watabou.noosa.Gizmo;
 import com.watabou.noosa.PointerArea;
 import com.watabou.noosa.ui.Component;
 import com.watabou.utils.Signal;
@@ -101,7 +102,7 @@ public class Button extends Component {
 						text += " _(" + KeyBindings.getKeyName(key) + ")_";
 					}
 					hoverTip = new Tooltip(Button.this, text, 80);
-					Button.this.parent.addToFront(hoverTip);
+					tooltipParent().addToFront(hoverTip);
 					hoverTip.camera = camera();
 					alignTooltip(hoverTip);
 				}
@@ -180,6 +181,16 @@ public class Button extends Component {
 
 	protected String hoverText() {
 		return null;
+	}
+
+	/** Where to attach {@link Tooltip} visuals; scroll content places tooltips above all scrolled rows. */
+	protected Component tooltipParent() {
+		for (Gizmo g = parent; g != null; g = g.parent) {
+			if (g instanceof ScrollPane) {
+				return ((ScrollPane) g).content();
+			}
+		}
+		return (Component) parent;
 	}
 
 	//TODO might be nice for more flexibility here

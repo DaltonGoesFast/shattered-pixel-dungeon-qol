@@ -520,4 +520,14 @@ public class SPDSettings extends GameSettings {
 	public static boolean obsChromaMasks() {
 		return getBoolean( KEY_OBS_CHROMA_MASKS, false );
 	}
+
+	public static final String KEY_AUTO_TALENT_PLAN = "auto_talent_plan";
+
+	public static void autoTalentPlan( boolean value ) {
+		put( KEY_AUTO_TALENT_PLAN, value );
+	}
+
+	public static boolean autoTalentPlan() {
+		return getBoolean( KEY_AUTO_TALENT_PLAN, false );
+	}
 }

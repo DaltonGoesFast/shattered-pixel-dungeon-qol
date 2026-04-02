@@ -23,16 +23,19 @@ package com.shatteredpixel.shatteredpixeldungeon.ui;
 
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Speck;
+import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.exotic.ScrollOfMetamorphosis;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndInfoTalent;
 import com.watabou.noosa.ColorBlock;
+import com.watabou.noosa.Group;
 import com.watabou.noosa.Image;
 import com.watabou.noosa.PointerArea;
 import com.watabou.noosa.audio.Sample;
@@ -53,7 +56,10 @@ public class TalentButton extends Button {
 	TalentIcon icon;
 	Image bg;
 
-	ColorBlock fill;
+	/** Filled ranks from real upgrades (brighter). */
+	ColorBlock fillApplied;
+	/** Ranks reserved in auto-spend queue (dimmer). */
+	ColorBlock fillQueued;
 
 	public enum Mode {
 		INFO,
@@ -81,8 +87,11 @@ public class TalentButton extends Button {
 	protected void createChildren() {
 		super.createChildren();
 
-		fill = new ColorBlock(0, 4, 0xFFFFFF44);
-		add(fill);
+		fillQueued = new ColorBlock(0, 4, 0x66FFEE33);
+		add(fillQueued);
+
+		fillApplied = new ColorBlock(0, 4, 0xFFFFFF66);
+		add(fillApplied);
 
 		bg = new Image(Assets.Interfaces.TALENT_BUTTON);
 		add(bg);
@@ -95,9 +104,24 @@ public class TalentButton extends Button {
 
 		super.layout();
 
-		fill.x = x+2;
-		fill.y = y + WIDTH - 1;
-		fill.size( pointsInTalent/(float)talent.maxPoints() * (WIDTH-4), 5);
+		float barW = WIDTH - 4;
+		float appliedW = pointsInTalent / (float) talent.maxPoints() * barW;
+		int pending = 0;
+		if (SPDSettings.autoTalentPlan() && mode == Mode.UPGRADE && Dungeon.hero != null) {
+			pending = Math.min(
+					Dungeon.hero.talentAutoPlanQueuedRanksFor( tier, talent ),
+					Math.max( 0, talent.maxPoints() - pointsInTalent ) );
+		}
+		float queuedW = pending / (float) talent.maxPoints() * barW;
+
+		fillApplied.x = x + 2;
+		fillApplied.y = y + WIDTH - 1;
+		fillApplied.size( appliedW, 5 );
+
+		fillQueued.x = x + 2 + appliedW;
+		fillQueued.y = y + WIDTH - 1;
+		fillQueued.size( queuedW, 5 );
+		fillQueued.visible = queuedW > 0.01f;
 
 		bg.x = x;
 		bg.y = y;
@@ -111,25 +135,31 @@ public class TalentButton extends Button {
 	protected void onClick() {
 		super.onClick();
 
+		if (mode == Mode.UPGRADE
+				&& SPDSettings.autoTalentPlan()
+				&& Dungeon.hero != null
+				&& Dungeon.hero.isAlive()
+				&& ShatteredPixelDungeon.scene() instanceof GameScene) {
+			if (!Dungeon.hero.appendTalentAutoPlanEntry( tier, talent )) {
+				if (Dungeon.hero.pointsInTalent( talent ) + Dungeon.hero.talentAutoPlanQueuedRanksFor( tier, talent )
+						>= talent.maxPoints()) {
+					GLog.w( Messages.get( TalentButton.class, "auto_queue_talent_cap" ) );
+				} else {
+					GLog.w( Messages.get( TalentButton.class, "auto_queue_tier_cap" ) );
+				}
+				return;
+			}
+			refreshContainingTierPane();
+			return;
+		}
+
 		Window toAdd;
 		if (mode == Mode.UPGRADE
 				&& Dungeon.hero != null
 				&& Dungeon.hero.isAlive()
 				&& Dungeon.hero.talentPointsAvailable(tier) > 0
 				&& Dungeon.hero.pointsInTalent(talent) < talent.maxPoints()){
-			toAdd = new WndInfoTalent(talent, pointsInTalent, new WndInfoTalent.TalentButtonCallback() {
-
-				@Override
-				public String prompt() {
-					return Messages.titleCase(Messages.get(WndInfoTalent.class, "upgrade"));
-				}
-
-				@Override
-				public void call() {
-					upgradeTalent();
-					Statistics.qualifiedForRandomVictoryBadge = false;
-				}
-			});
+			toAdd = manualUpgradeWindow();
 		} else if (mode == Mode.METAMORPH_CHOOSE && Dungeon.hero != null && Dungeon.hero.isAlive()) {
 			toAdd = new WndInfoTalent(talent, pointsInTalent, new WndInfoTalent.TalentButtonCallback() {
 
@@ -223,6 +253,63 @@ public class TalentButton extends Button {
 	}
 
 	@Override
+	protected void onRightClick() {
+		if (mode == Mode.UPGRADE
+				&& SPDSettings.autoTalentPlan()
+				&& Dungeon.hero != null
+				&& Dungeon.hero.isAlive()) {
+			Dungeon.hero.removeLastTalentAutoPlanEntryFor( tier, talent );
+			refreshContainingTierPane();
+		}
+	}
+
+	@Override
+	protected void onMiddleClick() {
+		if (mode == Mode.UPGRADE
+				&& SPDSettings.autoTalentPlan()
+				&& Dungeon.hero != null
+				&& Dungeon.hero.isAlive()
+				&& Dungeon.hero.talentPointsAvailable( tier ) > 0
+				&& Dungeon.hero.pointsInTalent( talent ) < talent.maxPoints()
+				&& ShatteredPixelDungeon.scene() instanceof GameScene) {
+			GameScene.show( manualUpgradeWindow() );
+		}
+	}
+
+	private Window manualUpgradeWindow() {
+		return new WndInfoTalent( talent, pointsInTalent, new WndInfoTalent.TalentButtonCallback() {
+
+			@Override
+			public String prompt() {
+				return Messages.titleCase( Messages.get( WndInfoTalent.class, "upgrade" ) );
+			}
+
+			@Override
+			public void call() {
+				upgradeTalent();
+				Statistics.qualifiedForRandomVictoryBadge = false;
+			}
+		} );
+	}
+
+	private void refreshContainingTierPane() {
+		Group p = parent;
+		while (p != null && !(p instanceof TalentsPane.TalentTierPane)) {
+			p = p.parent;
+		}
+		if (p instanceof TalentsPane.TalentTierPane) {
+			((TalentsPane.TalentTierPane) p).refreshTierDisplay();
+		}
+	}
+
+	void syncFromHero() {
+		if (Dungeon.hero != null) {
+			pointsInTalent = Dungeon.hero.pointsInTalent( talent );
+		}
+		layout();
+	}
+
+	@Override
 	protected void onPointerDown() {
 		icon.brightness( 1.5f );
 		bg.brightness( 1.5f );
@@ -237,7 +324,11 @@ public class TalentButton extends Button {
 
 	@Override
 	protected String hoverText() {
-		return Messages.titleCase(talent.title());
+		String t = Messages.titleCase( talent.title() );
+		if (mode == Mode.UPGRADE && SPDSettings.autoTalentPlan()) {
+			t += "\n" + Messages.get( TalentButton.class, "auto_hint" );
+		}
+		return t;
 	}
 
 	public void enable(boolean value ) {
@@ -249,14 +340,17 @@ public class TalentButton extends Button {
 	public void upgradeTalent(){
 		if (Dungeon.hero.talentPointsAvailable(tier) > 0 && parent != null) {
 			Dungeon.hero.upgradeTalent(talent);
-			float oldWidth = fill.width();
+			float oldWidth = fillApplied.width();
 			pointsInTalent++;
 			layout();
 			Sample.INSTANCE.play(Assets.Sounds.LEVELUP, 0.7f, 1.2f);
 			Emitter emitter = (Emitter) parent.recycle(Emitter.class);
 			emitter.revive();
-			emitter.pos(fill.x + (fill.width() + oldWidth) / 2f, fill.y + fill.height() / 2f);
+			emitter.pos( fillApplied.x + (fillApplied.width() + oldWidth) / 2f, fillApplied.y + fillApplied.height() / 2f );
 			emitter.burst(Speck.factory(Speck.STAR), 12);
+			if (SPDSettings.autoTalentPlan()) {
+				refreshContainingTierPane();
+			}
 		}
 	}
 }
