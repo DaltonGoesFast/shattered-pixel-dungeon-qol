@@ -8,7 +8,6 @@ import queue
 import uuid
 import threading
 import time
-import random
 from datetime import datetime
 
 try:
@@ -54,7 +53,6 @@ VIEWER_POINTS_LOCK_FILE = VIEWER_POINTS_FILE + ".lock"
 DOUBLE_POINTS_COUNTDOWN_FILE = os.path.join(SCRIPT_DIR, "double_points_countdown.txt")
 STREAMER_CHAT_SCORE_FILE = os.path.join(SCRIPT_DIR, "streamer_chat_score.json")
 STREAMER_CHAT_SCORE_TXT = os.path.join(SCRIPT_DIR, "streamer_chat_score.txt")
-HELPERS_HURTERS_DISABLED_FILE = os.path.join(SCRIPT_DIR, "helpers_hurters_disabled.txt")
 
 # Game WebSocket: receive live stream from game and serve via HTTP /api/game-data and game_summary.json
 GAME_WS_URL = "ws://127.0.0.1:5001"   # Game streaming port (default in game Settings; change if you set a different port)
@@ -87,9 +85,6 @@ obs_message_queue = queue.Queue()
 game_ws_received_count = 0
 last_ignored_source_log_time = 0.0
 IGNORED_SOURCE_LOG_INTERVAL = 60.0
-
-# Track dungeon depth from game snapshots (descend-only helper floor rewards)
-last_game_depth = None
 
 # Chat spawn: reference to game WebSocket for sending commands (set when connected)
 game_ws_app = None
@@ -211,30 +206,6 @@ def _save_score_data(data):
         print(f"Error saving streamer_chat_score: {e}")
 
 
-def _award_points_to_role(target_role, pts_to_add, log_label=''):
-    """Add pts_to_add to all viewers with the given helper/hurter role. No-op if helpers/hurters disabled or pts_to_add <= 0."""
-    if pts_to_add <= 0:
-        return
-    if os.path.exists(HELPERS_HURTERS_DISABLED_FILE):
-        return
-    if target_role not in ('helper', 'hurter'):
-        return
-    if not _acquire_viewer_points_lock():
-        print(f"{log_label or 'Role points'}: could not acquire viewer_points lock")
-        return
-    try:
-        raw = _read_viewer_points_raw()
-        for k, v in raw.items():
-            role = v[3] if len(v) >= 4 else ''
-            if role == target_role:
-                pts, last, donation_pts, role_val = v[0], v[1], v[2], v[3] if len(v) >= 4 else ''
-                raw[k] = (pts + pts_to_add, last, donation_pts, role_val)
-        _write_viewer_points_raw(raw)
-        print(f"{log_label or 'Role points'}: added {pts_to_add} pts to {target_role}s")
-    finally:
-        _release_viewer_points_lock()
-
-
 def _handle_score_event(data):
     """Handle hero_died or boss_slain from game WebSocket."""
     score_data = _load_score_data()
@@ -245,29 +216,14 @@ def _handle_score_event(data):
     _save_score_data(score_data)
     print(f"Score event {data.get('type')}: streamer={score_data['streamer']} chat={score_data['chat']}")
 
-    pts_per_helper = 10
-    pts_per_hurter = 10
-    try:
-        if os.path.exists(POINTS_CONFIG_FILE):
-            with open(POINTS_CONFIG_FILE, encoding='utf-8') as f:
-                cfg = json.load(f)
-            pts_per_helper = int(cfg.get('points_per_helper_on_boss', pts_per_helper))
-            pts_per_hurter = int(cfg.get('points_per_hurter_on_death', pts_per_hurter))
-    except (json.JSONDecodeError, OSError, TypeError, ValueError):
-        pass
-
-    target_role = 'helper' if data.get('type') == 'boss_slain' else 'hurter'
-    pts_to_add = pts_per_helper if target_role == 'helper' else pts_per_hurter
-    _award_points_to_role(target_role, pts_to_add, log_label='Score event')
-
 
 def _game_ws_on_message(ws, message):
     """Handle message from game WebSocket: update live data (same JSON shape as inspector)."""
-    global current_game_data, last_ws_update_time, last_item_info_open, game_ws_received_count, last_game_depth
+    global current_game_data, last_ws_update_time, last_item_info_open, game_ws_received_count
     try:
         data = json.loads(message)
         # Handle spawn/gold result (game reports success/failure)
-        if data.get('type') in ('ping_result', 'spawn_result', 'champion_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result', 'trap_result', 'transmute_result', 'summon_bee_result', 'ward_result', 'heal_result', 'cleanse_result', 'dew_result', 'corrupt_ally_result', 'hex_result', 'degrade_result', 'sabotage_result'):
+        if data.get('type') in ('ping_result', 'spawn_result', 'champion_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result', 'trap_result', 'bomb_result', 'transmute_result', 'summon_bee_result', 'ward_result', 'heal_result', 'cleanse_result', 'dew_result', 'corrupt_ally_result', 'hex_result', 'degrade_result', 'sabotage_result'):
             rid = data.get('request_id')
             ok = data.get('success', False)
             if rid:
@@ -311,6 +267,10 @@ def _game_ws_on_message(ws, message):
                         if data.get('type') == 'trap_result' and data.get('trap_name'):
                             pending_spawns[rid]['trap_name'] = data.get('trap_name')
                         if data.get('type') == 'trap_result' and data.get('error'):
+                            pending_spawns[rid]['error'] = data.get('error')
+                        if data.get('type') == 'bomb_result' and data.get('bomb_name'):
+                            pending_spawns[rid]['bomb_name'] = data.get('bomb_name')
+                        if data.get('type') == 'bomb_result' and data.get('error'):
                             pending_spawns[rid]['error'] = data.get('error')
                         if data.get('type') == 'transmute_result' and data.get('item_name'):
                             pending_spawns[rid]['item_name'] = data.get('item_name')
@@ -383,30 +343,6 @@ def _game_ws_on_message(ws, message):
                 os.fsync(f.fileno())
         except Exception as e:
             print(f"Error writing game_summary from WS: {e}")
-        # Descend-only: award helpers when dungeon depth increases (game scene only)
-        ui = data.get('ui') or {}
-        scene = ui.get('scene')
-        depth_raw = (data.get('stats') or {}).get('depth')
-        depth = None
-        if depth_raw is not None:
-            try:
-                depth = int(depth_raw)
-            except (TypeError, ValueError):
-                depth = None
-        if scene == 'game' and depth is not None:
-            pts_floor = 0
-            try:
-                if os.path.exists(POINTS_CONFIG_FILE):
-                    with open(POINTS_CONFIG_FILE, encoding='utf-8') as f:
-                        _cfg_floor = json.load(f)
-                    pts_floor = max(0, int(_cfg_floor.get('points_per_helper_on_new_floor', 0)))
-            except (json.JSONDecodeError, OSError, TypeError, ValueError):
-                pass
-            if last_game_depth is not None and depth > last_game_depth:
-                _award_points_to_role('helper', pts_floor, log_label='New floor (descend)')
-            last_game_depth = depth
-        else:
-            last_game_depth = None
         # OBS Advanced Scene Switcher: send item_info_open / item_info_closed when state changes
         if USE_OBS_ITEM_INFO_RELAY:
             ui = data.get('ui') or {}
@@ -588,14 +524,6 @@ def points_config_api():
             if os.path.exists(POINTS_CONFIG_FILE):
                 with open(POINTS_CONFIG_FILE, encoding='utf-8') as f:
                     data = json.load(f)
-                data.setdefault("points_per_helper_on_boss", 10)
-                data.setdefault("points_per_helper_on_new_floor", 0)
-                data.setdefault("points_per_hurter_on_death", 10)
-                data.setdefault("helper_discount_percent", 50)
-                data.setdefault("hurter_discount_percent", 50)
-                data.setdefault("helper_discount_commands", ["ward", "bee", "buff"])
-                data.setdefault("hurter_discount_commands", ["debuff", "curse", "trap", "gas"])
-                data.setdefault("cost_to_switch_side", 50)
                 data.setdefault("cost_per_heal", 100)
                 data.setdefault("cost_per_cleanse", 150)
                 data.setdefault("cost_per_dew", 30)
@@ -604,25 +532,22 @@ def points_config_api():
                 data.setdefault("cost_per_sabotage", 75)
                 data.setdefault("cost_per_corrupt_ally", 100)
                 data.setdefault("command_allowed_roles", {})
+                data.setdefault("cost_per_wand", 75)
+                data.setdefault("cost_per_bomb", 75)
             else:
                 data = {
-                    "points_per_helper_on_boss": 10,
-                    "points_per_helper_on_new_floor": 0,
-                    "points_per_hurter_on_death": 10,
                     "cost_per_gold": 5,
                     "cost_per_curse": 200,
                     "cost_per_gas": 75,
                     "cost_per_scroll": 100,
                     "cost_per_trap": 50,
+                    "cost_per_bomb": 75,
                     "cost_per_transmute": 150,
                     "cost_per_ally_bee": 75,
                     "cost_per_ward": 30,
                     "cost_per_buff": 75,
                     "cost_per_debuff": 50,
-                    "cost_per_wand_common": 50,
-                    "cost_per_wand_uncommon": 100,
-                    "cost_per_wand_rare": 200,
-                    "cost_per_wand_veryrare": 400,
+                    "cost_per_wand": 75,
                     "default_monster_cost": 100,
                     "cost_per_monster": {
                         "rat": 5, "albino": 10, "snake": 10, "gnoll": 10, "crab": 15,
@@ -631,11 +556,6 @@ def points_config_api():
                         "necromancer": 25, "ghoul": 40, "elemental": 40, "warlock": 45,
                         "monk": 50, "golem": 50, "succubus": 60, "eye": 70, "scorpio": 80,
                     },
-                    "helper_discount_percent": 50,
-                    "hurter_discount_percent": 50,
-                    "helper_discount_commands": ["ward", "bee", "buff"],
-                    "hurter_discount_commands": ["debuff", "curse", "trap", "gas"],
-                    "cost_to_switch_side": 50,
                     "cost_per_heal": 100,
                     "cost_per_cleanse": 150,
                     "cost_per_dew": 30,
@@ -661,30 +581,20 @@ def points_config_api():
         data = request.get_json(force=True, silent=True) or {}
         # Validate and sanitize
         cfg = {
-            "points_per_helper_on_boss": max(0, int(data.get("points_per_helper_on_boss", 10))),
-            "points_per_helper_on_new_floor": max(0, int(data.get("points_per_helper_on_new_floor", 0))),
-            "points_per_hurter_on_death": max(0, int(data.get("points_per_hurter_on_death", 10))),
             "cost_per_gold": max(1, int(data.get("cost_per_gold", 5))),
             "cost_per_curse": max(1, int(data.get("cost_per_curse", 200))),
             "cost_per_gas": max(1, int(data.get("cost_per_gas", 75))),
             "cost_per_scroll": max(1, int(data.get("cost_per_scroll", 100))),
             "cost_per_trap": max(1, int(data.get("cost_per_trap", 50))),
+            "cost_per_bomb": max(1, int(data.get("cost_per_bomb", 75))),
             "cost_per_transmute": max(1, int(data.get("cost_per_transmute", 150))),
             "cost_per_ally_bee": max(1, int(data.get("cost_per_ally_bee", 75))),
             "cost_per_ward": max(1, int(data.get("cost_per_ward", 30))),
             "cost_per_buff": max(1, int(data.get("cost_per_buff", 75))),
             "cost_per_debuff": max(1, int(data.get("cost_per_debuff", 50))),
-            "cost_per_wand_common": max(1, int(data.get("cost_per_wand_common", 50))),
-            "cost_per_wand_uncommon": max(1, int(data.get("cost_per_wand_uncommon", 100))),
-            "cost_per_wand_rare": max(1, int(data.get("cost_per_wand_rare", 200))),
-            "cost_per_wand_veryrare": max(1, int(data.get("cost_per_wand_veryrare", 400))),
+            "cost_per_wand": max(1, int(data.get("cost_per_wand", 75))),
             "default_monster_cost": max(1, int(data.get("default_monster_cost", 100))),
             "cost_per_monster": {},
-            "helper_discount_percent": max(0, min(100, int(data.get("helper_discount_percent", 50)))),
-            "hurter_discount_percent": max(0, min(100, int(data.get("hurter_discount_percent", 50)))),
-            "helper_discount_commands": data.get("helper_discount_commands") or ["ward", "bee", "buff"],
-            "hurter_discount_commands": data.get("hurter_discount_commands") or ["debuff", "curse", "trap", "gas"],
-            "cost_to_switch_side": max(0, int(data.get("cost_to_switch_side", 50))),
             "cost_per_heal": max(1, int(data.get("cost_per_heal", 100))),
             "cost_per_cleanse": max(1, int(data.get("cost_per_cleanse", 150))),
             "cost_per_dew": max(1, int(data.get("cost_per_dew", 30))),
@@ -1085,47 +995,6 @@ def viewer_points_clear_all():
         _release_viewer_points_lock()
 
 
-@app.route('/api/viewer-points/rebalance-roles', methods=['POST', 'OPTIONS'])
-def viewer_points_rebalance_roles():
-    """Randomly reassign helper/hurter among selected users so counts differ by at most one.
-    Body: { \"usernames\": [\"user1\", ...] } — only users who exist and have role helper or hurter are updated."""
-    if request.method == 'OPTIONS':
-        return '', 204
-    body = request.get_json(force=True, silent=True) or {}
-    raw_users = body.get('usernames') or body.get('users') or []
-    if not isinstance(raw_users, list) or not raw_users:
-        return jsonify({"error": "usernames array required"}), 400
-    pool = [str(u).strip().lower() for u in raw_users if u and str(u).strip()]
-    pool = list(dict.fromkeys(pool))
-    if not pool:
-        return jsonify({"error": "at least one username required"}), 400
-    if not _acquire_viewer_points_lock():
-        return jsonify({"error": "Points file busy, try again"}), 503
-    try:
-        data = _read_viewer_points_raw()
-        role_holders = []
-        for u in pool:
-            if u not in data:
-                continue
-            v = data[u]
-            role = v[3] if len(v) >= 4 else ''
-            if role in ('helper', 'hurter'):
-                role_holders.append(u)
-        if not role_holders:
-            return jsonify({"error": "No selected users with helper or hurter role"}), 400
-        random.shuffle(role_holders)
-        n_helpers = (len(role_holders) + 1) // 2
-        for i, u in enumerate(role_holders):
-            v = data[u]
-            new_role = 'helper' if i < n_helpers else 'hurter'
-            data[u] = (v[0], v[1], v[2], new_role)
-        _write_viewer_points_raw(data)
-        n_hurters = len(role_holders) - n_helpers
-        return jsonify({"ok": True, "updated": len(role_holders), "helpers": n_helpers, "hurters": n_hurters})
-    finally:
-        _release_viewer_points_lock()
-
-
 @app.route('/api/viewer-points/<username>', methods=['DELETE', 'OPTIONS'])
 def viewer_points_delete(username):
     """Remove a viewer from the points file."""
@@ -1349,7 +1218,7 @@ def spawn_command():
 
 @app.route('/api/champion-command', methods=['POST', 'OPTIONS'])
 def champion_command():
-    """Receive champion spawn command from Streamer.bot; forward to game via WebSocket. Cost is 2× base (no zone discount); overlay handles cost."""
+    """Receive champion spawn command from Streamer.bot; forward to game via WebSocket. Cost is 2× zone-adjusted spawn cost (same rules as !spawn); overlay handles cost."""
     global last_spawn_time
     if request.method == 'OPTIONS':
         return '', 204
@@ -1658,6 +1527,54 @@ def trap_command():
         return jsonify({'ok': False, 'error': str(e)}), 400
 
 
+@app.route('/api/bomb-command', methods=['POST', 'OPTIONS'])
+def bomb_command():
+    """Receive bomb command from Streamer.bot; forward to game via WebSocket."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        if not data and request.form:
+            data = request.form.to_dict()
+        username = (data.get('username') or '').strip() or None
+        if not game_ws_app:
+            return jsonify({'ok': False, 'error': 'Game not connected'}), 503
+        request_id = str(uuid.uuid4())
+        ev = threading.Event()
+        with spawn_lock:
+            pending_spawns[request_id] = {'event': ev, 'success': False}
+        try:
+            payload = {'command': 'bomb', 'request_id': request_id}
+            if username:
+                payload['username'] = username
+            print(f"Bomb send to game: request_id={request_id}")
+            game_ws_app.send(json.dumps(payload))
+        except Exception as e:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': str(e)}), 503
+        if ev.wait(timeout=SPAWN_RESULT_TIMEOUT):
+            with spawn_lock:
+                pending = pending_spawns.pop(request_id, {})
+                success = pending.get('success', False)
+                bomb_name = pending.get('bomb_name', '')
+                bomb_error = pending.get('error')
+        else:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': 'Bomb command timed out'}), 504
+        if success:
+            print(f"Bomb OK: {bomb_name} for {username}")
+            _record_command_event(username, 'bomb', bomb_name or '', True)
+            return jsonify({'ok': True, 'bomb_name': bomb_name})
+        err = bomb_error or 'No space to drop bomb'
+        _record_command_event(username, 'bomb', '', False)
+        return jsonify({'ok': False, 'error': err}), 200
+    except Exception as e:
+        print(f"Bomb 400 exception: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 400
+
+
 @app.route('/api/transmute-command', methods=['POST', 'OPTIONS'])
 def transmute_command():
     """Receive transmute command from Streamer.bot; forward to game via WebSocket."""
@@ -1898,8 +1815,8 @@ def debuff_command():
         return jsonify({'ok': False, 'error': str(e)}), 400
 
 
-def _forward_helper_command(cmd, result_key, default_err):
-    """Forward a helper/hurter command to game. result_key: buff_name, debuff_name, or item_name."""
+def _forward_chat_command(cmd, result_key, default_err):
+    """Forward a chat spend command to game. result_key: buff_name, debuff_name, or item_name."""
     if request.method == 'OPTIONS':
         return '', 204
     try:
@@ -1947,49 +1864,49 @@ def _forward_helper_command(cmd, result_key, default_err):
 
 @app.route('/api/heal-command', methods=['POST', 'OPTIONS'])
 def heal_command():
-    """Helper-exclusive: heal hero ~15% HP."""
-    return _forward_helper_command('heal', 'buff_name', 'Heal failed')
+    """Chat command: heal hero ~15% HP."""
+    return _forward_chat_command('heal', 'buff_name', 'Heal failed')
 
 
 @app.route('/api/cleanse-command', methods=['POST', 'OPTIONS'])
 def cleanse_command():
-    """Helper-exclusive: remove one random negative buff."""
-    return _forward_helper_command('cleanse', 'buff_name', 'No debuff to remove')
+    """Chat command: remove one random negative buff."""
+    return _forward_chat_command('cleanse', 'buff_name', 'No debuff to remove')
 
 
 @app.route('/api/dew-command', methods=['POST', 'OPTIONS'])
 def dew_command():
-    """Helper-exclusive: drop dewdrop near hero."""
-    return _forward_helper_command('dew', 'item_name', 'No space for dewdrop')
+    """Chat command: drop dewdrop near hero."""
+    return _forward_chat_command('dew', 'item_name', 'No space for dewdrop')
 
 
 @app.route('/api/corrupt-ally-command', methods=['POST', 'OPTIONS'])
 def corrupt_ally_command():
-    """Helper-exclusive: summon corrupted ally from current biome."""
-    return _forward_helper_command('corrupt_ally', 'mob_name', 'Corrupt ally failed')
+    """Chat command: summon corrupted ally from current biome."""
+    return _forward_chat_command('corrupt_ally', 'mob_name', 'Corrupt ally failed')
 
 
 @app.route('/api/hex-command', methods=['POST', 'OPTIONS'])
 def hex_command():
-    """Hurter-exclusive: apply Hex debuff."""
-    return _forward_helper_command('hex', 'debuff_name', 'Hex failed')
+    """Chat command: apply Hex debuff."""
+    return _forward_chat_command('hex', 'debuff_name', 'Hex failed')
 
 
 @app.route('/api/degrade-command', methods=['POST', 'OPTIONS'])
 def degrade_command():
-    """Hurter-exclusive: apply Degrade debuff."""
-    return _forward_helper_command('degrade', 'debuff_name', 'Degrade failed')
+    """Chat command: apply Degrade debuff."""
+    return _forward_chat_command('degrade', 'debuff_name', 'Degrade failed')
 
 
 @app.route('/api/sabotage-command', methods=['POST', 'OPTIONS'])
 def sabotage_command():
-    """Hurter-exclusive: remove one random positive buff."""
-    return _forward_helper_command('sabotage', 'buff_name', 'No buff to remove')
+    """Chat command: remove one random positive buff."""
+    return _forward_chat_command('sabotage', 'buff_name', 'No buff to remove')
 
 
 @app.route('/api/wand-command', methods=['POST', 'OPTIONS'])
 def wand_command():
-    """Receive cursed wand command from Streamer.bot; forward to game via WebSocket. Cost varies by rarity (0=common, 1=uncommon, 2=rare, 3=very_rare)."""
+    """Receive cursed wand command from Streamer.bot; forward to game via WebSocket. Fixed cost_per_wand; game rolls rarity (no tier in body => weighted common..very_rare)."""
     if request.method == 'OPTIONS':
         return '', 204
     try:

@@ -25,36 +25,34 @@ CHAT COMMANDS — Spend points to mess with the run!
 
 Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also give points!
 
-HELPERS vs HURTERS — Chat once to be assigned a side! Helpers earn bonus points when the streamer kills a boss; hurters earn when the hero dies. Each side gets 50% off certain commands (helpers: bee, ward, buff; hurters: curse, gas, trap, debuff). Helper-only: !heal, !cleanse, !dew, !corruptally. Hurter-only: !hex, !degrade, !sabotage. !myside shows your side. Switching sides costs 100 pts and has a long cooldown — choose wisely!
-
 COMMANDS:
-- !points — Check your balance
-- !toppoints / !leaderboard — Top 3 point holders
-- !spawn (monster) — Spawn a monster (cost varies). Half price when spawned beyond its native area (e.g. sewer mobs in prison+). Examples: !spawn rat, !spawn bat, !spawn scorpio
-- !champion (monster) — Spawn a champion version of that monster (2× base cost, no zone discount). Random type: Blazing, Projecting, Antimagic, Giant, Blessed, Growing. Examples: !champion rat, !champion eye
+- !points — Check your balance (free)
+- !toppoints / !leaderboard — Top 3 point holders (free)
+- !spawn (monster) — Spawn a monster (cost varies by zone). Half price when deeper than the mob’s native depth; later mobs in earlier chapters up to 3×. Examples: !spawn rat, !spawn bat, !spawn scorpio
+- !champion (monster) — Champion version (2× whatever !spawn would charge here — same zone rules). Random type: Blazing, Projecting, Antimagic, Giant, Blessed, Growing. Examples: !champion rat, !champion eye
 - !gold (amount) — Drop gold near the hero (5 pts per gold, 1–100). Example: !gold 25
-- !curse — Curse a random equipped item (200 pts)
+- !curse — Curse a random equipped item (100 pts)
 - !gas — Spawn random gas (75 pts). Toxic, confusion, storm clouds, inferno, and more!
 - !scroll — Use a random scroll (100 pts). Like +10 Unstable Spellbook — 50% chance for exotic version!
 - !trap — Place a random visible trap nearby (50 pts). Shocking, toxic, burning, teleport, summon, and more!
+- !bomb — Drop a weighted random lit bomb nearby (75 pts). Regular and alchemy bombs; fuse like a thrown bomb.
 - !transmute — Transmute a random transmutable item from bag or equipped (150 pts). Same rules as Scroll of Transmutation.
-- !bee — Summon an allied bee for 50 turns (30 pts). Fights for you like honeyed healing!
+- !bee — Summon an allied bee for 150 turns (40 pts). Fights for you like honeyed healing!
 - !ward — Summon a ward (9 pts). Scales with depth; upgrades existing ward if same tile.
 - !buff — Apply a random buff (75 pts). Haste, Healing, Barrier, Invisibility, and more!
 - !debuff — Apply a random debuff (50 pts). Blindness, Slow, Roots, Daze, and more!
-- !wand (tier) — Trigger a cursed wand effect. Tier required: common (50 pts), uncommon (100 pts), rare (200 pts), or veryrare (400 pts). Burn, freeze, teleport, gas, sheep, and more!
-- !heal — Helper only: heal hero ~15% HP (25 pts)
-- !cleanse — Helper only: remove one random debuff (25 pts)
-- !dew — Helper only: drop dewdrop near hero (5 pts)
-- !corruptally — Helper only: corrupted ally from current biome (40 pts)
-- !hex — Hurter only: apply Hex debuff (75 pts)
-- !degrade — Hurter only: apply Degrade debuff (75 pts)
-- !sabotage — Hurter only: remove one random buff (75 pts)
-- !switch — Switch helper ↔ hurter (100 pts, long cooldown)
+- !wand — Random cursed wand effect (weighted rarities); 75 pts. Burn, freeze, teleport, gas, sheep, and more!
+- !heal — Heal hero ~15% HP (25 pts)
+- !cleanse — Remove one random debuff (25 pts)
+- !dew — Drop a dewdrop near the hero (5 pts)
+- !corruptally — Summon a corrupted ally from the current biome (40 pts)
+- !hex — Apply Hex debuff (75 pts)
+- !degrade — Apply Degrade debuff (75 pts)
+- !sabotage — Remove one random positive buff (75 pts)
 
 Monster costs (base): rat 5 | albino/snake/gnoll 10 | crab/slime/swarm 15 | thief/skeleton/dm100 20 | guard/necromancer/spinner 25 | bat/brute 30 | shaman 35 | ghoul/elemental 40 | warlock 45 | monk/golem 50 | succubus 60 | eye 70 | scorpio 80
 
-Champion: 2× base cost (no zone discount). Example: !champion rat = 10 pts, !champion eye = 140 pts.
+Champion: 2× zone-adjusted spawn cost (cost varies with depth/chapter like !spawn).
 
-Prices can be changed at any time by the streamer but are correct for the most part.
+Prices can be changed anytime in the streamer’s points overlay; listed values are current for this channel.
 ```

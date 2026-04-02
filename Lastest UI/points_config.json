@@ -1,21 +1,16 @@
 {
-  "points_per_helper_on_boss": 10,
-  "points_per_helper_on_new_floor": 10,
-  "points_per_hurter_on_death": 10,
   "cost_per_gold": 5,
-  "cost_per_curse": 200,
+  "cost_per_curse": 100,
   "cost_per_gas": 75,
   "cost_per_scroll": 100,
   "cost_per_trap": 50,
+  "cost_per_bomb": 75,
   "cost_per_transmute": 150,
-  "cost_per_ally_bee": 30,
+  "cost_per_ally_bee": 40,
   "cost_per_ward": 9,
   "cost_per_buff": 75,
   "cost_per_debuff": 50,
-  "cost_per_wand_common": 50,
-  "cost_per_wand_uncommon": 100,
-  "cost_per_wand_rare": 200,
-  "cost_per_wand_veryrare": 400,
+  "cost_per_wand": 75,
   "default_monster_cost": 100,
   "cost_per_monster": {
     "rat": 5,
@@ -43,20 +38,6 @@
     "eye": 70,
     "scorpio": 80
   },
-  "helper_discount_percent": 50,
-  "hurter_discount_percent": 50,
-  "helper_discount_commands": [
-    "bee",
-    "ward",
-    "buff"
-  ],
-  "hurter_discount_commands": [
-    "curse",
-    "gas",
-    "trap",
-    "debuff"
-  ],
-  "cost_to_switch_side": 0,
   "cost_per_heal": 25,
   "cost_per_cleanse": 25,
   "cost_per_dew": 5,

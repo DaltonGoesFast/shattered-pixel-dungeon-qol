@@ -9,13 +9,14 @@ Usage:
   gas:      python points_command.py gas <username>
   scroll:   python points_command.py scroll <username>
   trap:     python points_command.py trap <username>
+  bomb:     python points_command.py bomb <username>
   transmute: python points_command.py transmute <username>
-  bee:       python points_command.py bee <username>  (summon allied bee, 75 pts, 50 turns)
+  bee:       python points_command.py bee <username>  (summon allied bee, 75 pts, 150 turns)
   ward:      python points_command.py ward <username>  (summon ward, 30 pts, scales with depth)
-  corruptally: python points_command.py corruptally <username>  (helper-only: summon corrupted ally from biome)
+  corruptally: python points_command.py corruptally <username>  (summon corrupted ally from biome)
   buff:     python points_command.py buff <username>
   debuff:   python points_command.py debuff <username>
-  wand:     python points_command.py wand <common|uncommon|rare|veryrare> <username>  (tier required)
+  wand:     python points_command.py wand <username>  (weighted random cursed-wand effect; legacy tier arg optional)
   superchat: python points_command.py superchat <microAmount> <currencyCode> <username> [isSubscribed 0|1] [userIsSponsor 0|1] [topFarder 0|1]
   cheer:    python points_command.py cheer <bits> <username> [isSubscribed 0|1] [userIsSponsor 0|1] [topFarder 0|1]
 
@@ -39,21 +40,13 @@ DONATION_RESULT_FILE = os.path.join(SCRIPT_DIR, "donation_result.txt")
 CONFIG_FILE = os.path.join(SCRIPT_DIR, "points_config.json")
 FREE_UNTIL_FILE = os.path.join(SCRIPT_DIR, "free_until.json")
 SPEND_DISABLED_FILE = os.path.join(SCRIPT_DIR, "spend_disabled.txt")
-HELPERS_HURTERS_DISABLED_FILE = os.path.join(SCRIPT_DIR, "helpers_hurters_disabled.txt")
 GAME_DATA_URL = "http://127.0.0.1:5000/api/game-data"
 DOUBLE_POINTS_END_FILE = os.path.join(SCRIPT_DIR, "double_points_end.txt")
-SWITCH_SIDE_LAST_FILE = os.path.join(SCRIPT_DIR, "switch_side_last.txt")
-SWITCH_SUCCESS_COOLDOWN_FILE = os.path.join(SCRIPT_DIR, "switch_success_cooldown.json")
 
 
 def is_spend_disabled():
     """True if streamer has disabled spending (e.g. via Stream Deck toggle)."""
     return os.path.exists(SPEND_DISABLED_FILE)
-
-
-def is_helpers_hurters_disabled():
-    """True if Helpers vs Hurters system is turned off (e.g. via Stream Deck toggle)."""
-    return os.path.exists(HELPERS_HURTERS_DISABLED_FILE)
 
 
 def is_double_points_active():
@@ -95,45 +88,11 @@ def donation_earn_multiplier(is_subscribed=False, is_sponsor=False, top_farder=F
     return m
 
 
-def _write_switch_side_last(ok):
-    try:
-        with open(SWITCH_SIDE_LAST_FILE, "w", encoding="utf-8") as f:
-            f.write("1" if ok else "0")
-    except OSError:
-        pass
-
-
-def _read_switch_success_cooldown_map():
-    try:
-        if not os.path.exists(SWITCH_SUCCESS_COOLDOWN_FILE):
-            return {}
-        with open(SWITCH_SUCCESS_COOLDOWN_FILE, encoding="utf-8") as f:
-            raw = json.load(f)
-        if not isinstance(raw, dict):
-            return {}
-        return {str(k).lower(): float(v) for k, v in raw.items() if v is not None}
-    except (json.JSONDecodeError, OSError, TypeError, ValueError):
-        return {}
-
-
-def _write_switch_success_cooldown_map(m):
-    try:
-        with open(SWITCH_SUCCESS_COOLDOWN_FILE, "w", encoding="utf-8") as f:
-            json.dump(m, f, indent=0)
-    except OSError:
-        pass
-
-
-def _switch_success_cooldown_seconds_left(key, cdmap):
-    until = float(cdmap.get(key, 0) or 0)
-    return max(0, int(round(until - time.time())))
-
-
 NATIVE_DEPTH = {
     "rat": 1, "albino": 1, "snake": 1, "gnoll": 2, "crab": 3, "slime": 4,
     "swarm": 3, "thief": 4, "skeleton": 6, "dm100": 7, "guard": 7,
     "necromancer": 8, "bat": 9, "brute": 11, "shaman": 11, "spinner": 12,
-    "ghoul": 914, "elemental": 16, "warlock": 16, "monk": 17, "golem": 18,
+    "ghoul": 14, "elemental": 16, "warlock": 16, "monk": 17, "golem": 18,
     "succubus": 19, "eye": 21, "scorpio": 23,
 }
 
@@ -141,12 +100,6 @@ NATIVE_DEPTH = {
 def load_config():
     """Load costs from points_config.json. Falls back to defaults if missing/invalid."""
     defaults = {
-        "helper_discount_percent": 50,
-        "hurter_discount_percent": 50,
-        "helper_discount_commands": ["ward", "bee", "buff", "corrupt_ally"],
-        "hurter_discount_commands": ["debuff", "curse", "trap", "gas"],
-        "cost_to_switch_side": 50,
-        "switch_success_cooldown_seconds": 300,
         "cost_per_heal": 100,
         "cost_per_cleanse": 150,
         "cost_per_dew": 30,
@@ -160,15 +113,13 @@ def load_config():
         "cost_per_gas": 75,
         "cost_per_scroll": 100,
         "cost_per_trap": 50,
+        "cost_per_bomb": 75,
         "cost_per_transmute": 150,
         "cost_per_ally_bee": 75,
         "cost_per_ward": 30,
         "cost_per_buff": 75,
         "cost_per_debuff": 50,
-        "cost_per_wand_common": 50,
-        "cost_per_wand_uncommon": 100,
-        "cost_per_wand_rare": 200,
-        "cost_per_wand_veryrare": 400,
+        "cost_per_wand": 75,
         "default_monster_cost": 100,
         "cost_per_monster": {
             "rat": 5, "albino": 10, "snake": 10, "gnoll": 10, "crab": 15,
@@ -189,35 +140,21 @@ def load_config():
                 monsters[k] = int(v)
             except (ValueError, TypeError):
                 pass
-        helper_discount_cmds = cfg.get("helper_discount_commands")
-        if not isinstance(helper_discount_cmds, list):
-            helper_discount_cmds = defaults["helper_discount_commands"]
-        hurter_discount_cmds = cfg.get("hurter_discount_commands")
-        if not isinstance(hurter_discount_cmds, list):
-            hurter_discount_cmds = defaults["hurter_discount_commands"]
         return {
-            "helper_discount_percent": max(0, min(100, int(cfg.get("helper_discount_percent", defaults["helper_discount_percent"])))),
-            "hurter_discount_percent": max(0, min(100, int(cfg.get("hurter_discount_percent", defaults["hurter_discount_percent"])))),
-            "helper_discount_commands": helper_discount_cmds,
-            "hurter_discount_commands": hurter_discount_cmds,
             "cost_per_gold": int(cfg.get("cost_per_gold", defaults["cost_per_gold"])),
             "cost_per_curse": int(cfg.get("cost_per_curse", defaults["cost_per_curse"])),
             "cost_per_gas": int(cfg.get("cost_per_gas", defaults["cost_per_gas"])),
             "cost_per_scroll": int(cfg.get("cost_per_scroll", defaults["cost_per_scroll"])),
             "cost_per_trap": int(cfg.get("cost_per_trap", defaults["cost_per_trap"])),
+            "cost_per_bomb": int(cfg.get("cost_per_bomb", defaults["cost_per_bomb"])),
             "cost_per_transmute": int(cfg.get("cost_per_transmute", defaults["cost_per_transmute"])),
             "cost_per_ally_bee": int(cfg.get("cost_per_ally_bee", defaults["cost_per_ally_bee"])),
             "cost_per_ward": int(cfg.get("cost_per_ward", defaults["cost_per_ward"])),
             "cost_per_buff": int(cfg.get("cost_per_buff", defaults["cost_per_buff"])),
             "cost_per_debuff": int(cfg.get("cost_per_debuff", defaults["cost_per_debuff"])),
-            "cost_per_wand_common": int(cfg.get("cost_per_wand_common", defaults["cost_per_wand_common"])),
-            "cost_per_wand_uncommon": int(cfg.get("cost_per_wand_uncommon", defaults["cost_per_wand_uncommon"])),
-            "cost_per_wand_rare": int(cfg.get("cost_per_wand_rare", defaults["cost_per_wand_rare"])),
-            "cost_per_wand_veryrare": int(cfg.get("cost_per_wand_veryrare", defaults["cost_per_wand_veryrare"])),
+            "cost_per_wand": max(1, int(cfg.get("cost_per_wand", defaults["cost_per_wand"]))),
             "default_monster_cost": int(cfg.get("default_monster_cost", defaults["default_monster_cost"])),
             "cost_per_monster": monsters,
-            "cost_to_switch_side": max(0, int(cfg.get("cost_to_switch_side", defaults["cost_to_switch_side"]))),
-            "switch_success_cooldown_seconds": max(0, int(cfg.get("switch_success_cooldown_seconds", defaults["switch_success_cooldown_seconds"]))),
             "cost_per_heal": max(1, int(cfg.get("cost_per_heal", defaults["cost_per_heal"]))),
             "cost_per_cleanse": max(1, int(cfg.get("cost_per_cleanse", defaults["cost_per_cleanse"]))),
             "cost_per_dew": max(1, int(cfg.get("cost_per_dew", defaults["cost_per_dew"]))),
@@ -256,50 +193,17 @@ def effective_cost(cost_key, base_cost):
     return 0 if is_cost_free(cost_key) else base_cost
 
 
-DEFAULT_ALLOWED_ROLES = {
-    "heal": "helper", "cleanse": "helper", "dew": "helper", "corrupt_ally": "helper",
-    "hex": "hurter", "degrade": "hurter", "sabotage": "hurter",
-}
-
-
 def check_command_access(command_id, role):
-    """Return (True, None) if allowed, else (False, error_msg). When helpers/hurters disabled, treat as both."""
-    if is_helpers_hurters_disabled():
-        if command_id == "switch":
-            return False, "Helpers/Hurters is currently turned off."
-        return True, None
+    """Return (True, None) if allowed, else (False, error_msg). Only \"disabled\" in command_allowed_roles blocks a command."""
     allowed = get_config().get("command_allowed_roles") or {}
-    val = allowed.get(command_id, DEFAULT_ALLOWED_ROLES.get(command_id, "both"))
+    val = allowed.get(command_id, "both")
     if val == "disabled":
         return False, "This command is currently disabled."
-    if val == "both":
-        return True, None
-    if not role or (role != "helper" and role != "hurter"):
-        return False, "Chat once to get a side, then you can use this command."
-    if val == "helper" and role == "hurter":
-        return False, "Only helpers can use !" + command_id + "."
-    if val == "hurter" and role == "helper":
-        return False, "Only hurters can use !" + command_id + "."
     return True, None
 
 
 def apply_role_discount(base_cost, command_id, role):
-    """Apply helper/hurter discount if system is ON and user has matching role. Spawn is always neutral."""
-    if command_id == "spawn":
-        return base_cost
-    if is_helpers_hurters_disabled():
-        return base_cost
-    cfg = get_config()
-    helper_pct = cfg.get("helper_discount_percent", 50)
-    hurter_pct = cfg.get("hurter_discount_percent", 50)
-    helper_cmds = cfg.get("helper_discount_commands") or ["ward", "bee", "buff"]
-    hurter_cmds = cfg.get("hurter_discount_commands") or ["debuff", "curse", "trap", "gas"]
-    if role == "helper" and command_id in helper_cmds:
-        discounted = base_cost - (base_cost * helper_pct // 100)
-        return max(1, discounted)
-    if role == "hurter" and command_id in hurter_cmds:
-        discounted = base_cost - (base_cost * hurter_pct // 100)
-        return max(1, discounted)
+    """Role discounts removed; always returns base_cost (signature kept for call sites)."""
     return base_cost
 VALID_MONSTERS = frozenset([
     "rat", "albino", "snake", "gnoll", "crab", "slime", "swarm", "thief",
@@ -397,21 +301,54 @@ def get_current_depth():
         return None
 
 
+def _dungeon_region(depth: int) -> int:
+    """0=sewers, 1=prison, 2=caves, 3=city, 4=halls — matches Desktop StreamingCommandHandler."""
+    return (depth - 1) // 5
+
+
+def _early_spawn_multiplier(depth: int, native: int) -> int:
+    """When depth < native: return 1, 2, or 3 for cross-chapter or same-caves-early rules."""
+    cur_r = _dungeon_region(depth)
+    nat_r = _dungeon_region(native)
+    if cur_r < nat_r:
+        if nat_r == 1:
+            return 2 if cur_r == 0 else 1
+        if nat_r == 2:
+            if cur_r == 0:
+                return 3
+            if cur_r == 1:
+                return 2
+            return 1
+        if nat_r >= 3:
+            if cur_r <= 1:
+                return 3
+            if cur_r == 2:
+                return 2
+            return 1
+    if cur_r == nat_r == 2 and depth < native:
+        return 2
+    return 1
+
+
 def compute_spawn_cost(monster: str) -> int:
+    """Late discount when deeper than native; early surcharge when shallower (chapter-based, up to 3×)."""
     cfg = get_config()
     base = cfg["cost_per_monster"].get(monster, cfg["default_monster_cost"])
     depth = get_current_depth()
     native = NATIVE_DEPTH.get(monster)
-    if depth is not None and native is not None and depth > native:
+    if depth is None or native is None:
+        return base
+    if depth > native:
         return max(1, base // 2)
+    if depth < native:
+        m = _early_spawn_multiplier(depth, native)
+        return max(1, base * m)
     return base
 
 
 def compute_champion_cost(monster: str) -> int:
-    """2× base cost, no early-zone discount."""
-    cfg = get_config()
-    base = cfg["cost_per_monster"].get(monster, cfg["default_monster_cost"])
-    return 2 * base
+    """2× zone-adjusted spawn cost (same early/late rules as !spawn)."""
+    return 2 * compute_spawn_cost(monster)
 
 
 def _http_error_msg(e, default_timeout: str) -> str:
@@ -513,7 +450,7 @@ def cmd_champion(args):
     if is_spend_disabled():
         return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
     if len(args) < 2:
-        return SPAWN_RESULT_FILE, "Usage: !champion <monster> (e.g. !champion rat). Costs 2× base spawn cost, no zone discount."
+        return SPAWN_RESULT_FILE, "Usage: !champion <monster> (e.g. !champion rat). Costs 2× zone-adjusted spawn cost."
     monster = args[0].lower()
     username = args[1]
     if monster not in VALID_MONSTERS:
@@ -869,6 +806,62 @@ def cmd_trap(args):
         return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
 
+def cmd_bomb(args):
+    if is_spend_disabled():
+        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
+    if len(args) < 1:
+        return SPAWN_RESULT_FILE, "Usage: !bomb (drops a weighted random lit bomb near you)"
+    username = args[0]
+
+    base_cost = effective_cost("cost_per_bomb", get_config()["cost_per_bomb"])
+    key = username.lower()
+    try:
+        with points_lock():
+            data = read_points()
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            ok, err = check_command_access("bomb", role)
+            if not ok:
+                return SPAWN_RESULT_FILE, err
+            cost = apply_role_discount(base_cost, "bomb", role)
+            total = effective_total(pts, donation_pts)
+            if total < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} for !bomb, you have {total}."
+
+            url = "http://127.0.0.1:5000/api/bomb-command"
+            payload = {"username": username}
+            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+            req.add_header("Content-Type", "application/json")
+
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    raw = resp.read().decode("utf-8", errors="replace")
+                    if not raw.strip():
+                        return SPAWN_RESULT_FILE, "Bomb command failed (empty response from server)"
+                    try:
+                        body = json.loads(raw)
+                    except json.JSONDecodeError:
+                        return SPAWN_RESULT_FILE, "Bomb command failed (server error). Is the overlay running?"
+                    if not body.get("ok"):
+                        return SPAWN_RESULT_FILE, body.get("error", "Bomb command failed")
+            except urllib.error.HTTPError as e:
+                return SPAWN_RESULT_FILE, _http_error_msg(
+                    e, "Bomb command timed out. Is the game running and in an active run?"
+                )
+            except urllib.error.URLError as e:
+                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
+            except Exception as e:
+                msg = str(e).strip() if e else ""
+                return SPAWN_RESULT_FILE, "Bomb command failed. " + (msg if msg else "Check overlay server and try again.")
+
+            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
+            data[key] = (new_pts, last, new_donation, role)
+            write_points(data)
+            bomb_name = body.get("bomb_name", "bomb")
+            return SPAWN_RESULT_FILE, f"ok|{bomb_name}|{new_pts}"
+    except TimeoutError:
+        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+
+
 def cmd_transmute(args):
     if is_spend_disabled():
         return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
@@ -929,7 +922,7 @@ def cmd_ally_bee(args):
     if is_spend_disabled():
         return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
     if len(args) < 1:
-        return SPAWN_RESULT_FILE, "Usage: !bee (summons an allied bee for 50 turns, 75 pts)"
+        return SPAWN_RESULT_FILE, "Usage: !bee (summons an allied bee for 150 turns, 75 pts)"
     username = args[0]
 
     base_cost = effective_cost("cost_per_ally_bee", get_config()["cost_per_ally_bee"])
@@ -1152,58 +1145,18 @@ def cmd_debuff(args):
 WAND_TIERS = frozenset(["common", "uncommon", "rare", "veryrare", "very_rare"])
 
 
-WAND_COST_KEYS = ["cost_per_wand_common", "cost_per_wand_uncommon", "cost_per_wand_rare", "cost_per_wand_veryrare"]
-
-
-def _wand_cost_for_rarity(cfg, rarity):
-    """Rarity: 0=common, 1=uncommon, 2=rare, 3=very_rare."""
-    costs = [
-        cfg.get("cost_per_wand_common", 50),
-        cfg.get("cost_per_wand_uncommon", 100),
-        cfg.get("cost_per_wand_rare", 200),
-        cfg.get("cost_per_wand_veryrare", 400),
-    ]
-    return costs[min(rarity, 3)]
-
-
-def _wand_effective_cost(cfg, rarity):
-    """Effective cost for wand at given rarity (0 if free)."""
-    base = _wand_cost_for_rarity(cfg, rarity)
-    key = WAND_COST_KEYS[min(rarity, 3)]
-    return effective_cost(key, base)
-
-
-def _tier_to_int(tier_str):
-    """Convert tier string to 0-3. Returns -1 for random/invalid."""
-    if not tier_str:
-        return -1
-    m = {"common": 0, "uncommon": 1, "rare": 2, "veryrare": 3, "very_rare": 3}
-    return m.get(tier_str.lower().strip(), -1)
-
-
 def cmd_wand(args):
     if is_spend_disabled():
         return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
     if len(args) < 1:
-        return SPAWN_RESULT_FILE, "Usage: !wand <common|uncommon|rare|veryrare> (tier required)"
-    tier = -1
+        return SPAWN_RESULT_FILE, "Usage: !wand (weighted random effect) or python points_command.py wand <username>"
     if len(args) >= 2 and args[0].lower().strip() in WAND_TIERS:
-        tier = _tier_to_int(args[0])
         username = args[1]
     else:
         username = args[0]
-        return SPAWN_RESULT_FILE, "Specify a tier: !wand common, !wand uncommon, !wand rare, or !wand veryrare"
 
     cfg = get_config()
-    if tier >= 0:
-        base_cost_check = _wand_effective_cost(cfg, tier)
-    else:
-        base_cost_check = max(
-            _wand_effective_cost(cfg, 0),
-            _wand_effective_cost(cfg, 1),
-            _wand_effective_cost(cfg, 2),
-            _wand_effective_cost(cfg, 3),
-        )
+    base_cost_check = effective_cost("cost_per_wand", cfg["cost_per_wand"])
     key = username.lower()
     try:
         with points_lock():
@@ -1219,8 +1172,6 @@ def cmd_wand(args):
 
             url = "http://127.0.0.1:5000/api/wand-command"
             payload = {"username": username}
-            if tier >= 0:
-                payload["tier"] = tier
             req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
             req.add_header("Content-Type", "application/json")
 
@@ -1245,8 +1196,7 @@ def cmd_wand(args):
                 msg = str(e).strip() if e else ""
                 return SPAWN_RESULT_FILE, "Wand command failed. " + (msg if msg else "Check overlay server and try again.")
 
-            rarity = body.get("rarity", 0)
-            base_cost = _wand_effective_cost(cfg, rarity)
+            base_cost = effective_cost("cost_per_wand", cfg["cost_per_wand"])
             cost = apply_role_discount(base_cost, "wand", role)
             new_pts, new_donation = deduct_points(pts, donation_pts, cost)
             data[key] = (new_pts, last, new_donation, role)
@@ -1618,67 +1568,6 @@ def cmd_sabotage(args):
         return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
 
-def cmd_switch(args):
-    # !switch is allowed even when spend_disabled.txt is present (role change only; still costs points if configured).
-    if is_helpers_hurters_disabled():
-        _write_switch_side_last(False)
-        return SPAWN_RESULT_FILE, "Helpers/Hurters is currently turned off."
-    if len(args) < 1:
-        _write_switch_side_last(False)
-        return SPAWN_RESULT_FILE, "Usage: !switch (switch helper/hurter side)"
-    username = args[0]
-    key = username.lower()
-    try:
-        with points_lock():
-            cfg = get_config()
-            cooldown_sec = cfg.get("switch_success_cooldown_seconds", 300)
-            if cooldown_sec > 0:
-                cdmap = _read_switch_success_cooldown_map()
-                left = _switch_success_cooldown_seconds_left(key, cdmap)
-                if left > 0:
-                    _write_switch_side_last(False)
-                    return SPAWN_RESULT_FILE, f"{username}, switch is on cooldown. Try again in {left}s."
-            data = read_points()
-            pts, last, donation_pts, role = _get_user_data(data, key)
-            if not role or (role != "helper" and role != "hurter"):
-                _write_switch_side_last(False)
-                return SPAWN_RESULT_FILE, "You don't have a side yet. Chat once to be assigned."
-            cost = cfg["cost_to_switch_side"]
-            total = effective_total(pts, donation_pts)
-            if cost > 0 and total < cost:
-                _write_switch_side_last(False)
-                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} to switch side, you have {total}."
-            new_role = "hurter" if role == "helper" else "helper"
-            if cost > 0:
-                new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-                data[key] = (new_pts, last, new_donation, new_role)
-            else:
-                data[key] = (pts, last, donation_pts, new_role)
-                new_pts = pts
-            write_points(data)
-            if cooldown_sec > 0:
-                cdmap = _read_switch_success_cooldown_map()
-                cdmap[key] = time.time() + cooldown_sec
-                _write_switch_success_cooldown_map(cdmap)
-            _write_switch_side_last(True)
-            return SPAWN_RESULT_FILE, f"ok|{new_role}|{new_pts}"
-    except TimeoutError:
-        _write_switch_side_last(False)
-        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
-
-
-def cmd_myside(args):
-    if len(args) < 1:
-        return SPAWN_RESULT_FILE, "Usage: !myside"
-    username = args[0]
-    key = username.lower()
-    data = read_points()
-    pts, last, donation_pts, role = _get_user_data(data, key)
-    if not role or (role != "helper" and role != "hurter"):
-        return SPAWN_RESULT_FILE, f"{username}, chat once to get a side, then use !myside to see it."
-    return SPAWN_RESULT_FILE, f"{username}, you're on the {role} side!"
-
-
 COMMANDS = {
     "spawn": cmd_spawn,
     "champion": cmd_champion,
@@ -1687,6 +1576,7 @@ COMMANDS = {
     "gas": cmd_gas,
     "scroll": cmd_scroll,
     "trap": cmd_trap,
+    "bomb": cmd_bomb,
     "transmute": cmd_transmute,
     "bee": cmd_ally_bee,
     "ward": cmd_ward,
@@ -1701,8 +1591,6 @@ COMMANDS = {
     "hex": cmd_hex,
     "degrade": cmd_degrade,
     "sabotage": cmd_sabotage,
-    "switch": cmd_switch,
-    "myside": cmd_myside,
     "superchat": cmd_superchat,
     "cheer": cmd_cheer,
 }
@@ -1712,7 +1600,7 @@ def main():
     args = [a.strip() for a in sys.argv[1:] if a.strip()]
     if len(args) < 1:
         with open(SPAWN_RESULT_FILE, "w", encoding="utf-8") as f:
-            f.write("Usage: points_command.py <spawn|champion|gold|curse|gas|scroll|trap|transmute|bee|ward|corruptally|buff|debuff|wand|heal|cleanse|dew|hex|degrade|sabotage|switch|myside|superchat|cheer> [args...]")
+            f.write("Usage: points_command.py <spawn|champion|gold|curse|gas|scroll|trap|bomb|transmute|bee|ward|corruptally|buff|debuff|wand|heal|cleanse|dew|hex|degrade|sabotage|superchat|cheer> [args...]")
         sys.exit(0)
 
     cmd = args[0].lower()

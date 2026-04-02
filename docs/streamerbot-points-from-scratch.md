@@ -2,6 +2,10 @@
 
 A simple file-based points system for Streamer.bot—no extensions. Viewers earn points by chatting and spend them to spawn monsters. Works with **Twitch and YouTube**.
 
+**Current mod:** Helper/hurter roles, `!switch`, `!myside`, role discounts, and passive boss/death/floor role points are **removed**. Disable or delete Streamer.bot actions that toggle `helpers_hurters_disabled.txt`, assign roles, or run `!switch` / `!myside`. `!heal`, `!cleanse`, `!dew`, `!corruptally`, `!hex`, `!degrade`, and `!sabotage` are normal spend commands for everyone.
+
+**`!wand` (unified):** One price — `cost_per_wand` in `points_config.json` / points-config UI (default **75**). No tier in chat: the **game** picks a valid cursed-wand effect with **weighted** rarity (~60% / ~30% / ~9% / ~1% for common → very rare, same as vanilla `CursedWand`). Streamer.bot should call `points_command.py wand %userName%` only (see [Action 18](#action-18-cursed-wand-effect-wand-with-points)).
+
 ---
 
 ## Prerequisites
@@ -16,18 +20,17 @@ Before implementing, ensure:
 
 ## Streamer.bot checklist (changes you make in the bot)
 
-Use this list when updating an **existing** setup. Game code fixes (corrupt `!ally` XP/loot, invalid `!gold 0`, cursed wand not costing a turn) need **no** Streamer.bot edits.
+Use this list when updating an **existing** setup. Game code fixes (corrupt `!ally` XP/loot, invalid `!gold 0`, cursed wand not costing a turn) need **no** Streamer.bot edits. **`!wand` layout changed:** if you still use `wand %rawInput% %userName%` for historic **tiers** (`common`, `veryrare`, etc.), switch to **`wand %userName%`** so bare `!wand` is not broken when `%rawInput%` is empty.
 
 | What | Why | Where to look |
 |------|-----|----------------|
-| **`!switch` cooldown only on success** | Built-in command cooldown runs even when the user cannot afford to switch, so they wait for nothing. | This doc: [Action 28: !switch](#action-28-switch) — **Remove trigger cooldown**, then **recommended 3-step** layout; on success use [cooldown C#](#apply-cooldown-via-c-streamerbot-api) if you have no “Set Command Cooldown” menu item. Do **not** paste **!spawn** / Monster Spawner C# for results or cooldown. |
+| **`!wand` Run a Program** | Unified wand: **one** cost (`cost_per_wand`), weighted random effect in the game. | [Action 18](#action-18-cursed-wand-effect-wand-with-points) |
 | **Cheer + Super Chat optional args** | So bits / Super Chat get the same **stacking 2×** as chat (!doublepoints, sub/member, optional top farder). Without the extra args, only global double points applies. | This doc: [Action 20](#action-20-earn-points-cheer), [Action 21](#action-21-earn-points-super-chat), [argument reference](#cheer--super-chat--argument-reference). |
 | **Chat → donor by %** | Transfer part of chat-only points into donor points from the overlay. | Open **points-config** in the browser (`/points-config`): set **Chat→Donor %** next to the button, then **Chat → Donor**. Not a Streamer.bot change. |
 
 **Files the Python script writes (for your paths):**
 
 - `Lastest UI/spawn_result.txt` — result of spend commands (often deleted by the next C# step).
-- `Lastest UI/switch_side_last.txt` — single character: `1` = last `switch` succeeded, `0` = failed (used for cooldown logic).
 
 ---
 
@@ -43,7 +46,7 @@ Use this list when updating an **existing** setup. Game code fixes (corrupt `!al
 | 04 | Check Points | !points | Show viewer their balance |
 | 05 | Top Points | !toppoints | Show top 3 point holders |
 | 06 | Spawn Monster | !spawn | Spend points to spawn monster |
-| 07 | Spawn Champion | !champion | Spend points to spawn champion (2× base) |
+| 07 | Spawn Champion | !champion | Spend points to spawn champion (2× zone-adjusted spawn) |
 | 08 | Drop Gold | !gold | Spend points to drop gold |
 | 09 | Curse Item | !curse | Spend points to curse equipped item |
 | 10 | Spawn Random Gas | !gas | Spend points to spawn random gas |
@@ -54,29 +57,27 @@ Use this list when updating an **existing** setup. Game code fixes (corrupt `!al
 | 15 | Ward | !ward | Spend points to summon ward |
 | 16 | Random Buff | !buff | Spend points to apply random buff |
 | 17 | Random Debuff | !debuff | Spend points to apply random debuff |
-| 18 | Cursed Wand Effect | !wand | Spend points to trigger cursed wand effect |
+| 18 | Cursed Wand Effect | !wand | Spend points; **one** price, **weighted** random cursed-wand effect (no viewer tier) |
 | 19 | Double Points | !doublepoints | Streamer only: 2× points for N minutes |
 | 20 | Earn Points (Cheer) | Twitch Cheer | 1 pt per bit; optional args for stacked 2× |
 | 21 | Earn Points (Super Chat) | YouTube Super Chat | 1 pt per $0.01; same optional args |
 | 22 | Reset Points | Stream Started | Clear non-donor points |
 | 23 | Spend OFF | Hotkey (Stream Deck OFF) | Disable spend commands |
 | 24 | Spend ON | Hotkey (Stream Deck ON) | Enable spend commands |
-| 25 | Helpers/Hurters OFF | Hotkey (Stream Deck OFF) | Disable helpers vs hurters |
-| 26 | Helpers/Hurters ON | Hotkey (Stream Deck ON) | Enable helpers vs hurters |
-| 27 | !myside | !myside | Remind user their side (no cost) |
-| 28 | !switch | !switch | Switch helper/hurter side (cost configurable) |
-| 29 | !heal | !heal | Helper: heal hero ~15% HP |
-| 30 | !cleanse | !cleanse | Helper: remove one random debuff |
-| 31 | !dew | !dew | Helper: drop dewdrop near hero |
-| 32 | !hex | !hex | Hurter: apply Hex debuff |
-| 33 | !degrade | !degrade | Hurter: apply Degrade debuff |
-| 34 | !sabotage | !sabotage | Hurter: remove one random buff |
+| 25 | !heal | !heal | Heal hero ~15% HP |
+| 26 | !cleanse | !cleanse | Remove one random debuff |
+| 27 | !dew | !dew | Drop dewdrop near hero |
+| 28 | !corruptally | !corruptally | Summon corrupted ally from current biome |
+| 29 | !hex | !hex | Apply Hex debuff |
+| 30 | !degrade | !degrade | Apply Degrade debuff |
+| 31 | !sabotage | !sabotage | Remove one random buff |
+| 36 | Bomb | !bomb | Spend points; weighted random lit bomb 1–4 tiles from hero |
 
 ---
 
 ## YouTube Support
 
-- **Commands (!spawn, !champion, !gold, !curse, !gas, !scroll, !trap, !transmute, !bee, !ward, !buff, !debuff, !wand, !points, !toppoints, !myside, !switch, !heal, !cleanse, !dew, !hex, !degrade, !sabotage):** When creating the command, enable **both Twitch and YouTube** as sources so one action handles both platforms.
+- **Commands (!spawn, !champion, !gold, !curse, !gas, !scroll, !trap, !bomb, !transmute, !bee, !ward, !buff, !debuff, !wand, !points, !toppoints, !corruptally, !heal, !cleanse, !dew, !hex, !degrade, !sabotage):** When creating the command, enable **both Twitch and YouTube** as sources so one action handles both platforms.
 - **Earn Points (message):** Add **Message Received** from YouTube → Triggers to the same action, or create a duplicate action with the YouTube trigger.
 - **Earn Points (passive):** Add **Present Viewers** from YouTube → Triggers (YouTube uses chat-activity threshold; no live viewer list).
 - **Response messages:** Use the **commandSource pattern** below so a single action sends to the correct chat.
@@ -119,20 +120,24 @@ Use **one action per command** that works for both Twitch and YouTube. After che
 | !gas | `%userName% spewed %gasName%! You have %userPointsRemaining% points left.` |
 | !scroll | `%userName% used a random scroll: %scrollName%! You have %userPointsRemaining% points left.` |
 | !trap | `%userName% placed a %trapName% nearby! You have %userPointsRemaining% points left.` |
+| !bomb | `%userName% armed a %bombName% nearby! You have %userPointsRemaining% points left.` |
 | !transmute | `%userName% transmuted an item into %transmuteItemName%! You have %userPointsRemaining% points left.` |
 | !bee | `%userName% summoned a bee to help you! You have %userPointsRemaining% points left.` |
 | !ward | `%userName% summoned a ward to help you! You have %userPointsRemaining% points left.` |
 | !buff | `%userName% gave you %buffName%! You have %userPointsRemaining% points left.` |
 | !debuff | `%userName% afflicted you with %debuffName%! You have %userPointsRemaining% points left.` |
 | !wand | `%userName% triggered a cursed wand effect: %wandEffectName%! You have %userPointsRemaining% points left.` |
-| !myside | `%spawnResult%` (result is the full message, e.g. "You're on the helper side!") |
-| !switch | `%userName% switched to %newSide%! You have %userPointsRemaining% points left.` (C# sets `newSide` from parts[1]) |
+| !corruptally | `%userName% summoned a corrupted %allyName% to fight for you! You have %userPointsRemaining% points left.` |
 | !heal | `%userName% healed you! You have %userPointsRemaining% points left.` |
 | !cleanse | `%userName% cleansed %allyName%! You have %userPointsRemaining% points left.` |
 | !dew | `%userName% dropped a dewdrop! You have %userPointsRemaining% points left.` |
 | !hex | `%userName% hexed you! You have %userPointsRemaining% points left.` |
 | !degrade | `%userName% degraded you! You have %userPointsRemaining% points left.` |
 | !sabotage | `%userName% sabotaged %allyName%! You have %userPointsRemaining% points left.` |
+
+*`!wand`:* Run a Program args must be `wand %userName%` (not `wand %rawInput% %userName%`). `%wandEffectName%` is the game’s effect id (Java class simple name).
+
+*Removed (do not add to Streamer.bot):* `!myside` and `!switch` — no longer implemented in `points_command.py`.
 
 ---
 
@@ -144,10 +149,10 @@ Points are stored in (update the path in all C# code if your project is elsewher
 ```
 C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt
 ```
-Format: one line per user: `username|points|lastEarnTimestamp|donationPts|role` (5 columns). `role` is `helper` or `hurter` (assigned alternating on first chat); legacy 4-column lines have no role until next earn. 3-column lines treated as donationPts=0.
+Format: one line per user: `username|points|lastEarnTimestamp|donationPts|role` (5 columns). The optional `role` column is **legacy** (e.g. `helper` / `hurter`); the overlay keeps it for file compatibility but does not use it for discounts, passive payouts, or command gating. Legacy 4-column lines have no role field; 3-column lines are treated as donationPts=0.
 The file is created automatically when the first action runs.
 
-**Helpers vs Hurters:** `helper_hurter_counter.txt` in the same folder stores an integer for alternating role assignment (0=helper, 1=hurter, 2=helper, …). Reset Points sets it to 0.
+**Legacy:** `helper_hurter_counter.txt` was used for alternating role assignment on first chat; you can delete it and stop writing it from Streamer.bot if you are on the current mod only.
 
 **Double points:** Stored in `double_points_end.txt` (Unix timestamp when 2x ends; `0` = off). Created when you first use `!doublepoints`.
 
@@ -964,7 +969,7 @@ The `points_command.py` script checks points, attempts the spawn, and **only ded
 
 **Edit costs:** Open http://localhost:5000/points-config or edit `points_config.json`. Example: `"rat": 25, "eye": 200`. Any monster not listed uses `DEFAULT_COST` (100).
 
-**Half price out-of-biome:** Monsters cost **half** when spawned beyond their native area (e.g. sewer mobs in prison+). The script fetches current depth from the overlay server; if the server is unavailable, full price is charged.
+**Zone-adjusted spawn cost:** When **deeper** than the mob’s native depth, cost is **half** the table base (cheap sewer mobs deep in the run). When **shallower** than native — spawning later-chapter mobs in earlier areas — cost is **2× or 3×** by chapter rules (see `compute_spawn_cost` in `points_command.py`, max **3×**). If depth cannot be read from the overlay, the script uses **full table base** (no discount or surcharge).
 
 **Troubleshooting (!spawn does nothing):**
 - **Monster name not passed:** Change `%input1%` to `%rawInput%` in the Arguments (Streamer.bot versions differ).
@@ -979,7 +984,7 @@ The `points_command.py` script checks points, attempts the spawn, and **only ded
 
 **Trigger:** Command Triggered → `!champion` (enable **both Twitch and YouTube** as sources)
 
-**Usage:** `!champion <monster>` (e.g. `!champion rat`, `!champion eye`). Spawns a **champion** version of the specified monster (random type: Blazing, Projecting, Antimagic, Giant, Blessed, or Growing). Same valid monsters as `!spawn`. **Cost:** always **2× the base spawn cost** — no early-zone discount.
+**Usage:** `!champion <monster>` (e.g. `!champion rat`, `!champion eye`). Spawns a **champion** version of the specified monster (random type: Blazing, Projecting, Antimagic, Giant, Blessed, or Growing). Same valid monsters as `!spawn`. **Cost:** **2×** the zone-adjusted `!spawn` cost (half-price deep spawns and early surcharges both apply).
 
 **Sub-Actions (in order):**
 
@@ -1044,7 +1049,7 @@ public class CPHInline
      - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
      - Leave **False Result** empty for both.
 
-**Cost:** 2× base monster cost (e.g. rat = 10 pts, eye = 140 pts). No half-price discount for spawning in a later zone.
+**Cost:** 2× whatever `!spawn` would charge at the current depth (examples vary: e.g. deep `!spawn rat` can be cheap, so champion rat is cheap too; early `!spawn eye` is expensive, so champion eye is even more).
 
 **Add to the same blocking queue** as spawn, gold, and earn actions. Shares spawn cooldown with `!spawn`.
 
@@ -1516,7 +1521,7 @@ public class CPHInline
 
 **Trigger:** Command Triggered → `!bee` (enable **both Twitch and YouTube** as sources)
 
-**Usage:** `!bee` — summons an **allied bee** next to the hero for 50 turns. The bee fights for the player like the one from Elixir of Honeyed Healing. Cost 75 pts (configurable).
+**Usage:** `!bee` — summons an **allied bee** next to the hero for 150 turns. The bee fights for the player like the one from Elixir of Honeyed Healing. Cost 75 pts (configurable).
 
 **Sub-Actions (in order):**
 
@@ -1783,23 +1788,21 @@ public class CPHInline
 
 ## Action 18: Cursed Wand Effect (!wand, with points)
 
-**Trigger:** Command Triggered → `!wand` (enable **both Twitch and YouTube** as sources)
+**Trigger:** Command Triggered → `!wand` (enable **both Twitch and YouTube** as sources). Prefer a command **with no required arguments** after `!wand` (viewers type just `!wand`).
 
-**Usage:** `!wand <tier>` — tier is required. Triggers a cursed wand effect from that rarity.
-- `!wand common` — common only (50 pts)
-- `!wand uncommon` — uncommon only (100 pts)
-- `!wand rare` — rare only (200 pts)
-- `!wand veryrare` — very rare only (400 pts)
-
-If they type just `!wand`, they get: "Specify a tier: !wand common, !wand uncommon, !wand rare, or !wand veryrare"
+**Usage:** `!wand` — one **fixed** price (`cost_per_wand`, default **75**); the game rolls a **valid** cursed wand effect with **weighted** rarity (same as vanilla cursed wand: ~60% common, ~30% uncommon, ~9% rare, ~1% very rare — see `CursedWand` in game sources). Viewers do **not** pick a tier. The game still reports a `rarity` index in WebSocket results; **points deducted** are always `cost_per_wand`, not by rolled tier.
 
 Excludes: AbortRetryFail, Explosion, FireBall, ForestFire.
+
+**Streamer.bot:** Use **`wand %userName%`** only (no `%rawInput%`). **Migrating:** If you used `wand %rawInput% %userName%`, remove `%rawInput%` so empty chat does not become a bogus first CLI argument. **Legacy:** `wand common %userName%` (or any tier) still works — the tier word is ignored and `%userName%` is used as the spender.
+
+**`points_config.json`:** Use **`cost_per_wand`** only; remove obsolete keys `cost_per_wand_common`, `cost_per_wand_uncommon`, `cost_per_wand_rare`, `cost_per_wand_veryrare` when you next save from the points-config UI.
 
 **Sub-Actions (in order):**
 
 1. **Run a Program**
    - **Target:** `python` (or full path to `python.exe`)
-   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" wand %rawInput% %userName%`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" wand %userName%`
    - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
    - **Wait maximum:** `10` seconds *(required — otherwise C# runs before the script writes the result file)*
 
@@ -1857,15 +1860,15 @@ public class CPHInline
      - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
      - Leave **False Result** empty for both.
 
-**Cost:** 50 (common) / 100 (uncommon) / 200 (rare) / 400 (very rare). Edit via points config.
+**Cost:** Single **`cost_per_wand`** (default 75). Edit via points config.
 
 **Add to the same blocking queue** as spawn, gold, curse, gas, scroll, and earn actions.
 
 **Fails when:** Not in an active run, hero dead, or no valid target cell (need visible tiles 2–6 from hero).
 
-**Troubleshooting:** Same as scroll — quotations on script path, Wait maximum 10 seconds, overlay running, game connected.
+**Troubleshooting:** Same as scroll — quotations on script path, Wait maximum 10 seconds, overlay running, game connected. **`!wand` fails or wrong user:** Confirm Arguments are **`wand %userName%`** only. **Free / cost UI:** Timed “free” uses the key **`cost_per_wand`** (not the old per-tier keys).
 
-**Test manually:** `python points_command.py wand common YourUsername` (tier required).
+**Test manually:** `python points_command.py wand YourUsername`
 
 ---
 
@@ -2169,7 +2172,7 @@ public class CPHInline
 
 ## Action 23: Spend OFF / Action 24: Spend ON (Stream Deck switch)
 
-**Purpose:** Two separate actions for Stream Deck "action switches" — when the switch is ON, trigger Spend ON (enable spending); when OFF, trigger Spend OFF (disable spending). Users can still earn points; they just can't use most spend commands when disabled. **`!switch` still works** while spend is off (side change / configured point cost still applies).
+**Purpose:** Two separate actions for Stream Deck "action switches" — when the switch is ON, trigger Spend ON (enable spending); when OFF, trigger Spend OFF (disable spending). Users can still earn points; they just can't use spend commands that check `spend_disabled.txt` while it exists. **All** such spends (including heal, hex, etc.) respect Spend OFF.
 
 ### Spend OFF action
 
@@ -2218,13 +2221,15 @@ public class CPHInline
 
 **Stream Deck setup:** Create an "Action Switch" or similar. Assign Spend ON to the ON state and Spend OFF to the OFF state. When the switch is ON, spending is enabled; when OFF, spending is disabled.
 
-**Coverage:** Spend commands in `points_command.py` (spawn, champion, gold, curse, gas, scroll, trap, transmute, bee, ward, buff, debuff, wand, heal, cleanse, dew, hex, degrade, sabotage) check for `spend_disabled.txt` and return "Spending is currently disabled by the streamer." when the file exists. **`!switch` is intentionally excluded** so viewers can change helper/hurter side while spending on other commands is paused. If you add new spend commands to the script, add the same `is_spend_disabled()` check at the start of the handler.
+**Coverage:** Spend commands in `points_command.py` (spawn, champion, gold, curse, gas, scroll, trap, transmute, bee, ward, buff, debuff, wand, heal, cleanse, dew, corrupt ally, hex, degrade, sabotage) check for `spend_disabled.txt` and return "Spending is currently disabled by the streamer." when the file exists. If you add new spend commands to the script, add the same `is_spend_disabled()` check at the start of the handler.
 
 ---
 
 ## Action 25: Helpers/Hurters OFF / Action 26: Helpers/Hurters ON (Stream Deck switch)
 
-**Purpose:** Same pattern as Spend OFF/ON. When Helpers/Hurters is OFF, the system treats everyone as "both" (no role-based point earning on boss/death, no discounts, !switch returns "Helpers/Hurters is currently turned off."). When ON, full helpers vs hurters behavior.
+**Historical — skip in current mod:** Helper/hurter toggles, passive role payouts, discounts, and `!switch` / `!myside` are removed. Do not create these actions unless you are maintaining an old fork.
+
+**Purpose (legacy):** Same pattern as Spend OFF/ON. When Helpers/Hurters was OFF, the system treated everyone as "both" (no role-based point earning on boss/death, no discounts, `!switch` returned a disabled message). When ON, helpers vs hurters behavior applied.
 
 ### Helpers/Hurters OFF action
 
@@ -2277,6 +2282,8 @@ public class CPHInline
 
 ## Action 27: !myside
 
+**Historical — skip in current mod:** `!myside` was removed from `points_command.py`. Delete this action if you still have it.
+
 **Trigger:** Command Triggered → `!myside` (enable **both Twitch and YouTube** as sources)
 
 **Usage:** `!myside` — reminds the user their assigned side (helper or hurter). **No cost.** Requires Helpers vs Hurters to be ON; if OFF, returns "Helpers/Hurters is currently turned off."
@@ -2327,6 +2334,8 @@ public class CPHInline
 ---
 
 ## Action 28: !switch
+
+**Historical — skip in current mod:** `!switch` was removed from `points_command.py`. Delete this action if you still have it.
 
 **Trigger:** Command Triggered → `!switch`
 
@@ -2932,11 +2941,11 @@ public class CPHInline
 
 ---
 
-## Action 35: !corruptally (Helper only)
+## Action 35: !corruptally
 
 **Trigger:** Command Triggered → `!corruptally`
 
-**Usage:** `!corruptally` — **Helper only.** Summons a corrupted (allied) enemy from the current biome to fight for you. Boss floors allowed. Cost configurable (default 100 pts). Helper discount applies.
+**Usage:** `!corruptally` — Summons a corrupted (allied) enemy from the current biome to fight for you. Boss floors allowed. Cost configurable (default 100 pts).
 
 **Sub-Actions (in order):**
 
@@ -3003,7 +3012,83 @@ public class CPHInline
      - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
      - Leave **False Result** empty for both.
 
-**Add to the same blocking queue** as other helper commands.
+**Add to the same blocking queue** as other spend commands.
+
+---
+
+## Action 36: Bomb (!bomb, with points)
+
+**Trigger:** Command Triggered → `!bomb` (enable **both Twitch and YouTube** as sources)
+
+**Usage:** `!bomb` — drops a **weighted random lit bomb** 1–4 tiles from the hero (same placement logic as `!trap` / gold, excluding chasm). Types include regular and alchemy bombs; fuse timing matches a thrown lit bomb.
+
+**Sub-Actions (in order):**
+
+1. **Run a Program**
+   - **Target:** `python`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" bomb %userName%`
+   - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait maximum:** `10` seconds
+
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`, `%bombName%`, and `%userPointsRemaining%`:
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string RESULT_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spawn_result.txt";
+
+    public bool Execute()
+    {
+        string result = "No result file - is overlay server running?";
+        string itemName = "";
+        string userPointsRemaining = "";
+        try
+        {
+            if (File.Exists(RESULT_FILE))
+            {
+                result = File.ReadAllText(RESULT_FILE).Trim();
+                File.Delete(RESULT_FILE);
+                var parts = result.Split('|');
+                if (parts.Length >= 3 && int.TryParse(parts[parts.Length - 1].Trim(), out _))
+                {
+                    userPointsRemaining = parts[parts.Length - 1].Trim();
+                    itemName = parts.Length >= 2 ? parts[1].Trim() : "";
+                    result = parts[0].Trim();
+                }
+                else if (parts.Length >= 2)
+                {
+                    itemName = parts[1].Trim();
+                    result = parts[0].Trim();
+                }
+            }
+        }
+        catch (Exception ex) { result = ex.Message; }
+        CPH.SetArgument("spawnResult", result);
+        CPH.SetArgument("bombName", itemName);
+        CPH.SetArgument("userPointsRemaining", userPointsRemaining);
+        return true;
+    }
+}
+```
+
+3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
+   - **True branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% armed a %bombName% nearby! You have %userPointsRemaining% points left.`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% armed a %bombName% nearby! You have %userPointsRemaining% points left.`
+     - Leave **False Result** empty for both.
+   - **False branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+     - Leave **False Result** empty for both.
+
+**Cost:** 75 points default (edit via points config as `cost_per_bomb`).
+
+**Add to the same blocking queue** as spawn, gold, curse, gas, scroll, trap, transmute, bee, ward, and earn actions.
+
+**Fails when:** Not in an active run, hero dead, or no valid tile 1–4 tiles from hero (e.g. surrounded or only chasm).
 
 ---
 
@@ -3013,28 +3098,27 @@ public class CPHInline
 |---------|-------|------|-------------|
 | **!points** | `!points` | Free | Check your point balance. |
 | **!toppoints** | `!toppoints` | Free | Show top 3 point holders. |
-| **!spawn** | `!spawn <monster>` | Varies by monster (5–80 pts) | Spawn a monster near the hero. Half price when spawned beyond its native biome. Valid monsters: rat, albino, snake, gnoll, crab, slime, swarm, thief, skeleton, bat, brute, shaman, spinner, dm100, guard, necromancer, ghoul, elemental, warlock, monk, golem, succubus, eye, scorpio. |
-| **!champion** | `!champion <monster>` | 2× base (10–160 pts) | Spawn a **champion** version of the monster (random type: Blazing, Projecting, Antimagic, Giant, Blessed, Growing). Same monster list as spawn. No zone discount. |
+| **!spawn** | `!spawn <monster>` | Varies by monster and chapter (see script) | Spawn a monster near the hero. Half price when deeper than native; up to 3× when spawning late mobs early. Valid monsters: rat, albino, snake, gnoll, crab, slime, swarm, thief, skeleton, bat, brute, shaman, spinner, dm100, guard, necromancer, ghoul, elemental, warlock, monk, golem, succubus, eye, scorpio. |
+| **!champion** | `!champion <monster>` | 2× zone-adjusted spawn | Spawn a **champion** version of the monster (random type: Blazing, Projecting, Antimagic, Giant, Blessed, Growing). Same monster list and zone rules as spawn. |
 | **!gold** | `!gold <amount>` | 2 pts per gold | Drop gold near the hero. Amount 1–100 required (e.g. `!gold 10` = 20 pts). |
 | **!curse** | `!curse` | 200 pts | Curse a **random** equipped item (weapon, armor, ring, artifact, or misc). |
 | **!gas** | `!gas` | 75 pts | Spawn random gas (Chaotic Censer +3). Toxic, confusion, regrowth, storm clouds, smoke, stench, inferno, blizzard, or corrosive gas. |
 | **!scroll** | `!scroll` | 100 pts | Use a random scroll (like +10 Unstable Spellbook). 50% chance for exotic version. |
 | **!trap** | `!trap` | 50 pts | Place a random visible trap 1–4 tiles from the hero. Pool of 27 traps (instant-death/high-damage ones blacklisted). |
+| **!bomb** | `!bomb` | 75 pts (default) | Drop a weighted random **lit bomb** 1–4 tiles from the hero (regular + alchemy bombs). |
 | **!transmute** | `!transmute` | 150 pts | Transmute a random transmutable item from bag or equipped. Same rules as Scroll of Transmutation. |
-| **!bee** | `!bee` | 75 pts | Summon an allied bee next to the hero for 50 turns. Fights for you like Elixir of Honeyed Healing. |
+| **!bee** | `!bee` | 75 pts | Summon an allied bee next to the hero for 150 turns. Fights for you like Elixir of Honeyed Healing. |
 | **!buff** | `!buff` | 75 pts | Apply a random buff (Haste, Healing, Barrier, Invisibility, etc.). Healing = 10% HP over 10 turns; Barrier = 10% HP shield. |
 | **!debuff** | `!debuff` | 50 pts | Apply a random debuff (Blindness, Slow, Roots, Daze, etc.). Excludes Paralysis, Burning, Poison. |
-| **!wand** | `!wand common` (tier required) | 50–400 pts | Trigger a cursed wand effect. Tier required: common, uncommon, rare, or veryrare. |
+| **!wand** | `!wand` | Configurable (default 75) | Random cursed wand effect; weighted common → very rare. |
 | **!doublepoints** | `!doublepoints <minutes>` | — | **Streamer only.** 2× points for N minutes (max 120). `!doublepoints 5` for 5 min. |
-| **!myside** | `!myside` | Free | Remind user their side (helper/hurter). Requires Helpers vs Hurters ON. |
-| **!switch** | `!switch` | Configurable (default 50) | Switch helper ↔ hurter. Requires Helpers vs Hurters ON. |
-| **!heal** | `!heal` | Configurable (default 100) | **Helper only.** Heal hero ~15% HP. |
-| **!cleanse** | `!cleanse` | Configurable (default 150) | **Helper only.** Remove one random debuff. |
-| **!dew** | `!dew` | Configurable (default 30) | **Helper only.** Drop dewdrop near hero. |
-| **!corruptally** | `!corruptally` | Configurable (default 100) | **Helper only.** Summon a corrupted ally from the current biome. Boss floors allowed. |
-| **!hex** | `!hex` | Configurable (default 75) | **Hurter only.** Apply Hex debuff. |
-| **!degrade** | `!degrade` | Configurable (default 100) | **Hurter only.** Apply Degrade debuff. |
-| **!sabotage** | `!sabotage` | Configurable (default 75) | **Hurter only.** Remove one random buff. |
+| **!heal** | `!heal` | Configurable (default 100) | Heal hero ~15% HP. |
+| **!cleanse** | `!cleanse` | Configurable (default 150) | Remove one random debuff. |
+| **!dew** | `!dew` | Configurable (default 30) | Drop dewdrop near hero. |
+| **!corruptally** | `!corruptally` | Configurable (default 100) | Summon a corrupted ally from the current biome. Boss floors allowed. |
+| **!hex** | `!hex` | Configurable (default 75) | Apply Hex debuff. |
+| **!degrade** | `!degrade` | Configurable (default 100) | Apply Degrade debuff. |
+| **!sabotage** | `!sabotage` | Configurable (default 75) | Remove one random buff. |
 
 **Spawn costs (base):** rat 5, albino/snake/gnoll 10, crab/slime/swarm 15, thief/skeleton/dm100 20, guard/necromancer/spinner 25, bat/brute 30, shaman 35, ghoul/elemental 40, warlock 45, monk/golem 50, succubus 60, eye 70, scorpio 80. Unknown monsters default to 100. Edit `points_config.json` or use the config UI to change.
 
@@ -3050,7 +3134,7 @@ public class CPHInline
 | 04 | Check Points | !points | Show viewer their balance |
 | 05 | Top Points | !toppoints | Show top 3 point holders |
 | 06 | Spawn Monster | !spawn | Spend points (cost varies by monster) |
-| 07 | Spawn Champion | !champion | Spawn champion (2× base, no discount) |
+| 07 | Spawn Champion | !champion | Spawn champion (2× zone-adjusted !spawn cost) |
 | 08 | Drop Gold | !gold | Spend points to drop gold |
 | 09 | Curse Item | !curse | Spend points to curse equipped item |
 | 10 | Spawn Gas | !gas | Spend points to spawn random gas |
@@ -3061,24 +3145,22 @@ public class CPHInline
 | 15 | Ward | !ward | Spend points to summon ward |
 | 16 | Random Buff | !buff | Spend points to apply random buff |
 | 17 | Random Debuff | !debuff | Spend points to apply random debuff |
-| 18 | Cursed Wand | !wand | Spend points for cursed wand effect |
+| 18 | Cursed Wand | !wand | Fixed cost; weighted random cursed-wand effect |
 | 19 | Double Points | !doublepoints | Streamer only: 2× points for N min |
 | 20 | Earn Points (Cheer) | Twitch Cheer | 1 pt per bit; optional args for stacked 2× |
 | 21 | Earn Points (Super Chat) | YouTube Super Chat | 1 pt per $0.01; same optional args |
 | 22 | Reset Points | Stream Started | Clear non-donor points |
 | 23 | Spend OFF | Hotkey | Disable spend commands |
 | 24 | Spend ON | Hotkey | Enable spend commands |
-| 25 | Helpers/Hurters OFF | Hotkey | Disable helpers vs hurters |
-| 26 | Helpers/Hurters ON | Hotkey | Enable helpers vs hurters |
-| 27 | !myside | !myside | Remind user their side (free) |
-| 28 | !switch | !switch | Switch helper/hurter (cost configurable) |
-| 29 | !heal | !heal | Helper: heal hero ~15% HP |
-| 30 | !cleanse | !cleanse | Helper: remove one debuff |
-| 31 | !dew | !dew | Helper: drop dewdrop |
-| 32 | !hex | !hex | Hurter: apply Hex debuff |
-| 33 | !degrade | !degrade | Hurter: apply Degrade debuff |
-| 34 | !sabotage | !sabotage | Hurter: remove one buff |
-| 35 | !corruptally | !corruptally | Helper: summon corrupted ally from biome |
+| 25 | !heal | !heal | Heal hero ~15% HP |
+| 26 | !cleanse | !cleanse | Remove one random debuff |
+| 27 | !dew | !dew | Drop dewdrop near hero |
+| 28 | !corruptally | !corruptally | Summon corrupted ally from current biome |
+| 29 | !hex | !hex | Apply Hex debuff |
+| 30 | !degrade | !degrade | Apply Degrade debuff |
+| 31 | !sabotage | !sabotage | Remove one random buff |
+
+*Legacy Streamer.bot actions (omit):* Helpers/Hurters OFF/ON, `!myside`, `!switch` — for historical setup only, see the sections **"Action 25: Helpers/Hurters OFF"** through **"Action 28: !switch"** earlier in this document (not the Summary row numbers in this table).
 
 ---
 
@@ -3088,6 +3170,7 @@ public class CPHInline
 - **Passive earn** only adds to users already in the file—they must send at least one message first. Enable **Live Update** under Platform → Twitch → Settings for Present Viewers to work.
 - **Message Received** fires on every chat message. Ensure the Earn action does not also fire on bot messages or your own messages if you want to exclude them (add a conditional if needed).
 - For `!spawn`, the Command Triggered must pass `input1` (the text after the command). Use `%rawInput%` or `%input1%` depending on your Streamer.bot version.
+- For **`!wand`**, the opposite: **do not** require extra text after the command for the script — use **`wand %userName%`** in Run a Program.
 - Edit `POINTS_PER_MESSAGE`, `POINTS_PER_TICK`, and `COOLDOWN_SEC` (in Earn Points on chat for chat, Earn Points passive for passive) in the C# code. Edit points costs via http://localhost:5000/points-config or `points_config.json`.
 - **Double points** persists until the duration ends. To clear it when the stream starts, add `File.WriteAllText(DOUBLE_FILE, "0");` to the Reset Points action.
 - **Top farder 2x:** The earn actions read from `TOP_FARDER_FILE` (default: `OBS files\textread\leader.txt`). Expected format: `Top Farder: USERNAME - 45`. Change the path if your fard counter writes to a different file.

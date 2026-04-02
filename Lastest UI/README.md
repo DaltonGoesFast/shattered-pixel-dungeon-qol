@@ -43,7 +43,7 @@ If you want to use the game data in another project, you can:
 - `index.html`: The clean, dark-themed dashboard frontend.
 - `game_summary.txt`: The human-readable text output of your current game.
 - `game_summary.json`: The machine-readable JSON output for external projects.
-- `streamerbot/`: Streamer.bot export string (`shatter-the-streamer-export-0.1.0.txt`), overlay batch helpers (e.g. `open-ws-inspect.bat`).
+- `streamerbot/`: Streamer.bot export string (`shatter-the-streamer-export-0.1.0.txt`) and batch helpers (e.g. `open-ws-inspect.bat`). If the export predates removing helper/hurter actions, re-import from a fresh bot setup or follow [docs/streamerbot-points-from-scratch.md](../docs/streamerbot-points-from-scratch.md).
 
 ## Backups
 Your previous work and graphical overlay components are available in the `backup` and `backup_20251201` folders.

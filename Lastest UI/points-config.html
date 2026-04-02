@@ -383,7 +383,6 @@
   <div class="col-left" id="colLeft">
   <section id="section-general" data-section="general">
     <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>General costs</h2>
-    <p class="sub" style="margin-bottom: 0.5rem; font-size: 0.85rem;">Helper/Hurter: check to apply role discount (see Helpers vs Hurters for %).</p>
     <div class="row free-mins-row" style="margin-bottom:0.75rem;padding-bottom:0.75rem;border-bottom:1px solid var(--spd-border);">
       <label for="freeMins">Free for (mins):</label>
       <input type="number" id="freeMins" min="1" max="1440" value="5" style="width:64px;">
@@ -395,10 +394,6 @@
       <button type="button" class="free-btn">Free</button>
       <span class="free-countdown" style="display:none;"></span>
       <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
-      <span class="discount-checks">
-        <label><input type="checkbox" class="discount-helper" data-cmd="gold"> Helper</label>
-        <label><input type="checkbox" class="discount-hurter" data-cmd="gold"> Hurter</label>
-      </span>
     </div>
     <div class="row" data-cost-key="cost_per_curse" data-cmd="curse">
       <label for="cost_per_curse">Curse:</label>
@@ -406,10 +401,6 @@
       <button type="button" class="free-btn">Free</button>
       <span class="free-countdown" style="display:none;"></span>
       <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
-      <span class="discount-checks">
-        <label><input type="checkbox" class="discount-helper" data-cmd="curse"> Helper</label>
-        <label><input type="checkbox" class="discount-hurter" data-cmd="curse"> Hurter</label>
-      </span>
     </div>
     <div class="row" data-cost-key="cost_per_gas" data-cmd="gas">
       <label for="cost_per_gas">Gas:</label>
@@ -417,10 +408,6 @@
       <button type="button" class="free-btn">Free</button>
       <span class="free-countdown" style="display:none;"></span>
       <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
-      <span class="discount-checks">
-        <label><input type="checkbox" class="discount-helper" data-cmd="gas"> Helper</label>
-        <label><input type="checkbox" class="discount-hurter" data-cmd="gas"> Hurter</label>
-      </span>
     </div>
     <div class="row" data-cost-key="cost_per_scroll" data-cmd="scroll">
       <label for="cost_per_scroll">Random scroll:</label>
@@ -428,10 +415,6 @@
       <button type="button" class="free-btn">Free</button>
       <span class="free-countdown" style="display:none;"></span>
       <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
-      <span class="discount-checks">
-        <label><input type="checkbox" class="discount-helper" data-cmd="scroll"> Helper</label>
-        <label><input type="checkbox" class="discount-hurter" data-cmd="scroll"> Hurter</label>
-      </span>
     </div>
     <div class="row" data-cost-key="cost_per_trap" data-cmd="trap">
       <label for="cost_per_trap">Trap:</label>
@@ -439,10 +422,13 @@
       <button type="button" class="free-btn">Free</button>
       <span class="free-countdown" style="display:none;"></span>
       <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
-      <span class="discount-checks">
-        <label><input type="checkbox" class="discount-helper" data-cmd="trap"> Helper</label>
-        <label><input type="checkbox" class="discount-hurter" data-cmd="trap"> Hurter</label>
-      </span>
+    </div>
+    <div class="row" data-cost-key="cost_per_bomb" data-cmd="bomb">
+      <label for="cost_per_bomb">Bomb:</label>
+      <input type="number" id="cost_per_bomb" min="1" value="75">
+      <button type="button" class="free-btn">Free</button>
+      <span class="free-countdown" style="display:none;"></span>
+      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
     </div>
     <div class="row" data-cost-key="cost_per_transmute" data-cmd="transmute">
       <label for="cost_per_transmute">Transmute:</label>
@@ -450,10 +436,6 @@
       <button type="button" class="free-btn">Free</button>
       <span class="free-countdown" style="display:none;"></span>
       <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
-      <span class="discount-checks">
-        <label><input type="checkbox" class="discount-helper" data-cmd="transmute"> Helper</label>
-        <label><input type="checkbox" class="discount-hurter" data-cmd="transmute"> Hurter</label>
-      </span>
     </div>
     <div class="row" data-cost-key="cost_per_ally_bee" data-cmd="bee">
       <label for="cost_per_ally_bee">Bee:</label>
@@ -461,10 +443,6 @@
       <button type="button" class="free-btn">Free</button>
       <span class="free-countdown" style="display:none;"></span>
       <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
-      <span class="discount-checks">
-        <label><input type="checkbox" class="discount-helper" data-cmd="bee"> Helper</label>
-        <label><input type="checkbox" class="discount-hurter" data-cmd="bee"> Hurter</label>
-      </span>
     </div>
     <div class="row" data-cost-key="cost_per_ward" data-cmd="ward">
       <label for="cost_per_ward">Ward:</label>
@@ -472,10 +450,6 @@
       <button type="button" class="free-btn">Free</button>
       <span class="free-countdown" style="display:none;"></span>
       <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
-      <span class="discount-checks">
-        <label><input type="checkbox" class="discount-helper" data-cmd="ward"> Helper</label>
-        <label><input type="checkbox" class="discount-hurter" data-cmd="ward"> Hurter</label>
-      </span>
     </div>
     <div class="row" data-cost-key="cost_per_buff" data-cmd="buff">
       <label for="cost_per_buff">Random buff:</label>
@@ -483,10 +457,6 @@
       <button type="button" class="free-btn">Free</button>
       <span class="free-countdown" style="display:none;"></span>
       <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
-      <span class="discount-checks">
-        <label><input type="checkbox" class="discount-helper" data-cmd="buff"> Helper</label>
-        <label><input type="checkbox" class="discount-hurter" data-cmd="buff"> Hurter</label>
-      </span>
     </div>
     <div class="row" data-cost-key="cost_per_debuff" data-cmd="debuff">
       <label for="cost_per_debuff">Random debuff:</label>
@@ -494,58 +464,66 @@
       <button type="button" class="free-btn">Free</button>
       <span class="free-countdown" style="display:none;"></span>
       <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
-      <span class="discount-checks">
-        <label><input type="checkbox" class="discount-helper" data-cmd="debuff"> Helper</label>
-        <label><input type="checkbox" class="discount-hurter" data-cmd="debuff"> Hurter</label>
-      </span>
     </div>
-    <div class="row" data-cost-key="cost_per_wand_common" data-cmd="wand">
-      <label for="cost_per_wand_common">Wand (common):</label>
-      <input type="number" id="cost_per_wand_common" min="1" value="50">
+    <div class="row" data-cost-key="cost_per_wand" data-cmd="wand">
+      <label for="cost_per_wand">Cursed wand (!wand):</label>
+      <input type="number" id="cost_per_wand" min="1" value="75">
       <button type="button" class="free-btn">Free</button>
       <span class="free-countdown" style="display:none;"></span>
       <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
-      <span class="discount-checks">
-        <label><input type="checkbox" class="discount-helper" data-cmd="wand"> Helper</label>
-        <label><input type="checkbox" class="discount-hurter" data-cmd="wand"> Hurter</label>
-      </span>
-    </div>
-    <div class="row" data-cost-key="cost_per_wand_uncommon" data-cmd="wand">
-      <label for="cost_per_wand_uncommon">Wand (uncommon):</label>
-      <input type="number" id="cost_per_wand_uncommon" min="1" value="100">
-      <button type="button" class="free-btn">Free</button>
-      <span class="free-countdown" style="display:none;"></span>
-      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
-      <span class="discount-checks">
-        <label><input type="checkbox" class="discount-helper" data-cmd="wand"> Helper</label>
-        <label><input type="checkbox" class="discount-hurter" data-cmd="wand"> Hurter</label>
-      </span>
-    </div>
-    <div class="row" data-cost-key="cost_per_wand_rare" data-cmd="wand">
-      <label for="cost_per_wand_rare">Wand (rare):</label>
-      <input type="number" id="cost_per_wand_rare" min="1" value="200">
-      <button type="button" class="free-btn">Free</button>
-      <span class="free-countdown" style="display:none;"></span>
-      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
-      <span class="discount-checks">
-        <label><input type="checkbox" class="discount-helper" data-cmd="wand"> Helper</label>
-        <label><input type="checkbox" class="discount-hurter" data-cmd="wand"> Hurter</label>
-      </span>
-    </div>
-    <div class="row" data-cost-key="cost_per_wand_veryrare" data-cmd="wand">
-      <label for="cost_per_wand_veryrare">Wand (very rare):</label>
-      <input type="number" id="cost_per_wand_veryrare" min="1" value="400">
-      <button type="button" class="free-btn">Free</button>
-      <span class="free-countdown" style="display:none;"></span>
-      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
-      <span class="discount-checks">
-        <label><input type="checkbox" class="discount-helper" data-cmd="wand"> Helper</label>
-        <label><input type="checkbox" class="discount-hurter" data-cmd="wand"> Hurter</label>
-      </span>
     </div>
     <div class="row" data-cost-key="default_monster_cost">
       <label for="default_monster_cost">Default monster:</label>
       <input type="number" id="default_monster_cost" min="1" value="100">
+      <button type="button" class="free-btn">Free</button>
+      <span class="free-countdown" style="display:none;"></span>
+      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
+    </div>
+    <div class="row" data-cost-key="cost_per_heal" data-cmd="heal">
+      <label for="cost_per_heal">Heal:</label>
+      <input type="number" id="cost_per_heal" min="1" value="100">
+      <button type="button" class="free-btn">Free</button>
+      <span class="free-countdown" style="display:none;"></span>
+      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
+    </div>
+    <div class="row" data-cost-key="cost_per_cleanse" data-cmd="cleanse">
+      <label for="cost_per_cleanse">Cleanse:</label>
+      <input type="number" id="cost_per_cleanse" min="1" value="150">
+      <button type="button" class="free-btn">Free</button>
+      <span class="free-countdown" style="display:none;"></span>
+      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
+    </div>
+    <div class="row" data-cost-key="cost_per_dew" data-cmd="dew">
+      <label for="cost_per_dew">Dew:</label>
+      <input type="number" id="cost_per_dew" min="1" value="30">
+      <button type="button" class="free-btn">Free</button>
+      <span class="free-countdown" style="display:none;"></span>
+      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
+    </div>
+    <div class="row" data-cost-key="cost_per_corrupt_ally" data-cmd="corrupt_ally">
+      <label for="cost_per_corrupt_ally">Corrupt ally:</label>
+      <input type="number" id="cost_per_corrupt_ally" min="1" value="100">
+      <button type="button" class="free-btn">Free</button>
+      <span class="free-countdown" style="display:none;"></span>
+      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
+    </div>
+    <div class="row" data-cost-key="cost_per_hex" data-cmd="hex">
+      <label for="cost_per_hex">Hex:</label>
+      <input type="number" id="cost_per_hex" min="1" value="75">
+      <button type="button" class="free-btn">Free</button>
+      <span class="free-countdown" style="display:none;"></span>
+      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
+    </div>
+    <div class="row" data-cost-key="cost_per_degrade" data-cmd="degrade">
+      <label for="cost_per_degrade">Degrade:</label>
+      <input type="number" id="cost_per_degrade" min="1" value="100">
+      <button type="button" class="free-btn">Free</button>
+      <span class="free-countdown" style="display:none;"></span>
+      <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
+    </div>
+    <div class="row" data-cost-key="cost_per_sabotage" data-cmd="sabotage">
+      <label for="cost_per_sabotage">Sabotage:</label>
+      <input type="number" id="cost_per_sabotage" min="1" value="75">
       <button type="button" class="free-btn">Free</button>
       <span class="free-countdown" style="display:none;"></span>
       <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
@@ -565,7 +543,7 @@
   <div class="col-center" id="colCenter">
   <section id="section-viewer" data-section="viewer" class="col-center">
     <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>Viewer points <span id="vpUpdated" style="margin-left:6px;font-weight:normal;color:var(--spd-muted-on-surface);font-size:0.85rem;">—</span> <label style="margin-left:8px;font-weight:normal;font-size:0.85rem;">Refresh <input type="number" id="vpRefreshSec" min="5" max="120" value="10" style="width:44px;padding:2px 4px;">s</label></h2>
-    <p class="sub" style="margin-bottom: 0.5rem;">Search to filter, or type a new username + points to add. Auto-refreshes every 10s. Used by !spawn, !champion, !gold, !curse, !gas, !scroll, !trap, !transmute, !bee, !wand.</p>
+    <p class="sub" style="margin-bottom: 0.5rem;">Search to filter, or type a new username + points to add. Auto-refreshes every 10s. Used by !spawn, !champion, !gold, !curse, !gas, !scroll, !trap, !bomb, !transmute, !bee, !wand.</p>
     <div class="search-bar">
       <input type="text" id="vp_search" placeholder="Search users or type new username…" autocomplete="off">
     </div>
@@ -576,8 +554,6 @@
       <button id="set_points">Set</button>
       <label title="Percent of chat-only points to move to donor">Chat→Donor % <input type="number" id="chatToDonorPercent" min="0" max="100" value="100" style="width:52px;padding:2px 4px;"></label>
       <button id="chatToDonor" style="background:var(--spd-btn-secondary);" title="Convert a percentage of selected users' chat points to donor points">Chat → Donor</button>
-      <span id="vpRoleCounts" style="font-size:0.85rem;color:var(--spd-muted-on-surface);" title="All viewers with a role">Helpers: — | Hurters: —</span>
-      <button id="vpBalanceRoles" type="button" style="background:var(--spd-btn-secondary);" title="Randomly equalize helper/hurter among selected rows (only users already helper or hurter)">Balance roles (selected)</button>
       <button id="clearNonDonor" style="background:var(--spd-btn-secondary);">Delete all points</button>
       <button id="clearAll" style="background:var(--spd-danger);">Delete all donor points</button>
       <button id="exportViewerCsv" style="background:var(--spd-btn-secondary);" title="Download viewer points as CSV">Export CSV</button>
@@ -655,90 +631,6 @@
       <span id="doublePointsCountdown" class="free-countdown" style="margin-left:8px;">—</span>
     </div>
   </section>
-  <section id="section-helpers-hurters" data-section="helpers_hurters">
-    <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>Helpers vs Hurters</h2>
-    <p class="sub" style="margin-bottom: 0.75rem;">ON/OFF is controlled via Stream Deck (Helpers/Hurters toggle). The settings below apply when the system is ON. Check Helper/Hurter next to each cost to apply the discount.</p>
-    <div class="row" style="margin-bottom:0.5rem;">
-      <label for="points_per_helper_on_boss">Points per helper when boss slain:</label>
-      <input type="number" id="points_per_helper_on_boss" min="0" value="10" style="width:64px;">
-    </div>
-    <div class="row" style="margin-bottom:0.5rem;">
-      <label for="points_per_hurter_on_death">Points per hurter when hero dies:</label>
-      <input type="number" id="points_per_hurter_on_death" min="0" value="10" style="width:64px;">
-    </div>
-    <div class="row" style="margin-bottom:0.5rem;">
-      <label for="points_per_helper_on_new_floor">Points per helper on new floor (descend only):</label>
-      <input type="number" id="points_per_helper_on_new_floor" min="0" value="0" style="width:64px;" title="0 = off. Awards all helpers when dungeon depth increases (not when ascending).">
-    </div>
-    <div class="row" style="margin-bottom:0.5rem;">
-      <label for="helper_discount_percent">Helper discount %:</label>
-      <input type="number" id="helper_discount_percent" min="0" max="100" value="50" style="width:64px;">
-    </div>
-    <div class="row" style="margin-bottom:0.5rem;">
-      <label for="hurter_discount_percent">Hurter discount %:</label>
-      <input type="number" id="hurter_discount_percent" min="0" max="100" value="50" style="width:64px;">
-    </div>
-    <div class="row" style="margin-bottom:0.5rem;">
-      <label for="cost_to_switch_side">Cost to switch side (0 = free):</label>
-      <input type="number" id="cost_to_switch_side" min="0" value="50" style="width:64px;">
-    </div>
-    <div class="row" data-cost-key="cost_per_heal" data-cmd="heal" style="margin-bottom:0.5rem;">
-      <label for="cost_per_heal">Heal:</label>
-      <input type="number" id="cost_per_heal" min="1" value="100" style="width:64px;">
-      <span class="discount-checks">
-        <label><input type="checkbox" class="discount-helper" data-cmd="heal"> Helper</label>
-        <label><input type="checkbox" class="discount-hurter" data-cmd="heal"> Hurter</label>
-      </span>
-    </div>
-    <div class="row" data-cost-key="cost_per_cleanse" data-cmd="cleanse" style="margin-bottom:0.5rem;">
-      <label for="cost_per_cleanse">Cleanse:</label>
-      <input type="number" id="cost_per_cleanse" min="1" value="150" style="width:64px;">
-      <span class="discount-checks">
-        <label><input type="checkbox" class="discount-helper" data-cmd="cleanse"> Helper</label>
-        <label><input type="checkbox" class="discount-hurter" data-cmd="cleanse"> Hurter</label>
-      </span>
-    </div>
-    <div class="row" data-cost-key="cost_per_dew" data-cmd="dew" style="margin-bottom:0.5rem;">
-      <label for="cost_per_dew">Dew:</label>
-      <input type="number" id="cost_per_dew" min="1" value="30" style="width:64px;">
-      <span class="discount-checks">
-        <label><input type="checkbox" class="discount-helper" data-cmd="dew"> Helper</label>
-        <label><input type="checkbox" class="discount-hurter" data-cmd="dew"> Hurter</label>
-      </span>
-    </div>
-    <div class="row" data-cost-key="cost_per_corrupt_ally" data-cmd="corrupt_ally" style="margin-bottom:0.5rem;">
-      <label for="cost_per_corrupt_ally">Corrupt ally:</label>
-      <input type="number" id="cost_per_corrupt_ally" min="1" value="40" style="width:64px;">
-      <span class="discount-checks">
-        <label><input type="checkbox" class="discount-helper" data-cmd="corrupt_ally"> Helper</label>
-        <label><input type="checkbox" class="discount-hurter" data-cmd="corrupt_ally"> Hurter</label>
-      </span>
-    </div>
-    <div class="row" data-cost-key="cost_per_hex" data-cmd="hex" style="margin-bottom:0.5rem;">
-      <label for="cost_per_hex">Hex:</label>
-      <input type="number" id="cost_per_hex" min="1" value="75" style="width:64px;">
-      <span class="discount-checks">
-        <label><input type="checkbox" class="discount-helper" data-cmd="hex"> Helper</label>
-        <label><input type="checkbox" class="discount-hurter" data-cmd="hex"> Hurter</label>
-      </span>
-    </div>
-    <div class="row" data-cost-key="cost_per_degrade" data-cmd="degrade" style="margin-bottom:0.5rem;">
-      <label for="cost_per_degrade">Degrade:</label>
-      <input type="number" id="cost_per_degrade" min="1" value="100" style="width:64px;">
-      <span class="discount-checks">
-        <label><input type="checkbox" class="discount-helper" data-cmd="degrade"> Helper</label>
-        <label><input type="checkbox" class="discount-hurter" data-cmd="degrade"> Hurter</label>
-      </span>
-    </div>
-    <div class="row" data-cost-key="cost_per_sabotage" data-cmd="sabotage" style="margin-bottom:0.5rem;">
-      <label for="cost_per_sabotage">Sabotage:</label>
-      <input type="number" id="cost_per_sabotage" min="1" value="75" style="width:64px;">
-      <span class="discount-checks">
-        <label><input type="checkbox" class="discount-helper" data-cmd="sabotage"> Helper</label>
-        <label><input type="checkbox" class="discount-hurter" data-cmd="sabotage"> Hurter</label>
-      </span>
-    </div>
-  </section>
   <section id="section-activity" data-section="activity">
     <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>Activity</h2>
     <details id="activityDetails" open style="margin-top:0.25rem;">
@@ -785,7 +677,6 @@
       <div class="config-row"><label><input type="checkbox" id="cfg-section-viewer" checked> Viewer points</label></div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-game" checked> Game data (WebSocket)</label></div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-score" checked> Streamer vs Chat Score</label></div>
-      <div class="config-row"><label><input type="checkbox" id="cfg-section-helpers-hurters" checked> Helpers vs Hurters</label></div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-activity" checked> Activity</label></div>
       <div class="btns">
         <button id="overallConfigReset">Reset</button>
@@ -933,36 +824,19 @@
           document.getElementById('cost_per_gas').value = data.cost_per_gas ?? 75;
           document.getElementById('cost_per_scroll').value = data.cost_per_scroll ?? 100;
           document.getElementById('cost_per_trap').value = data.cost_per_trap ?? 50;
+          document.getElementById('cost_per_bomb').value = data.cost_per_bomb ?? 75;
           document.getElementById('cost_per_transmute').value = data.cost_per_transmute ?? 150;
           document.getElementById('cost_per_ally_bee').value = data.cost_per_ally_bee ?? 75;
           document.getElementById('cost_per_ward').value = data.cost_per_ward ?? 30;
           document.getElementById('cost_per_buff').value = data.cost_per_buff ?? 75;
           document.getElementById('cost_per_debuff').value = data.cost_per_debuff ?? 50;
-          document.getElementById('cost_per_wand_common').value = data.cost_per_wand_common ?? 50;
-          document.getElementById('cost_per_wand_uncommon').value = data.cost_per_wand_uncommon ?? 100;
-          document.getElementById('cost_per_wand_rare').value = data.cost_per_wand_rare ?? 200;
-          document.getElementById('cost_per_wand_veryrare').value = data.cost_per_wand_veryrare ?? 400;
+          document.getElementById('cost_per_wand').value = data.cost_per_wand ?? 75;
           document.getElementById('default_monster_cost').value = data.default_monster_cost ?? 100;
           const setIf = (id, val, def) => { const e = document.getElementById(id); if (e) e.value = val ?? def; };
-          setIf('points_per_helper_on_boss', data.points_per_helper_on_boss, 10);
-          setIf('points_per_helper_on_new_floor', data.points_per_helper_on_new_floor, 0);
-          setIf('points_per_hurter_on_death', data.points_per_hurter_on_death, 10);
-          setIf('helper_discount_percent', data.helper_discount_percent, 50);
-          setIf('hurter_discount_percent', data.hurter_discount_percent, 50);
-          const helperCmds = data.helper_discount_commands || ['ward', 'bee', 'buff'];
-          const hurterCmds = data.hurter_discount_commands || ['debuff', 'curse', 'trap', 'gas'];
-          document.querySelectorAll('.row[data-cmd]').forEach(row => {
-            const cmd = row.dataset.cmd;
-            const h = row.querySelector('.discount-helper');
-            const ht = row.querySelector('.discount-hurter');
-            if (h) h.checked = helperCmds.includes(cmd);
-            if (ht) ht.checked = hurterCmds.includes(cmd);
-          });
-          setIf('cost_to_switch_side', data.cost_to_switch_side, 50);
           setIf('cost_per_heal', data.cost_per_heal, 100);
           setIf('cost_per_cleanse', data.cost_per_cleanse, 150);
           setIf('cost_per_dew', data.cost_per_dew, 30);
-          setIf('cost_per_corrupt_ally', data.cost_per_corrupt_ally, 40);
+          setIf('cost_per_corrupt_ally', data.cost_per_corrupt_ally, 100);
           setIf('cost_per_hex', data.cost_per_hex, 75);
           setIf('cost_per_degrade', data.cost_per_degrade, 100);
           setIf('cost_per_sabotage', data.cost_per_sabotage, 75);
@@ -1023,37 +897,19 @@
         cost_per_gas: parseInt(document.getElementById('cost_per_gas').value, 10) || 75,
         cost_per_scroll: parseInt(document.getElementById('cost_per_scroll').value, 10) || 100,
         cost_per_trap: parseInt(document.getElementById('cost_per_trap').value, 10) || 50,
+        cost_per_bomb: parseInt(document.getElementById('cost_per_bomb').value, 10) || 75,
         cost_per_transmute: parseInt(document.getElementById('cost_per_transmute').value, 10) || 150,
         cost_per_ally_bee: parseInt(document.getElementById('cost_per_ally_bee').value, 10) || 75,
         cost_per_ward: parseInt(document.getElementById('cost_per_ward').value, 10) || 30,
         cost_per_buff: parseInt(document.getElementById('cost_per_buff').value, 10) || 75,
         cost_per_debuff: parseInt(document.getElementById('cost_per_debuff').value, 10) || 50,
-        cost_per_wand_common: parseInt(document.getElementById('cost_per_wand_common').value, 10) || 50,
-        cost_per_wand_uncommon: parseInt(document.getElementById('cost_per_wand_uncommon').value, 10) || 100,
-        cost_per_wand_rare: parseInt(document.getElementById('cost_per_wand_rare').value, 10) || 200,
-        cost_per_wand_veryrare: parseInt(document.getElementById('cost_per_wand_veryrare').value, 10) || 400,
+        cost_per_wand: parseInt(document.getElementById('cost_per_wand').value, 10) || 75,
         default_monster_cost: parseInt(document.getElementById('default_monster_cost').value, 10) || 100,
         cost_per_monster: costPerMonster,
-        points_per_helper_on_boss: parseInt(document.getElementById('points_per_helper_on_boss')?.value, 10) || 10,
-        points_per_helper_on_new_floor: Math.max(0, parseInt(document.getElementById('points_per_helper_on_new_floor')?.value, 10) || 0),
-        points_per_hurter_on_death: parseInt(document.getElementById('points_per_hurter_on_death')?.value, 10) || 10,
-        helper_discount_percent: parseInt(document.getElementById('helper_discount_percent')?.value, 10) || 50,
-        hurter_discount_percent: parseInt(document.getElementById('hurter_discount_percent')?.value, 10) || 50,
-        helper_discount_commands: (() => {
-          const cmds = new Set();
-          document.querySelectorAll('.discount-helper:checked').forEach(cb => cmds.add(cb.dataset.cmd));
-          return Array.from(cmds);
-        })(),
-        hurter_discount_commands: (() => {
-          const cmds = new Set();
-          document.querySelectorAll('.discount-hurter:checked').forEach(cb => cmds.add(cb.dataset.cmd));
-          return Array.from(cmds);
-        })(),
-        cost_to_switch_side: parseInt(document.getElementById('cost_to_switch_side')?.value, 10) ?? 50,
         cost_per_heal: parseInt(document.getElementById('cost_per_heal')?.value, 10) || 100,
         cost_per_cleanse: parseInt(document.getElementById('cost_per_cleanse')?.value, 10) || 150,
         cost_per_dew: parseInt(document.getElementById('cost_per_dew')?.value, 10) || 30,
-        cost_per_corrupt_ally: parseInt(document.getElementById('cost_per_corrupt_ally')?.value, 10) || 40,
+        cost_per_corrupt_ally: parseInt(document.getElementById('cost_per_corrupt_ally')?.value, 10) || 100,
         cost_per_hex: parseInt(document.getElementById('cost_per_hex')?.value, 10) || 75,
         cost_per_degrade: parseInt(document.getElementById('cost_per_degrade')?.value, 10) || 100,
         cost_per_sabotage: parseInt(document.getElementById('cost_per_sabotage')?.value, 10) || 75,
@@ -1307,14 +1163,16 @@
     const VP_REFRESH_STORAGE = 'vp_refresh_sec';
     const VP_REFRESH_DEFAULT = 10;
     const OVERALL_CONFIG_STORAGE = 'overlay_layout_config';
-    const OVERALL_CONFIG_DEFAULT = { columns: 3, sections: { general: true, monsters: true, viewer: true, game: true, score: true, helpers_hurters: true, activity: true }, order: ['general', 'monsters', 'viewer', 'game', 'score', 'helpers_hurters'], columnCounts: [2, 1, 3], monsterColumns: 2, monsterSectionWidth: 540 };
+    const OVERALL_CONFIG_DEFAULT = { columns: 3, sections: { general: true, monsters: true, viewer: true, game: true, score: true, activity: true }, order: ['general', 'monsters', 'viewer', 'game', 'score'], columnCounts: [2, 1, 3], monsterColumns: 2, monsterSectionWidth: 540 };
     function getOverallConfig() {
       try {
         const s = localStorage.getItem(OVERALL_CONFIG_STORAGE);
         if (s) {
           const c = JSON.parse(s);
           if (c && typeof c.columns === 'number' && c.sections) {
-            if (!Array.isArray(c.order)) c.order = ['general', 'monsters', 'viewer', 'game', 'score', 'helpers_hurters'];
+            if (!Array.isArray(c.order)) c.order = ['general', 'monsters', 'viewer', 'game', 'score'];
+            c.order = c.order.filter(id => id !== 'helpers_hurters');
+            if (c.sections && c.sections.helpers_hurters != null) delete c.sections.helpers_hurters;
             if (!Array.isArray(c.columnCounts) || c.columnCounts.length !== 3) c.columnCounts = [2, 1, 2];
             if (c.monsterColumns == null) c.monsterColumns = 2;
             if (c.monsterSectionWidth == null) c.monsterSectionWidth = 420;
@@ -1347,7 +1205,7 @@
         grid.classList.add('col-' + Math.max(1, Math.min(3, cfg.columns)));
         applyColumnWidths();
       }
-      ['general', 'monsters', 'viewer', 'game', 'score', 'helpers_hurters', 'activity'].forEach(id => {
+      ['general', 'monsters', 'viewer', 'game', 'score', 'activity'].forEach(id => {
         const el = document.getElementById('section-' + id);
         if (el) el.style.display = (cfg.sections[id] !== false) ? '' : 'none';
       });
@@ -1564,13 +1422,6 @@
         .then(r => r.json())
         .then(data => {
           viewerPointsData = Object.entries(data).sort((a, b) => b[1].points - a[1].points);
-          let nh = 0, nhu = 0;
-          viewerPointsData.forEach(([, d]) => {
-            if (d.role === 'helper') nh++;
-            else if (d.role === 'hurter') nhu++;
-          });
-          const vprc = document.getElementById('vpRoleCounts');
-          if (vprc) vprc.textContent = 'Helpers: ' + nh + ' | Hurters: ' + nhu;
           const container = document.getElementById('viewer_points_list');
           const updatedEl = document.getElementById('vpUpdated');
           if (updatedEl) { updatedEl.textContent = '(updated just now)'; }
@@ -1581,10 +1432,8 @@
           }
           const donationPts = (d) => (d.donationPts != null ? d.donationPts : 0);
           const chatPts = (d) => Math.max(0, (d.points || 0) - donationPts(d));
-          const roleVal = (d) => (d.role === 'helper' || d.role === 'hurter') ? d.role : '';
-          const roleSelect = (d) => `<select class="edit-role" style="padding:2px 4px;font-size:0.85rem;min-width:80px;background:var(--spd-viewer-list);color:var(--spd-text-on-viewer-list);border:1px solid var(--spd-border);border-radius:4px;"><option value=""${roleVal(d)===''?' selected':''}>—</option><option value="helper"${roleVal(d)==='helper'?' selected':''}>helper</option><option value="hurter"${roleVal(d)==='hurter'?' selected':''}>hurter</option></select>`;
-          container.innerHTML = '<table style="width:100%;border-collapse:collapse;"><thead><tr><th style="width:36px;"><input type="checkbox" id="vpSelectAll" title="Select all visible"></th><th style="text-align:left;padding:4px 8px;">User</th><th style="text-align:right;padding:4px 8px;">Points</th><th style="text-align:right;padding:4px 8px;">Donor</th><th style="text-align:center;padding:4px 8px;">Role</th><th></th></tr></thead><tbody>' +
-            viewerPointsData.map(([u, d]) => `<tr data-user="${escapeHtml(u)}"><td style="padding:4px 8px;"><input type="checkbox" class="vp-row-select"></td><td style="padding:4px 8px;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(u)}">${escapeHtml(u)}</td><td style="padding:4px 8px;"><input type="number" class="edit-pts" value="${chatPts(d)}" min="0" style="width:90px;min-width:50px;padding:2px 4px;box-sizing:border-box;"></td><td style="padding:4px 8px;"><input type="number" class="edit-donor" value="${donationPts(d)}" min="0" style="width:90px;min-width:50px;padding:2px 4px;box-sizing:border-box;"></td><td style="padding:4px 8px;text-align:center;">${roleSelect(d)}</td><td style="padding:4px 8px;"><button class="save-row" style="padding:2px 8px;font-size:0.85rem;">Save</button> <button class="del-row" style="padding:2px 8px;font-size:0.85rem;background:var(--spd-danger);">Del</button></td></tr>`).join('') +
+          container.innerHTML = '<table style="width:100%;border-collapse:collapse;"><thead><tr><th style="width:36px;"><input type="checkbox" id="vpSelectAll" title="Select all visible"></th><th style="text-align:left;padding:4px 8px;">User</th><th style="text-align:right;padding:4px 8px;">Points</th><th style="text-align:right;padding:4px 8px;">Donor</th><th></th></tr></thead><tbody>' +
+            viewerPointsData.map(([u, d]) => `<tr data-user="${escapeHtml(u)}"><td style="padding:4px 8px;"><input type="checkbox" class="vp-row-select"></td><td style="padding:4px 8px;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(u)}">${escapeHtml(u)}</td><td style="padding:4px 8px;"><input type="number" class="edit-pts" value="${chatPts(d)}" min="0" style="width:90px;min-width:50px;padding:2px 4px;box-sizing:border-box;"></td><td style="padding:4px 8px;"><input type="number" class="edit-donor" value="${donationPts(d)}" min="0" style="width:90px;min-width:50px;padding:2px 4px;box-sizing:border-box;"></td><td style="padding:4px 8px;"><button class="save-row" style="padding:2px 8px;font-size:0.85rem;">Save</button> <button class="del-row" style="padding:2px 8px;font-size:0.85rem;background:var(--spd-danger);">Del</button></td></tr>`).join('') +
             '</tbody></table>';
           filterViewerPoints();
           const selectAllEl = document.getElementById('vpSelectAll');
@@ -1601,12 +1450,10 @@
               const user = tr.dataset.user;
               const chat = parseInt(tr.querySelector('.edit-pts').value, 10);
               const donor = parseInt(tr.querySelector('.edit-donor').value, 10);
-              const roleEl = tr.querySelector('.edit-role');
-              const role = roleEl ? roleEl.value : '';
               if (isNaN(chat) || chat < 0) { showMsg('Invalid points', false); return; }
               if (isNaN(donor) || donor < 0) { showMsg('Invalid donor points', false); return; }
               const totalPoints = chat + donor;
-              const payload = { username: user, points: totalPoints, donationPts: donor, role: role || '' };
+              const payload = { username: user, points: totalPoints, donationPts: donor };
               fetch('/api/viewer-points', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
                 .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg(user + ' updated', true); loadViewerPoints(true); logActivity('VP: updated ' + user); })
                 .catch(e => showMsg('Failed: ' + e.message, false));
@@ -1717,12 +1564,6 @@
     });
 
     document.getElementById('save').addEventListener('click', save);
-    document.body.addEventListener('change', (e) => {
-      const cb = e.target.closest('.discount-helper, .discount-hurter');
-      if (!cb || cb.dataset.cmd !== 'wand') return;
-      const cls = cb.classList.contains('discount-helper') ? 'discount-helper' : 'discount-hurter';
-      document.querySelectorAll('.' + cls + '[data-cmd="wand"]').forEach(c => { c.checked = cb.checked; });
-    });
     document.getElementById('exportConfig').addEventListener('click', exportConfig);
     document.getElementById('importConfig').addEventListener('click', () => document.getElementById('importConfigFile').click());
     document.getElementById('importConfigFile').addEventListener('change', (e) => {
@@ -1814,31 +1655,6 @@
       })
         .then(r => r.json())
         .then(d => { if (d.error) throw new Error(d.error); showMsg(`Converted ${pct}% chat→donor for ${d.count} users`, true); loadViewerPoints(true); logActivity('VP: Chat→Donor ' + pct + '% ' + (d.count || 0) + ' users'); })
-        .catch(e => showMsg('Failed: ' + e.message, false));
-    });
-    document.getElementById('vpBalanceRoles').addEventListener('click', () => {
-      const names = [];
-      document.querySelectorAll('#viewer_points_list tbody tr').forEach(tr => {
-        if (tr.style.display === 'none') return;
-        const cb = tr.querySelector('.vp-row-select');
-        if (cb && cb.checked && tr.dataset.user) names.push(tr.dataset.user);
-      });
-      if (!names.length) {
-        showMsg('Select at least one row with helper/hurter to rebalance', false);
-        return;
-      }
-      fetch('/api/viewer-points/rebalance-roles', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usernames: names }),
-      })
-        .then(r => r.json())
-        .then(d => {
-          if (d.error) throw new Error(d.error);
-          showMsg('Balanced: ' + d.helpers + ' helpers, ' + d.hurters + ' hurters (' + d.updated + ' users)', true);
-          loadViewerPoints(true);
-          logActivity('VP: balanced roles ' + d.updated + ' users');
-        })
         .catch(e => showMsg('Failed: ' + e.message, false));
     });
     document.getElementById('clearNonDonor').addEventListener('click', () => {
@@ -1936,7 +1752,6 @@
       document.getElementById('cfg-section-viewer').checked = cfg.sections.viewer !== false;
       document.getElementById('cfg-section-game').checked = cfg.sections.game !== false;
       document.getElementById('cfg-section-score').checked = cfg.sections.score !== false;
-      document.getElementById('cfg-section-helpers-hurters').checked = cfg.sections.helpers_hurters !== false;
       document.getElementById('cfg-section-activity').checked = cfg.sections.activity !== false;
       document.getElementById('overallConfigModal').classList.add('open');
     });
@@ -1955,7 +1770,6 @@
           viewer: document.getElementById('cfg-section-viewer').checked,
           game: document.getElementById('cfg-section-game').checked,
           score: document.getElementById('cfg-section-score').checked,
-          helpers_hurters: document.getElementById('cfg-section-helpers-hurters').checked,
           activity: document.getElementById('cfg-section-activity').checked,
         },
         order,
@@ -1974,12 +1788,11 @@
       document.getElementById('cfg-section-viewer').checked = true;
       document.getElementById('cfg-section-game').checked = true;
       document.getElementById('cfg-section-score').checked = true;
-      document.getElementById('cfg-section-helpers-hurters').checked = true;
       document.getElementById('cfg-section-activity').checked = true;
     });
     document.getElementById('overallConfigRestoreLayout').addEventListener('click', () => {
       const cfg = getOverallConfig();
-      cfg.order = ['general', 'monsters', 'viewer', 'game', 'score', 'helpers_hurters'];
+      cfg.order = ['general', 'monsters', 'viewer', 'game', 'score'];
       cfg.columnCounts = [2, 1, 2];
       saveOverallConfig(cfg);
       document.getElementById('overallConfigModal').classList.remove('open');
@@ -2220,7 +2033,7 @@
 
     // WebSocket inspector
     let ws = null, wsLastData = null, wsLastTime = 0, wsStaleInterval = null;
-    const WS_EVENT_TYPES = ['ping_result', 'spawn_result', 'champion_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result', 'trap_result', 'transmute_result', 'summon_bee_result', 'ward_result'];
+    const WS_EVENT_TYPES = ['ping_result', 'spawn_result', 'champion_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result', 'trap_result', 'bomb_result', 'transmute_result', 'summon_bee_result', 'ward_result'];
     function isGameStateMessage(data) {
       if (!data || typeof data !== 'object') return false;
       if (data.source !== 'shattered-pixel-dungeon') return false;

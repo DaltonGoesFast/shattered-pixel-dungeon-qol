@@ -17,7 +17,7 @@ This guide helps you emulate the full streaming setup so you can test and verify
 
 ## 1. Overlay Server
 
-The Flask server exposes **`/api/game-data`**, **`/api/points-config`** (GET/POST), viewer-points APIs (including bulk ops and **`/api/viewer-points/rebalance-roles`**), **`/api/streamer-chat-score`**, double-points endpoints, **`/api/activity-commands`**, and many forwarded chat routes such as **`/api/spawn-command`**, **`/api/champion-command`**, **`/api/gold-command`**, **`/api/trap-command`**, **`/api/transmute-command`**, **`/api/summon-bee-command`**, **`/api/ward-command`**, **`/api/corrupt-ally-command`**, helper/hurter commands, **`/api/wand-command`**, etc. See `Lastest UI/server.py` for the full list, or open **`http://localhost:5000/ws-inspect`** for a combined inspector.
+The Flask server exposes **`/api/game-data`**, **`/api/points-config`** (GET/POST), viewer-points APIs (including bulk ops), **`/api/streamer-chat-score`**, double-points endpoints, **`/api/activity-commands`**, and many forwarded chat routes such as **`/api/spawn-command`**, **`/api/champion-command`**, **`/api/gold-command`**, **`/api/trap-command`**, **`/api/transmute-command`**, **`/api/summon-bee-command`**, **`/api/ward-command`**, **`/api/corrupt-ally-command`**, **`/api/heal-command`**, **`/api/hex-command`**, and related spend routes, **`/api/wand-command`**, etc. See `Lastest UI/server.py` for the full list, or open **`http://localhost:5000/ws-inspect`** for a combined inspector.
 
 ```bash
 cd "Lastest UI"
@@ -41,7 +41,7 @@ Game WebSocket: ws://127.0.0.1:5001
 | URL | Purpose |
 |-----|---------|
 | `/overlay` | OBS browser source (game summary overlay) |
-| `/points-config` | Costs, helpers/hurters (incl. per-floor helper points), viewer points table, streamer vs chat score |
+| `/points-config` | Costs (including heal/cleanse/dew/corrupt ally/hex/degrade/sabotage), viewer points table, streamer vs chat score |
 | `/double-points-countdown` | Optional OBS text source for 2× countdown |
 | `/ws-inspect` | Live game JSON + config snapshot |
 
@@ -76,7 +76,7 @@ python points_command.py spawn rat YourUsername
 python points_command.py scroll YourUsername
 ```
 - Requires: overlay server running, game running with streaming, `viewer_points.txt` with enough points.
-- Creates `viewer_points.txt` if missing. Each line is: `username|totalPoints|lastActivityUnix|donationPts|role` (role: `helper`, `hurter`, or empty). Example chat-only user: `yourusername|100|0|0|`
+- Creates `viewer_points.txt` if missing. Each line is: `username|totalPoints|lastActivityUnix|donationPts|role` (optional fifth column may be legacy `helper`/`hurter` or empty; it is no longer used for discounts or command gating). Example chat-only user: `yourusername|100|0|0|`
 
 ### Spawn (via HTTP)
 ```bash
@@ -126,7 +126,7 @@ If you prefer not to use the export, follow [streamerbot-points-from-scratch.md]
 | Points config UI | Open `http://localhost:5000/points-config` | Page loads; Save writes `points_config.json` |
 | Game data | `curl http://localhost:5000/api/game-data` | JSON with `stats` (includes `depth`), `hero`, etc. when game is in a run and WS connected |
 | Spawn script | Ensure `viewer_points.txt` has `testuser|50|0|0|` (or use UI), run `python points_command.py spawn rat testuser` | `ok` in `spawn_result.txt` if game is running and has space |
-| Half-price | Be deeper than the mob’s native chapter, spawn a cheap sewer mob | Spawn cost reflects overlay rules (see `points_command.py` / config) |
+| Spawn zone pricing | Deeper than native depth: half price; earlier chapter than native: up to 3× (see `points_command.py`) | Costs match script when `/api/game-data` reports depth |
 | Streamer.bot import | After import, trigger one command + check game | No path errors; WebSocket shows connected if your actions require it |
 
 ---
@@ -138,4 +138,3 @@ If you prefer not to use the export, follow [streamerbot-points-from-scratch.md]
 - **"Not enough points"** — Raise balance in **points-config** or add a line to `viewer_points.txt` (`username|total|0|0|`).
 - **Paths in Streamer.bot** — Python and C# actions often use absolute paths from the export author. Update to your `Lastest UI` folder.
 - **Imported Streamer.bot profile: commands fire but game ignores** — Recreate **WebSocket Client** connection to `ws://127.0.0.1:<game port>`; confirm the game’s streaming toggle is on.
-- **Helper floor points not awarding** — Requires helpers/hurters system **on** (no `helpers_hurters_disabled.txt` lockout), `points_per_helper_on_new_floor` greater than `0` in `points_config.json`, and **descending** to a deeper floor (ascending does not grant).

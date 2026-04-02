@@ -4,45 +4,51 @@ Spend points to mess with the run! Earn points by chatting (1 per message, 30s c
 
 ---
 
-**HELPERS vs HURTERS** — Chat once to be assigned a side! Helpers earn bonus points when the streamer kills a boss; hurters earn when the hero dies. Each side gets 50% off certain commands (helpers: bee, ward, buff; hurters: curse, gas, trap, debuff). **!myside** shows your side. **!switch** costs 100 pts and has a long cooldown — choose wisely!
+**!points** — Check your balance (free)
 
----
+**!toppoints** / **!leaderboard** — Top 3 point holders (free)
 
-**!points** — Check your balance
+**!spawn** (monster) — Spawn a monster (cost varies by chapter/depth). Half price when deeper than the mob’s native depth; later mobs in earlier areas up to 3×. Examples: !spawn rat, !spawn bat, !spawn scorpio
 
-**!toppoints** / **!leaderboard** — Top 3 point holders
+**!champion** (monster) — Champion version (**2×** whatever !spawn would charge — same zone rules). Random champion type. Examples: !champion rat, !champion eye
 
-**!spawn** (monster) — Spawn a monster (cost varies). Half price when spawned beyond its native area. Examples: !spawn rat, !spawn bat, !spawn scorpio
+**!gold** (amount) — Drop gold near the hero (**5** pts per gold, 1–100). Example: !gold 25
 
-**!champion** (monster) — Spawn a champion version of that monster (2× base cost, no discount). Random champion type. Examples: !champion rat, !champion eye
+**!curse** — Curse a random equipped item (**100** pts)
 
-**!gold** (amount) — Drop gold near the hero (5 pts per gold, 1–100). Example: !gold 25
+**!gas** — Spawn random gas (**75** pts). Toxic, confusion, storm clouds, inferno, and more!
 
-**!curse** — Curse a random equipped item (200 pts)
+**!scroll** — Use a random scroll (**100** pts). Like +10 Unstable Spellbook — 50% chance for exotic version!
 
-**!gas** — Spawn random gas (75 pts). Toxic, confusion, storm clouds, inferno, and more!
+**!trap** — Place a random visible trap nearby (**50** pts). Shocking, toxic, burning, teleport, summon, and more!
 
-**!scroll** — Use a random scroll (100 pts). Like +10 Unstable Spellbook — 50% chance for exotic version!
+**!bomb** — Drop a weighted random lit bomb nearby (**75** pts). Regular and alchemy bombs; fuse like a thrown bomb.
 
-**!trap** — Place a random visible trap nearby (50 pts). Shocking, toxic, burning, teleport, summon, and more!
+**!transmute** — Transmute a random transmutable item from bag or equipped (**150** pts). Same rules as Scroll of Transmutation.
 
-**!transmute** — Transmute a random transmutable item from bag or equipped (150 pts). Same rules as Scroll of Transmutation.
+**!bee** — Summon an allied bee for **150** turns (**40** pts). Fights for you like honeyed healing!
 
-**!bee** — Summon an allied bee for 50 turns (30 pts). Fights for you like honeyed healing!
+**!ward** — Summon a ward (**9** pts). Scales with depth; upgrades existing ward if same tile.
 
-**!ward** — Summon a ward (9 pts). Scales with depth; upgrades existing ward if same tile.
+**!buff** — Apply a random buff (**75** pts). Haste, Healing, Barrier, Invisibility, and more!
 
-**!buff** — Apply a random buff (75 pts). Haste, Healing, Barrier, Invisibility, and more!
+**!debuff** — Apply a random debuff (**50** pts). Blindness, Slow, Roots, Daze, and more!
 
-**!debuff** — Apply a random debuff (50 pts). Blindness, Slow, Roots, Daze, and more!
+**!wand** — Random cursed wand effect (weighted rarities); **75** pts. Burn, freeze, teleport, gas, sheep, and more!
 
-**!wand** (tier) — Trigger a cursed wand effect. Tier required: common (50 pts), uncommon (100 pts), rare (200 pts), or veryrare (400 pts). Burn, freeze, teleport, gas, sheep, and more!
+**!heal** — Heal hero ~15% HP (**25** pts)
 
-**Helper only:** !heal (25 pts), !cleanse (25 pts), !dew (5 pts), !corruptally (40 pts — summons a corrupted ally from the current biome, boss floors allowed)
+**!cleanse** — Remove one random debuff (**25** pts)
 
-**Hurter only:** !hex (75 pts), !degrade (75 pts), !sabotage (75 pts)
+**!dew** — Drop a dewdrop near the hero (**5** pts)
 
-**!switch** — Switch helper ↔ hurter (100 pts, long cooldown)
+**!corruptally** — Summon a corrupted ally from the current biome (**40** pts)
+
+**!hex** — Apply Hex debuff (**75** pts)
+
+**!degrade** — Apply Degrade debuff (**75** pts)
+
+**!sabotage** — Remove one random positive buff (**75** pts)
 
 ---
 
@@ -61,6 +67,6 @@ Spend points to mess with the run! Earn points by chatting (1 per message, 30s c
 - 70 pts: eye
 - 80 pts: scorpio
 
-**Champion:** 2× base cost (no zone discount). e.g. !champion rat = 10 pts, !champion eye = 140 pts.
+**Champion:** 2× zone-adjusted spawn cost (final price depends on depth like !spawn).
 
-*Prices can be changed at any time by the streamer but are correct for the most part.*
+*These prices match the streamer’s points overlay config. They can be changed anytime.*

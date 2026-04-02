@@ -101,6 +101,17 @@ import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfTransmutat
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfTeleportation;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfTransmutation;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.exotic.ExoticScroll;
+import com.shatteredpixel.shatteredpixeldungeon.items.bombs.ArcaneBomb;
+import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
+import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Firebomb;
+import com.shatteredpixel.shatteredpixeldungeon.items.bombs.FlashBangBomb;
+import com.shatteredpixel.shatteredpixeldungeon.items.bombs.FrostBomb;
+import com.shatteredpixel.shatteredpixeldungeon.items.bombs.HolyBomb;
+import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Noisemaker;
+import com.shatteredpixel.shatteredpixeldungeon.items.bombs.RegrowthBomb;
+import com.shatteredpixel.shatteredpixeldungeon.items.bombs.ShrapnelBomb;
+import com.shatteredpixel.shatteredpixeldungeon.items.bombs.SmokeBomb;
+import com.shatteredpixel.shatteredpixeldungeon.items.bombs.WoollyBomb;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.AlarmTrap;
@@ -472,6 +483,61 @@ public final class StreamingCommandHandler {
 		return trapName;
 	}
 
+	/** Weighted chat bomb pool (profile "B" + Noisemaker = Arcane weight, Regrowth = 1). */
+	@SuppressWarnings("unchecked")
+	private static final Class<? extends Bomb>[] CHAT_BOMB_CLASSES = new Class[]{
+			Bomb.class, FrostBomb.class, Firebomb.class, HolyBomb.class, SmokeBomb.class, WoollyBomb.class,
+			FlashBangBomb.class, ArcaneBomb.class, Noisemaker.class, ShrapnelBomb.class, RegrowthBomb.class
+	};
+	private static final float[] CHAT_BOMB_WEIGHTS = new float[]{
+			28, 18, 16, 12, 8, 8, 4, 4, 4, 2, 1
+	};
+
+	/** Spawn a weighted random lit bomb near the hero. Returns bomb name on success, ERR:... on failure. */
+	public static String handleSpawnBomb(String username) {
+		if (Dungeon.hero == null || Dungeon.level == null)
+			return "ERR:Not in an active run (title/menu)";
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+			return "ERR:Not in an active run (title/menu)";
+		if (!Dungeon.hero.isAlive())
+			return "ERR:Hero is dead";
+
+		int heroPos = Dungeon.hero.pos;
+		boolean[] spawnPassable = new boolean[Dungeon.level.length()];
+		for (int i = 0; i < spawnPassable.length; i++) {
+			spawnPassable[i] = Dungeon.level.passable[i] || Dungeon.level.avoid[i];
+		}
+		PathFinder.buildDistanceMap(heroPos, spawnPassable, SPAWN_RADIUS);
+
+		ArrayList<Integer> candidates = new ArrayList<>();
+		for (int p = 0; p < Dungeon.level.length(); p++) {
+			int d = PathFinder.distance[p];
+			if (d < 1 || d > SPAWN_RADIUS) continue;
+			if (Actor.findChar(p) != null) continue;
+			if (!Dungeon.level.passable[p] && !Dungeon.level.avoid[p]) continue;
+			if (Dungeon.level.pit[p]) continue;
+			candidates.add(p);
+		}
+		if (candidates.isEmpty())
+			return "ERR:No space to drop bomb (hero surrounded or no valid tiles)";
+
+		int cell = Random.element(candidates);
+		int idx = Random.chances(CHAT_BOMB_WEIGHTS);
+		Class<? extends Bomb> bombClass = CHAT_BOMB_CLASSES[idx];
+		Bomb bomb = Reflection.newInstance(bombClass);
+		if (bomb == null)
+			return "ERR:Failed to create bomb";
+
+		// Light fuse before drop so ItemSprite.link → view(heap) reads glowing() with fuse set (same order as Bomb.onThrow).
+		bomb.startFuseAfterDrop(cell);
+		Dungeon.level.drop(bomb, cell).sprite.drop();
+
+		String bombName = bomb.name();
+		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
+		GLog.w(Messages.get(StreamingCommandHandler.class, "chat_bomb"), chatter, bombName);
+		return bombName;
+	}
+
 	/** Transmute a random transmutable item (bag or equipped). Returns new item name on success, error on failure. */
 	public static String handleTransmute(String username) {
 		if (Dungeon.hero == null || Dungeon.level == null)
@@ -492,7 +558,7 @@ public final class StreamingCommandHandler {
 		return resultName;
 	}
 
-	/** Summon an allied bee next to the hero (lasts 50 turns). Returns "Bee" on success, error on failure. */
+	/** Summon an allied bee next to the hero (lasts 150 turns). Returns "Bee" on success, error on failure. */
 	public static String handleSummonBee(String username) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
@@ -501,7 +567,7 @@ public final class StreamingCommandHandler {
 		if (!Dungeon.hero.isAlive())
 			return "ERR:Hero is dead";
 
-		if (!Bee.spawnAllyForChat(Dungeon.hero, 50))
+		if (!Bee.spawnAllyForChat(Dungeon.hero, 150))
 			return "ERR:No space for bee (hero surrounded)";
 
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
@@ -857,7 +923,7 @@ public final class StreamingCommandHandler {
 		return debuffName;
 	}
 
-	/** Helper-exclusive: Heal hero ~15% HP. Returns null on success, ERR:... on failure. */
+	/** Chat command: heal hero ~15% HP. Returns null on success, ERR:... on failure. */
 	public static String handleChatHeal(String username) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
@@ -876,7 +942,7 @@ public final class StreamingCommandHandler {
 		return "Healing";
 	}
 
-	/** Helper-exclusive: Remove one random negative buff. Returns buff name on success, ERR:... on failure. */
+	/** Chat command: remove one random negative buff. Returns buff name on success, ERR:... on failure. */
 	public static String handleChatCleanse(String username) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
@@ -901,7 +967,7 @@ public final class StreamingCommandHandler {
 		return buffName;
 	}
 
-	/** Helper-exclusive: Drop dewdrop near hero. Returns "Dewdrop" on success, ERR:... on failure. */
+	/** Chat command: drop dewdrop near hero. Returns "Dewdrop" on success, ERR:... on failure. */
 	public static String handleChatDew(String username) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
@@ -936,7 +1002,7 @@ public final class StreamingCommandHandler {
 		return "Dewdrop";
 	}
 
-	/** Helper-exclusive: Summon a corrupted (allied) enemy from the current biome. Boss floors allowed. Returns mob name on success, ERR:... on failure. */
+	/** Chat command: summon a corrupted (allied) enemy from the current biome. Boss floors allowed. Returns mob name on success, ERR:... on failure. */
 	public static String handleChatCorruptAlly(String username) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
@@ -999,7 +1065,7 @@ public final class StreamingCommandHandler {
 		return mobName;
 	}
 
-	/** Hurter-exclusive: Apply Hex debuff. Returns "Hex" on success, ERR:... on failure. */
+	/** Chat command: apply Hex debuff. Returns "Hex" on success, ERR:... on failure. */
 	public static String handleChatHex(String username) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
@@ -1015,7 +1081,7 @@ public final class StreamingCommandHandler {
 		return "Hex";
 	}
 
-	/** Hurter-exclusive: Apply Degrade debuff. Returns "Degrade" on success, ERR:... on failure. */
+	/** Chat command: apply Degrade debuff. Returns "Degrade" on success, ERR:... on failure. */
 	public static String handleChatDegrade(String username) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
@@ -1031,7 +1097,7 @@ public final class StreamingCommandHandler {
 		return "Degrade";
 	}
 
-	/** Hurter-exclusive: Remove one random positive buff. Returns buff name on success, ERR:... on failure. */
+	/** Chat command: remove one random positive buff. Returns buff name on success, ERR:... on failure. */
 	public static String handleChatSabotage(String username) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";

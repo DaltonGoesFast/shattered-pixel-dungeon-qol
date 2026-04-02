@@ -22,28 +22,25 @@ When a spawn or champion command reaches a live run through the streaming server
 - **ChatSpawned marking:** Enemies get the **`ChatSpawned`** buff — **region-scaled XP** when killed (by dungeon chapter instead of the mob’s raw base XP, so early floors aren’t flooded with late-game XP) and a **visible dark “champion-style” aura** (cosmetic).
 - **Out-of-depth tuning:** Spawning something **above** the current floor’s native area applies **`SpawnScaled`** — HP is scaled down toward the current depth, and **outgoing damage and effective armor** are scaled down further so the fight stays closer to fair.
 - **Cross-region spawn stagger:** Spawning a mob **far above** its home chapter can apply **short paralysis** on arrival (duration scales with how far “up” you pulled it), giving a beat to reposition.
-- **Variant rolls:** `!spawn shaman` / champions pick a **random Red / Blue / Purple** shaman; `elemental` similarly rolls an elemental variant. **Champion** spawns add a **random champion modifier** (e.g. Blazing, Antimagic, Growing) at **double the normal point cost** and **without** the “native zone half off” discount used by plain spawns (see [COMMANDS.md](COMMANDS.md)).
-- **Spawn point discount (overlay):** Ordinary **`!spawn`** can cost **half** when the mob is requested on a **deeper chapter than its native home** (e.g. sewer-tier mobs on prison+). **`!champion`** does not use that discount.
+- **Variant rolls:** `!spawn shaman` / champions pick a **random Red / Blue / Purple** shaman; `elemental` similarly rolls an elemental variant. **Champion** spawns add a **random champion modifier** (e.g. Blazing, Antimagic, Growing) at **2×** whatever **`!spawn`** would charge at the current depth (same half-price / early-surcharge rules; see [COMMANDS.md](COMMANDS.md)).
+- **Spawn zone pricing (overlay):** **`!spawn`** is **half** the table cost when **deeper** than the mob’s native depth, and **2×–3×** when spawning **later-chapter** mobs in **earlier** areas (details in `points_command.py`). **`!champion`** uses **2×** that zone-adjusted spawn cost.
 - **Ghoul splits:** Ghoul children spawned from a chat-spawned ghoul **inherit** `ChatSpawned` (and `SpawnScaled` when relevant) so behavior stays consistent.
 
-### Helpers vs hurters (when the points system enables roles)
+### Extra chat spend commands
 
-- First-time chatters can be assigned **helper** or **hurter**; helpers get **bonus points on boss kills**, hurters on **hero death** (exact rates live in the overlay config).
-- **Side discounts:** Helpers get **50% off** `!bee`, `!ward`, `!buff` (and their discount applies to **`!corruptally`**). Hurters get **50% off** `!curse`, `!gas`, `!trap`, `!debuff`.
-- **Side-specific commands:** Helpers: **`!heal`**, **`!cleanse`**, **`!dew`**, **`!corruptally`** (summons a **corrupted ally** from the **current biome**, boss floors allowed). Hurters: **`!hex`**, **`!degrade`**, **`!sabotage`** — removes a **random positive buff that has a visible icon** (silent / iconless buffs are not eligible).
-- **Role switch:** **`!switch`** costs points and uses a **long cooldown** (overlay-configurable).
+Viewers can use **`!heal`**, **`!cleanse`**, **`!dew`**, **`!corruptally`** (corrupted ally from the **current biome**, boss floors allowed), **`!hex`**, **`!degrade`**, and **`!sabotage`** (removes a **random positive buff that has a visible icon**). Costs are set in the overlay; there are no helper/hurter roles or side discounts.
 
 ### Other run-affecting chat actions (summary)
 
 Full syntax and tables live in **[COMMANDS.md](COMMANDS.md)**. At a glance, viewers can spend points to:
 
-- Spawn normal or **champion** mobs, drop **gold**, apply **curse** to a random equipped item, spawn **gas** or **traps**, fire a random **scroll** or **cursed wand** tier, **transmute** an item, summon **bees** / **wards**, shuffle **buffs** and **debuffs**, and (streamer-only) run **`!doublepoints`**.
+- Spawn normal or **champion** mobs, drop **gold**, apply **curse** to a random equipped item, spawn **gas** or **traps**, fire a random **scroll** or **cursed wand** (**!wand**, one price, weighted effect), **transmute** an item, summon **bees** / **wards**, shuffle **buffs** and **debuffs**, and (streamer-only) run **`!doublepoints`**.
 
 Point costs in the tables are the **defaults**; the overlay can override them.
 
 ### What is configurable (without rebuilding the game)
 
-- **Per-command costs,** role discounts, helper/hurter exclusivity, and overlay behavior (see `Lastest UI` config / overlay).
+- **Per-command costs** and overlay behavior (see `Lastest UI` config / overlay). Optional per-command **disable** via `command_allowed_roles` in `points_config.json` (`"disabled"`).
 - **Game settings:** tile indicator, quickslot swapper, boss bar on all enemies, and other SPD interface toggles.
 
 ---

@@ -117,6 +117,13 @@ public class Bomb extends Item {
 		return new Fuse();
 	}
 
+	/** Start the lit fuse (same delay as a thrown lit bomb). For floor drops, call **before** {@link com.shatteredpixel.shatteredpixeldungeon.levels.Level#drop(Item, int)} so the heap {@link com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSprite} picks up {@link #glowing()}. Skips ignition on chasm. */
+	public void startFuseAfterDrop( int cell ) {
+		if (!Dungeon.level.pit[ cell ]) {
+			Actor.addDelayed(fuse = createFuse().ignite(this), 2);
+		}
+	}
+
 	@Override
 	protected void onThrow( int cell ) {
 		if (!Dungeon.level.pit[ cell ] && lightingFuse) {

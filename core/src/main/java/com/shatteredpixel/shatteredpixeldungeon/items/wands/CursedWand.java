@@ -189,7 +189,7 @@ public class CursedWand {
 	}
 
 	/** Chat command: pick random valid effect excluding given classes. Returns effect and rarity (0=common, 1=uncommon, 2=rare, 3=very_rare).
-	 * If tier >= 0, picks only from that tier; otherwise random by EFFECT_CAT_CHANCES. */
+	 * If tier >= 0, picks only from that tier; if tier < 0 (unified !wand), random by EFFECT_CAT_CHANCES (60/30/9/1). */
 	public static CursedEffect randomValidEffectExcluding(Item origin, Char user, Ballistica bolt, boolean positiveOnly,
 			java.util.Set<Class<? extends CursedEffect>> excluded, int[] outRarity, int tier) {
 		int rarity;

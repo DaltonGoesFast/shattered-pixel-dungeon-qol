@@ -299,6 +299,22 @@ public class StreamingServer extends WebSocketServer {
 						broadcast(resp.toString());
 					}
 				});
+			} else if ("bomb".equals(cmd)) {
+				Gdx.app.postRunnable(() -> {
+					String result = StreamingCommandHandler.handleSpawnBomb(usernameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String bombName = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "bomb_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (bombName != null) resp.addProperty("bomb_name", bombName);
+						if (err != null) resp.addProperty("error", err);
+						broadcast(resp.toString());
+					}
+				});
 			} else if ("transmute".equals(cmd)) {
 				Gdx.app.postRunnable(() -> {
 					String result = StreamingCommandHandler.handleTransmute(usernameFinal);
