@@ -26,8 +26,8 @@ Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also g
 |---------|------|-------------|
 | **!points** | Free | Check your balance |
 | **!toppoints** / **!leaderboard** | Free | Top 3 point holders |
-| **!spawn** \<monster\> | Varies | Spawn a monster (cost varies by monster and **zone**). **Half price** when deeper than the mob’s native depth; **up to 3×** when spawning later-chapter mobs in earlier areas (see `points_command.py`). Examples: `!spawn rat`, `!spawn bat`, `!spawn scorpio` |
-| **!champion** \<monster\> | 2× spawn | Spawn a **champion** version of that monster (**2×** the zone-adjusted `!spawn` cost — same early/late rules). Random type: Blazing, Projecting, Antimagic, Giant, Blessed, Growing. Examples: `!champion rat`, `!champion eye` |
+| **!spawn** \<monster\> | Varies | Spawn a monster. Uses the table **base** for that mob, then compares current **depth** to the mob’s natural **first** floor (see `NATIVE_DEPTH` / `_dungeon_region` in `Lastest UI/points_command.py`). **Deeper** than that floor → **½** base (int divide, min 1). **Shallower** (still before that floor) → **1×–3×** base from **chapter** (5-floor block) rules: e.g. late-chapter mobs in sewers/prison cost up to **3×**; many “one chapter early” cases are **2×**, including some same-Caves-earlier-floor spawns. Examples: `!spawn rat`, `!spawn bat`, `!spawn scorpio` |
+| **!champion** \<monster\> | 2× spawn | Spawn a **champion** version (**2×** the same depth/chapter-adjusted cost as `!spawn` would be here—not 2× the raw table base). Random type: Blazing, Projecting, Antimagic, Giant, Blessed, Growing. Examples: `!champion rat`, `!champion eye` |
 | **!gold** \<amount\> | 5 / gold | Drop gold near the hero (**5** pts per gold, 1–100). Example: `!gold 25` |
 | **!curse** | 100 | Curse a **random** equipped item. No slot needed — picks weapon, armor, ring, artifact, or misc at random. |
 | **!gas** | 75 | Spawn random gas. Toxic, confusion, storm clouds, inferno, blizzard, and more! |
@@ -45,6 +45,8 @@ Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also g
 ---
 
 ## Monster costs (base)
+
+These are **before** the spawn depth/chapter multiplier or half-off rule above.
 
 | Cost | Monsters |
 |------|----------|
@@ -64,7 +66,7 @@ Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also g
 
 ---
 
-**Champion:** 2× whatever `!spawn` would charge at the current depth (examples vary with zone; e.g. deep cheap mobs can be less than 2× table base).
+**Champion:** 2× whatever `!spawn` would charge at the current depth after base + depth/chapter adjustment (e.g. a discounted deep spawn stays discounted before the ×2).
 
 *Costs are configurable by the streamer (points config / overlay).*
 
