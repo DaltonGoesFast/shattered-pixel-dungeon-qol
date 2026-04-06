@@ -475,6 +475,22 @@ public class StreamingServer extends WebSocketServer {
 						broadcast(resp.toString());
 					}
 				});
+			} else if ("ring_of_wealth".equals(cmd)) {
+				Gdx.app.postRunnable(() -> {
+					String result = StreamingCommandHandler.handleRingOfWealthDrop(usernameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String detail = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "ring_of_wealth_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (detail != null) resp.addProperty("detail", detail);
+						if (err != null) resp.addProperty("error", err);
+						broadcast(resp.toString());
+					}
+				});
 			}
 		} catch (Exception ignored) {}
 	}

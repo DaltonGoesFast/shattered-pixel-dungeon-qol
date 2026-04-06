@@ -3,6 +3,7 @@
   "cost_per_curse": 100,
   "cost_per_gas": 75,
   "cost_per_scroll": 100,
+  "cost_per_ring_of_wealth": 100,
   "cost_per_trap": 50,
   "cost_per_bomb": 75,
   "cost_per_transmute": 150,

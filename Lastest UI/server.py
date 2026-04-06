@@ -223,7 +223,7 @@ def _game_ws_on_message(ws, message):
     try:
         data = json.loads(message)
         # Handle spawn/gold result (game reports success/failure)
-        if data.get('type') in ('ping_result', 'spawn_result', 'champion_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result', 'trap_result', 'bomb_result', 'transmute_result', 'summon_bee_result', 'ward_result', 'heal_result', 'cleanse_result', 'dew_result', 'corrupt_ally_result', 'hex_result', 'degrade_result', 'sabotage_result'):
+        if data.get('type') in ('ping_result', 'spawn_result', 'champion_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result', 'trap_result', 'bomb_result', 'transmute_result', 'summon_bee_result', 'ward_result', 'heal_result', 'cleanse_result', 'dew_result', 'corrupt_ally_result', 'hex_result', 'degrade_result', 'sabotage_result', 'ring_of_wealth_result'):
             rid = data.get('request_id')
             ok = data.get('success', False)
             if rid:
@@ -311,6 +311,10 @@ def _game_ws_on_message(ws, message):
                         if data.get('type') == 'sabotage_result' and data.get('buff_name'):
                             pending_spawns[rid]['buff_name'] = data.get('buff_name')
                         if data.get('type') == 'sabotage_result' and data.get('error'):
+                            pending_spawns[rid]['error'] = data.get('error')
+                        if data.get('type') == 'ring_of_wealth_result' and data.get('detail'):
+                            pending_spawns[rid]['detail'] = data.get('detail')
+                        if data.get('type') == 'ring_of_wealth_result' and data.get('error'):
                             pending_spawns[rid]['error'] = data.get('error')
                         pending_spawns[rid]['event'].set()
             print(f"Game {data.get('type')}: request_id={rid} success={ok}")
@@ -531,6 +535,7 @@ def points_config_api():
                 data.setdefault("cost_per_degrade", 100)
                 data.setdefault("cost_per_sabotage", 75)
                 data.setdefault("cost_per_corrupt_ally", 100)
+                data.setdefault("cost_per_ring_of_wealth", 100)
                 data.setdefault("command_allowed_roles", {})
                 data.setdefault("cost_per_wand", 75)
                 data.setdefault("cost_per_bomb", 75)
@@ -563,6 +568,7 @@ def points_config_api():
                     "cost_per_degrade": 100,
                     "cost_per_sabotage": 75,
                     "cost_per_corrupt_ally": 100,
+                    "cost_per_ring_of_wealth": 100,
                     "command_allowed_roles": {},
                 }
             free_until = {}
@@ -602,6 +608,7 @@ def points_config_api():
             "cost_per_degrade": max(1, int(data.get("cost_per_degrade", 100))),
             "cost_per_sabotage": max(1, int(data.get("cost_per_sabotage", 75))),
             "cost_per_corrupt_ally": max(1, int(data.get("cost_per_corrupt_ally", 100))),
+            "cost_per_ring_of_wealth": max(1, int(data.get("cost_per_ring_of_wealth", 100))),
             "command_allowed_roles": data.get("command_allowed_roles") or {},
         }
         for k, v in (data.get("cost_per_monster") or {}).items():
@@ -1476,6 +1483,54 @@ def scroll_command():
         return jsonify({'ok': False, 'error': err}), 200
     except Exception as e:
         print(f"Scroll 400 exception: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 400
+
+
+@app.route('/api/ring-of-wealth-command', methods=['POST', 'OPTIONS'])
+def ring_of_wealth_command():
+    """Receive Ring of Wealth loot command from Streamer.bot; forward to game via WebSocket."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        if not data and request.form:
+            data = request.form.to_dict()
+        username = (data.get('username') or '').strip() or None
+        if not game_ws_app:
+            return jsonify({'ok': False, 'error': 'Game not connected'}), 503
+        request_id = str(uuid.uuid4())
+        ev = threading.Event()
+        with spawn_lock:
+            pending_spawns[request_id] = {'event': ev, 'success': False}
+        try:
+            payload = {'command': 'ring_of_wealth', 'request_id': request_id}
+            if username:
+                payload['username'] = username
+            print(f"Ring of wealth send to game: request_id={request_id}")
+            game_ws_app.send(json.dumps(payload))
+        except Exception as e:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': str(e)}), 503
+        if ev.wait(timeout=SPAWN_RESULT_TIMEOUT):
+            with spawn_lock:
+                pending = pending_spawns.pop(request_id, {})
+                success = pending.get('success', False)
+                detail = pending.get('detail', '')
+                row_error = pending.get('error')
+        else:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': 'Ring of wealth command timed out'}), 504
+        if success:
+            print(f"Ring of wealth OK: {detail!r} for {username}")
+            _record_command_event(username, 'ring_of_wealth', detail or '', True)
+            return jsonify({'ok': True, 'detail': detail})
+        err = row_error or 'Ring of wealth command failed'
+        _record_command_event(username, 'ring_of_wealth', '', False)
+        return jsonify({'ok': False, 'error': err}), 200
+    except Exception as e:
+        print(f"Ring of wealth 400 exception: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 400
 
 

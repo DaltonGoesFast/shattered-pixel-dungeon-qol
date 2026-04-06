@@ -319,6 +319,9 @@ public class TalentsPane extends ScrollPane {
 		}
 
 		void refreshTierDisplay() {
+			if (Dungeon.hero != null) {
+				Dungeon.hero.pruneStaleTalentAutoPlanEntries( tier );
+			}
 			for (TalentButton b : buttons) {
 				b.syncFromHero();
 			}

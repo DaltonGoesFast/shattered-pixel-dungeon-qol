@@ -21,6 +21,7 @@
 
 package com.shatteredpixel.shatteredpixeldungeon.desktop;
 
+import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
@@ -93,6 +94,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.MagesStaff;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.MissileWeapon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
 import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
+import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfWealth;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.Scroll;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfIdentify;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfMagicMapping;
@@ -405,6 +407,89 @@ public final class StreamingCommandHandler {
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		GLog.h(Messages.get(StreamingCommandHandler.class, "chat_gold_dropped"), chatter, amount);
 		return null;
+	}
+
+	/** Virtual Ring of Wealth upgrade level by chapter (stream command). */
+	private static int wealthRingLevelForDepth(int depth) {
+		if (depth <= 5) return 1;
+		if (depth <= 10) return 3;
+		if (depth <= 15) return 5;
+		if (depth <= 20) return 7;
+		return 10;
+	}
+
+	/**
+	 * Ring of Wealth–style bonus loot for chat: simulates a kill roll from a random current-biome mob,
+	 * uses forced ring tier by depth; guarantees at least one consumable-style item if the main pass yields nothing.
+	 * Returns comma-separated item titles on success, or ERR:... on failure.
+	 */
+	public static String handleRingOfWealthDrop(String username) {
+		if (Dungeon.hero == null || Dungeon.level == null)
+			return "ERR:Not in an active run (title/menu)";
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+			return "ERR:Not in an active run (title/menu)";
+		if (!Dungeon.hero.isAlive())
+			return "ERR:Hero is dead";
+
+		int heroPos = Dungeon.hero.pos;
+		boolean[] spawnPassable = new boolean[Dungeon.level.length()];
+		for (int i = 0; i < spawnPassable.length; i++) {
+			spawnPassable[i] = Dungeon.level.passable[i] || Dungeon.level.avoid[i];
+		}
+		PathFinder.buildDistanceMap(heroPos, spawnPassable, SPAWN_RADIUS);
+
+		ArrayList<Integer> candidates = new ArrayList<>();
+		for (int p = 0; p < Dungeon.level.length(); p++) {
+			int d = PathFinder.distance[p];
+			if (d < 1 || d > SPAWN_RADIUS) continue;
+			if (Actor.findChar(p) != null) continue;
+			if (!Dungeon.level.passable[p] && !Dungeon.level.avoid[p]) continue;
+			candidates.add(p);
+		}
+		if (candidates.isEmpty())
+			return "ERR:No space to drop loot (hero surrounded)";
+
+		int cell = Random.element(candidates);
+
+		ArrayList<Class<? extends Mob>> rotation = MobSpawner.getMobRotation(Dungeon.depth);
+		if (rotation == null || rotation.isEmpty())
+			return "ERR:No mob rotation for this depth";
+
+		Class<? extends Mob> mobClass = Random.element(rotation);
+		Mob sample = Reflection.newInstance(mobClass);
+		if (sample == null)
+			return "ERR:Failed to sample mob";
+
+		int rolls = 1;
+		if (Char.hasProp(sample, Char.Property.BOSS)) rolls = 15;
+		else if (Char.hasProp(sample, Char.Property.MINIBOSS)) rolls = 5;
+
+		int wealthLvl = wealthRingLevelForDepth(Dungeon.depth);
+		ArrayList<Item> bonus = RingOfWealth.tryForBonusDrop(Dungeon.hero, rolls, wealthLvl);
+
+		ArrayList<Item> toDrop = new ArrayList<>();
+		if (bonus != null) {
+			toDrop.addAll(bonus);
+		}
+		if (toDrop.isEmpty()) {
+			Item i;
+			do {
+				i = RingOfWealth.genConsumableDrop(wealthLvl - 1);
+			} while (Challenges.isItemBlocked(i));
+			toDrop.add(i);
+		}
+
+		StringBuilder titles = new StringBuilder();
+		for (Item it : toDrop) {
+			Dungeon.level.drop(it, cell).sprite.drop();
+			if (titles.length() > 0) titles.append(", ");
+			titles.append(it.title());
+		}
+		RingOfWealth.showFlareForBonusDrop(Dungeon.hero.sprite);
+
+		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
+		GLog.p(Messages.get(StreamingCommandHandler.class, "chat_ring_of_wealth"), chatter, titles.toString());
+		return titles.toString();
 	}
 
 	// All traps that can be chosen for chat spawn. Remove classes from TRAP_BLACKLIST to allow them.
@@ -995,7 +1080,7 @@ public final class StreamingCommandHandler {
 			return "ERR:No space to drop dewdrop (hero surrounded)";
 
 		int cell = Random.element(candidates);
-		Dungeon.level.drop(new Dewdrop(), cell).sprite.drop();
+		Dungeon.level.drop(new Dewdrop(), cell, true).sprite.drop();
 
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		GLog.h(Messages.get(StreamingCommandHandler.class, "chat_dew"), chatter);

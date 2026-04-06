@@ -977,8 +977,12 @@ public abstract class Level implements Bundlable {
 	}
 	
 	public Heap drop( Item item, int cell ) {
+		return drop( item, cell, false );
+	}
 
-		if (item == null || Challenges.isItemBlocked(item)){
+	public Heap drop( Item item, int cell, boolean bypassChallengeItemBlock ) {
+
+		if (item == null || (!bypassChallengeItemBlock && Challenges.isItemBlocked(item))){
 
 			//create a dummy heap, give it a dummy sprite, don't add it to the game, and return it.
 			//effectively nullifies whatever the logic calling this wants to do, including dropping items.
@@ -1010,7 +1014,7 @@ public abstract class Level implements Bundlable {
 			do {
 				n = cell + PathFinder.NEIGHBOURS8[Random.Int( 8 )];
 			} while (!passable[n] && !avoid[n]);
-			return drop( item, n );
+			return drop( item, n, bypassChallengeItemBlock );
 			
 		} else {
 			heap.drop(item);

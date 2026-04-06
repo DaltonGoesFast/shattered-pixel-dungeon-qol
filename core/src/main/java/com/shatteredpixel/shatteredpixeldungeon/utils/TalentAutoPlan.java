@@ -21,8 +21,6 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
 public class TalentAutoPlan {
 
@@ -35,12 +33,19 @@ public class TalentAutoPlan {
 		for (int pass = 0; pass < maxPasses; pass++) {
 			boolean progress = false;
 			for (int tier = 1; tier <= Talent.MAX_TALENT_TIERS; tier++) {
-				List<String> order = orderList( hero, tier );
-				for (String name : order) {
+				hero.pruneStaleTalentAutoPlanEntries( tier );
+				ArrayList<String> order = hero.talentAutoOrderForTier( tier );
+				if (order == null || order.isEmpty()) {
+					continue;
+				}
+				for (int i = 0; i < order.size(); i++) {
+					String name = order.get( i );
 					Talent t;
 					try {
 						t = Talent.valueOf( name );
 					} catch (IllegalArgumentException e) {
+						order.remove( i );
+						i--;
 						continue;
 					}
 					if (!hero.talents.get( tier - 1 ).containsKey( t )) {
@@ -53,6 +58,8 @@ public class TalentAutoPlan {
 						continue;
 					}
 					hero.upgradeTalent( t );
+					order.remove( i );
+					i--;
 					Statistics.qualifiedForRandomVictoryBadge = false;
 					progress = true;
 				}
@@ -61,10 +68,5 @@ public class TalentAutoPlan {
 				break;
 			}
 		}
-	}
-
-	private static List<String> orderList( Hero hero, int tier ) {
-		ArrayList<String> o = hero.talentAutoOrderForTier( tier );
-		return o == null ? Collections.emptyList() : o;
 	}
 }

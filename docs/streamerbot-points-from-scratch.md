@@ -72,12 +72,13 @@ Use this list when updating an **existing** setup. Game code fixes (corrupt `!al
 | 30 | !degrade | !degrade | Apply Degrade debuff |
 | 31 | !sabotage | !sabotage | Remove one random buff |
 | 36 | Bomb | !bomb | Spend points; weighted random lit bomb 1–4 tiles from hero |
+| 37 | Ring of Wealth loot | !row | Spend points; RoW-style drops by chapter, always ≥1 item |
 
 ---
 
 ## YouTube Support
 
-- **Commands (!spawn, !champion, !gold, !curse, !gas, !scroll, !trap, !bomb, !transmute, !bee, !ward, !buff, !debuff, !wand, !points, !toppoints, !corruptally, !heal, !cleanse, !dew, !hex, !degrade, !sabotage):** When creating the command, enable **both Twitch and YouTube** as sources so one action handles both platforms.
+- **Commands (!spawn, !champion, !gold, !curse, !gas, !scroll, !row, !trap, !bomb, !transmute, !bee, !ward, !buff, !debuff, !wand, !points, !toppoints, !corruptally, !heal, !cleanse, !dew, !hex, !degrade, !sabotage):** When creating the command, enable **both Twitch and YouTube** as sources so one action handles both platforms.
 - **Earn Points (message):** Add **Message Received** from YouTube → Triggers to the same action, or create a duplicate action with the YouTube trigger.
 - **Earn Points (passive):** Add **Present Viewers** from YouTube → Triggers (YouTube uses chat-activity threshold; no live viewer list).
 - **Response messages:** Use the **commandSource pattern** below so a single action sends to the correct chat.
@@ -119,6 +120,7 @@ Use **one action per command** that works for both Twitch and YouTube. After che
 | !curse | `%userName% cursed your %curseItemName%! You have %userPointsRemaining% points left.` |
 | !gas | `%userName% spewed %gasName%! You have %userPointsRemaining% points left.` |
 | !scroll | `%userName% used a random scroll: %scrollName%! You have %userPointsRemaining% points left.` |
+| !row | `%userName% triggered Ring of Wealth loot: %rowLoot%! You have %userPointsRemaining% points left.` |
 | !trap | `%userName% placed a %trapName% nearby! You have %userPointsRemaining% points left.` |
 | !bomb | `%userName% armed a %bombName% nearby! You have %userPointsRemaining% points left.` |
 | !transmute | `%userName% transmuted an item into %transmuteItemName%! You have %userPointsRemaining% points left.` |
@@ -2221,7 +2223,7 @@ public class CPHInline
 
 **Stream Deck setup:** Create an "Action Switch" or similar. Assign Spend ON to the ON state and Spend OFF to the OFF state. When the switch is ON, spending is enabled; when OFF, spending is disabled.
 
-**Coverage:** Spend commands in `points_command.py` (spawn, champion, gold, curse, gas, scroll, trap, transmute, bee, ward, buff, debuff, wand, heal, cleanse, dew, corrupt ally, hex, degrade, sabotage) check for `spend_disabled.txt` and return "Spending is currently disabled by the streamer." when the file exists. If you add new spend commands to the script, add the same `is_spend_disabled()` check at the start of the handler.
+**Coverage:** Spend commands in `points_command.py` (spawn, champion, gold, curse, gas, scroll, row, trap, transmute, bee, ward, buff, debuff, wand, heal, cleanse, dew, corrupt ally, hex, degrade, sabotage) check for `spend_disabled.txt` and return "Spending is currently disabled by the streamer." when the file exists. If you add new spend commands to the script, add the same `is_spend_disabled()` check at the start of the handler.
 
 ---
 
@@ -3092,6 +3094,74 @@ public class CPHInline
 
 ---
 
+## Action 37: Ring of Wealth loot (!row, with points)
+
+**Trigger:** Command Triggered → `!row` (enable **both Twitch and YouTube** as sources)
+
+**Usage:** `!row` — drops **Ring of Wealth** bonus loot near the hero (same logic as a kill with a forced ring tier by chapter: +1 sewers, +3 prison, +5 caves, +7 city, +10 halls). Simulates roll count from a random mob in the current biome’s spawn rotation. If the main pass yields nothing, **one** consumable-style RoW drop is guaranteed. Cost: **`cost_per_ring_of_wealth`** in `points_config.json` / points-config UI (default **100**).
+
+**Sub-Actions (in order):**
+
+1. **Run a Program**
+   - **Target:** `python`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" row %userName%`
+   - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait maximum:** `10` seconds
+
+2. **Execute C# Code** — same pattern as scroll; set `%rowLoot%` from the middle segment of `ok|detail|pts`:
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string RESULT_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spawn_result.txt";
+
+    public bool Execute()
+    {
+        string result = "No result file - is overlay server running?";
+        string itemName = "";
+        string userPointsRemaining = "";
+        try
+        {
+            if (File.Exists(RESULT_FILE))
+            {
+                result = File.ReadAllText(RESULT_FILE).Trim();
+                File.Delete(RESULT_FILE);
+                var parts = result.Split('|');
+                if (parts.Length >= 3 && int.TryParse(parts[parts.Length - 1].Trim(), out _))
+                {
+                    userPointsRemaining = parts[parts.Length - 1].Trim();
+                    itemName = parts[1].Trim();
+                    result = parts[0].Trim();
+                }
+                else if (parts.Length >= 2)
+                {
+                    itemName = parts[1].Trim();
+                    result = parts[0].Trim();
+                }
+            }
+        }
+        catch (Exception ex) { result = ex.Message; }
+        CPH.SetArgument("spawnResult", result);
+        CPH.SetArgument("rowLoot", itemName);
+        CPH.SetArgument("userPointsRemaining", userPointsRemaining);
+        return true;
+    }
+}
+```
+
+3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
+   - **True branch:** commandSource pattern with YouTube/Twitch messages: `%userName% triggered Ring of Wealth loot: %rowLoot%! You have %userPointsRemaining% points left.`
+   - **False branch:** same as scroll (print `%spawnResult%`).
+
+**Add to the same blocking queue** as spawn, gold, curse, gas, scroll, and earn actions.
+
+**Fails when:** Not in an active run, hero dead, no drop tile near hero, or game not connected to overlay WebSocket.
+
+---
+
 ## Commands Quick Reference
 
 | Command | Usage | Cost | Description |
@@ -3104,6 +3174,7 @@ public class CPHInline
 | **!curse** | `!curse` | 200 pts | Curse a **random** equipped item (weapon, armor, ring, artifact, or misc). |
 | **!gas** | `!gas` | 75 pts | Spawn random gas (Chaotic Censer +3). Toxic, confusion, regrowth, storm clouds, smoke, stench, inferno, blizzard, or corrosive gas. |
 | **!scroll** | `!scroll` | 100 pts | Use a random scroll (like +10 Unstable Spellbook). 50% chance for exotic version. |
+| **!row** | `!row` | 100 pts (default) | Ring of Wealth–style bonus loot; tier by chapter; always at least one item. Config: `cost_per_ring_of_wealth`. |
 | **!trap** | `!trap` | 50 pts | Place a random visible trap 1–4 tiles from the hero. Pool of 27 traps (instant-death/high-damage ones blacklisted). |
 | **!bomb** | `!bomb` | 75 pts (default) | Drop a weighted random **lit bomb** 1–4 tiles from the hero (regular + alchemy bombs). |
 | **!transmute** | `!transmute` | 150 pts | Transmute a random transmutable item from bag or equipped. Same rules as Scroll of Transmutation. |
@@ -3159,6 +3230,8 @@ public class CPHInline
 | 29 | !hex | !hex | Apply Hex debuff |
 | 30 | !degrade | !degrade | Apply Degrade debuff |
 | 31 | !sabotage | !sabotage | Remove one random buff |
+| 36 | Bomb | !bomb | Spend points; weighted random lit bomb near hero |
+| 37 | Ring of Wealth | !row | Spend points; RoW-style loot by chapter |
 
 *Legacy Streamer.bot actions (omit):* Helpers/Hurters OFF/ON, `!myside`, `!switch` — for historical setup only, see the sections **"Action 25: Helpers/Hurters OFF"** through **"Action 28: !switch"** earlier in this document (not the Summary row numbers in this table).
 

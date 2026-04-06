@@ -32,6 +32,7 @@ Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also g
 | **!curse** | 100 | Curse a **random** equipped item. No slot needed — picks weapon, armor, ring, artifact, or misc at random. |
 | **!gas** | 75 | Spawn random gas. Toxic, confusion, storm clouds, inferno, blizzard, and more! |
 | **!scroll** | 100 | Use a random scroll. Like +10 Unstable Spellbook — 50% chance for exotic version! |
+| **!row** | 100 | Drop **Ring of Wealth**–style bonus loot near the hero (simulated kill from a random current-biome mob). Virtual ring tier scales by chapter (+1 sewers … +10 halls). **Always at least one item.** |
 | **!trap** | 50 | Place a random visible trap 1–4 tiles from the hero. Pool of 27 traps (instant-death/high-damage blacklisted). |
 | **!bomb** | 75 | Drop a weighted random lit bomb 1–4 tiles from the hero. |
 | **!transmute** | 150 | Transmute a random transmutable item from bag or equipped. Same rules as Scroll of Transmutation. |

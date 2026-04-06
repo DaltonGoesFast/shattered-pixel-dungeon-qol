@@ -110,9 +110,22 @@ public class RingOfWealth extends Ring {
 	
 	public static ArrayList<Item> tryForBonusDrop(Char target, int tries ){
 		int bonus = getBuffedBonus(target, Wealth.class);
-
 		if (bonus <= 0) return null;
+		return tryForBonusDropWithWealthLevel(target, tries, bonus, null);
+	}
 
+	/**
+	 * Like {@link #tryForBonusDrop(Char, int)} but uses {@code forcedWealthBonus} for reward tiers
+	 * without requiring an equipped ring. {@code equipBonusOverride} is used for equipment drops
+	 * (simulates a single ring at that level); consumable tier uses {@code forcedWealthBonus}.
+	 */
+	public static ArrayList<Item> tryForBonusDrop(Char target, int tries, int forcedWealthBonus ){
+		if (forcedWealthBonus <= 0) return null;
+		return tryForBonusDropWithWealthLevel(target, tries, forcedWealthBonus, forcedWealthBonus);
+	}
+
+	/** @param equipBonusForGear if non-null, used for {@link #genEquipmentDrop(int)}; if null, summed from equipped Wealth buffs */
+	private static ArrayList<Item> tryForBonusDropWithWealthLevel(Char target, int tries, int wealthBonus, Integer equipBonusForGear ){
 		CounterBuff triesToDrop = target.buff(TriesToDropTracker.class);
 		if (triesToDrop == null){
 			triesToDrop = Buff.affect(target, TriesToDropTracker.class);
@@ -125,22 +138,25 @@ public class RingOfWealth extends Ring {
 			dropsToEquip.countUp( Random.NormalIntRange(5, 10) );
 		}
 
-		//now handle reward logic
 		ArrayList<Item> drops = new ArrayList<>();
 
 		triesToDrop.countDown(tries);
 		while ( triesToDrop.count() <= 0 ){
 			if (dropsToEquip.count() <= 0){
-				int equipBonus = 0;
-
-				//A second ring of wealth can be at most +1 when calculating wealth bonus for equips
-				//This is to prevent using an upgraded wealth to farm another upgraded wealth and
-				//using the two to get substantially more upgrade value than intended
-				for (Wealth w : target.buffs(Wealth.class)){
-					if (w.buffedLvl() > equipBonus){
-						equipBonus = w.buffedLvl() + Math.min(equipBonus, 2);
-					} else {
-						equipBonus += Math.min(w.buffedLvl(), 2);
+				int equipBonus;
+				if (equipBonusForGear != null){
+					equipBonus = equipBonusForGear;
+				} else {
+					equipBonus = 0;
+					//A second ring of wealth can be at most +1 when calculating wealth bonus for equips
+					//This is to prevent using an upgraded wealth to farm another upgraded wealth and
+					//using the two to get substantially more upgrade value than intended
+					for (Wealth w : target.buffs(Wealth.class)){
+						if (w.buffedLvl() > equipBonus){
+							equipBonus = w.buffedLvl() + Math.min(equipBonus, 2);
+						} else {
+							equipBonus += Math.min(w.buffedLvl(), 2);
+						}
 					}
 				}
 
@@ -153,14 +169,14 @@ public class RingOfWealth extends Ring {
 			} else {
 				Item i;
 				do {
-					i = genConsumableDrop(bonus - 1);
+					i = genConsumableDrop(wealthBonus - 1);
 				} while (Challenges.isItemBlocked(i));
 				drops.add(i);
 				dropsToEquip.countDown(1);
 			}
 			triesToDrop.countUp( Random.NormalIntRange(0, 20) );
 		}
-		
+
 		return drops;
 	}
 

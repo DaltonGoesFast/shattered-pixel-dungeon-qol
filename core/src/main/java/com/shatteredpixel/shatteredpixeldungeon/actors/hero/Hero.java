@@ -483,7 +483,29 @@ public class Hero extends Char {
 		return Math.max( 0, maxNorm - Math.min( spent, maxNorm ) );
 	}
 
+	public void pruneStaleTalentAutoPlanEntries( int tier ) {
+		if (tier < 1 || tier > Talent.MAX_TALENT_TIERS) {
+			return;
+		}
+		ArrayList<String> q = talentAutoOrderForTier( tier );
+		if (q == null || q.isEmpty()) {
+			return;
+		}
+		q.removeIf( name -> {
+			try {
+				Talent t = Talent.valueOf( name );
+				if (!talents.get( tier - 1 ).containsKey( t )) {
+					return true;
+				}
+				return pointsInTalent( t ) >= t.maxPoints();
+			} catch (IllegalArgumentException e) {
+				return true;
+			}
+		} );
+	}
+
 	public boolean appendTalentAutoPlanEntry( int tier, Talent t ) {
+		pruneStaleTalentAutoPlanEntries( tier );
 		if (pointsInTalent( t ) + talentAutoPlanQueuedRanksFor( tier, t ) >= t.maxPoints()) {
 			return false;
 		}

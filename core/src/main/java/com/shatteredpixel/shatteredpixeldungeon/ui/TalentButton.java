@@ -140,28 +140,59 @@ public class TalentButton extends Button {
 				&& Dungeon.hero != null
 				&& Dungeon.hero.isAlive()
 				&& ShatteredPixelDungeon.scene() instanceof GameScene) {
-			if (!Dungeon.hero.appendTalentAutoPlanEntry( tier, talent )) {
-				if (Dungeon.hero.pointsInTalent( talent ) + Dungeon.hero.talentAutoPlanQueuedRanksFor( tier, talent )
-						>= talent.maxPoints()) {
-					GLog.w( Messages.get( TalentButton.class, "auto_queue_talent_cap" ) );
-				} else {
-					GLog.w( Messages.get( TalentButton.class, "auto_queue_tier_cap" ) );
-				}
+			if (Dungeon.hero.appendTalentAutoPlanEntry( tier, talent )) {
+				refreshContainingTierPane();
 				return;
 			}
-			refreshContainingTierPane();
-			return;
+			boolean talentCapped =
+					Dungeon.hero.pointsInTalent( talent ) + Dungeon.hero.talentAutoPlanQueuedRanksFor( tier, talent )
+							>= talent.maxPoints();
+			if (!talentCapped) {
+				GLog.w( Messages.get( TalentButton.class, "auto_queue_tier_cap" ) );
+			}
+			// fall through: maxed talents should still open info; tier-full may open manual upgrade / info
 		}
 
-		Window toAdd;
+		Window toAdd = createTalentWindow();
+
+		if (ShatteredPixelDungeon.scene() instanceof GameScene){
+			GameScene.show(toAdd);
+		} else {
+			ShatteredPixelDungeon.scene().addToFront(toAdd);
+		}
+	}
+
+	@Override
+	protected void onRightClick() {
+		if (mode == Mode.UPGRADE
+				&& SPDSettings.autoTalentPlan()
+				&& Dungeon.hero != null
+				&& Dungeon.hero.isAlive()) {
+			Dungeon.hero.removeLastTalentAutoPlanEntryFor( tier, talent );
+			refreshContainingTierPane();
+		}
+	}
+
+	@Override
+	protected void onMiddleClick() {
+		Window toAdd = createTalentWindow();
+		if (ShatteredPixelDungeon.scene() instanceof GameScene){
+			GameScene.show( toAdd );
+		} else {
+			ShatteredPixelDungeon.scene().addToFront( toAdd );
+		}
+	}
+
+	/** Full talent window: description and upgrade / metamorph action when applicable. */
+	private Window createTalentWindow() {
 		if (mode == Mode.UPGRADE
 				&& Dungeon.hero != null
 				&& Dungeon.hero.isAlive()
 				&& Dungeon.hero.talentPointsAvailable(tier) > 0
-				&& Dungeon.hero.pointsInTalent(talent) < talent.maxPoints()){
-			toAdd = manualUpgradeWindow();
+				&& Dungeon.hero.pointsInTalent(talent) < talent.maxPoints()) {
+			return manualUpgradeWindow();
 		} else if (mode == Mode.METAMORPH_CHOOSE && Dungeon.hero != null && Dungeon.hero.isAlive()) {
-			toAdd = new WndInfoTalent(talent, pointsInTalent, new WndInfoTalent.TalentButtonCallback() {
+			return new WndInfoTalent(talent, pointsInTalent, new WndInfoTalent.TalentButtonCallback() {
 
 				@Override
 				public String prompt() {
@@ -182,7 +213,7 @@ public class TalentButton extends Button {
 				}
 			});
 		} else if (mode == Mode.METAMORPH_REPLACE && Dungeon.hero != null && Dungeon.hero.isAlive()) {
-			toAdd = new WndInfoTalent(talent, pointsInTalent, new WndInfoTalent.TalentButtonCallback() {
+			return new WndInfoTalent(talent, pointsInTalent, new WndInfoTalent.TalentButtonCallback() {
 
 				@Override
 				public String prompt() {
@@ -242,37 +273,7 @@ public class TalentButton extends Button {
 				}
 			});
 		} else {
-			toAdd = new WndInfoTalent(talent, pointsInTalent, null);
-		}
-
-		if (ShatteredPixelDungeon.scene() instanceof GameScene){
-			GameScene.show(toAdd);
-		} else {
-			ShatteredPixelDungeon.scene().addToFront(toAdd);
-		}
-	}
-
-	@Override
-	protected void onRightClick() {
-		if (mode == Mode.UPGRADE
-				&& SPDSettings.autoTalentPlan()
-				&& Dungeon.hero != null
-				&& Dungeon.hero.isAlive()) {
-			Dungeon.hero.removeLastTalentAutoPlanEntryFor( tier, talent );
-			refreshContainingTierPane();
-		}
-	}
-
-	@Override
-	protected void onMiddleClick() {
-		if (mode == Mode.UPGRADE
-				&& SPDSettings.autoTalentPlan()
-				&& Dungeon.hero != null
-				&& Dungeon.hero.isAlive()
-				&& Dungeon.hero.talentPointsAvailable( tier ) > 0
-				&& Dungeon.hero.pointsInTalent( talent ) < talent.maxPoints()
-				&& ShatteredPixelDungeon.scene() instanceof GameScene) {
-			GameScene.show( manualUpgradeWindow() );
+			return new WndInfoTalent(talent, pointsInTalent, null);
 		}
 	}
 

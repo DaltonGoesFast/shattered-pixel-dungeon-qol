@@ -30,6 +30,7 @@ import com.watabou.input.PointerEvent;
 import com.watabou.noosa.Camera;
 import com.watabou.noosa.Game;
 import com.watabou.noosa.Gizmo;
+import com.watabou.noosa.Group;
 import com.watabou.noosa.PointerArea;
 import com.watabou.noosa.ui.Component;
 import com.watabou.utils.Signal;
@@ -102,7 +103,12 @@ public class Button extends Component {
 						text += " _(" + KeyBindings.getKeyName(key) + ")_";
 					}
 					hoverTip = new Tooltip(Button.this, text, 80);
-					tooltipParent().addToFront(hoverTip);
+					Component tipParent = tooltipParent();
+					if (tipParent != null) {
+						tipParent.addToFront(hoverTip);
+					} else {
+						Game.scene().addToFront(hoverTip);
+					}
 					hoverTip.camera = camera();
 					alignTooltip(hoverTip);
 				}
@@ -190,20 +196,38 @@ public class Button extends Component {
 				return ((ScrollPane) g).content();
 			}
 		}
-		return (Component) parent;
+		for (Gizmo g = parent; g != null; g = g.parent) {
+			if (g instanceof Component) {
+				return (Component) g;
+			}
+		}
+		return null;
 	}
 
 	//TODO might be nice for more flexibility here
 	private void alignTooltip( Tooltip tip ){
-		tip.setPos(x, y-tip.height()-1);
+		Component tipParent = tooltipParent();
+		float tx = x;
+		float ty = y;
+		if (tipParent != null) {
+			for (Group g = parent; g != null && g != tipParent; g = g.parent) {
+				if (g instanceof Component) {
+					Component c = (Component) g;
+					tx += c.left();
+					ty += c.top();
+				}
+			}
+		}
+		tip.setPos(tx, ty - tip.height() - 1);
 		Camera cam = camera();
 		//shift left if there's no room on the right
 		if (tip.right() > (cam.width+cam.scroll.x)){
 			tip.setPos(tip.left() - (tip.right() - (cam.width+cam.scroll.x)), tip.top());
 		}
 		//move to the bottom if there's no room on top
-		if (tip.top() < 0){
-			tip.setPos(tip.left(), bottom()+1);
+		float btnBottom = ty + height;
+		if (tip.top() < cam.scroll.y){
+			tip.setPos(tip.left(), btnBottom + 1);
 		}
 	}
 

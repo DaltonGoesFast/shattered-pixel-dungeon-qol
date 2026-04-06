@@ -8,9 +8,9 @@ Spend points to mess with the run! Earn points by chatting (1 per message, 30s c
 
 **!toppoints** / **!leaderboard** — Top 3 point holders (free)
 
-**!spawn** (monster) — Spawn a monster (cost varies by chapter/depth). Half price when deeper than the mob’s native depth; later mobs in earlier areas up to 3×. Examples: !spawn rat, !spawn bat, !spawn scorpio
+**!spawn** (monster) — Table **base** cost, then vs. that mob’s natural **first** floor: **½** if you’re **deeper**; **1×–3×** if you’re **shallower** (before that floor), by **dungeon chapter** rules—up to **3×** for very early spawns of late-chapter mobs, often **2×** one chapter early or same-Caves-earlier-floor (see `Lastest UI/points_command.py`). Examples: !spawn rat, !spawn bat, !spawn scorpio
 
-**!champion** (monster) — Champion version (**2×** whatever !spawn would charge — same zone rules). Random champion type. Examples: !champion rat, !champion eye
+**!champion** (monster) — **2×** that adjusted !spawn price (not 2× raw table). Random champion type. Examples: !champion rat, !champion eye
 
 **!gold** (amount) — Drop gold near the hero (**5** pts per gold, 1–100). Example: !gold 25
 
@@ -19,6 +19,8 @@ Spend points to mess with the run! Earn points by chatting (1 per message, 30s c
 **!gas** — Spawn random gas (**75** pts). Toxic, confusion, storm clouds, inferno, and more!
 
 **!scroll** — Use a random scroll (**100** pts). Like +10 Unstable Spellbook — 50% chance for exotic version!
+
+**!row** — Ring of Wealth bonus loot near the hero (**100** pts). Tier scales with chapter; always at least one item.
 
 **!trap** — Place a random visible trap nearby (**50** pts). Shocking, toxic, burning, teleport, summon, and more!
 
@@ -52,7 +54,7 @@ Spend points to mess with the run! Earn points by chatting (1 per message, 30s c
 
 ---
 
-**Monster costs (base):**
+**Monster costs (base, before depth/chapter × or ½):**
 - 5 pts: rat
 - 10 pts: albino, snake, gnoll
 - 15 pts: crab, slime, swarm
@@ -67,6 +69,6 @@ Spend points to mess with the run! Earn points by chatting (1 per message, 30s c
 - 70 pts: eye
 - 80 pts: scorpio
 
-**Champion:** 2× zone-adjusted spawn cost (final price depends on depth like !spawn).
+**Champion:** 2× the spawn price after those depth/chapter rules (same as !spawn at this floor, then double).
 
 *These prices match the streamer’s points overlay config. They can be changed anytime.*

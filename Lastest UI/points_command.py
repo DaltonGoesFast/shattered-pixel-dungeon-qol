@@ -8,6 +8,7 @@ Usage:
   curse:    python points_command.py curse <username>  (picks random slot)
   gas:      python points_command.py gas <username>
   scroll:   python points_command.py scroll <username>
+  row:      python points_command.py row <username>  (Ring of Wealth loot, 100 pts, scales with depth)
   trap:     python points_command.py trap <username>
   bomb:     python points_command.py bomb <username>
   transmute: python points_command.py transmute <username>
@@ -112,6 +113,7 @@ def load_config():
         "cost_per_curse": 200,
         "cost_per_gas": 75,
         "cost_per_scroll": 100,
+        "cost_per_ring_of_wealth": 100,
         "cost_per_trap": 50,
         "cost_per_bomb": 75,
         "cost_per_transmute": 150,
@@ -145,6 +147,7 @@ def load_config():
             "cost_per_curse": int(cfg.get("cost_per_curse", defaults["cost_per_curse"])),
             "cost_per_gas": int(cfg.get("cost_per_gas", defaults["cost_per_gas"])),
             "cost_per_scroll": int(cfg.get("cost_per_scroll", defaults["cost_per_scroll"])),
+            "cost_per_ring_of_wealth": max(1, int(cfg.get("cost_per_ring_of_wealth", defaults["cost_per_ring_of_wealth"]))),
             "cost_per_trap": int(cfg.get("cost_per_trap", defaults["cost_per_trap"])),
             "cost_per_bomb": int(cfg.get("cost_per_bomb", defaults["cost_per_bomb"])),
             "cost_per_transmute": int(cfg.get("cost_per_transmute", defaults["cost_per_transmute"])),
@@ -216,10 +219,35 @@ VALID_SLOTS = frozenset(["weapon", "armor", "ring", "artifact", "misc"])
 SLOT_ALIASES = {"trinket": "misc", "middle": "misc"}
 SLOT_HELP = "weapon, armor, ring, artifact, misc (middle slot)"
 
+# USD value of 1 unit of foreign currency. Ballpark ~early 2026; tune for your region if needed.
+# Used when Frankfurter fails (offline, timeout, unsupported code, empty rates).
 FALLBACK_RATES = {
-    "USD": 1.0, "EUR": 1.08, "GBP": 1.27, "CAD": 0.74, "AUD": 0.65,
-    "JPY": 0.0067, "MXN": 0.058, "BRL": 0.20, "INR": 0.012,
-    "KRW": 0.00075, "CHF": 1.13, "PLN": 0.25, "SEK": 0.095, "ARS": 0.00075,  # 1 ARS ≈ 0.00075 USD (1 USD ≈ 1333 ARS)
+    "AED": 0.27, "AFN": 0.014, "ALL": 0.011, "AMD": 0.0025, "ANG": 0.56, "AOA": 0.0011,
+    "ARS": 0.00075, "AUD": 0.65, "AWG": 0.56, "AZN": 0.59, "BAM": 0.55, "BBD": 0.50,
+    "BDT": 0.0083, "BGN": 0.55, "BHD": 2.65, "BIF": 0.00035, "BMD": 1.0, "BND": 0.74,
+    "BOB": 0.145, "BRL": 0.18, "BSD": 1.0, "BTN": 0.012, "BWP": 0.074, "BYN": 0.31,
+    "BZD": 0.50, "CAD": 0.72, "CDF": 0.00036, "CHF": 1.13, "CLP": 0.00105, "CNY": 0.138,
+    "COP": 0.00025, "CRC": 0.0020, "CUP": 0.038, "CVE": 0.0097, "CZK": 0.044, "DJF": 0.0056,
+    "DKK": 0.145, "DOP": 0.017, "DZD": 0.0075, "EGP": 0.020, "ERN": 0.067, "ETB": 0.0070,
+    "EUR": 1.05, "FJD": 0.445, "FKP": 1.27, "GBP": 1.27, "GEL": 0.36, "GHS": 0.065,
+    "GIP": 1.27, "GMD": 0.015, "GNF": 0.000116, "GTQ": 0.13, "GYD": 0.0048, "HKD": 0.128,
+    "HNL": 0.040, "HRK": 0.14, "HTG": 0.0076, "HUF": 0.0028, "IDR": 0.000062, "ILS": 0.27,
+    "INR": 0.012, "IQD": 0.00076, "IRR": 0.000024, "ISK": 0.0071, "JMD": 0.0064, "JOD": 1.41,
+    "JPY": 0.0067, "KES": 0.0077, "KGS": 0.011, "KHR": 0.00025, "KMF": 0.0022, "KRW": 0.00075,
+    "KWD": 3.25, "KYD": 1.20, "KZT": 0.0020, "LAK": 0.000046, "LBP": 0.000011, "LKR": 0.0033,
+    "LRD": 0.0052, "LSL": 0.055, "LYD": 0.18, "MAD": 0.10, "MDL": 0.055, "MGA": 0.00022,
+    "MKD": 0.017, "MMK": 0.00048, "MNT": 0.00029, "MOP": 0.125, "MRU": 0.025, "MUR": 0.022,
+    "MVR": 0.065, "MWK": 0.00058, "MXN": 0.055, "MYR": 0.225, "MZN": 0.016, "NAD": 0.055,
+    "NGN": 0.00065, "NIO": 0.027, "NOK": 0.091, "NPR": 0.0075, "NZD": 0.59, "OMR": 2.60,
+    "PAB": 1.0, "PEN": 0.27, "PGK": 0.25, "PHP": 0.017, "PKR": 0.0035, "PLN": 0.25,
+    "PYG": 0.00013, "QAR": 0.27, "RON": 0.22, "RSD": 0.0095, "RUB": 0.010, "RWF": 0.00076,
+    "SAR": 0.27, "SBD": 0.12, "SCR": 0.074, "SDG": 0.0017, "SEK": 0.096, "SGD": 0.74,
+    "SHP": 1.27, "SLE": 0.045, "SOS": 0.0018, "SRD": 0.032, "SSP": 0.00077, "STN": 0.046,
+    "SVC": 0.114, "SZL": 0.055, "THB": 0.029, "TJS": 0.092, "TMT": 0.29, "TND": 0.32,
+    "TOP": 0.42, "TRY": 0.0225, "TTD": 0.148, "TWD": 0.031, "TZS": 0.00039, "UAH": 0.024,
+    "UGX": 0.00027, "USD": 1.0, "UYU": 0.025, "UZS": 0.000078, "VES": 0.027, "VND": 0.000039,
+    "VUV": 0.0084, "WST": 0.36, "XAF": 0.0017, "XCD": 0.37, "XOF": 0.0017, "XPF": 0.0091,
+    "YER": 0.0040, "ZAR": 0.055, "ZMW": 0.036,
 }
 
 
@@ -750,6 +778,62 @@ def cmd_scroll(args):
         return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
 
+def cmd_row(args):
+    if is_spend_disabled():
+        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
+    if len(args) < 1:
+        return SPAWN_RESULT_FILE, "Usage: !row (Ring of Wealth bonus loot near you, always at least one item)"
+    username = args[0]
+
+    base_cost = effective_cost("cost_per_ring_of_wealth", get_config()["cost_per_ring_of_wealth"])
+    key = username.lower()
+    try:
+        with points_lock():
+            data = read_points()
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            ok, err = check_command_access("ring_of_wealth", role)
+            if not ok:
+                return SPAWN_RESULT_FILE, err
+            cost = apply_role_discount(base_cost, "ring_of_wealth", role)
+            total = effective_total(pts, donation_pts)
+            if total < cost:
+                return SPAWN_RESULT_FILE, f"Not enough points! Need {cost} for Ring of Wealth loot, you have {total}."
+
+            url = "http://127.0.0.1:5000/api/ring-of-wealth-command"
+            payload = {"username": username}
+            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+            req.add_header("Content-Type", "application/json")
+
+            try:
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    raw = resp.read().decode("utf-8", errors="replace")
+                    if not raw.strip():
+                        return SPAWN_RESULT_FILE, "Ring of wealth command failed (empty response from server)"
+                    try:
+                        body = json.loads(raw)
+                    except json.JSONDecodeError:
+                        return SPAWN_RESULT_FILE, "Ring of wealth command failed (server error). Is the overlay running?"
+                    if not body.get("ok"):
+                        return SPAWN_RESULT_FILE, body.get("error", "Ring of wealth command failed")
+            except urllib.error.HTTPError as e:
+                return SPAWN_RESULT_FILE, _http_error_msg(
+                    e, "Ring of wealth command timed out. Is the game running and in an active run?"
+                )
+            except urllib.error.URLError:
+                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
+            except Exception as e:
+                msg = str(e).strip() if e else ""
+                return SPAWN_RESULT_FILE, "Ring of wealth command failed. " + (msg if msg else "Check overlay server and try again.")
+
+            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
+            data[key] = (new_pts, last, new_donation, role)
+            write_points(data)
+            detail = body.get("detail", "loot")
+            return SPAWN_RESULT_FILE, f"ok|{detail}|{new_pts}"
+    except TimeoutError:
+        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+
+
 def cmd_trap(args):
     if is_spend_disabled():
         return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
@@ -1211,15 +1295,18 @@ def fetch_usd_rate(currency_code: str) -> float:
     code = currency_code.upper()[:3]
     if code == "USD":
         return 1.0
-    if code in FALLBACK_RATES:
-        return FALLBACK_RATES[code]
     try:
         url = f"https://api.frankfurter.dev/v1/latest?from={code}&to=USD"
         with urllib.request.urlopen(url, timeout=5) as resp:
             data = json.loads(resp.read().decode())
-            return float(data.get("rates", {}).get("USD", FALLBACK_RATES.get(code, 1.0)))
+            usd = data.get("rates", {}).get("USD")
+            if usd is not None:
+                f = float(usd)
+                if f > 0:
+                    return f
     except Exception:
-        return FALLBACK_RATES.get(code, 1.0)
+        pass
+    return FALLBACK_RATES.get(code, 1.0)
 
 
 def cmd_superchat(args):
@@ -1575,6 +1662,7 @@ COMMANDS = {
     "curse": cmd_curse,
     "gas": cmd_gas,
     "scroll": cmd_scroll,
+    "row": cmd_row,
     "trap": cmd_trap,
     "bomb": cmd_bomb,
     "transmute": cmd_transmute,
@@ -1600,7 +1688,7 @@ def main():
     args = [a.strip() for a in sys.argv[1:] if a.strip()]
     if len(args) < 1:
         with open(SPAWN_RESULT_FILE, "w", encoding="utf-8") as f:
-            f.write("Usage: points_command.py <spawn|champion|gold|curse|gas|scroll|trap|bomb|transmute|bee|ward|corruptally|buff|debuff|wand|heal|cleanse|dew|hex|degrade|sabotage|superchat|cheer> [args...]")
+            f.write("Usage: points_command.py <spawn|champion|gold|curse|gas|scroll|row|trap|bomb|transmute|bee|ward|corruptally|buff|debuff|wand|heal|cleanse|dew|hex|degrade|sabotage|superchat|cheer> [args...]")
         sys.exit(0)
 
     cmd = args[0].lower()
