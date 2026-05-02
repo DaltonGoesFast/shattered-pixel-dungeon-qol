@@ -15,6 +15,16 @@ This repo is a fork of **Shattered Pixel Dungeon** focused on **quality-of-life 
 - **Item note marker:** Items that have a **custom note** show a **note icon** in inventory lists so you can spot tagged gear at a glance.
 - **Boss-style HP bar:** A wide boss-health style bar can track combatants. By default the game can show this style of bar more broadly (**boss bar on all enemies** setting is on by default; turn it off in settings if you only want vanilla-style presentation). Major bosses still hook the bar for phase / bleed styling where the base game does.
 
+### Alt tilesets (visual)
+
+Optional alternate environment art for the **first three chapters** (sewers, prison, caves). Each chapter is decided **independently** when a **new run** starts.
+
+- **Setting:** **Settings → Display → Alt tilesets** — slider from **never** through **always**, in **10% steps** (stored as 0–100). At **0%** no chapter uses alt tiles; at **100%** all three do; in between, each chapter rolls its own chance when the run begins (saved with that run).
+- **What changes:** Region **floor tiles**, **water**, and **`terrain_features`** load from `01`-prefixed sheets under `core/src/main/assets/environment/` (e.g. `01tiles_sewers.png`, `01tiles_prison.png`, `01tiles_caves.png`, matching waters and `01terrain_features.png` where used).
+- **Prison extras:** While the prison chapter uses alt tiles, matching **mob sprites** use `01`-prefixed textures (e.g. guards, skeletons, tengu). **Quest tilemaps** (`prison_quest`, `prison_exit`) use `01`-prefixed **custom_tiles** when alt prison applies.
+- **Caves extras:** The **DM-300 arena** custom tilemap uses **`01caves_boss.png`** when alt caves applies.
+- **Blacksmith mine:** The **mining quest branch** always uses **vanilla** caves floor/water/terrain art so quest layouts stay readable even when the main caves use alt tiles.
+
 ### Enemies spawned via chat / streaming (desktop)
 
 When a spawn or champion command reaches a live run through the streaming server:
@@ -41,7 +51,7 @@ Point costs in the tables are the **defaults**; the overlay can override them.
 ### What is configurable (without rebuilding the game)
 
 - **Per-command costs** and overlay behavior (see `Lastest UI` config / overlay). Optional per-command **disable** via `command_allowed_roles` in `points_config.json` (`"disabled"`).
-- **Game settings:** tile indicator, quickslot swapper, boss bar on all enemies, and other SPD interface toggles.
+- **Game settings:** tile indicator, quickslot swapper, boss bar on all enemies, **alt tilesets** chance (display tab), and other SPD interface toggles.
 
 ---
 
