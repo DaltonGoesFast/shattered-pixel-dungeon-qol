@@ -223,6 +223,7 @@ public class WndSettings extends WndTabbed {
 		ColorBlock sep1;
 		CheckBox chkFullscreen;
 		CheckBox chkLandscape;
+		OptionSlider optAndroidEdgeZoom;
 		ColorBlock sep2;
 		OptionSlider optBrightness;
 		OptionSlider optVisGrid;
@@ -271,6 +272,19 @@ public class WndSettings extends WndTabbed {
 				};
 				chkLandscape.checked(SPDSettings.landscape());
 				add(chkLandscape);
+
+				optAndroidEdgeZoom = new OptionSlider(
+						Messages.get(this, "edge_zoom_gesture"),
+						Messages.get(this, "edge_zoom_off"),
+						Messages.get(this, "edge_zoom_right"),
+						0, 2) {
+					@Override
+					protected void onChange() {
+						SPDSettings.androidEdgeZoomSide(getSelectedValue());
+					}
+				};
+				optAndroidEdgeZoom.setSelectedValue(SPDSettings.androidEdgeZoomSide());
+				add(optAndroidEdgeZoom);
 			}
 
 			sep2 = new ColorBlock(1, 1, 0xFF000000);
@@ -364,6 +378,11 @@ public class WndSettings extends WndTabbed {
 				bottom = chkLandscape.bottom();
 			}
 
+			if (optAndroidEdgeZoom != null) {
+				optAndroidEdgeZoom.setRect(0, bottom + GAP, width, SLIDER_HEIGHT);
+				bottom = optAndroidEdgeZoom.bottom();
+			}
+
 			sep2.size(width, 1);
 			sep2.y = bottom + GAP;
 			bottom = sep2.y + 1;
@@ -401,6 +420,7 @@ public class WndSettings extends WndTabbed {
 		OptionSlider optUIMode;
 		OptionSlider optUIScale;
 		RedButton btnToolbarSettings;
+		CheckBox chkShowQuickslotSwapButton;
 		CheckBox chkFlipTags;
 		CheckBox chkCenterOnCycleNoEnemies;
 		CheckBox chkBossBarAllEnemies;
@@ -519,16 +539,30 @@ public class WndSettings extends WndTabbed {
 								}
 								add(btnCentered);
 
+								CheckBox chkShowSwapChip = new CheckBox(Messages.get(WndSettings.UITab.this, "quickslot_swap_button")) {
+									@Override
+									protected void onClick() {
+										super.onClick();
+										SPDSettings.showQuickslotSwapButton(checked());
+										Toolbar.updateLayout();
+									}
+								};
+								chkShowSwapChip.checked(SPDSettings.showQuickslotSwapButton());
+
 								chkQuickSwapper = new CheckBox(Messages.get(WndSettings.UITab.this, "quickslot_swapper")) {
 									@Override
 									protected void onClick() {
 										super.onClick();
 										SPDSettings.quickSwapper(checked());
+										chkShowSwapChip.enable(checked());
 										Toolbar.updateLayout();
 									}
 								};
 								chkQuickSwapper.checked(SPDSettings.quickSwapper());
+								chkShowSwapChip.enable(SPDSettings.quickSwapper());
+
 								add(chkQuickSwapper);
+								add(chkShowSwapChip);
 
 								swapperDesc = PixelScene.renderTextBlock(Messages.get(WndSettings.UITab.this, "swapper_desc"), 5);
 								swapperDesc.hardlight(0x888888);
@@ -569,8 +603,10 @@ public class WndSettings extends WndTabbed {
 
 								chkQuickSwapper.setRect(0, btnGrouped.bottom() + GAP, width, BTN_HEIGHT);
 
+								chkShowSwapChip.setRect(0, chkQuickSwapper.bottom() + 1, width, BTN_HEIGHT);
+
 								swapperDesc.maxWidth(width);
-								swapperDesc.setPos(0, chkQuickSwapper.bottom()+1);
+								swapperDesc.setPos(0, chkShowSwapChip.bottom() + 1);
 
 								if (width > 200) {
 									chkFlipToolbar.setRect(0, swapperDesc.bottom() + GAP, width / 2 - 1, BTN_HEIGHT);
@@ -600,6 +636,18 @@ public class WndSettings extends WndTabbed {
 				};
 				chkFlipTags.checked(SPDSettings.flipTags());
 				add(chkFlipTags);
+
+				chkShowQuickslotSwapButton = new CheckBox(Messages.get(this, "quickslot_swap_button")) {
+					@Override
+					protected void onClick() {
+						super.onClick();
+						SPDSettings.showQuickslotSwapButton(checked());
+						Toolbar.updateLayout();
+					}
+				};
+				chkShowQuickslotSwapButton.checked(SPDSettings.showQuickslotSwapButton());
+				chkShowQuickslotSwapButton.enable(SPDSettings.quickSwapper());
+				add(chkShowQuickslotSwapButton);
 
 			}
 
@@ -703,6 +751,8 @@ public class WndSettings extends WndTabbed {
 			} else {
 				chkFlipTags.setRect(0, height + GAP, width, BTN_HEIGHT);
 				height = chkFlipTags.bottom();
+				chkShowQuickslotSwapButton.setRect(0, height + GAP, width, BTN_HEIGHT);
+				height = chkShowQuickslotSwapButton.bottom();
 			}
 
 			chkCenterOnCycleNoEnemies.setRect(0, height + GAP, width, BTN_HEIGHT);

@@ -43,8 +43,24 @@ import com.watabou.utils.PathFinder;
 
 public class QuickSlotButton extends Button {
 
-	/** Which set of 6 slots is visible (0 or 1). Toggle with QUICKSLOT_SWAP_SET hotkey. */
+	/** Which set of 6 slots is visible (0 or 1) when quickslot swapper is off. Toggle with QUICKSLOT_SWAP_SET hotkey. */
 	public static int activeSet = 0;
+
+	/**
+	 * When {@link SPDSettings#quickSwapper()} is on: narrow toolbar cycles four disjoint triplets (0–2 … 9–11);
+	 * wide toolbar toggles two disjoint six-slot banks (0–5 vs 6–11).
+	 */
+	public static final int QUICKSWAPPER_PAGE_SIZE = 3;
+	public static final int QUICKSWAPPER_PAGE_COUNT = QuickSlot.SIZE / QUICKSWAPPER_PAGE_SIZE;
+	public static final int QUICKSWAPPER_WIDE_BANK_COUNT = QuickSlot.SIZE / QuickSlot.SLOTS_PER_SET;
+	public static int quickSlotPage = 0;
+
+	public static void advanceQuickSwapperPage() {
+		int span = lastVisible >= QuickSlot.SLOTS_PER_SET
+				? QUICKSWAPPER_WIDE_BANK_COUNT
+				: QUICKSWAPPER_PAGE_COUNT;
+		quickSlotPage = (quickSlotPage + 1) % span;
+	}
 
 	private static QuickSlotButton[] instance = new QuickSlotButton[QuickSlot.SLOTS_PER_SET];
 	/** Display slot index 0-5; actual storage index is getActualSlot(slotNum). */
@@ -58,8 +74,15 @@ public class QuickSlotButton extends Button {
 	public static int targetingSlot = -1; // actual slot index 0-11 for getItem(targetingSlot)
 	public static Char lastTarget = null;
 
-	/** Actual quickslot storage index (0-11) for the given display slot (0-5). */
+	/** Actual quickslot storage index (0-11) for the given toolbar slot index (0-5). */
 	public static int getActualSlot(int displaySlot) {
+		if (SPDSettings.quickSwapper()) {
+			if (lastVisible >= QuickSlot.SLOTS_PER_SET) {
+				int bank = quickSlotPage % QUICKSWAPPER_WIDE_BANK_COUNT;
+				return displaySlot + bank * QuickSlot.SLOTS_PER_SET;
+			}
+			return (displaySlot % QUICKSWAPPER_PAGE_SIZE) + quickSlotPage * QUICKSWAPPER_PAGE_SIZE;
+		}
 		return displaySlot + activeSet * QuickSlot.SLOTS_PER_SET;
 	}
 
@@ -81,6 +104,7 @@ public class QuickSlotButton extends Button {
 	public static void reset() {
 		instance = new QuickSlotButton[QuickSlot.SLOTS_PER_SET];
 		activeSet = 0;
+		quickSlotPage = 0;
 		lastTarget = null;
 		targetingSlot = -1;
 	}
@@ -273,8 +297,11 @@ public class QuickSlotButton extends Button {
 		//Remember if the player adds the waterskin as one of their first actions.
 		if (Statistics.duration + Actor.now() <= 10){
 			boolean containsWaterskin = false;
-			for (int i = 0; i < instance.length; i++) {
-				if (select(i) instanceof Waterskin) containsWaterskin = true;
+			for (int s = 0; s < QuickSlot.SIZE; s++) {
+				if (Dungeon.quickslot.getItem(s) instanceof Waterskin) {
+					containsWaterskin = true;
+					break;
+				}
 			}
 			if (containsWaterskin) SPDSettings.quickslotWaterskin(true);
 		}
@@ -381,8 +408,11 @@ public class QuickSlotButton extends Button {
 		//Remember if the player removes the waterskin as one of their first actions.
 		if (Statistics.duration + Actor.now() <= 10){
 			boolean containsWaterskin = false;
-			for (int i = 0; i < instance.length; i++) {
-				if (select(i) instanceof Waterskin) containsWaterskin = true;
+			for (int s = 0; s < QuickSlot.SIZE; s++) {
+				if (Dungeon.quickslot.getItem(s) instanceof Waterskin) {
+					containsWaterskin = true;
+					break;
+				}
 			}
 			if (!containsWaterskin) SPDSettings.quickslotWaterskin(false);
 		}

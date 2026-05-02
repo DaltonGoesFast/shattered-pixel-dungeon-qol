@@ -36,7 +36,7 @@ public class QuickSlot {
 	 * which can happen for a stackable item that has been 'used up', these are referred to as placeholders.
 	 */
 
-	// Two sets of 6 slots each; hotkey swaps which set is visible (QoL)
+	// 12 slots: with quickslot swapper on, the toolbar shows 4 pages of 3; with it off, two banks of 6 (second bank via hotkey on desktop).
 	public static final int SLOTS_PER_SET = 6;
 	public static int SIZE = SLOTS_PER_SET * 2; // 12 total
 	private Item[] slots = new Item[SIZE];

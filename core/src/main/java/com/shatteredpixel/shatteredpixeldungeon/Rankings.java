@@ -38,7 +38,6 @@ import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.MeleeWeapon;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Notes;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.ui.QuickSlotButton;
-import com.shatteredpixel.shatteredpixeldungeon.ui.Toolbar;
 import com.shatteredpixel.shatteredpixeldungeon.utils.DungeonSeed;
 import com.watabou.noosa.Game;
 import com.watabou.utils.Bundlable;
@@ -325,7 +324,6 @@ public enum Rankings {
 		Notes.reset();
 		Dungeon.quickslot.reset();
 		QuickSlotButton.reset();
-		Toolbar.swappedQuickslots = false;
 
 		if (data == null) return;
 

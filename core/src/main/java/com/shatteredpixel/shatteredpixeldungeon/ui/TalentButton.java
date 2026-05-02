@@ -34,12 +34,16 @@ import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndInfoTalent;
+import com.shatteredpixel.shatteredpixeldungeon.windows.WndOptions;
+import com.shatteredpixel.shatteredpixeldungeon.windows.WndTabbed;
 import com.watabou.noosa.ColorBlock;
+import com.watabou.noosa.Gizmo;
 import com.watabou.noosa.Group;
 import com.watabou.noosa.Image;
 import com.watabou.noosa.PointerArea;
 import com.watabou.noosa.audio.Sample;
 import com.watabou.noosa.particles.Emitter;
+import com.watabou.utils.DeviceCompat;
 
 import java.util.LinkedHashMap;
 
@@ -150,16 +154,14 @@ public class TalentButton extends Button {
 			if (!talentCapped) {
 				GLog.w( Messages.get( TalentButton.class, "auto_queue_tier_cap" ) );
 			}
-			// fall through: maxed talents should still open info; tier-full may open manual upgrade / info
+			// Touch: tap only queues / warns; use a long-press menu for info, unqueue, and manual upgrade.
+			if (!DeviceCompat.isDesktop()) {
+				return;
+			}
+			// Desktop: maxed talents should still open info; tier-full may open manual upgrade / info
 		}
 
-		Window toAdd = createTalentWindow();
-
-		if (ShatteredPixelDungeon.scene() instanceof GameScene){
-			GameScene.show(toAdd);
-		} else {
-			ShatteredPixelDungeon.scene().addToFront(toAdd);
-		}
+		showTalentWindow();
 	}
 
 	@Override
@@ -175,8 +177,54 @@ public class TalentButton extends Button {
 
 	@Override
 	protected void onMiddleClick() {
+		showTalentWindow();
+	}
+
+	@Override
+	protected boolean onLongClick() {
+		if (touchAutoPlanUpgradeInGame()) {
+			GameScene.show( new WndOptions(
+					Messages.titleCase( talent.title() ),
+					Messages.get( TalentButton.class, "touch_auto_msg" ),
+					Messages.get( TalentButton.class, "touch_view" ),
+					Messages.get( TalentButton.class, "touch_unqueue" )
+			) {
+				@Override
+				protected void onSelect( int index ) {
+					if (index == 0) {
+						showTalentWindow();
+					} else if (index == 1) {
+						Dungeon.hero.removeLastTalentAutoPlanEntryFor( tier, talent );
+						refreshContainingTierPane();
+					}
+				}
+
+				@Override
+				protected boolean enabled( int index ) {
+					if (index == 1) {
+						return Dungeon.hero.talentAutoPlanQueuedRanksFor( tier, talent ) > 0;
+					}
+					return true;
+				}
+			} );
+			return true;
+		}
+		return super.onLongClick();
+	}
+
+	/** Non-desktop, auto-plan queue UI in the hero talents tab during gameplay. */
+	private boolean touchAutoPlanUpgradeInGame() {
+		return !DeviceCompat.isDesktop()
+				&& mode == Mode.UPGRADE
+				&& SPDSettings.autoTalentPlan()
+				&& Dungeon.hero != null
+				&& Dungeon.hero.isAlive()
+				&& ShatteredPixelDungeon.scene() instanceof GameScene;
+	}
+
+	private void showTalentWindow() {
 		Window toAdd = createTalentWindow();
-		if (ShatteredPixelDungeon.scene() instanceof GameScene){
+		if (ShatteredPixelDungeon.scene() instanceof GameScene) {
 			GameScene.show( toAdd );
 		} else {
 			ShatteredPixelDungeon.scene().addToFront( toAdd );
@@ -330,6 +378,28 @@ public class TalentButton extends Button {
 			t += "\n" + Messages.get( TalentButton.class, "auto_hint" );
 		}
 		return t;
+	}
+
+	/**
+	 * {@link WndTabbed} draws tab buttons after page content, so tooltips on lower tiers sat behind
+	 * the tab strip. Parent to the window so {@code addToFront} stacks above tabs (and fixes tier 4).
+	 */
+	@Override
+	protected Group tooltipOverlayParent() {
+		if (mode != Mode.UPGRADE) {
+			return null;
+		}
+		for (Gizmo g = parent; g != null; g = g.parent) {
+			if (g instanceof WndTabbed) {
+				return (Group) g;
+			}
+		}
+		return null;
+	}
+
+	@Override
+	protected boolean tooltipPreferUiOverlay() {
+		return mode == Mode.UPGRADE;
 	}
 
 	public void enable(boolean value ) {

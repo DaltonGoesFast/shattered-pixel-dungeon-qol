@@ -76,7 +76,6 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.SpecialRoom
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.ui.QuickSlotButton;
-import com.shatteredpixel.shatteredpixeldungeon.ui.Toolbar;
 import com.shatteredpixel.shatteredpixeldungeon.utils.DungeonSeed;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndResurrect;
 import com.watabou.noosa.Game;
@@ -258,7 +257,6 @@ public class Dungeon {
 
 		quickslot.reset();
 		QuickSlotButton.reset();
-		Toolbar.swappedQuickslots = false;
 		
 		depth = 1;
 		branch = 0;
@@ -737,7 +735,6 @@ public class Dungeon {
 
 		quickslot.reset();
 		QuickSlotButton.reset();
-		Toolbar.swappedQuickslots = false;
 
 		Dungeon.challenges = bundle.getInt( CHALLENGES );
 		Dungeon.mobsToChampion = bundle.getFloat( MOBS_TO_CHAMPION );

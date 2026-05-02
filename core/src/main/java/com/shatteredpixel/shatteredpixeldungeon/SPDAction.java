@@ -96,6 +96,12 @@ public class SPDAction extends GameAction {
 	public static final GameAction ZOOM_IN      = new SPDAction("zoom_in");
 	public static final GameAction ZOOM_OUT     = new SPDAction("zoom_out");
 
+	/** Pan the main game camera (desktop); same speed scaling as the controller right stick. */
+	public static final GameAction CAMERA_N     = new SPDAction("camera_n");
+	public static final GameAction CAMERA_S     = new SPDAction("camera_s");
+	public static final GameAction CAMERA_W     = new SPDAction("camera_w");
+	public static final GameAction CAMERA_E     = new SPDAction("camera_e");
+
 	private static final LinkedHashMap<Integer, GameAction> defaultBindings = new LinkedHashMap<>();
 	static {
 		defaultBindings.put( Input.Keys.ESCAPE,         SPDAction.BACK );

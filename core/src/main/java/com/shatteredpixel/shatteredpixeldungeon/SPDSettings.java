@@ -52,6 +52,8 @@ public class SPDSettings extends GameSettings {
 	public static final String KEY_FULLSCREEN	= "fullscreen"; //used to hide navbars on mobile
 	public static final String KEY_LANDSCAPE	= "force_landscape";
 	public static final String KEY_ZOOM			= "zoom";
+	/** 0 = off, 1 = left screen edge, 2 = right. Android one-finger vertical drag zoom while playing. */
+	public static final String KEY_ANDROID_EDGE_ZOOM_SIDE = "android_edge_zoom_side";
 	public static final String KEY_BRIGHTNESS	= "brightness";
 	public static final String KEY_GRID 	    = "visual_grid";
 	public static final String KEY_TILE_INDICATOR = "tile_indicator";
@@ -83,6 +85,14 @@ public class SPDSettings extends GameSettings {
 	
 	public static int zoom() {
 		return getInt( KEY_ZOOM, 0 );
+	}
+
+	public static void androidEdgeZoomSide( int value ) {
+		put( KEY_ANDROID_EDGE_ZOOM_SIDE, value );
+	}
+
+	public static int androidEdgeZoomSide() {
+		return getInt( KEY_ANDROID_EDGE_ZOOM_SIDE, 0, 0, 2 );
 	}
 	
 	public static void brightness( int value ) {
@@ -168,6 +178,7 @@ public class SPDSettings extends GameSettings {
 	public static final String KEY_UI_SIZE 	    = "full_ui";
 	public static final String KEY_SCALE		= "scale";
 	public static final String KEY_QUICK_SWAP	= "quickslot_swapper";
+	public static final String KEY_SHOW_QUICKSLOT_SWAP_BUTTON = "show_quickslot_swap_button";
 	public static final String KEY_FLIPTOOLBAR	= "flipped_ui";
 	public static final String KEY_FLIPTAGS 	= "flip_tags";
 	public static final String KEY_CENTER_ON_CYCLE_NO_ENEMIES = "center_on_cycle_no_enemies";
@@ -208,6 +219,15 @@ public class SPDSettings extends GameSettings {
 	public static void quickSwapper(boolean value ){ put( KEY_QUICK_SWAP, value ); }
 	
 	public static boolean quickSwapper(){ return getBoolean( KEY_QUICK_SWAP, true); }
+
+	public static void showQuickslotSwapButton( boolean value ) {
+		put( KEY_SHOW_QUICKSLOT_SWAP_BUTTON, value );
+	}
+
+	/** On-screen swap chip while quickslot swapper is on; desktop defaults off (use hotkey). */
+	public static boolean showQuickslotSwapButton() {
+		return getBoolean( KEY_SHOW_QUICKSLOT_SWAP_BUTTON, !DeviceCompat.isDesktop() );
+	}
 	
 	public static void flipToolbar( boolean value) {
 		put(KEY_FLIPTOOLBAR, value );

@@ -22,6 +22,7 @@
 package com.shatteredpixel.shatteredpixeldungeon.ui;
 
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
+import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
 import com.watabou.input.ControllerHandler;
 import com.watabou.input.GameAction;
 import com.watabou.input.KeyBindings;
@@ -33,6 +34,8 @@ import com.watabou.noosa.Gizmo;
 import com.watabou.noosa.Group;
 import com.watabou.noosa.PointerArea;
 import com.watabou.noosa.ui.Component;
+import com.watabou.utils.Point;
+import com.watabou.utils.PointF;
 import com.watabou.utils.Signal;
 
 public class Button extends Component {
@@ -103,13 +106,22 @@ public class Button extends Component {
 						text += " _(" + KeyBindings.getKeyName(key) + ")_";
 					}
 					hoverTip = new Tooltip(Button.this, text, 80);
+					Group overlayHost = tooltipOverlayParent();
 					Component tipParent = tooltipParent();
-					if (tipParent != null) {
+					boolean uiEscape = tooltipPreferUiOverlay() && overlayHost != null;
+					if (uiEscape) {
+						// Same coordinates as the hero window, but uiCamera is not clipped to it.
+						Game.scene().addToFront(hoverTip);
+					} else if (overlayHost != null) {
+						overlayHost.addToFront(hoverTip);
+						hoverTip.camera = overlayHost.camera();
+					} else if (tipParent != null) {
 						tipParent.addToFront(hoverTip);
+						hoverTip.camera = tipParent.camera();
 					} else {
 						Game.scene().addToFront(hoverTip);
+						hoverTip.camera = camera();
 					}
-					hoverTip.camera = camera();
 					alignTooltip(hoverTip);
 				}
 			}
@@ -204,13 +216,40 @@ public class Button extends Component {
 		return null;
 	}
 
+	/**
+	 * Optional host drawn above complex chrome (e.g. {@code WndTabbed} tabs). When non-null, tooltip
+	 * is parented here instead of {@link #tooltipParent()}.
+	 */
+	protected Group tooltipOverlayParent() {
+		return null;
+	}
+
+	/** When true with a non-null {@link #tooltipOverlayParent()}, tooltip is drawn on {@link PixelScene#uiCamera}. */
+	protected boolean tooltipPreferUiOverlay() {
+		return false;
+	}
+
 	//TODO might be nice for more flexibility here
 	private void alignTooltip( Tooltip tip ){
-		Component tipParent = tooltipParent();
+		Group overlayHost = tooltipOverlayParent();
+		boolean uiEscape = tooltipPreferUiOverlay() && overlayHost != null;
+		Component scrollContent = null;
+		for (Gizmo g = parent; g != null; g = g.parent) {
+			if (g instanceof ScrollPane) {
+				scrollContent = ((ScrollPane) g).content();
+				break;
+			}
+		}
+		// Window camera coords != scroll content coords; tier 4 (max scroll) was mis-projected to the screen bottom.
+		boolean uiEscapeScroll = uiEscape && scrollContent != null;
+		Group coordStop = uiEscapeScroll ? scrollContent : (overlayHost != null ? overlayHost : tooltipParent());
+		if (coordStop == null) {
+			coordStop = tooltipParent();
+		}
 		float tx = x;
 		float ty = y;
-		if (tipParent != null) {
-			for (Group g = parent; g != null && g != tipParent; g = g.parent) {
+		if (coordStop != null) {
+			for (Group g = parent; g != null && g != coordStop; g = g.parent) {
 				if (g instanceof Component) {
 					Component c = (Component) g;
 					tx += c.left();
@@ -218,16 +257,47 @@ public class Button extends Component {
 				}
 			}
 		}
-		tip.setPos(tx, ty - tip.height() - 1);
-		Camera cam = camera();
-		//shift left if there's no room on the right
-		if (tip.right() > (cam.width+cam.scroll.x)){
-			tip.setPos(tip.left() - (tip.right() - (cam.width+cam.scroll.x)), tip.top());
+		Camera cam;
+		if (uiEscapeScroll) {
+			cam = scrollContent.camera();
+		} else if (uiEscape) {
+			cam = overlayHost.camera();
+		} else {
+			cam = tip.camera();
+			if (cam == null) {
+				cam = camera();
+			}
 		}
-		//move to the bottom if there's no room on top
+		float tipLeft = tx;
+		float tipTop = ty - tip.height() - 1;
+		float tipRight = tipLeft + tip.width();
+		if (tipRight > (cam.width + cam.scroll.x)) {
+			tipLeft -= (tipRight - (cam.width + cam.scroll.x));
+			tipRight = tipLeft + tip.width();
+		}
 		float btnBottom = ty + height;
-		if (tip.top() < cam.scroll.y){
-			tip.setPos(tip.left(), btnBottom + 1);
+		if (tipTop < cam.scroll.y) {
+			if (uiEscape) {
+				// Hero talent tooltips: keep above the row like tier 3; flipping below tier 4 reads far too low.
+				tipTop = cam.scroll.y;
+			} else {
+				tipTop = btnBottom + 1;
+			}
+		}
+		if (uiEscapeScroll) {
+			// Small upward shift in scroll space before screen projection (tips still read slightly low).
+			tipTop -= 10f;
+			if (tipTop < cam.scroll.y) {
+				tipTop = cam.scroll.y;
+			}
+		}
+		if (uiEscape) {
+			Point scr = cam.cameraToScreen(tipLeft, tipTop);
+			PointF uiTL = PixelScene.uiCamera.screenToCamera(scr.x, scr.y);
+			tip.setPos(uiTL.x, uiTL.y);
+			tip.camera = PixelScene.uiCamera;
+		} else {
+			tip.setPos(tipLeft, tipTop);
 		}
 	}
 

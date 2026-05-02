@@ -24,6 +24,7 @@ package com.shatteredpixel.shatteredpixeldungeon.scenes;
 import com.badlogic.gdx.Input;
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
+import com.shatteredpixel.shatteredpixeldungeon.SPDAction;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.effects.BadgeBanner;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Languages;
@@ -37,6 +38,7 @@ import com.shatteredpixel.shatteredpixeldungeon.windows.WndJournal;
 import com.watabou.gltextures.TextureCache;
 import com.watabou.glwrap.Blending;
 import com.watabou.input.ControllerHandler;
+import com.watabou.input.KeyBindings;
 import com.watabou.input.KeyEvent;
 import com.watabou.input.PointerEvent;
 import com.watabou.noosa.BitmapText;
@@ -256,6 +258,41 @@ public class PixelScene extends Scene {
 				}
 				ControllerHandler.updateControllerPointer(virtualCursorPos, true);
 			}
+		}
+
+		applyKeyboardCameraPan();
+	}
+
+	/** Same movement scaling as the controller right stick at full deflection (see block above). */
+	private static void applyKeyboardCameraPan() {
+		if (!DeviceCompat.isDesktop() || Cursor.isCursorCaptured() || KeyBindings.bindingKey) {
+			return;
+		}
+
+		float panX = 0f;
+		float panY = 0f;
+		if (KeyBindings.isKeyboardActionHeld(SPDAction.CAMERA_N)) panY -= 1f;
+		if (KeyBindings.isKeyboardActionHeld(SPDAction.CAMERA_S)) panY += 1f;
+		if (KeyBindings.isKeyboardActionHeld(SPDAction.CAMERA_W)) panX -= 1f;
+		if (KeyBindings.isKeyboardActionHeld(SPDAction.CAMERA_E)) panX += 1f;
+		if (panX == 0f && panY == 0f) {
+			return;
+		}
+
+		float len = (float) Math.sqrt(panX * panX + panY * panY);
+		panX /= len;
+		panY /= len;
+
+		int sensitivity = SPDSettings.controllerPointerSensitivity() * 100;
+		PointF cameraShift = new PointF(
+				defaultZoom * sensitivity * Game.elapsed * panX,
+				defaultZoom * sensitivity * Game.elapsed * panY);
+
+		cameraShift.invScale(Camera.main.zoom);
+		cameraShift.x *= Camera.main.edgeScroll.x;
+		cameraShift.y *= Camera.main.edgeScroll.y;
+		if (cameraShift.length() > 0f) {
+			Camera.main.shift(cameraShift);
 		}
 	}
 

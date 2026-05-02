@@ -21,6 +21,7 @@
 
 package com.watabou.input;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 
 import java.util.ArrayList;
@@ -111,6 +112,19 @@ public class KeyBindings {
 			}
 		}
 		return result;
+	}
+
+	/** True if any keyboard key bound to {@code action} is currently held (desktop). */
+	public static boolean isKeyboardActionHeld(GameAction action) {
+		if (bindingKey) {
+			return false;
+		}
+		for (int keyCode : bindings.keySet()) {
+			if (bindings.get(keyCode) == action && Gdx.input.isKeyPressed(keyCode)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	public static String getKeyName( int keyCode ){

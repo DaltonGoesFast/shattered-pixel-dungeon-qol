@@ -38,6 +38,7 @@ import com.watabou.input.ScrollEvent;
 import com.watabou.noosa.Camera;
 import com.watabou.noosa.Game;
 import com.watabou.noosa.ScrollArea;
+import com.watabou.utils.DeviceCompat;
 import com.watabou.utils.GameMath;
 import com.watabou.utils.Point;
 import com.watabou.utils.PointF;
@@ -174,11 +175,27 @@ public class CellSelector extends ScrollArea {
 	private PointerEvent another;
 	private float startZoom;
 	private float startSpan;
+
+	/** Android one-finger edge drag zoom (see SPDSettings.androidEdgeZoomSide). */
+	private boolean edgeZoomActive;
+	private float edgeZoomLastY;
 	
 	@Override
 	protected void onPointerDown( PointerEvent event ) {
 		camera.edgeScroll.set(-1);
+
+		if (another == null && event == curEvent) {
+			if (!pinching && DeviceCompat.isAndroid() && SPDSettings.androidEdgeZoomSide() != 0
+					&& isInAndroidEdgeZoomStrip(event.current.x)) {
+				edgeZoomActive = true;
+				edgeZoomLastY = event.current.y;
+			} else {
+				edgeZoomActive = false;
+			}
+		}
+
 		if (event != curEvent && another == null) {
+			edgeZoomActive = false;
 					
 			if (curEvent.type == PointerEvent.Type.UP) {
 				curEvent = event;
@@ -201,6 +218,13 @@ public class CellSelector extends ScrollArea {
 	@Override
 	protected void onPointerUp( PointerEvent event ) {
 		camera.edgeScroll.set(1);
+
+		if (edgeZoomActive && !pinching && event == curEvent) {
+			zoom(Math.round(camera.zoom));
+			mouseZoom = camera.zoom;
+			edgeZoomActive = false;
+		}
+
 		if (pinching && (event == curEvent || event == another)) {
 			
 			pinching = false;
@@ -231,6 +255,18 @@ public class CellSelector extends ScrollArea {
 					zoom - (zoom % 0.1f),
 				PixelScene.maxZoom ) );
 
+		} else if (edgeZoomActive) {
+
+			float dy = event.current.y - edgeZoomLastY;
+			edgeZoomLastY = event.current.y;
+			if (Math.abs(dy) > 0.5f) {
+				dragging = true;
+			}
+			float sensitivity = 48f * Game.density;
+			float deltaLevels = -dy / sensitivity;
+			mouseZoom = GameMath.gate(PixelScene.minZoom, mouseZoom + deltaLevels, PixelScene.maxZoom);
+			zoom(Math.round(mouseZoom));
+
 		} else {
 		
 			if (!dragging && PointF.distance( event.current, event.start ) > dragThreshold) {
@@ -244,6 +280,14 @@ public class CellSelector extends ScrollArea {
 			}
 		}
 		
+	}
+
+	private boolean isInAndroidEdgeZoomStrip(float screenX) {
+		int side = SPDSettings.androidEdgeZoomSide();
+		if (side == 0) return false;
+		float strip = Math.max(48f * Game.density, Game.width * 0.07f);
+		if (side == 1) return screenX <= strip;
+		return screenX >= Game.width - strip;
 	}
 
 	//used for movement
@@ -496,6 +540,7 @@ public class CellSelector extends ScrollArea {
 	public void reset() {
 		super.reset();
 		another = null;
+		edgeZoomActive = false;
 		if (pinching){
 			pinching = false;
 
