@@ -1,5 +1,13 @@
 apply plugin: 'com.android.application'
 
+// Signed release APKs: copy android/keystore.properties.example → android/keystore.properties
+// and fill in paths/passwords (keystore.properties is gitignored).
+def keystorePropsFile = rootProject.file('android/keystore.properties')
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) {
+    keystorePropsFile.withInputStream { stream -> keystoreProps.load(stream) }
+}
+
 android {
     namespace 'com.shatteredpixel.shatteredpixeldungeon.android'
     compileSdk appAndroidCompileSDK
@@ -20,6 +28,17 @@ android {
 
     }
 
+    signingConfigs {
+        release {
+            if (keystorePropsFile.exists()) {
+                keyAlias keystoreProps['keyAlias']?.trim()
+                keyPassword keystoreProps['keyPassword']?.trim()
+                storeFile rootProject.file(keystoreProps['storeFile']?.trim())
+                storePassword keystoreProps['storePassword']?.trim()
+            }
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix ".indev"
@@ -30,6 +49,9 @@ android {
             }
         }
         release {
+            if (keystorePropsFile.exists()) {
+                signingConfig signingConfigs.release
+            }
 
             //These lines enable R8, which is a code shrinker/optimizer/obfuscator.
             //This makes release APKs smaller and more efficient, but also makes debugging trickier
@@ -100,4 +122,14 @@ task copyAndroidNatives() {
 
 tasks.matching { it.name.contains("merge") && it.name.contains("JniLibFolders") }.configureEach { packageTask ->
     packageTask.dependsOn 'copyAndroidNatives'
+}
+
+gradle.taskGraph.whenReady { graph ->
+    def wantsSignedRelease = graph.allTasks.any { it.name in ['assembleRelease', 'bundleRelease'] }
+    if (wantsSignedRelease && !keystorePropsFile.exists()) {
+        throw new GradleException(
+                'Release signing requires android/keystore.properties. Gradle ignores keystore.properties.example. ' +
+                        'Copy android/keystore.properties.example to android/keystore.properties and set storeFile, storePassword, keyAlias, and keyPassword.'
+        )
+    }
 }

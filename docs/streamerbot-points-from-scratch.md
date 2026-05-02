@@ -971,7 +971,7 @@ The `points_command.py` script checks points, attempts the spawn, and **only ded
 
 **Edit costs:** Open http://localhost:5000/points-config or edit `points_config.json`. Example: `"rat": 25, "eye": 200`. Any monster not listed uses `DEFAULT_COST` (100).
 
-**Zone-adjusted spawn cost:** When **deeper** than the mob’s native depth, cost is **half** the table base (cheap sewer mobs deep in the run). When **shallower** than native — spawning later-chapter mobs in earlier areas — cost is **2× or 3×** by chapter rules (see `compute_spawn_cost` in `points_command.py`, max **3×**). If depth cannot be read from the overlay, the script uses **full table base** (no discount or surcharge).
+**Zone-adjusted spawn cost:** When **deeper** than the mob’s native depth, cost is **half** the table base (cheap sewer mobs deep in the run). When **shallower** than native — spawning later-chapter mobs in earlier areas — `_early_spawn_multiplier` compares your **chapter** (five 5-floor blocks: sewers → prison → caves → city → halls via `_dungeon_region`) to the mob’s home chapter and picks **tier** 1/2/3. Cost is **base × (1 + 0.20 × (tier − 1))** → **100% / 120% / 140%** (rounded, min 1). One edge case bumps tier while still in the **caves** chapter (see function body). If depth cannot be read from the overlay, the script uses **full table base** (no discount or surcharge).
 
 **Troubleshooting (!spawn does nothing):**
 - **Monster name not passed:** Change `%input1%` to `%rawInput%` in the Arguments (Streamer.bot versions differ).
@@ -986,7 +986,7 @@ The `points_command.py` script checks points, attempts the spawn, and **only ded
 
 **Trigger:** Command Triggered → `!champion` (enable **both Twitch and YouTube** as sources)
 
-**Usage:** `!champion <monster>` (e.g. `!champion rat`, `!champion eye`). Spawns a **champion** version of the specified monster (random type: Blazing, Projecting, Antimagic, Giant, Blessed, or Growing). Same valid monsters as `!spawn`. **Cost:** **2×** the zone-adjusted `!spawn` cost (half-price deep spawns and early surcharges both apply).
+**Usage:** `!champion <monster>` (e.g. `!champion rat`, `!champion eye`). Spawns a **champion** version of the specified monster (random type: Blazing, Projecting, Antimagic, Giant, Blessed, or Growing). Same valid monsters as `!spawn`. **Cost:** **2×** the zone-adjusted `!spawn` cost (half-price deep spawns and chapter-gap surcharges when shallower both apply).
 
 **Sub-Actions (in order):**
 
@@ -1051,7 +1051,7 @@ public class CPHInline
      - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
      - Leave **False Result** empty for both.
 
-**Cost:** 2× whatever `!spawn` would charge at the current depth (examples vary: e.g. deep `!spawn rat` can be cheap, so champion rat is cheap too; early `!spawn eye` is expensive, so champion eye is even more).
+**Cost:** 2× whatever `!spawn` would charge at the current depth (examples vary: e.g. deep `!spawn rat` can be cheap, so champion rat is cheap too; early `!spawn eye` pays the chapter-gap bump on base, so champion eye scales the same way).
 
 **Add to the same blocking queue** as spawn, gold, and earn actions. Shares spawn cooldown with `!spawn`.
 
@@ -3168,7 +3168,7 @@ public class CPHInline
 |---------|-------|------|-------------|
 | **!points** | `!points` | Free | Check your point balance. |
 | **!toppoints** | `!toppoints` | Free | Show top 3 point holders. |
-| **!spawn** | `!spawn <monster>` | Varies by monster and chapter (see script) | Spawn a monster near the hero. Half price when deeper than native; up to 3× when spawning late mobs early. Valid monsters: rat, albino, snake, gnoll, crab, slime, swarm, thief, skeleton, bat, brute, shaman, spinner, dm100, guard, necromancer, ghoul, elemental, warlock, monk, golem, succubus, eye, scorpio. |
+| **!spawn** | `!spawn <monster>` | Varies by monster and chapter gap (see script) | Spawn a monster near the hero. Half price when deeper than native; when shallower, chapter comparison yields **+0% / +20% / +40%** on table base (rounded). Valid monsters: rat, albino, snake, gnoll, crab, slime, swarm, thief, skeleton, bat, brute, shaman, spinner, dm100, guard, necromancer, ghoul, elemental, warlock, monk, golem, succubus, eye, scorpio. |
 | **!champion** | `!champion <monster>` | 2× zone-adjusted spawn | Spawn a **champion** version of the monster (random type: Blazing, Projecting, Antimagic, Giant, Blessed, Growing). Same monster list and zone rules as spawn. |
 | **!gold** | `!gold <amount>` | 2 pts per gold | Drop gold near the hero. Amount 1–100 required (e.g. `!gold 10` = 20 pts). |
 | **!curse** | `!curse` | 200 pts | Curse a **random** equipped item (weapon, armor, ring, artifact, or misc). |

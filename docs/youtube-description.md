@@ -17,7 +17,7 @@ Stream Commands:
 
 Streaming VERTICAL and HORIZONTAL on YouTube!
 
-Join our Discord! https://discord.gg/HwZvHfAbdK
+Join our Discord! https://discord.gg/Xrv52j4mEf
 
 ---
 
@@ -28,7 +28,7 @@ Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also g
 COMMANDS:
 - !points — Check your balance (free)
 - !toppoints / !leaderboard — Top 3 point holders (free)
-- !spawn (monster) — Table base for that mob, then depth vs. natural first floor: half off if deeper; 1×–3× if shallower (before that floor), by chapter (5-floor blocks)—up to 3× for very early late-mob spawns, often 2× one chapter early or same-Caves-earlier-floor (tiers in Lastest UI/points_command.py). Examples: !spawn rat, !spawn bat, !spawn scorpio
+- !spawn (monster) — Table price for that mob vs current depth and where it normally first appears: half off if you're deeper than that (min 1 pt). If you're still above that depth, extra cost depends on chapter gap—the dungeon is five chapters of five floors each (sewers → prison → caves → city → halls). You pay the listed price, or +20% on it, or +40% on it (rounded). Examples: !spawn rat, !spawn bat, !spawn scorpio
 - !champion (monster) — 2× that adjusted !spawn cost (not 2× raw table). Random type: Blazing, Projecting, Antimagic, Giant, Blessed, Growing. Examples: !champion rat, !champion eye
 - !gold (amount) — Drop gold near the hero (5 pts per gold, 1–100). Example: !gold 25
 - !curse — Curse a random equipped item (100 pts)
@@ -51,9 +51,9 @@ COMMANDS:
 - !degrade — Apply Degrade debuff (75 pts)
 - !sabotage — Remove one random positive buff (75 pts)
 
-Monster costs (base, before depth/chapter × or ½): rat 5 | albino/snake/gnoll 10 | crab/slime/swarm 15 | thief/skeleton/dm100 20 | guard/necromancer/spinner 25 | bat/brute 30 | shaman 35 | ghoul/elemental 40 | warlock 45 | monk/golem 50 | succubus 60 | eye 70 | scorpio 80
+Monster costs (table base before depth adjustment above): rat 5 | albino/snake/gnoll 10 | crab/slime/swarm 15 | thief/skeleton/dm100 20 | guard/necromancer/spinner 25 | bat/brute 30 | shaman 35 | ghoul/elemental 40 | warlock 45 | monk/golem 50 | succubus 60 | eye 70 | scorpio 80
 
-Champion: 2× the adjusted !spawn cost at this depth—not 2× the table base by itself.
+Champion: 2× the zone-adjusted !spawn cost at this depth—not 2× the table base by itself.
 
 Prices can be changed anytime in the streamer’s points overlay; listed values are current for this channel.
 ```

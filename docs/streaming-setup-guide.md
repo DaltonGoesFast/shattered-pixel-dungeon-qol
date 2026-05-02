@@ -126,7 +126,7 @@ If you prefer not to use the export, follow [streamerbot-points-from-scratch.md]
 | Points config UI | Open `http://localhost:5000/points-config` | Page loads; Save writes `points_config.json` |
 | Game data | `curl http://localhost:5000/api/game-data` | JSON with `stats` (includes `depth`), `hero`, etc. when game is in a run and WS connected |
 | Spawn script | Ensure `viewer_points.txt` has `testuser|50|0|0|` (or use UI), run `python points_command.py spawn rat testuser` | `ok` in `spawn_result.txt` if game is running and has space |
-| Spawn zone pricing | Deeper than native depth: half price; earlier chapter than native: up to 3× (see `points_command.py`) | Costs match script when `/api/game-data` reports depth |
+| Spawn zone pricing | Deeper than native depth: half price; shallower: chapter-gap surcharge (+20% per step on base, max +40%; see `compute_spawn_cost` / `_early_spawn_multiplier` in `points_command.py`) | Costs match script when `/api/game-data` reports depth |
 | Streamer.bot import | After import, trigger one command + check game | No path errors; WebSocket shows connected if your actions require it |
 
 ---

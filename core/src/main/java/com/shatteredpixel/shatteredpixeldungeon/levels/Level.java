@@ -500,6 +500,10 @@ public abstract class Level implements Bundlable {
 	public String waterTex() {
 		return null;
 	}
+
+	public String terrainFeaturesTex() {
+		return Assets.Environment.TERRAIN_FEATURES;
+	}
 	
 	abstract protected boolean build();
 	

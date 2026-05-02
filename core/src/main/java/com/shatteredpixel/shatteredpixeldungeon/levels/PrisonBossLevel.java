@@ -25,6 +25,7 @@ import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Bones;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
@@ -49,6 +50,7 @@ import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.plants.Plant;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.tiles.CustomTilemap;
+import com.shatteredpixel.shatteredpixeldungeon.utils.AltAssetPaths;
 import com.shatteredpixel.shatteredpixeldungeon.ui.TargetHealthIndicator;
 import com.watabou.utils.BArray;
 import com.watabou.noosa.Camera;
@@ -106,12 +108,23 @@ public class PrisonBossLevel extends Level {
 	
 	@Override
 	public String tilesTex() {
+		if ( SPDSettings.useAltTileset( Statistics.prisonAltTileset ) ) {
+			return AltAssetPaths.prefixedVariant( Assets.Environment.TILES_PRISON );
+		}
 		return Assets.Environment.TILES_PRISON;
 	}
 	
 	@Override
 	public String waterTex() {
+		if ( SPDSettings.useAltTileset( Statistics.prisonAltTileset ) ) {
+			return AltAssetPaths.prefixedVariant( Assets.Environment.WATER_PRISON );
+		}
 		return Assets.Environment.WATER_PRISON;
+	}
+
+	@Override
+	public String terrainFeaturesTex() {
+		return AltAssetPaths.prisonTerrainFeaturesTex();
 	}
 	
 	private static final String STATE	        = "state";
@@ -769,7 +782,7 @@ public class PrisonBossLevel extends Level {
 	public static class FadingTraps extends CustomTilemap {
 		
 		{
-			texture = Assets.Environment.TERRAIN_FEATURES;
+			texture = AltAssetPaths.prisonTerrainFeaturesTex();
 		}
 		
 		Rect area;
@@ -876,7 +889,7 @@ public class PrisonBossLevel extends Level {
 	public static class ExitVisual extends CustomTilemap {
 		
 		{
-			texture = Assets.Environment.PRISON_EXIT;
+			texture = AltAssetPaths.prisonCustomTile( Assets.Environment.PRISON_EXIT );
 			
 			tileW = 14;
 			tileH = 11;
@@ -922,7 +935,7 @@ public class PrisonBossLevel extends Level {
 	public static class ExitVisualWalls extends CustomTilemap {
 		
 		{
-			texture = Assets.Environment.PRISON_EXIT;
+			texture = AltAssetPaths.prisonCustomTile( Assets.Environment.PRISON_EXIT );
 			
 			tileW = 14;
 			tileH = 22;

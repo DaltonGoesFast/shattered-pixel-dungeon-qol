@@ -2,7 +2,7 @@
  * Shattered Pixel Dungeon
  * Copyright (C) 2014-2026 Evan Debenham
  *
- * This program is free software: you can redistribute it and/or modify
+ * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
@@ -58,6 +58,7 @@ public class TalentAutoPlan {
 						continue;
 					}
 					hero.upgradeTalent( t );
+					hero.appendTalentAutoSpendHistory( tier, name );
 					order.remove( i );
 					i--;
 					Statistics.qualifiedForRandomVictoryBadge = false;
@@ -68,5 +69,63 @@ public class TalentAutoPlan {
 				break;
 			}
 		}
+
+		for (int tier = 1; tier <= Talent.MAX_TALENT_TIERS; tier++) {
+			if (hero.bonusTalentPoints( tier ) > 0) {
+				spendRemainingUsingHistoryOrFallback( hero, tier );
+			}
+		}
+	}
+
+	/**
+	 * Spend divine-inspiration bonus points when the pending queue no longer covers them:
+	 * repeat the recorded auto-plan order, then tier talent order as a last resort.
+	 */
+	private static void spendRemainingUsingHistoryOrFallback( Hero hero, int tier ) {
+		int guard = 0;
+		while (hero.talentPointsAvailable( tier ) > 0 && guard++ < 64) {
+			boolean progressed = false;
+			ArrayList<String> hist = hero.talentAutoSpendHistoryForTier( tier );
+			if (hist != null) {
+				for (String name : hist) {
+					if (tryUpgradeNamed( hero, tier, name )) {
+						progressed = true;
+						break;
+					}
+				}
+			}
+			if (!progressed) {
+				for (Talent t : hero.talents.get( tier - 1 ).keySet()) {
+					if (tryUpgradeNamed( hero, tier, t.name() )) {
+						progressed = true;
+						break;
+					}
+				}
+			}
+			if (!progressed) {
+				break;
+			}
+		}
+	}
+
+	private static boolean tryUpgradeNamed( Hero hero, int tier, String name ) {
+		Talent t;
+		try {
+			t = Talent.valueOf( name );
+		} catch (IllegalArgumentException e) {
+			return false;
+		}
+		if (!hero.talents.get( tier - 1 ).containsKey( t )) {
+			return false;
+		}
+		if (hero.pointsInTalent( t ) >= t.maxPoints()) {
+			return false;
+		}
+		if (hero.talentPointsAvailable( tier ) <= 0) {
+			return false;
+		}
+		hero.upgradeTalent( t );
+		Statistics.qualifiedForRandomVictoryBadge = false;
+		return true;
 	}
 }

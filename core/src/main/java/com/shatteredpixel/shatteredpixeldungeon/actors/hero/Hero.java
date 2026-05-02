@@ -217,6 +217,12 @@ public class Hero extends Char {
 	public ArrayList<String> talentAutoOrderTier2;
 	public ArrayList<String> talentAutoOrderTier3;
 	public ArrayList<String> talentAutoOrderTier4;
+
+	/** Order talents were applied via auto-plan (for spending divine inspiration when the pending queue is empty). */
+	public ArrayList<String> talentAutoSpendHistoryTier1;
+	public ArrayList<String> talentAutoSpendHistoryTier2;
+	public ArrayList<String> talentAutoSpendHistoryTier3;
+	public ArrayList<String> talentAutoSpendHistoryTier4;
 	
 	private int attackSkill = 10;
 	private int defenseSkill = 5;
@@ -302,6 +308,11 @@ public class Hero extends Char {
 	private static final String TALENT_AUTO_ORDER_3 = "talent_auto_order_3";
 	private static final String TALENT_AUTO_ORDER_4 = "talent_auto_order_4";
 
+	private static final String TALENT_AUTO_SPEND_HIST_1 = "talent_auto_spend_hist_1";
+	private static final String TALENT_AUTO_SPEND_HIST_2 = "talent_auto_spend_hist_2";
+	private static final String TALENT_AUTO_SPEND_HIST_3 = "talent_auto_spend_hist_3";
+	private static final String TALENT_AUTO_SPEND_HIST_4 = "talent_auto_spend_hist_4";
+
 	private static final String ATTACK		= "attackSkill";
 	private static final String DEFENSE		= "defenseSkill";
 	private static final String STRENGTH	= "STR";
@@ -322,6 +333,10 @@ public class Hero extends Char {
 		putTalentAutoOrderInBundle( bundle, TALENT_AUTO_ORDER_2, talentAutoOrderTier2 );
 		putTalentAutoOrderInBundle( bundle, TALENT_AUTO_ORDER_3, talentAutoOrderTier3 );
 		putTalentAutoOrderInBundle( bundle, TALENT_AUTO_ORDER_4, talentAutoOrderTier4 );
+		putTalentAutoOrderInBundle( bundle, TALENT_AUTO_SPEND_HIST_1, talentAutoSpendHistoryTier1 );
+		putTalentAutoOrderInBundle( bundle, TALENT_AUTO_SPEND_HIST_2, talentAutoSpendHistoryTier2 );
+		putTalentAutoOrderInBundle( bundle, TALENT_AUTO_SPEND_HIST_3, talentAutoSpendHistoryTier3 );
+		putTalentAutoOrderInBundle( bundle, TALENT_AUTO_SPEND_HIST_4, talentAutoSpendHistoryTier4 );
 		
 		bundle.put( ATTACK, attackSkill );
 		bundle.put( DEFENSE, defenseSkill );
@@ -354,6 +369,10 @@ public class Hero extends Char {
 		talentAutoOrderTier2 = readTalentAutoOrderFromBundle( bundle, TALENT_AUTO_ORDER_2 );
 		talentAutoOrderTier3 = readTalentAutoOrderFromBundle( bundle, TALENT_AUTO_ORDER_3 );
 		talentAutoOrderTier4 = readTalentAutoOrderFromBundle( bundle, TALENT_AUTO_ORDER_4 );
+		talentAutoSpendHistoryTier1 = readTalentAutoOrderFromBundle( bundle, TALENT_AUTO_SPEND_HIST_1 );
+		talentAutoSpendHistoryTier2 = readTalentAutoOrderFromBundle( bundle, TALENT_AUTO_SPEND_HIST_2 );
+		talentAutoSpendHistoryTier3 = readTalentAutoOrderFromBundle( bundle, TALENT_AUTO_SPEND_HIST_3 );
+		talentAutoSpendHistoryTier4 = readTalentAutoOrderFromBundle( bundle, TALENT_AUTO_SPEND_HIST_4 );
 		
 		attackSkill = bundle.getInt( ATTACK );
 		defenseSkill = bundle.getInt( DEFENSE );
@@ -449,9 +468,9 @@ public class Hero extends Char {
 		}
 	}
 
-	/** Points that can be spent by auto-talent (excludes divine inspiration bonus). */
+	/** Points auto-talent may spend (includes divine inspiration bonus for that tier). */
 	public int talentPointsAvailableForAuto( int tier ){
-		return Math.max( 0, talentPointsAvailable( tier ) - bonusTalentPoints( tier ) );
+		return Math.max( 0, talentPointsAvailable( tier ) );
 	}
 
 	public ArrayList<String> talentAutoOrderForTier( int tier ) {
@@ -471,6 +490,38 @@ public class Hero extends Char {
 			case 3: talentAutoOrderTier3 = order; break;
 			case 4: talentAutoOrderTier4 = order; break;
 		}
+	}
+
+	public ArrayList<String> talentAutoSpendHistoryForTier( int tier ) {
+		switch (tier) {
+			case 1: return talentAutoSpendHistoryTier1;
+			case 2: return talentAutoSpendHistoryTier2;
+			case 3: return talentAutoSpendHistoryTier3;
+			case 4: return talentAutoSpendHistoryTier4;
+			default: return null;
+		}
+	}
+
+	public void setTalentAutoSpendHistoryForTier( int tier, ArrayList<String> history ) {
+		switch (tier) {
+			case 1: talentAutoSpendHistoryTier1 = history; break;
+			case 2: talentAutoSpendHistoryTier2 = history; break;
+			case 3: talentAutoSpendHistoryTier3 = history; break;
+			case 4: talentAutoSpendHistoryTier4 = history; break;
+		}
+	}
+
+	public void appendTalentAutoSpendHistory( int tier, String talentName ) {
+		ArrayList<String> h = talentAutoSpendHistoryForTier( tier );
+		if (h == null) {
+			h = new ArrayList<>();
+			setTalentAutoSpendHistoryForTier( tier, h );
+		}
+		h.add( talentName );
+	}
+
+	public void clearTalentAutoSpendHistory( int tier ) {
+		setTalentAutoSpendHistoryForTier( tier, null );
 	}
 
 	/** Max entries in the auto queue for this tier (normal level-based points, not divine inspiration). */

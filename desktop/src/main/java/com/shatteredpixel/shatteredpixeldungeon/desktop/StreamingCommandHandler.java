@@ -187,6 +187,19 @@ public final class StreamingCommandHandler {
 		NATIVE_DEPTH.put("succubus", 19); NATIVE_DEPTH.put("eye", 21);    NATIVE_DEPTH.put("scorpio", 23);
 	}
 
+	/**
+	 * Whether chat-spawn HP/damage/armor ({@link SpawnScaled}) should be reduced at the current depth.
+	 * Cross-chapter spawns use an earlier region. Within the Sewers, mobs whose natural first floor is 3+
+	 * ({@link MobSpawner}: swarm, crab, slime) also scale when spawned shallower (e.g. crab on 1–2).
+	 */
+	private static boolean shouldApplyChatSpawnStatScaling(Integer nativeDepth) {
+		if (nativeDepth == null || Dungeon.depth >= nativeDepth) return false;
+		int currentRegion = (Dungeon.depth - 1) / 5;
+		int nativeRegion = (nativeDepth - 1) / 5;
+		if (currentRegion < nativeRegion) return true;
+		return nativeDepth >= 3 && nativeDepth <= 5;
+	}
+
 	/** Called from main thread via Gdx.app.postRunnable. Returns null on success, error message on failure. */
 	public static String handleSpawn(String monsterName, String username) {
 		if (Dungeon.hero == null || Dungeon.level == null)
@@ -229,22 +242,15 @@ public final class StreamingCommandHandler {
 			}
 		}
 
-		// Scale down HP, damage, and armor only when spawning a monster from a LATER biome in an EARLIER biome.
-		// If the monster is in its native biome (e.g. crab on floor 1 = both sewers), never scale down.
+		// Scale down HP, damage, and armor when spawning before the mob's natural first floor (see shouldApplyChatSpawnStatScaling).
 		Integer nativeDepth = NATIVE_DEPTH.get(monsterName);
-		if (nativeDepth != null && Dungeon.depth < nativeDepth) {
-			int currentRegion = (Dungeon.depth - 1) / 5;  // 0=sewers, 1=prison, 2=caves, 3=city, 4=demon
-			int nativeRegion = (nativeDepth - 1) / 5;
-			if (currentRegion < nativeRegion) {
-				// Different biome (e.g. skeleton in sewers) — scale down
-				float scale = Math.max(MIN_HP_SCALE, (float) Dungeon.depth / nativeDepth);
-				int newHT = Math.max(1, Math.round(mob.HT * scale));
-				int newHP = Math.max(1, Math.round(mob.HP * scale));
-				mob.HT = newHT;
-				mob.HP = newHP;
-				SpawnScaled.affect(mob, scale);
-			}
-			// Same biome (e.g. crab on floor 1, both sewers) — no scaling
+		if (shouldApplyChatSpawnStatScaling(nativeDepth)) {
+			float scale = Math.max(MIN_HP_SCALE, (float) Dungeon.depth / nativeDepth);
+			int newHT = Math.max(1, Math.round(mob.HT * scale));
+			int newHP = Math.max(1, Math.round(mob.HP * scale));
+			mob.HT = newHT;
+			mob.HP = newHP;
+			SpawnScaled.affect(mob, scale);
 		}
 
 		int heroPos = Dungeon.hero.pos;
@@ -326,17 +332,13 @@ public final class StreamingCommandHandler {
 		}
 
 		Integer nativeDepth = NATIVE_DEPTH.get(monsterName);
-		if (nativeDepth != null && Dungeon.depth < nativeDepth) {
-			int currentRegion = (Dungeon.depth - 1) / 5;
-			int nativeRegion = (nativeDepth - 1) / 5;
-			if (currentRegion < nativeRegion) {
-				float scale = Math.max(MIN_HP_SCALE, (float) Dungeon.depth / nativeDepth);
-				int newHT = Math.max(1, Math.round(mob.HT * scale));
-				int newHP = Math.max(1, Math.round(mob.HP * scale));
-				mob.HT = newHT;
-				mob.HP = newHP;
-				SpawnScaled.affect(mob, scale);
-			}
+		if (shouldApplyChatSpawnStatScaling(nativeDepth)) {
+			float scale = Math.max(MIN_HP_SCALE, (float) Dungeon.depth / nativeDepth);
+			int newHT = Math.max(1, Math.round(mob.HT * scale));
+			int newHP = Math.max(1, Math.round(mob.HP * scale));
+			mob.HT = newHT;
+			mob.HP = newHP;
+			SpawnScaled.affect(mob, scale);
 		}
 
 		int heroPos = Dungeon.hero.pos;
@@ -623,24 +625,51 @@ public final class StreamingCommandHandler {
 		return bombName;
 	}
 
-	/** Transmute a random transmutable item (bag or equipped). Returns new item name on success, error on failure. */
-	public static String handleTransmute(String username) {
-		if (Dungeon.hero == null || Dungeon.level == null)
-			return "ERR:Not in an active run (title/menu)";
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
-			return "ERR:Not in an active run (title/menu)";
-		if (!Dungeon.hero.isAlive())
-			return "ERR:Hero is dead";
+	/** Result of a chat transmute for WebSocket clients (includes original item name). */
+	public static final class TransmuteStreamResult {
+		public String errorMessage;
+		public String originalName;
+		public String resultName;
+	}
+
+	/**
+	 * Transmute a random transmutable item (bag or equipped).
+	 * On failure {@link #errorMessage} is set (without an {@code ERR:} prefix).
+	 */
+	public static TransmuteStreamResult transmuteForStream(String username) {
+		TransmuteStreamResult out = new TransmuteStreamResult();
+		if (Dungeon.hero == null || Dungeon.level == null) {
+			out.errorMessage = "Not in an active run (title/menu)";
+			return out;
+		}
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene)) {
+			out.errorMessage = "Not in an active run (title/menu)";
+			return out;
+		}
+		if (!Dungeon.hero.isAlive()) {
+			out.errorMessage = "Hero is dead";
+			return out;
+		}
 
 		ScrollOfTransmutation.TransmuteResult tr = ScrollOfTransmutation.transmuteOneRandom(Dungeon.hero);
-		if (tr == null)
-			return "ERR:No transmutable item (need at least one weapon, armor, ring, artifact, potion, scroll, wand, seed, runestone, or trinket)";
+		if (tr == null) {
+			out.errorMessage = "No transmutable item (need at least one weapon, armor, ring, artifact, potion, scroll, wand, seed, runestone, or trinket)";
+			return out;
+		}
 
-		String resultName = tr.result.name();
-		String originalName = tr.originalName;
+		out.resultName = tr.result.name();
+		out.originalName = tr.originalName;
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
-		GLog.p(Messages.get(StreamingCommandHandler.class, "chat_transmuted"), chatter, originalName, resultName);
-		return resultName;
+		GLog.p(Messages.get(StreamingCommandHandler.class, "chat_transmuted"), chatter, out.originalName, out.resultName);
+		return out;
+	}
+
+	/** Transmute a random transmutable item (bag or equipped). Returns new item name on success, error on failure. */
+	public static String handleTransmute(String username) {
+		TransmuteStreamResult r = transmuteForStream(username);
+		if (r.errorMessage != null)
+			return "ERR:" + r.errorMessage;
+		return r.resultName;
 	}
 
 	/** Summon an allied bee next to the hero (lasts 150 turns). Returns "Bee" on success, error on failure. */

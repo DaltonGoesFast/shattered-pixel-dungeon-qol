@@ -23,7 +23,9 @@ package com.shatteredpixel.shatteredpixeldungeon.levels;
 
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
+import com.shatteredpixel.shatteredpixeldungeon.utils.AltAssetPaths;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
@@ -166,12 +168,23 @@ public class CavesLevel extends RegularLevel {
 
 	@Override
 	public String tilesTex() {
+		if ( SPDSettings.useAltTileset( Statistics.cavesAltTileset ) ) {
+			return AltAssetPaths.prefixedVariant( Assets.Environment.TILES_CAVES );
+		}
 		return Assets.Environment.TILES_CAVES;
 	}
 	
 	@Override
 	public String waterTex() {
+		if ( SPDSettings.useAltTileset( Statistics.cavesAltTileset ) ) {
+			return AltAssetPaths.prefixedVariant( Assets.Environment.WATER_CAVES );
+		}
 		return Assets.Environment.WATER_CAVES;
+	}
+
+	@Override
+	public String terrainFeaturesTex() {
+		return AltAssetPaths.cavesTerrainFeaturesTex();
 	}
 	
 	@Override

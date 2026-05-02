@@ -82,6 +82,17 @@ public class MiningLevel extends CavesLevel {
 
 	}
 
+	/** Quest branch always uses vanilla caves sheets (alt tileset applies only on the main caves chapter). */
+	@Override
+	public String waterTex() {
+		return Assets.Environment.WATER_CAVES;
+	}
+
+	@Override
+	public String terrainFeaturesTex() {
+		return Assets.Environment.TERRAIN_FEATURES;
+	}
+
 	@Override
 	public void playLevelMusic() {
 		Music.INSTANCE.play(Assets.Music.CAVES_TENSE, true);

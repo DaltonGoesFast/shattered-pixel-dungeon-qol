@@ -29,6 +29,7 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.painters.Painter;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.standard.StandardRoom;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.tiles.CustomTilemap;
+import com.shatteredpixel.shatteredpixeldungeon.utils.AltAssetPaths;
 import com.watabou.noosa.Tilemap;
 import com.watabou.utils.Point;
 
@@ -82,7 +83,7 @@ public class RitualSiteRoom extends StandardRoom {
 	public static class RitualMarker extends CustomTilemap {
 		
 		{
-			texture = Assets.Environment.PRISON_QUEST;
+			texture = AltAssetPaths.prisonCustomTile( Assets.Environment.PRISON_QUEST );
 			
 			tileW = tileH = 3;
 		}

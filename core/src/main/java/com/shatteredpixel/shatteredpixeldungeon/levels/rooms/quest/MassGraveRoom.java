@@ -36,6 +36,7 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.Room;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.SpecialRoom;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.tiles.CustomTilemap;
+import com.shatteredpixel.shatteredpixeldungeon.utils.AltAssetPaths;
 import com.watabou.noosa.Image;
 import com.watabou.noosa.Tilemap;
 import com.watabou.utils.Random;
@@ -129,7 +130,7 @@ public class MassGraveRoom extends SpecialRoom {
 		private static final int FLOOR          = 7;
 
 		{
-			texture = Assets.Environment.PRISON_QUEST;
+			texture = AltAssetPaths.prisonCustomTile( Assets.Environment.PRISON_QUEST );
 		}
 
 		@Override

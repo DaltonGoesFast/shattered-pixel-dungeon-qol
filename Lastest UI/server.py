@@ -274,6 +274,8 @@ def _game_ws_on_message(ws, message):
                             pending_spawns[rid]['error'] = data.get('error')
                         if data.get('type') == 'transmute_result' and data.get('item_name'):
                             pending_spawns[rid]['item_name'] = data.get('item_name')
+                        if data.get('type') == 'transmute_result' and data.get('original_item_name'):
+                            pending_spawns[rid]['original_item_name'] = data.get('original_item_name')
                         if data.get('type') == 'transmute_result' and data.get('error'):
                             pending_spawns[rid]['error'] = data.get('error')
                         if data.get('type') == 'summon_bee_result' and data.get('ally_name'):
@@ -1661,15 +1663,20 @@ def transmute_command():
                 pending = pending_spawns.pop(request_id, {})
                 success = pending.get('success', False)
                 item_name = pending.get('item_name', '')
+                original_item_name = pending.get('original_item_name', '')
                 transmute_error = pending.get('error')
         else:
             with spawn_lock:
                 pending_spawns.pop(request_id, None)
             return jsonify({'ok': False, 'error': 'Transmute command timed out'}), 504
         if success:
-            print(f"Transmute OK: {item_name} for {username}")
+            print(f"Transmute OK: {original_item_name!r} -> {item_name!r} for {username}")
             _record_command_event(username, 'transmute', item_name or '', True)
-            return jsonify({'ok': True, 'item_name': item_name})
+            return jsonify({
+                'ok': True,
+                'item_name': item_name,
+                'original_item_name': original_item_name,
+            })
         err = transmute_error or 'No transmutable item'
         _record_command_event(username, 'transmute', '', False)
         return jsonify({'ok': False, 'error': err}), 200

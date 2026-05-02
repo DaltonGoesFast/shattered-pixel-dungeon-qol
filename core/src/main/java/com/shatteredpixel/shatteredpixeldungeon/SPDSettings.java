@@ -126,6 +126,42 @@ public class SPDSettings extends GameSettings {
 	public static int screenShake() {
 		return getInt( KEY_SCREEN_SHAKE, 2, 0, 4 );
 	}
+
+	/** 0–100: chance each region uses {@code 01-}prefixed tiles at run start; 0 = never, 100 = always; in-between follows saved run flags unless clamped by 0/100. */
+	public static final String KEY_ALT_TILESET_CHANCE = "alt_tileset_chance";
+
+	/** Legacy boolean; migrated once into {@link #KEY_ALT_TILESET_CHANCE}. */
+	private static final String LEGACY_FORCE_ALT_TILESETS = "force_alt_tilesets";
+
+	private static boolean legacyAltTilesetPrefsChecked = false;
+
+	private static void migrateLegacyAltTilesetPrefsIfNeeded() {
+		if (legacyAltTilesetPrefsChecked) return;
+		legacyAltTilesetPrefsChecked = true;
+		if (!contains(KEY_ALT_TILESET_CHANCE) && contains(LEGACY_FORCE_ALT_TILESETS)) {
+			put(KEY_ALT_TILESET_CHANCE, getBoolean(LEGACY_FORCE_ALT_TILESETS, false) ? 100 : 50);
+		}
+	}
+
+	public static void altTilesetChance( int percent ) {
+		put(KEY_ALT_TILESET_CHANCE, Math.max(0, Math.min(100, percent)));
+	}
+
+	public static int altTilesetChance() {
+		migrateLegacyAltTilesetPrefsIfNeeded();
+		return getInt(KEY_ALT_TILESET_CHANCE, 50, 0, 100);
+	}
+
+	/**
+	 * Whether “big” alt tilesets ({@code 01-} environment sheets) apply for this region,
+	 * combining the per-run {@link com.shatteredpixel.shatteredpixeldungeon.Statistics} roll with the user slider.
+	 */
+	public static boolean useAltTileset( boolean statisticsSaysAlt ) {
+		int p = altTilesetChance();
+		if (p >= 100) return true;
+		if (p <= 0) return false;
+		return statisticsSaysAlt;
+	}
 	
 	//Interface
 

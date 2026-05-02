@@ -25,7 +25,9 @@ import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Bones;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
+import com.shatteredpixel.shatteredpixeldungeon.utils.AltAssetPaths;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
@@ -95,12 +97,23 @@ public class CavesBossLevel extends Level {
 
 	@Override
 	public String tilesTex() {
+		if ( SPDSettings.useAltTileset( Statistics.cavesAltTileset ) ) {
+			return AltAssetPaths.prefixedVariant( Assets.Environment.TILES_CAVES );
+		}
 		return Assets.Environment.TILES_CAVES;
 	}
 
 	@Override
 	public String waterTex() {
+		if ( SPDSettings.useAltTileset( Statistics.cavesAltTileset ) ) {
+			return AltAssetPaths.prefixedVariant( Assets.Environment.WATER_CAVES );
+		}
 		return Assets.Environment.WATER_CAVES;
+	}
+
+	@Override
+	public String terrainFeaturesTex() {
+		return AltAssetPaths.cavesTerrainFeaturesTex();
 	}
 
 	private static int WIDTH = 33;
@@ -648,7 +661,7 @@ public class CavesBossLevel extends Level {
 	public static class CityEntrance extends CustomTilemap{
 
 		{
-			texture = Assets.Environment.CAVES_BOSS;
+			texture = AltAssetPaths.cavesCustomTile( Assets.Environment.CAVES_BOSS );
 		}
 
 		private static short[] entryWay = new short[]{
@@ -705,7 +718,7 @@ public class CavesBossLevel extends Level {
 	public static class EntranceOverhang extends CustomTilemap{
 
 		{
-			texture = Assets.Environment.CAVES_BOSS;
+			texture = AltAssetPaths.cavesCustomTile( Assets.Environment.CAVES_BOSS );
 		}
 
 		private static short[] entryWay = new short[]{
@@ -749,7 +762,7 @@ public class CavesBossLevel extends Level {
 	public static class ArenaVisuals extends CustomTilemap {
 
 		{
-			texture = Assets.Environment.CAVES_BOSS;
+			texture = AltAssetPaths.cavesCustomTile( Assets.Environment.CAVES_BOSS );
 		}
 
 		@Override

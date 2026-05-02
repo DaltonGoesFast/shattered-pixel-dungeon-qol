@@ -121,6 +121,7 @@ public class KingsCrown extends Item {
 		}
 
 		hero.talentAutoOrderTier4 = null;
+		hero.clearTalentAutoSpendHistory( 4 );
 		hero.armorAbility = ability;
 		Talent.initArmorTalents(hero);
 		TalentAutoPlan.tryApply( hero );

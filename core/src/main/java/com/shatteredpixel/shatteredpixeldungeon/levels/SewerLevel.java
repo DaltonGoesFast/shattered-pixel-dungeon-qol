@@ -25,6 +25,7 @@ import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.GamesInProgress;
+import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Ghost;
@@ -49,6 +50,7 @@ import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.SurfaceScene;
 import com.shatteredpixel.shatteredpixeldungeon.tiles.DungeonTilemap;
+import com.shatteredpixel.shatteredpixeldungeon.utils.AltAssetPaths;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndMessage;
 import com.watabou.noosa.Game;
 import com.watabou.noosa.Group;
@@ -108,12 +110,26 @@ public class SewerLevel extends RegularLevel {
 	
 	@Override
 	public String tilesTex() {
+		if ( SPDSettings.useAltTileset( Statistics.sewersAltTileset ) ) {
+			return AltAssetPaths.prefixedVariant( Assets.Environment.TILES_SEWERS );
+		}
 		return Assets.Environment.TILES_SEWERS;
 	}
 	
 	@Override
 	public String waterTex() {
+		if ( SPDSettings.useAltTileset( Statistics.sewersAltTileset ) ) {
+			return AltAssetPaths.prefixedVariant( Assets.Environment.WATER_SEWERS );
+		}
 		return Assets.Environment.WATER_SEWERS;
+	}
+
+	@Override
+	public String terrainFeaturesTex() {
+		if ( SPDSettings.useAltTileset( Statistics.sewersAltTileset ) ) {
+			return AltAssetPaths.prefixedVariant( Assets.Environment.TERRAIN_FEATURES );
+		}
+		return Assets.Environment.TERRAIN_FEATURES;
 	}
 	
 	@Override

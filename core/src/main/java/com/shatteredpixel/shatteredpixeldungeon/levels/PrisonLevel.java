@@ -23,6 +23,7 @@ package com.shatteredpixel.shatteredpixeldungeon.levels;
 
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Wandmaker;
@@ -47,6 +48,7 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.traps.TeleportationTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.ToxicTrap;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.tiles.DungeonTilemap;
+import com.shatteredpixel.shatteredpixeldungeon.utils.AltAssetPaths;
 import com.watabou.noosa.Game;
 import com.watabou.noosa.Group;
 import com.watabou.noosa.Halo;
@@ -115,12 +117,23 @@ public class PrisonLevel extends RegularLevel {
 	
 	@Override
 	public String tilesTex() {
+		if ( SPDSettings.useAltTileset( Statistics.prisonAltTileset ) ) {
+			return AltAssetPaths.prefixedVariant( Assets.Environment.TILES_PRISON );
+		}
 		return Assets.Environment.TILES_PRISON;
 	}
 	
 	@Override
 	public String waterTex() {
+		if ( SPDSettings.useAltTileset( Statistics.prisonAltTileset ) ) {
+			return AltAssetPaths.prefixedVariant( Assets.Environment.WATER_PRISON );
+		}
 		return Assets.Environment.WATER_PRISON;
+	}
+
+	@Override
+	public String terrainFeaturesTex() {
+		return AltAssetPaths.prisonTerrainFeaturesTex();
 	}
 	
 	@Override

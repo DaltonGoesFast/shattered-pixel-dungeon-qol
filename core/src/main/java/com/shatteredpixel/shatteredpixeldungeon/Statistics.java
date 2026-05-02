@@ -22,6 +22,7 @@
 package com.shatteredpixel.shatteredpixeldungeon;
 
 import com.watabou.utils.Bundle;
+import com.watabou.utils.Random;
 import com.watabou.utils.SparseArray;
 
 import java.util.Arrays;
@@ -74,6 +75,15 @@ public class Statistics {
 	public static boolean amuletObtained = false;
 	public static boolean gameWon = false;
 	public static boolean ascended = false;
+
+	/** When true, sewer floors use {@code 01}-prefixed environment textures for the whole run. */
+	public static boolean sewersAltTileset = false;
+
+	/** When true, prison floors (depths 6–10) use {@code 01}-prefixed environment and matching mob sprites. */
+	public static boolean prisonAltTileset = false;
+
+	/** When true, cave floors use {@code 01}-prefixed cave tiles/water for the whole run. */
+	public static boolean cavesAltTileset = false;
 	
 	public static void reset() {
 		
@@ -117,6 +127,22 @@ public class Statistics {
 		amuletObtained = false;
 		gameWon = false;
 		ascended = false;
+
+		int p = SPDSettings.altTilesetChance();
+		if (p >= 100) {
+			sewersAltTileset = true;
+			prisonAltTileset = true;
+			cavesAltTileset = true;
+		} else if (p <= 0) {
+			sewersAltTileset = false;
+			prisonAltTileset = false;
+			cavesAltTileset = false;
+		} else {
+			float f = p / 100f;
+			sewersAltTileset = Random.Float() < f;
+			prisonAltTileset = Random.Float() < f;
+			cavesAltTileset = Random.Float() < f;
+		}
 		
 	}
 	
@@ -161,6 +187,10 @@ public class Statistics {
 	private static final String AMULET          = "amuletObtained";
 	private static final String WON		        = "won";
 	private static final String ASCENDED		= "ascended";
+
+	private static final String SEWERS_ALT_TILESET = "sewers_alt_tileset";
+	private static final String PRISON_ALT_TILESET = "prison_alt_tileset";
+	private static final String CAVES_ALT_TILESET = "caves_alt_tileset";
 	
 	public static void storeInBundle( Bundle bundle ) {
 		bundle.put( GOLD,		goldCollected );
@@ -207,6 +237,10 @@ public class Statistics {
 		bundle.put( AMULET,		amuletObtained );
 		bundle.put( WON,        gameWon );
 		bundle.put( ASCENDED,   ascended );
+
+		bundle.put( SEWERS_ALT_TILESET, sewersAltTileset );
+		bundle.put( PRISON_ALT_TILESET, prisonAltTileset );
+		bundle.put( CAVES_ALT_TILESET, cavesAltTileset );
 	}
 	
 	public static void restoreFromBundle( Bundle bundle ) {
@@ -268,6 +302,10 @@ public class Statistics {
 		amuletObtained	= bundle.getBoolean( AMULET );
 		gameWon         = bundle.getBoolean( WON );
 		ascended        = bundle.getBoolean( ASCENDED );
+
+		sewersAltTileset = bundle.contains( SEWERS_ALT_TILESET ) && bundle.getBoolean( SEWERS_ALT_TILESET );
+		prisonAltTileset = bundle.contains( PRISON_ALT_TILESET ) && bundle.getBoolean( PRISON_ALT_TILESET );
+		cavesAltTileset = bundle.contains( CAVES_ALT_TILESET ) && bundle.getBoolean( CAVES_ALT_TILESET );
 	}
 	
 	public static void preview( GamesInProgress.Info info, Bundle bundle ){

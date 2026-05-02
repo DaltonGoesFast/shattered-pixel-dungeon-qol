@@ -8,7 +8,7 @@ Spend points to mess with the run! Earn points by chatting (1 per message, 30s c
 
 **!toppoints** / **!leaderboard** — Top 3 point holders (free)
 
-**!spawn** (monster) — Table **base** cost, then vs. that mob’s natural **first** floor: **½** if you’re **deeper**; **1×–3×** if you’re **shallower** (before that floor), by **dungeon chapter** rules—up to **3×** for very early spawns of late-chapter mobs, often **2×** one chapter early or same-Caves-earlier-floor (see `Lastest UI/points_command.py`). Examples: !spawn rat, !spawn bat, !spawn scorpio
+**!spawn** (monster) — Table **base** vs your depth and that mob’s normal **first** floor: **½** off if you’re **deeper** (rounded down, min 1). If you’re **still above** that depth, extra cost follows **chapter gap**: five chapters × five floors (sewers → prison → caves → city → halls)—you pay **base**, **base +20%**, or **base +40%** (rounded). Exact mapping is in `Lastest UI/points_command.py`. Examples: !spawn rat, !spawn bat, !spawn scorpio
 
 **!champion** (monster) — **2×** that adjusted !spawn price (not 2× raw table). Random champion type. Examples: !champion rat, !champion eye
 
@@ -54,7 +54,7 @@ Spend points to mess with the run! Earn points by chatting (1 per message, 30s c
 
 ---
 
-**Monster costs (base, before depth/chapter × or ½):**
+**Monster costs (table base before depth/chapter adjustment):**
 - 5 pts: rat
 - 10 pts: albino, snake, gnoll
 - 15 pts: crab, slime, swarm
@@ -69,6 +69,6 @@ Spend points to mess with the run! Earn points by chatting (1 per message, 30s c
 - 70 pts: eye
 - 80 pts: scorpio
 
-**Champion:** 2× the spawn price after those depth/chapter rules (same as !spawn at this floor, then double).
+**Champion:** 2× the zone-adjusted !spawn price at this depth (same depth rules as !spawn, then double—not 2× raw table base alone).
 
 *These prices match the streamer’s points overlay config. They can be changed anytime.*

@@ -101,6 +101,7 @@ public class TengusMask extends Item {
 		curUser.busy();
 		
 		curUser.talentAutoOrderTier3 = null;
+		curUser.clearTalentAutoSpendHistory( 3 );
 		curUser.subClass = way;
 		Talent.initSubclassTalents(curUser);
 		TalentAutoPlan.tryApply( curUser );

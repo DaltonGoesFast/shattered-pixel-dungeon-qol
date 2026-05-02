@@ -41,7 +41,7 @@ public class TerrainFeaturesTilemap extends DungeonTilemap {
 	private SparseArray<Trap> traps;
 
 	public TerrainFeaturesTilemap(SparseArray<Plant> plants, SparseArray<Trap> traps) {
-		super(Assets.Environment.TERRAIN_FEATURES);
+		super(Dungeon.level != null ? Dungeon.level.terrainFeaturesTex() : Assets.Environment.TERRAIN_FEATURES);
 
 		this.plants = plants;
 		this.traps = traps;

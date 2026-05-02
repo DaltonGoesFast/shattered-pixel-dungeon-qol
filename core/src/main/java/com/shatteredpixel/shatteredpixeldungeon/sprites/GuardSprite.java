@@ -22,6 +22,7 @@
 package com.shatteredpixel.shatteredpixeldungeon.sprites;
 
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
+import com.shatteredpixel.shatteredpixeldungeon.utils.AltAssetPaths;
 import com.shatteredpixel.shatteredpixeldungeon.effects.particles.ShadowParticle;
 import com.watabou.noosa.MovieClip;
 import com.watabou.noosa.TextureFilm;
@@ -31,7 +32,7 @@ public class GuardSprite extends MobSprite {
 	public GuardSprite() {
 		super();
 
-		texture( Assets.Sprites.GUARD );
+		texture( AltAssetPaths.prisonMobSprite( Assets.Sprites.GUARD ) );
 
 		TextureFilm frames = new TextureFilm( texture, 12, 16 );
 

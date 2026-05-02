@@ -229,6 +229,7 @@ public class WndSettings extends WndTabbed {
 		CheckBox chkTileIndicator;
 		OptionSlider optFollowIntensity;
 		OptionSlider optScreenShake;
+		OptionSlider optAltTilesetChance;
 
 		@Override
 		protected void createChildren() {
@@ -325,6 +326,23 @@ public class WndSettings extends WndTabbed {
 			optScreenShake.setSelectedValue(SPDSettings.screenShake());
 			add(optScreenShake);
 
+			optAltTilesetChance = new OptionSlider(
+					Messages.get(this, "alt_tileset_chance"),
+					Messages.get(this, "alt_tilesets_min"),
+					Messages.get(this, "alt_tilesets_max"),
+					0, 10) {
+				@Override
+				protected void onChange() {
+					SPDSettings.altTilesetChance(getSelectedValue() * 10);
+					if (ShatteredPixelDungeon.scene() instanceof GameScene) {
+						ShatteredPixelDungeon.seamlessResetScene();
+					}
+				}
+			};
+			int altStep = Math.round(SPDSettings.altTilesetChance() / 10f);
+			optAltTilesetChance.setSelectedValue(Math.max(0, Math.min(10, altStep)));
+			add(optAltTilesetChance);
+
 		}
 
 		@Override
@@ -368,7 +386,9 @@ public class WndSettings extends WndTabbed {
 				optScreenShake.setRect(0, optFollowIntensity.bottom() + GAP, width, SLIDER_HEIGHT);
 			}
 
-			height = optScreenShake.bottom();
+			float afterSliders = Math.max( optFollowIntensity.bottom(), optScreenShake.bottom() );
+			optAltTilesetChance.setRect(0, afterSliders + GAP, width, SLIDER_HEIGHT);
+			height = optAltTilesetChance.bottom();
 		}
 
 	}

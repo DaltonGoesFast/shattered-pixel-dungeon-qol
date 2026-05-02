@@ -68,6 +68,13 @@ public class StreamingServer extends WebSocketServer {
 		broadcast(obj.toString());
 	}
 
+	/** Echo chatter name on command results so read-only clients (e.g. Godot) don’t rely only on UDP pairing. */
+	private void addChatter(JsonObject resp, String chatter) {
+		if (chatter != null && !chatter.isEmpty()) {
+			resp.addProperty("username", chatter);
+		}
+	}
+
 	@Override
 	public void onOpen(org.java_websocket.WebSocket conn, org.java_websocket.handshake.ClientHandshake handshake) {
 		// Send a fresh snapshot from the game thread so new clients get current run, not stale lastPayload
@@ -108,6 +115,7 @@ public class StreamingServer extends WebSocketServer {
 					resp.addProperty("request_id", requestId);
 					resp.addProperty("success", true);
 					resp.addProperty("version", "QoL-3.3.7");
+					addChatter(resp, usernameFinal);
 					broadcast(resp.toString());
 				}
 			} else if ("spawn".equals(cmd)) {
@@ -128,6 +136,8 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("request_id", requestId);
 						resp.addProperty("success", ok);
 						if (err != null) resp.addProperty("error", err);
+						if (ok) resp.addProperty("monster", monsterFinal);
+						addChatter(resp, usernameFinal);
 						broadcast(resp.toString());
 					}
 				});
@@ -150,6 +160,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (err != null) resp.addProperty("error", err);
 						if (ok) resp.addProperty("monster", monsterFinal);
+						addChatter(resp, usernameFinal);
 						broadcast(resp.toString());
 					}
 				});
@@ -174,6 +185,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("request_id", requestId);
 						resp.addProperty("success", ok);
 						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
 						broadcast(resp.toString());
 					}
 				});
@@ -190,6 +202,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (gasName != null) resp.addProperty("gas_name", gasName);
 						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
 						broadcast(resp.toString());
 					}
 				});
@@ -209,6 +222,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (itemName != null) resp.addProperty("item_name", itemName);
 						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
 						broadcast(resp.toString());
 					}
 				});
@@ -225,6 +239,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (scrollName != null) resp.addProperty("scroll_name", scrollName);
 						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
 						broadcast(resp.toString());
 					}
 				});
@@ -247,6 +262,7 @@ public class StreamingServer extends WebSocketServer {
 							if (effectName != null) resp.addProperty("effect_name", effectName);
 							resp.addProperty("rarity", rarity);
 							if (err != null) resp.addProperty("error", err);
+							addChatter(resp, usernameFinal);
 							broadcast(resp.toString());
 						}
 					});
@@ -264,6 +280,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (buffName != null) resp.addProperty("buff_name", buffName);
 						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
 						broadcast(resp.toString());
 					}
 				});
@@ -280,6 +297,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (debuffName != null) resp.addProperty("debuff_name", debuffName);
 						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
 						broadcast(resp.toString());
 					}
 				});
@@ -296,6 +314,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (trapName != null) resp.addProperty("trap_name", trapName);
 						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
 						broadcast(resp.toString());
 					}
 				});
@@ -312,22 +331,24 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (bombName != null) resp.addProperty("bomb_name", bombName);
 						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
 						broadcast(resp.toString());
 					}
 				});
 			} else if ("transmute".equals(cmd)) {
 				Gdx.app.postRunnable(() -> {
-					String result = StreamingCommandHandler.handleTransmute(usernameFinal);
-					boolean ok = (result != null && !result.startsWith("ERR:"));
-					String itemName = ok ? result : null;
-					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					StreamingCommandHandler.TransmuteStreamResult tr = StreamingCommandHandler.transmuteForStream(usernameFinal);
+					boolean ok = (tr.errorMessage == null);
+					String err = tr.errorMessage;
 					if (requestId != null && !requestId.isEmpty()) {
 						JsonObject resp = new JsonObject();
 						resp.addProperty("type", "transmute_result");
 						resp.addProperty("request_id", requestId);
 						resp.addProperty("success", ok);
-						if (itemName != null) resp.addProperty("item_name", itemName);
+						if (ok && tr.resultName != null) resp.addProperty("item_name", tr.resultName);
+						if (ok && tr.originalName != null) resp.addProperty("original_item_name", tr.originalName);
 						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
 						broadcast(resp.toString());
 					}
 				});
@@ -344,6 +365,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (allyName != null) resp.addProperty("ally_name", allyName);
 						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
 						broadcast(resp.toString());
 					}
 				});
@@ -360,6 +382,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (wardName != null) resp.addProperty("ward_name", wardName);
 						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
 						broadcast(resp.toString());
 					}
 				});
@@ -376,6 +399,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (buffName != null) resp.addProperty("buff_name", buffName);
 						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
 						broadcast(resp.toString());
 					}
 				});
@@ -392,6 +416,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (buffName != null) resp.addProperty("buff_name", buffName);
 						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
 						broadcast(resp.toString());
 					}
 				});
@@ -408,6 +433,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (itemName != null) resp.addProperty("item_name", itemName);
 						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
 						broadcast(resp.toString());
 					}
 				});
@@ -424,6 +450,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (mobName != null) resp.addProperty("mob_name", mobName);
 						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
 						broadcast(resp.toString());
 					}
 				});
@@ -440,6 +467,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (debuffName != null) resp.addProperty("debuff_name", debuffName);
 						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
 						broadcast(resp.toString());
 					}
 				});
@@ -456,6 +484,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (debuffName != null) resp.addProperty("debuff_name", debuffName);
 						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
 						broadcast(resp.toString());
 					}
 				});
@@ -472,6 +501,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (buffName != null) resp.addProperty("buff_name", buffName);
 						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
 						broadcast(resp.toString());
 					}
 				});
@@ -488,6 +518,7 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("success", ok);
 						if (detail != null) resp.addProperty("detail", detail);
 						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
 						broadcast(resp.toString());
 					}
 				});

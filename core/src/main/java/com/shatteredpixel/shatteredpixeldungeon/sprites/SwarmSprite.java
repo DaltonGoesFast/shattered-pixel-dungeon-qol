@@ -22,6 +22,7 @@
 package com.shatteredpixel.shatteredpixeldungeon.sprites;
 
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
+import com.shatteredpixel.shatteredpixeldungeon.utils.AltAssetPaths;
 import com.watabou.noosa.TextureFilm;
 
 public class SwarmSprite extends MobSprite {
@@ -29,7 +30,7 @@ public class SwarmSprite extends MobSprite {
 	public SwarmSprite() {
 		super();
 		
-		texture( Assets.Sprites.SWARM );
+		texture( AltAssetPaths.prisonMobSprite( Assets.Sprites.SWARM ) );
 		
 		TextureFilm frames = new TextureFilm( texture, 16, 16 );
 		

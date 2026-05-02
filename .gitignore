@@ -1,5 +1,6 @@
 # Built application files
 *.apk
+*.aab
 
 # Files for the Dalvik VM
 *.dex
@@ -15,12 +16,32 @@ release/
 # Local configuration file (sdk path, etc)
 local.properties
 
+# Android release signing (never commit)
+android/keystore.properties
+android/*.jks
+android/*.keystore
+*.jks
+
+# Local snapshot trees (can break git on Windows path length)
+backup-working-*/
+backup-before-*/
+
 #intellij project files
 *.iml
 *.idea
 
 # Cursor IDE
 .cursor/
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+*.lnk
+
+# Scratch / local-only assets
+temp_banners.png
+temp_*.png
 
 # Lastest UI generated/runtime
 Lastest UI/**/My-Nice-Script_*.cmd
@@ -45,6 +66,12 @@ Lastest UI/__pycache__/
 Lastest UI/*.log
 Lastest UI/*.zip
 Lastest UI/old_*.txt
+Lastest UI/streamdeck_free_duration.txt
+Lastest UI/assigned_role.txt
+Lastest UI/assigned_role.txt.bak
+Lastest UI/helper_hurter_counter.txt
+Lastest UI/switch_side_last.txt
+Lastest UI/switch_success_cooldown.json
 
 # Lastest UI backups
 Lastest UI/backup/

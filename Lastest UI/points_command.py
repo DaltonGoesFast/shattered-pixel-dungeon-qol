@@ -22,6 +22,7 @@ Usage:
   cheer:    python points_command.py cheer <bits> <username> [isSubscribed 0|1] [userIsSponsor 0|1] [topFarder 0|1]
 
 All spend commands write to spawn_result.txt (ok or ok|extra|pts). The last value is remaining points. Donation writes to donation_result.txt.
+Transmute uses four fields: ok|<original_item_name>|<result_item_name>|<points> (original may be empty if the game build omits it).
 """
 import sys
 import urllib.request
@@ -335,7 +336,7 @@ def _dungeon_region(depth: int) -> int:
 
 
 def _early_spawn_multiplier(depth: int, native: int) -> int:
-    """When depth < native: return 1, 2, or 3 for cross-chapter or same-caves-early rules."""
+    """When depth < native: return 1, 2, or 3 (tier steps). Maps to +0%, +20%, +40% on base cost."""
     cur_r = _dungeon_region(depth)
     nat_r = _dungeon_region(native)
     if cur_r < nat_r:
@@ -359,7 +360,7 @@ def _early_spawn_multiplier(depth: int, native: int) -> int:
 
 
 def compute_spawn_cost(monster: str) -> int:
-    """Late discount when deeper than native; early surcharge when shallower (chapter-based, up to 3×)."""
+    """Late discount when deeper than native; early surcharge when shallower (+20% per tier step above baseline)."""
     cfg = get_config()
     base = cfg["cost_per_monster"].get(monster, cfg["default_monster_cost"])
     depth = get_current_depth()
@@ -369,8 +370,9 @@ def compute_spawn_cost(monster: str) -> int:
     if depth > native:
         return max(1, base // 2)
     if depth < native:
-        m = _early_spawn_multiplier(depth, native)
-        return max(1, base * m)
+        tier = _early_spawn_multiplier(depth, native)  # 1, 2, or 3 → +0%, +20%, +40%
+        factor = 1.0 + 0.20 * (tier - 1)
+        return max(1, int(round(base * factor)))
     return base
 
 
@@ -995,9 +997,11 @@ def cmd_transmute(args):
 
             new_pts, new_donation = deduct_points(pts, donation_pts, cost)
             data[key] = (new_pts, last, new_donation, role)
+            # Transmute: echo both item names for Streamer.bot/Twitch (matches in-game GLog when game sends original_item_name).
             write_points(data)
-            item_name = body.get("item_name", "item")
-            return SPAWN_RESULT_FILE, f"ok|{item_name}|{new_pts}"
+            item_name = (body.get("item_name") or "item").strip()
+            original_item_name = (body.get("original_item_name") or "").strip()
+            return SPAWN_RESULT_FILE, f"ok|{original_item_name}|{item_name}|{new_pts}"
     except TimeoutError:
         return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 
