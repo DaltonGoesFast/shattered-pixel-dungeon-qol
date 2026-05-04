@@ -80,16 +80,23 @@ public class TalentAutoPlan {
 	/**
 	 * Spend divine-inspiration bonus points when the pending queue no longer covers them:
 	 * repeat the recorded auto-plan order, then tier talent order as a last resort.
+	 * <p>
+	 * Only spends up to {@link Hero#bonusTalentPoints(int)} per call &mdash; normal level
+	 * talent points must stay for the queue (first pass) or manual assignment; otherwise
+	 * this fallback would drain the whole tier (e.g. after King's Crown / Tengu's Mask
+	 * clears the queue and history while inspiration is active).
 	 */
 	private static void spendRemainingUsingHistoryOrFallback( Hero hero, int tier ) {
+		int bonusBudget = hero.bonusTalentPoints( tier );
 		int guard = 0;
-		while (hero.talentPointsAvailable( tier ) > 0 && guard++ < 64) {
+		while (bonusBudget > 0 && hero.talentPointsAvailable( tier ) > 0 && guard++ < 64) {
 			boolean progressed = false;
 			ArrayList<String> hist = hero.talentAutoSpendHistoryForTier( tier );
 			if (hist != null) {
 				for (String name : hist) {
 					if (tryUpgradeNamed( hero, tier, name )) {
 						progressed = true;
+						bonusBudget--;
 						break;
 					}
 				}
@@ -98,6 +105,7 @@ public class TalentAutoPlan {
 				for (Talent t : hero.talents.get( tier - 1 ).keySet()) {
 					if (tryUpgradeNamed( hero, tier, t.name() )) {
 						progressed = true;
+						bonusBudget--;
 						break;
 					}
 				}
