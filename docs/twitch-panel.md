@@ -8,13 +8,15 @@ Spend points to mess with the run! Earn points by chatting (1 per message, 30s c
 
 **!toppoints** / **!leaderboard** — Top 3 point holders (free)
 
+**!givepoints** (amount) (target) — Give points to another viewer (free). YouTube works without `@`: `!givepoints 50 bob` (Twitch also accepts `@bob`). Spends chat points first, then donor points if needed.
+
 **!spawn** (monster) — Table **base** vs your depth and that mob’s normal **first** floor: **½** off if you’re **deeper** (rounded down, min 1). If you’re **still above** that depth, extra cost follows **chapter gap**: five chapters × five floors (sewers → prison → caves → city → halls)—you pay **base**, **base +20%**, or **base +40%** (rounded). Exact mapping is in `Lastest UI/points_command.py`. Examples: !spawn rat, !spawn bat, !spawn scorpio
 
 **!champion** (monster) — **2×** that adjusted !spawn price (not 2× raw table). Random champion type. Examples: !champion rat, !champion eye
 
 **!gold** (amount) — Drop gold near the hero (**5** pts per gold, 1–100). Example: !gold 25
 
-**!curse** — Curse a random equipped item (**100** pts)
+**!curse** — Curse a random equipped item (**100** base pts; **doubles** for each item already cursed on you — 100 / 200 / 400 / 800 / 1600 / 3200)
 
 **!gas** — Spawn random gas (**75** pts). Toxic, confusion, storm clouds, inferno, and more!
 
@@ -23,6 +25,8 @@ Spend points to mess with the run! Earn points by chatting (1 per message, 30s c
 **!row** — Ring of Wealth bonus loot near the hero (**100** pts). Tier scales with chapter; always at least one item.
 
 **!trap** — Place a random visible trap nearby (**50** pts). Shocking, toxic, burning, teleport, summon, and more!
+
+**!plant** — Plant a random seed nearby (**30** pts). Fails if the **Barren Land** challenge is enabled.
 
 **!bomb** — Drop a weighted random lit bomb nearby (**75** pts). Regular and alchemy bombs; fuse like a thrown bomb.
 

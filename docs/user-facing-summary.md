@@ -14,14 +14,16 @@ Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also g
 
 COMMANDS (points):
 - !points / !toppoints / !leaderboard — Free
+- !givepoints (amount) (target) — Give points to another viewer. YouTube: no @ needed (example: !givepoints 50 bob). Spends chat points first, then donor points if needed.
 - !spawn (monster) — Table base vs depth and where that mob normally first appears: half off (rounded down, min 1) if the hero is deeper. If still above that depth, price bumps by dungeon chapter gap (five 5-floor chapters from sewers to halls)—listed price, +20%, or +40% (rounded). Details in Lastest UI/points_command.py.
 - !champion (monster) — 2× the adjusted !spawn price here (not 2× the raw table)
 - !gold (amount) — 5 pts per gold (1–100). Example: !gold 25 → 125 pts
-- !curse — 100
+- !curse — 100 base; doubles per known curse worn (100 / 200 / 400 / 800 / 1600 / 3200)
 - !gas — 75
 - !scroll — 100
 - !row — 100 (Ring of Wealth–style loot; scales by chapter; always ≥1 item)
 - !trap — 50
+- !plant — 30 (plants a random seed near the hero; fails if Barren Land is enabled)
 - !bomb — 75
 - !transmute — 150
 - !bee — 40 (allied bee, 150 turns)

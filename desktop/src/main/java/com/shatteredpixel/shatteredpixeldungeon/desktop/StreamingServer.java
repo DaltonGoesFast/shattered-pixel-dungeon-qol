@@ -208,10 +208,11 @@ public class StreamingServer extends WebSocketServer {
 				});
 			} else if ("curse".equals(cmd)) {
 				String slot = obj.has("slot") ? obj.get("slot").getAsString() : null;
-				if (slot == null || slot.isEmpty()) return;
-				String slotFinal = slot.trim().toLowerCase();
+				String slotFinal = (slot != null) ? slot.trim().toLowerCase() : "";
 				Gdx.app.postRunnable(() -> {
-					String result = StreamingCommandHandler.handleCurse(slotFinal, usernameFinal);
+					String result = slotFinal.isEmpty()
+							? StreamingCommandHandler.handleCurseRandom(usernameFinal)
+							: StreamingCommandHandler.handleCurse(slotFinal, usernameFinal);
 					boolean ok = (result != null && !result.startsWith("ERR:"));
 					String itemName = ok ? result : null;
 					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
@@ -313,6 +314,23 @@ public class StreamingServer extends WebSocketServer {
 						resp.addProperty("request_id", requestId);
 						resp.addProperty("success", ok);
 						if (trapName != null) resp.addProperty("trap_name", trapName);
+						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
+						broadcast(resp.toString());
+					}
+				});
+			} else if ("plant".equals(cmd)) {
+				Gdx.app.postRunnable(() -> {
+					String result = StreamingCommandHandler.handlePlantRandom(usernameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String plantName = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "plant_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (plantName != null) resp.addProperty("plant_name", plantName);
 						if (err != null) resp.addProperty("error", err);
 						addChatter(resp, usernameFinal);
 						broadcast(resp.toString());
@@ -514,6 +532,128 @@ public class StreamingServer extends WebSocketServer {
 					if (requestId != null && !requestId.isEmpty()) {
 						JsonObject resp = new JsonObject();
 						resp.addProperty("type", "ring_of_wealth_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (detail != null) resp.addProperty("detail", detail);
+						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
+						broadcast(resp.toString());
+					}
+				});
+			} else if ("streamer_search_items".equals(cmd)) {
+				String query = obj.has("query") ? obj.get("query").getAsString() : null;
+				int limit = 12;
+				if (obj.has("limit")) {
+					try { limit = obj.get("limit").getAsInt(); } catch (Exception ignored) {}
+				}
+				final String queryFinal = query;
+				final int limitFinal = limit;
+				Gdx.app.postRunnable(() -> {
+					String result = StreamingCommandHandler.handleStreamerSearchItems(queryFinal, limitFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String detail = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "streamer_debug_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (detail != null) resp.addProperty("detail", detail);
+						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
+						broadcast(resp.toString());
+					}
+				});
+			} else if ("streamer_apply_buff".equals(cmd)) {
+				String buffName = obj.has("buff") ? obj.get("buff").getAsString() : null;
+				float duration = 0f;
+				if (obj.has("duration")) {
+					try { duration = obj.get("duration").getAsFloat(); } catch (Exception ignored) {}
+				}
+				final String buffNameFinal = buffName;
+				final float durationFinal = duration;
+				Gdx.app.postRunnable(() -> {
+					String result = StreamingCommandHandler.handleStreamerApplyBuff(
+							buffNameFinal, durationFinal, usernameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String detail = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "streamer_debug_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (detail != null) resp.addProperty("detail", detail);
+						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
+						broadcast(resp.toString());
+					}
+				});
+			} else if ("streamer_apply_debuff".equals(cmd)) {
+				String debuffName = obj.has("debuff") ? obj.get("debuff").getAsString() : null;
+				float duration = 0f;
+				if (obj.has("duration")) {
+					try { duration = obj.get("duration").getAsFloat(); } catch (Exception ignored) {}
+				}
+				final String debuffNameFinal = debuffName;
+				final float durationFinal = duration;
+				Gdx.app.postRunnable(() -> {
+					String result = StreamingCommandHandler.handleStreamerApplyDebuff(
+							debuffNameFinal, durationFinal, usernameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String detail = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "streamer_debug_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (detail != null) resp.addProperty("detail", detail);
+						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
+						broadcast(resp.toString());
+					}
+				});
+			} else if ("streamer_give_item".equals(cmd)) {
+				String itemName = obj.has("item") ? obj.get("item").getAsString() : null;
+				int quantity = 1;
+				int level = 0;
+				if (obj.has("quantity")) {
+					try { quantity = obj.get("quantity").getAsInt(); } catch (Exception ignored) {}
+				}
+				if (obj.has("level")) {
+					try { level = obj.get("level").getAsInt(); } catch (Exception ignored) {}
+				}
+				final String itemNameFinal = itemName;
+				final int quantityFinal = quantity;
+				final int levelFinal = level;
+				Gdx.app.postRunnable(() -> {
+					String result = StreamingCommandHandler.handleStreamerGiveItem(
+							itemNameFinal, quantityFinal, levelFinal, usernameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String detail = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "streamer_debug_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (detail != null) resp.addProperty("detail", detail);
+						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
+						broadcast(resp.toString());
+					}
+				});
+			} else if (cmd != null && cmd.startsWith("streamer_")) {
+				final String cmdFinal = cmd;
+				Gdx.app.postRunnable(() -> {
+					String result = StreamingCommandHandler.handleStreamerDebug(cmdFinal, usernameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String detail = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "streamer_debug_result");
 						resp.addProperty("request_id", requestId);
 						resp.addProperty("success", ok);
 						if (detail != null) resp.addProperty("detail", detail);

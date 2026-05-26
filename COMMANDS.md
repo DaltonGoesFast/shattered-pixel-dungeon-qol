@@ -26,6 +26,7 @@ Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also g
 |---------|------|-------------|
 | **!points** | Free | Check your balance |
 | **!toppoints** / **!leaderboard** | Free | Top 3 point holders |
+| **!givepoints** \<amount\> \<target\> | Free | Transfer points to another viewer. Works on YouTube without `@`: `!givepoints 50 bob` (Twitch also accepts `@bob`). Spends chat points first, then donor points if needed. |
 | **!spawn** \<monster\> | Varies | Spawn a monster. Uses the table **base** for that mob, then compares current **depth** to the mob’s natural **first** floor (`NATIVE_DEPTH` in `Lastest UI/points_command.py`). **Deeper** than that floor → **½** base (int divide, min 1). **Shallower** → `_dungeon_region` / `_early_spawn_multiplier` assign one of three factors from **chapter** alignment (5-floor blocks: sewers→…→halls; plus a same-chapter cave edge case): **100% / 120% / 140%** of base via **base × (1 + 0.20 × (tier − 1))**, tier ∈ {1,2,3}, rounded, min 1. Examples: `!spawn rat`, `!spawn bat`, `!spawn scorpio` |
 | **!champion** \<monster\> | 2× spawn | Spawn a **champion** version (**2×** the same zone-adjusted cost as `!spawn` would be here—not 2× the raw table base). Random type: Blazing, Projecting, Antimagic, Giant, Blessed, Growing. Examples: `!champion rat`, `!champion eye` |
 | **!gold** \<amount\> | 5 / gold | Drop gold near the hero (**5** pts per gold, 1–100). Example: `!gold 25` |
@@ -34,6 +35,7 @@ Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also g
 | **!scroll** | 100 | Use a random scroll. Like +10 Unstable Spellbook — 50% chance for exotic version! |
 | **!row** | 100 | Drop **Ring of Wealth**–style bonus loot near the hero (simulated kill from a random current-biome mob). Virtual ring tier scales by chapter (+1 sewers … +10 halls). **Always at least one item.** |
 | **!trap** | 50 | Place a random visible trap 1–4 tiles from the hero. Pool of 27 traps (instant-death/high-damage blacklisted). |
+| **!plant** | 30 | Plant a random seed near the hero. Fails if the **Barren Land** challenge is enabled. |
 | **!bomb** | 75 | Drop a weighted random lit bomb 1–4 tiles from the hero. |
 | **!transmute** | 150 | Transmute a random transmutable item from bag or equipped. Same rules as Scroll of Transmutation. |
 | **!bee** | 40 | Summon an allied bee next to the hero for **150** turns. Fights for you like Elixir of Honeyed Healing. |

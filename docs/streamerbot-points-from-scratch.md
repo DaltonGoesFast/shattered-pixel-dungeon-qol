@@ -67,6 +67,7 @@ Use this list when updating an **existing** setup. Game code fixes (corrupt `!al
 | 25 | !heal | !heal | Heal hero ~15% HP |
 | 26 | !cleanse | !cleanse | Remove one random debuff |
 | 27 | !dew | !dew | Drop dewdrop near hero |
+| 28 | !plant | !plant | Plant a random seed near hero (fails if Barren Land enabled) |
 | 28 | !corruptally | !corruptally | Summon corrupted ally from current biome |
 | 29 | !hex | !hex | Apply Hex debuff |
 | 30 | !degrade | !degrade | Apply Degrade debuff |
@@ -78,7 +79,7 @@ Use this list when updating an **existing** setup. Game code fixes (corrupt `!al
 
 ## YouTube Support
 
-- **Commands (!spawn, !champion, !gold, !curse, !gas, !scroll, !row, !trap, !bomb, !transmute, !bee, !ward, !buff, !debuff, !wand, !points, !toppoints, !corruptally, !heal, !cleanse, !dew, !hex, !degrade, !sabotage):** When creating the command, enable **both Twitch and YouTube** as sources so one action handles both platforms.
+- **Commands (!spawn, !champion, !gold, !curse, !gas, !scroll, !row, !trap, !bomb, !transmute, !bee, !ward, !buff, !debuff, !wand, !points, !toppoints, !corruptally, !heal, !cleanse, !dew, !plant, !hex, !degrade, !sabotage):** When creating the command, enable **both Twitch and YouTube** as sources so one action handles both platforms.
 - **Earn Points (message):** Add **Message Received** from YouTube → Triggers to the same action, or create a duplicate action with the YouTube trigger.
 - **Earn Points (passive):** Add **Present Viewers** from YouTube → Triggers (YouTube uses chat-activity threshold; no live viewer list).
 - **Response messages:** Use the **commandSource pattern** below so a single action sends to the correct chat.
@@ -3162,12 +3163,144 @@ public class CPHInline
 
 ---
 
+## Action 38: Give Points (!givepoints — viewer to viewer)
+
+**Trigger:** Command Triggered → `!givepoints` (enable **both Twitch and YouTube** as sources)
+
+**Usage:** `!givepoints <amount> <target>` — transfers points from the chatter running the command to another viewer.
+
+- Works with **YouTube** (no `@` required): `!givepoints 50 bob`
+- Works with **Twitch** (with or without `@`): `!givepoints 50 bob` or `!givepoints 50 @bob`
+- Uses **all points**: it spends **chat-earned points first**, then **donor points** if needed.
+
+**Sub-Actions (in order):**
+
+1. **Run a Program**
+   - **Target:** `python`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" givepoints %rawInput% %userName%`
+   - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait maximum:** `10` seconds
+
+2. **Execute C# Code** — read `spawn_result.txt` and print it to chat (this command returns a full message string):
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string RESULT_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spawn_result.txt";
+
+    public bool Execute()
+    {
+        string result = "No result file - is overlay server running?";
+        try
+        {
+            if (File.Exists(RESULT_FILE))
+            {
+                result = File.ReadAllText(RESULT_FILE).Trim();
+                File.Delete(RESULT_FILE);
+            }
+        }
+        catch (Exception ex) { result = ex.Message; }
+        CPH.SetArgument("spawnResult", result);
+        return true;
+    }
+}
+```
+
+3. **Send Message** — commandSource pattern:
+   - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+   - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+   - Leave **False Result** empty for both.
+
+**Add to the same blocking queue** as other points commands.
+
+---
+
+## Action 39: Plant random seed (!plant, with points)
+
+**Trigger:** Command Triggered → `!plant` (enable **both Twitch and YouTube** as sources)
+
+**Usage:** `!plant` — plants a **random seed** 1–4 tiles from the hero (on valid ground tiles). **Fails if the Barren Land challenge is enabled.**
+
+**Sub-Actions (in order):**
+
+1. **Run a Program**
+   - **Target:** `python`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" plant %userName%`
+   - **Working Directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait maximum:** `10` seconds
+
+2. **Execute C# Code** — reads `spawn_result.txt`, sets `%spawnResult%`, `%plantName%`, and `%userPointsRemaining%`:
+
+```csharp
+using System;
+using System.IO;
+
+public class CPHInline
+{
+    const string RESULT_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spawn_result.txt";
+
+    public bool Execute()
+    {
+        string result = "No result file - is overlay server running?";
+        string plantName = "";
+        string userPointsRemaining = "";
+        try
+        {
+            if (File.Exists(RESULT_FILE))
+            {
+                result = File.ReadAllText(RESULT_FILE).Trim();
+                File.Delete(RESULT_FILE);
+                var parts = result.Split('|');
+                if (parts.Length >= 3 && int.TryParse(parts[parts.Length - 1].Trim(), out _))
+                {
+                    userPointsRemaining = parts[parts.Length - 1].Trim();
+                    plantName = parts.Length >= 2 ? parts[1].Trim() : "";
+                    result = parts[0].Trim();
+                }
+                else if (parts.Length >= 2)
+                {
+                    plantName = parts[1].Trim();
+                    result = parts[0].Trim();
+                }
+            }
+        }
+        catch (Exception ex) { result = ex.Message; }
+        CPH.SetArgument("spawnResult", result);
+        CPH.SetArgument("plantName", plantName);
+        CPH.SetArgument("userPointsRemaining", userPointsRemaining);
+        return true;
+    }
+}
+```
+
+3. **Conditional:** `if ("%spawnResult%" Equals "ok")`
+   - **True branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName% planted %plantName% nearby! You have %userPointsRemaining% points left.`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%userName% planted %plantName% nearby! You have %userPointsRemaining% points left.`
+     - Leave **False Result** empty for both.
+   - **False branch:** Use commandSource pattern:
+     - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%spawnResult%`
+     - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: `%spawnResult%`
+     - Leave **False Result** empty for both.
+
+**Cost:** 30 points default (edit via points config as `cost_per_plant`).
+
+**Add to the same blocking queue** as other spend commands.
+
+**Fails when:** Not in an active run, hero dead, **Barren Land enabled**, or no valid ground tile 1–4 tiles from the hero.
+
+---
+
 ## Commands Quick Reference
 
 | Command | Usage | Cost | Description |
 |---------|-------|------|-------------|
 | **!points** | `!points` | Free | Check your point balance. |
 | **!toppoints** | `!toppoints` | Free | Show top 3 point holders. |
+| **!givepoints** | `!givepoints <amount> <target>` | Free | Transfer points to another viewer (no `@` required on YouTube). Spends chat points first, then donor points if needed. |
 | **!spawn** | `!spawn <monster>` | Varies by monster and chapter gap (see script) | Spawn a monster near the hero. Half price when deeper than native; when shallower, chapter comparison yields **+0% / +20% / +40%** on table base (rounded). Valid monsters: rat, albino, snake, gnoll, crab, slime, swarm, thief, skeleton, bat, brute, shaman, spinner, dm100, guard, necromancer, ghoul, elemental, warlock, monk, golem, succubus, eye, scorpio. |
 | **!champion** | `!champion <monster>` | 2× zone-adjusted spawn | Spawn a **champion** version of the monster (random type: Blazing, Projecting, Antimagic, Giant, Blessed, Growing). Same monster list and zone rules as spawn. |
 | **!gold** | `!gold <amount>` | 2 pts per gold | Drop gold near the hero. Amount 1–100 required (e.g. `!gold 10` = 20 pts). |
@@ -3176,6 +3309,7 @@ public class CPHInline
 | **!scroll** | `!scroll` | 100 pts | Use a random scroll (like +10 Unstable Spellbook). 50% chance for exotic version. |
 | **!row** | `!row` | 100 pts (default) | Ring of Wealth–style bonus loot; tier by chapter; always at least one item. Config: `cost_per_ring_of_wealth`. |
 | **!trap** | `!trap` | 50 pts | Place a random visible trap 1–4 tiles from the hero. Pool of 27 traps (instant-death/high-damage ones blacklisted). |
+| **!plant** | `!plant` | Configurable (default 30) | Plant a random seed near the hero. **Fails if Barren Land challenge is enabled.** |
 | **!bomb** | `!bomb` | 75 pts (default) | Drop a weighted random **lit bomb** 1–4 tiles from the hero (regular + alchemy bombs). |
 | **!transmute** | `!transmute` | 150 pts | Transmute a random transmutable item from bag or equipped. Same rules as Scroll of Transmutation. |
 | **!bee** | `!bee` | 75 pts | Summon an allied bee next to the hero for 150 turns. Fights for you like Elixir of Honeyed Healing. |
@@ -3204,6 +3338,7 @@ public class CPHInline
 | 03 | First Words Bonus | (add to First Words) | +5 on first chat |
 | 04 | Check Points | !points | Show viewer their balance |
 | 05 | Top Points | !toppoints | Show top 3 point holders |
+| 38 | Give Points | !givepoints | Viewer-to-viewer transfer (chat points first, then donor points) |
 | 06 | Spawn Monster | !spawn | Spend points (cost varies by monster) |
 | 07 | Spawn Champion | !champion | Spawn champion (2× zone-adjusted !spawn cost) |
 | 08 | Drop Gold | !gold | Spend points to drop gold |
@@ -3232,6 +3367,7 @@ public class CPHInline
 | 31 | !sabotage | !sabotage | Remove one random buff |
 | 36 | Bomb | !bomb | Spend points; weighted random lit bomb near hero |
 | 37 | Ring of Wealth | !row | Spend points; RoW-style loot by chapter |
+| 39 | Plant | !plant | Spend points; plant a random seed near hero (fails if Barren Land enabled) |
 
 *Legacy Streamer.bot actions (omit):* Helpers/Hurters OFF/ON, `!myside`, `!switch` — for historical setup only, see the sections **"Action 25: Helpers/Hurters OFF"** through **"Action 28: !switch"** earlier in this document (not the Summary row numbers in this table).
 

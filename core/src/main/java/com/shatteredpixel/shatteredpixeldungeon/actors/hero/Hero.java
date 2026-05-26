@@ -109,6 +109,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.SkeletonKey;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.TalismanOfForesight;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.TimekeepersHourglass;
 import com.shatteredpixel.shatteredpixeldungeon.items.bags.MagicalHolster;
+import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.journal.Guidebook;
 import com.shatteredpixel.shatteredpixeldungeon.items.keys.CrystalKey;
 import com.shatteredpixel.shatteredpixeldungeon.items.keys.GoldenKey;
@@ -250,6 +251,9 @@ public class Hero extends Char {
 	
 	private ArrayList<Mob> visibleEnemies;
 
+	/** Floor cells with a lit bomb currently in hero FOV (stops auto-move when a new one appears). */
+	private ArrayList<Integer> visibleLitBombs;
+
 	//This list is maintained so that some logic checks can be skipped
 	// for enemies we know we aren't seeing normally, resulting in better performance
 	public ArrayList<Mob> mindVisionEnemies = new ArrayList<>();
@@ -263,6 +267,7 @@ public class Hero extends Char {
 		belongings = new Belongings( this );
 		
 		visibleEnemies = new ArrayList<>();
+		visibleLitBombs = new ArrayList<>();
 	}
 	
 	public void updateHT( boolean boostHP ){
@@ -1039,6 +1044,7 @@ public class Hero extends Char {
 		}
 		
 		checkVisibleMobs();
+		checkVisibleBombs();
 		BuffIndicator.refreshHero();
 		BuffIndicator.refreshBoss();
 		
@@ -1937,6 +1943,40 @@ public class Hero extends Char {
 				}
 			}
 		}
+	}
+
+	public void checkVisibleBombs() {
+		ArrayList<Integer> visible = new ArrayList<>();
+
+		boolean newBomb = false;
+
+		for (Heap heap : Dungeon.level.heaps.valueList()) {
+			if (heap == null || heap.type != Type.HEAP) continue;
+			if (!fieldOfView[heap.pos]) continue;
+
+			boolean litBomb = false;
+			for (Item item : heap.items) {
+				if (item instanceof Bomb && ((Bomb) item).fuse != null) {
+					litBomb = true;
+					break;
+				}
+			}
+			if (!litBomb) continue;
+
+			visible.add(heap.pos);
+			if (!visibleLitBombs.contains(heap.pos)) {
+				newBomb = true;
+			}
+		}
+
+		if (newBomb) {
+			if (resting) {
+				Dungeon.observe();
+			}
+			interrupt();
+		}
+
+		visibleLitBombs = visible;
 	}
 	
 	public int visibleEnemies() {

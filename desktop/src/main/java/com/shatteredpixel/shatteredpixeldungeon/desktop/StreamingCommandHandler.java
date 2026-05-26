@@ -21,6 +21,7 @@
 
 package com.shatteredpixel.shatteredpixeldungeon.desktop;
 
+import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
@@ -64,8 +65,10 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ChatSpawned;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Cripple;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Daze;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Haste;
+import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.WaterOfHealth;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Degrade;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Healing;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Hunger;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Hex;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Invisibility;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Levitation;
@@ -90,17 +93,24 @@ import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfMagicMissile;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfWarding;
 import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
-import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.MagesStaff;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.MissileWeapon;
+import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
+import com.shatteredpixel.shatteredpixeldungeon.effects.CellEmitter;
+import com.shatteredpixel.shatteredpixeldungeon.effects.FloatingText;
+import com.shatteredpixel.shatteredpixeldungeon.effects.Speck;
+import com.shatteredpixel.shatteredpixeldungeon.effects.particles.ShaftParticle;
+import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfHealing;
+import com.shatteredpixel.shatteredpixeldungeon.items.trinkets.VialOfBlood;
+import com.shatteredpixel.shatteredpixeldungeon.sprites.CharSprite;
 import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfWealth;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.Scroll;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfIdentify;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfMagicMapping;
-import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfRemoveCurse;
-import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfTransmutation;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfTeleportation;
+import com.shatteredpixel.shatteredpixeldungeon.effects.SpellSprite;
+import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfRemoveCurse;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfTransmutation;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.exotic.ExoticScroll;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.ArcaneBomb;
@@ -116,6 +126,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.bombs.SmokeBomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.WoollyBomb;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
+import com.shatteredpixel.shatteredpixeldungeon.plants.Plant;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.AlarmTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.BlazingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.BurningTrap;
@@ -156,12 +167,14 @@ import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
 import com.watabou.utils.BArray;
 import com.watabou.utils.Callback;
 import com.watabou.utils.PathFinder;
+import com.watabou.noosa.audio.Sample;
 import com.watabou.utils.Random;
 import com.watabou.utils.Reflection;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.ArrayList;
 import java.util.Map;
 
 /**
@@ -570,14 +583,62 @@ public final class StreamingCommandHandler {
 		return trapName;
 	}
 
-	/** Weighted chat bomb pool (profile "B" + Noisemaker = Arcane weight, Regrowth = 1). */
+	/** Plant a random seed near the hero. Only works when Barren Land is OFF. Returns plant/seed name on success, ERR:... on failure. */
+	public static String handlePlantRandom(String username) {
+		if (Dungeon.hero == null || Dungeon.level == null)
+			return "ERR:Not in an active run (title/menu)";
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+			return "ERR:Not in an active run (title/menu)";
+		if (!Dungeon.hero.isAlive())
+			return "ERR:Hero is dead";
+		if (Dungeon.isChallenged(Challenges.NO_HERBALISM))
+			return "ERR:Barren Land is enabled";
+
+		int heroPos = Dungeon.hero.pos;
+		boolean[] spawnPassable = new boolean[Dungeon.level.length()];
+		for (int i = 0; i < spawnPassable.length; i++) {
+			spawnPassable[i] = Dungeon.level.passable[i] || Dungeon.level.avoid[i];
+		}
+		PathFinder.buildDistanceMap(heroPos, spawnPassable, SPAWN_RADIUS);
+
+		ArrayList<Integer> candidates = new ArrayList<>();
+		for (int p = 0; p < Dungeon.level.length(); p++) {
+			int d = PathFinder.distance[p];
+			if (d < 1 || d > SPAWN_RADIUS) continue;
+			if (Actor.findChar(p) != null) continue;
+			if (!Dungeon.level.passable[p] && !Dungeon.level.avoid[p]) continue;
+			if (Dungeon.level.pit[p]) continue;
+			int terr = Dungeon.level.map[p];
+			// Keep to "ground" tiles that Level.plant can convert to GRASS if needed.
+			if (terr == Terrain.GRASS || terr == Terrain.HIGH_GRASS || terr == Terrain.FURROWED_GRASS
+					|| terr == Terrain.EMPTY || terr == Terrain.EMBERS || terr == Terrain.EMPTY_DECO) {
+				candidates.add(p);
+			}
+		}
+		if (candidates.isEmpty())
+			return "ERR:No space to plant (need nearby ground tiles)";
+
+		int cell = Random.element(candidates);
+		Plant.Seed seed = (Plant.Seed) Generator.randomUsingDefaults(Generator.Category.SEED);
+		if (seed == null)
+			return "ERR:Failed to choose a seed";
+
+		Dungeon.level.plant(seed, cell);
+
+		String seedName = seed.name();
+		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
+		GLog.p(Messages.get(StreamingCommandHandler.class, "chat_plant"), chatter, seedName);
+		return seedName;
+	}
+
+	/** Weighted chat bomb pool (profile "B" + Noisemaker = Arcane weight, Woolly = rare tier, Regrowth = 1). */
 	@SuppressWarnings("unchecked")
 	private static final Class<? extends Bomb>[] CHAT_BOMB_CLASSES = new Class[]{
 			Bomb.class, FrostBomb.class, Firebomb.class, HolyBomb.class, SmokeBomb.class, WoollyBomb.class,
 			FlashBangBomb.class, ArcaneBomb.class, Noisemaker.class, ShrapnelBomb.class, RegrowthBomb.class
 	};
 	private static final float[] CHAT_BOMB_WEIGHTS = new float[]{
-			28, 18, 16, 12, 8, 8, 4, 4, 4, 2, 1
+			28, 18, 16, 12, 8, 4, 4, 4, 4, 2, 1
 	};
 
 	/** Spawn a weighted random lit bomb near the hero. Returns bomb name on success, ERR:... on failure. */
@@ -760,7 +821,7 @@ public final class StreamingCommandHandler {
 		switch (slot.toLowerCase()) {
 			case "weapon":
 				KindOfWeapon wep = Dungeon.hero.belongings.weapon();
-				if (wep instanceof Weapon && !(wep instanceof MagesStaff) && !(wep instanceof MissileWeapon))
+				if (wep instanceof Weapon && !(wep instanceof MissileWeapon))
 					item = (Item) wep;
 				slotName = "weapon";
 				break;
@@ -810,6 +871,23 @@ public final class StreamingCommandHandler {
 		String itemName = item.name();
 		GLog.n(Messages.get(StreamingCommandHandler.class, "chat_curse"), chatter, slotName);
 		return itemName;
+	}
+
+	/** Curse a random eligible equipped item (tries each slot once, shuffled). */
+	public static String handleCurseRandom(String username) {
+		ArrayList<String> slots = new ArrayList<>();
+		slots.add("weapon");
+		slots.add("armor");
+		slots.add("ring");
+		slots.add("artifact");
+		slots.add("misc");
+		Collections.shuffle(slots);
+		for (String slot : slots) {
+			String result = handleCurse(slot, username);
+			if (result != null && !result.startsWith("ERR:"))
+				return result;
+		}
+		return "ERR:No curseable equipped item (all slots empty or already cursed)";
 	}
 
 	/** Spawn random gas (Chaotic Censer at level +3). Returns gas name on success, error message on failure. */
@@ -1234,6 +1312,348 @@ public final class StreamingCommandHandler {
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		GLog.n(Messages.get(StreamingCommandHandler.class, "chat_sabotage"), chatter, buffName);
 		return buffName;
+	}
+
+	/** Dispatch streamer-only WebSocket commands ({@code streamer_*}). */
+	public static String handleStreamerDebug(String command, String username) {
+		if (command == null) return "ERR:Missing command";
+		switch (command) {
+			case "streamer_heal_all": return handleStreamerHealAll(username);
+			case "streamer_identify_all": return handleStreamerIdentifyAll(username);
+			case "streamer_reveal_map": return handleStreamerRevealMap(username);
+			case "streamer_goto_stairs_down": return handleStreamerGotoStairs(username, true);
+			case "streamer_goto_stairs_up": return handleStreamerGotoStairs(username, false);
+			default: return "ERR:Unknown streamer command: " + command;
+		}
+	}
+
+	/** Streamer debug: search items + buffs (no run required). Returns matches separated by |. */
+	public static String handleStreamerSearchItems(String query, int limit) {
+		if (query == null || query.trim().isEmpty())
+			return "ERR:Enter a search term";
+		limit = Math.max(1, Math.min(limit, 25));
+		ArrayList<String> labels = new ArrayList<>();
+		for (String s : StreamerItemResolver.suggestLabels(query, limit)) {
+			labels.add("[item] " + s);
+		}
+		int remaining = limit - labels.size();
+		if (remaining > 0) {
+			for (String s : StreamerBuffResolver.suggestLabelsAny(query, remaining)) {
+				labels.add("[buff/debuff] " + s);
+			}
+		}
+		if (labels.isEmpty())
+			return "ERR:No matches for: " + query.trim();
+		return labels.size() + " match(es): " + String.join("|", labels);
+	}
+
+	/** Apply a named buff to the hero. duration &lt;= 0 uses each buff's default length. */
+	public static String handleStreamerApplyBuff(String buffName, float duration, String username) {
+		String err = streamerDebugPrecheck();
+		if (err != null) return err;
+		if (buffName == null || buffName.trim().isEmpty())
+			return "ERR:No buff name";
+
+		Class<? extends Buff> buffClass = StreamerBuffResolver.resolveBuff(buffName);
+		if (buffClass == null)
+			return "ERR:" + StreamerBuffResolver.unknownBuffMessage(buffName);
+		if (StreamerBuffResolver.isDebuff(buffClass))
+			return "ERR:" + buffName + " is a debuff; use: debuff " + buffClass.getSimpleName();
+
+		String applied = applyStreamerBuffClass(buffClass, duration);
+		GLog.p(Messages.get(StreamingCommandHandler.class, "streamer_buff"), applied);
+		if (duration > 0)
+			return applied + " (" + (int) duration + " turns)";
+		return applied;
+	}
+
+	/** Apply a named debuff to the hero. duration &lt;= 0 uses each debuff's default length. */
+	public static String handleStreamerApplyDebuff(String debuffName, float duration, String username) {
+		String err = streamerDebugPrecheck();
+		if (err != null) return err;
+		if (debuffName == null || debuffName.trim().isEmpty())
+			return "ERR:No debuff name";
+
+		Class<? extends Buff> debuffClass = StreamerBuffResolver.resolveDebuff(debuffName);
+		if (debuffClass == null)
+			return "ERR:" + StreamerBuffResolver.unknownDebuffMessage(debuffName);
+		if (!StreamerBuffResolver.isDebuff(debuffClass))
+			return "ERR:" + debuffName + " is a buff; use: buff " + debuffClass.getSimpleName();
+
+		if (debuffClass == Roots.class && Dungeon.hero.flying)
+			return "ERR:Roots cannot be applied while flying";
+
+		String applied = applyStreamerDebuffClass(debuffClass, duration);
+		GLog.n(Messages.get(StreamingCommandHandler.class, "streamer_debuff"), applied);
+		if (duration > 0)
+			return applied + " (" + (int) duration + " turns)";
+		return applied;
+	}
+
+	private static String applyStreamerBuffClass(Class<? extends Buff> buffClass, float duration) {
+		Hero hero = Dungeon.hero;
+		float d = duration > 0 ? duration : -1f;
+
+		if (buffClass == Healing.class) {
+			int totalHeal = Math.max(1, Math.round(hero.HT * 0.1f));
+			int perTick = Math.max(1, totalHeal / 10);
+			Healing h = Buff.affect(hero, Healing.class);
+			h.setHeal(totalHeal, 0, perTick);
+		} else if (buffClass == Barrier.class) {
+			int shield = Math.max(1, Math.round(hero.HT * 0.1f));
+			Barrier b = Buff.affect(hero, Barrier.class);
+			b.setShield(shield);
+		} else if (buffClass == Haste.class) {
+			Buff.affect(hero, Haste.class, d > 0 ? d : Haste.DURATION);
+		} else if (buffClass == Adrenaline.class) {
+			Buff.affect(hero, Adrenaline.class, d > 0 ? d : Adrenaline.DURATION);
+		} else if (buffClass == Invisibility.class) {
+			Buff.affect(hero, Invisibility.class, d > 0 ? d : Invisibility.DURATION);
+		} else if (buffClass == Levitation.class) {
+			Buff.affect(hero, Levitation.class, d > 0 ? d : Levitation.DURATION);
+		} else if (buffClass == Recharging.class) {
+			Buff.affect(hero, Recharging.class, d > 0 ? d : 8f);
+		} else if (buffClass == MindVision.class) {
+			Buff.affect(hero, MindVision.class, d > 0 ? d : MindVision.DURATION);
+		}
+		return Messages.titleCase(buffClass.getSimpleName());
+	}
+
+	private static String applyStreamerDebuffClass(Class<? extends Buff> debuffClass, float duration) {
+		Hero hero = Dungeon.hero;
+		float d = duration > 0 ? duration : -1f;
+
+		if (debuffClass == Blindness.class) {
+			Buff.affect(hero, Blindness.class, d > 0 ? d : Blindness.DURATION);
+		} else if (debuffClass == Weakness.class) {
+			Buff.affect(hero, Weakness.class, d > 0 ? d : Weakness.DURATION);
+		} else if (debuffClass == Slow.class) {
+			Buff.affect(hero, Slow.class, d > 0 ? d : Slow.DURATION);
+		} else if (debuffClass == Cripple.class) {
+			Buff.affect(hero, Cripple.class, d > 0 ? d : Cripple.DURATION);
+		} else if (debuffClass == Roots.class) {
+			Buff.affect(hero, Roots.class, d > 0 ? d : Roots.DURATION);
+		} else if (debuffClass == Daze.class) {
+			Buff.affect(hero, Daze.class, d > 0 ? d : Daze.DURATION);
+		} else if (debuffClass == Vulnerable.class) {
+			Buff.affect(hero, Vulnerable.class, d > 0 ? d : Vulnerable.DURATION);
+		} else if (debuffClass == Hex.class) {
+			Buff.affect(hero, Hex.class, d > 0 ? d : Hex.DURATION);
+		} else if (debuffClass == Degrade.class) {
+			Buff.affect(hero, Degrade.class, d > 0 ? d : Degrade.DURATION);
+		}
+		return Messages.titleCase(debuffClass.getSimpleName());
+	}
+
+	/** Streamer debug: give item by display or class name. */
+	public static String handleStreamerGiveItem(String itemName, int quantity, int level, String username) {
+		String err = streamerDebugPrecheck();
+		if (err != null) return err;
+		if (itemName == null || itemName.trim().isEmpty())
+			return "ERR:No item name";
+
+		String ambig = StreamerItemResolver.ambiguousMessage(itemName);
+		if (ambig != null) return "ERR:" + ambig;
+
+		Class<? extends Item> clazz = StreamerItemResolver.resolveClass(itemName);
+		if (clazz == null)
+			return "ERR:" + StreamerItemResolver.unknownMessage(itemName);
+
+		Hero hero = Dungeon.hero;
+		quantity = Math.max(1, Math.min(quantity, 999));
+		level = Math.max(0, Math.min(level, 99));
+
+		if (clazz == Gold.class) {
+			Item gold = Reflection.newInstance(Gold.class);
+			if (gold == null) return "ERR:Failed to create item";
+			gold.quantity(quantity);
+			if (!gold.collect(hero.belongings.backpack))
+				return "ERR:Inventory full";
+			Item.updateQuickslot();
+			GLog.p(Messages.get(StreamingCommandHandler.class, "streamer_give_item", gold.name()));
+			return gold.name() + " x" + quantity;
+		}
+
+		int remaining = quantity;
+		String lastTitle = null;
+		while (remaining > 0) {
+			Item item = Reflection.newInstance(clazz);
+			if (item == null) return "ERR:Failed to create item";
+
+			if (level > 0) {
+				item.level(level);
+				item.levelKnown = true;
+			}
+			item.identify(false);
+			item.cursed = false;
+			item.cursedKnown = true;
+
+			if (item instanceof Wand) {
+				((Wand) item).updateLevel();
+			}
+
+			int stackAmt = 1;
+			if (item.stackable) {
+				stackAmt = Math.min(remaining, 20);
+				item.quantity(stackAmt);
+				remaining -= stackAmt;
+			} else {
+				remaining--;
+			}
+
+			if (!item.collect(hero.belongings.backpack)) {
+				if (lastTitle == null)
+					return "ERR:Inventory full";
+				return "ERR:Inventory full (delivered " + lastTitle + " only)";
+			}
+			lastTitle = item.title();
+		}
+
+		Item.updateQuickslot();
+		String detail = lastTitle != null ? lastTitle : clazz.getSimpleName();
+		if (quantity > 1 || level > 0) {
+			if (level > 0) detail += " +" + level;
+			if (quantity > 1) detail += " x" + quantity;
+		}
+		GLog.p(Messages.get(StreamingCommandHandler.class, "streamer_give_item", detail));
+		return detail;
+	}
+
+	private static String streamerDebugPrecheck() {
+		if (Dungeon.hero == null || Dungeon.level == null)
+			return "ERR:Not in an active run (title/menu)";
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+			return "ERR:Not in an active run (title/menu)";
+		if (!Dungeon.hero.isAlive())
+			return "ERR:Hero is dead";
+		return null;
+	}
+
+	/**
+	 * Streamer debug: full heal like a well of healing — removes all debuffs,
+	 * cleanses curses on equipped and inventory gear, satisfies hunger, heals to full.
+	 */
+	public static String handleStreamerHealAll(String username) {
+		String err = streamerDebugPrecheck();
+		if (err != null) return err;
+		Hero hero = Dungeon.hero;
+
+		ArrayList<Buff> negatives = new ArrayList<>();
+		for (Buff b : hero.buffs()) {
+			if (b.type == Buff.buffType.NEGATIVE) negatives.add(b);
+		}
+		for (Buff b : negatives) b.detach();
+
+		PotionOfHealing.cure(hero);
+
+		Degrade degrade = hero.buff(Degrade.class);
+		if (degrade != null) degrade.detach();
+
+		ArrayList<Item> uncursables = new ArrayList<>();
+		for (Item item : hero.belongings) {
+			if (ScrollOfRemoveCurse.uncursable(item)) uncursables.add(item);
+		}
+		if (!uncursables.isEmpty()) {
+			ScrollOfRemoveCurse.uncurse(hero, uncursables.toArray(new Item[0]));
+		} else {
+			hero.belongings.uncurseEquipped();
+		}
+
+		Sample.INSTANCE.play(Assets.Sounds.DRINK);
+		hero.buff(Hunger.class).satisfy(Hunger.STARVING);
+
+		if (VialOfBlood.delayBurstHealing()) {
+			Healing healing = Buff.affect(hero, Healing.class);
+			healing.setHeal(hero.HT, 0, VialOfBlood.maxHealPerTurn());
+			healing.applyVialEffect();
+		} else {
+			hero.HP = hero.HT;
+			hero.sprite.emitter().start(Speck.factory(Speck.HEALING), 0.4f, 4);
+			hero.sprite.showStatusWithIcon(CharSprite.POSITIVE, Integer.toString(hero.HT), FloatingText.HEALING);
+		}
+
+		CellEmitter.get(hero.pos).start(ShaftParticle.FACTORY, 0.2f, 3);
+		hero.interrupt();
+		hero.updateHT(false);
+
+		GLog.p(Messages.get(WaterOfHealth.class, "procced"));
+		return "Well of healing";
+	}
+
+	/** Streamer debug: identify all items in inventory and equipment. */
+	public static String handleStreamerIdentifyAll(String username) {
+		String err = streamerDebugPrecheck();
+		if (err != null) return err;
+		Hero hero = Dungeon.hero;
+		int count = 0;
+		for (Item item : hero.belongings) {
+			if (item != null && !item.isIdentified()) {
+				ScrollOfIdentify.IDItem(item);
+				count++;
+			}
+		}
+		Item.updateQuickslot();
+		if (count == 0) {
+			GLog.i(Messages.get(StreamingCommandHandler.class, "streamer_identify_none"));
+			return "Nothing to identify";
+		}
+		GLog.p(Messages.get(StreamingCommandHandler.class, "streamer_identify_all", count));
+		return "Identified " + count + " item(s)";
+	}
+
+	/** Streamer debug: magic mapping for the current floor (like scroll of magic mapping). */
+	public static String handleStreamerRevealMap(String username) {
+		String err = streamerDebugPrecheck();
+		if (err != null) return err;
+		Hero hero = Dungeon.hero;
+
+		int length = Dungeon.level.length();
+		int[] map = Dungeon.level.map;
+		boolean[] mapped = Dungeon.level.mapped;
+		boolean[] discoverable = Dungeon.level.discoverable;
+		boolean noticed = false;
+
+		for (int i = 0; i < length; i++) {
+			int terr = map[i];
+			if (discoverable[i]) {
+				mapped[i] = true;
+				if ((Terrain.flags[terr] & Terrain.SECRET) != 0) {
+					Dungeon.level.discover(i);
+					if (Dungeon.level.heroFOV[i]) {
+						GameScene.discoverTile(i, terr);
+						ScrollOfMagicMapping.discover(i);
+						noticed = true;
+					}
+				}
+			}
+		}
+		GameScene.updateFog();
+		GLog.i(Messages.get(ScrollOfMagicMapping.class, "layout"));
+		if (noticed) {
+			Sample.INSTANCE.play(Assets.Sounds.SECRET);
+		}
+		SpellSprite.show(hero, SpellSprite.MAP);
+		Sample.INSTANCE.play(Assets.Sounds.READ);
+		hero.interrupt();
+		return "Map revealed";
+	}
+
+	/** Streamer debug: teleport to floor exit (down) or entrance (up). */
+	public static String handleStreamerGotoStairs(String username, boolean stairsDown) {
+		String err = streamerDebugPrecheck();
+		if (err != null) return err;
+		Hero hero = Dungeon.hero;
+
+		int cell = stairsDown ? Dungeon.level.exit() : Dungeon.level.entrance();
+		if (cell <= 0) {
+			return stairsDown ? "ERR:No stairs down on this level" : "ERR:No stairs up on this level";
+		}
+		if (!ScrollOfTeleportation.teleportToLocation(hero, cell)) {
+			return "ERR:Cannot reach stairs (blocked)";
+		}
+		hero.interrupt();
+		GLog.i(Messages.get(ScrollOfTeleportation.class, "tele"));
+		return stairsDown ? "Stairs down" : "Stairs up";
 	}
 
 	/** Phase 2: full monster list. Returns null for unknown. */

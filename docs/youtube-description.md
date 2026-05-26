@@ -28,14 +28,16 @@ Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also g
 COMMANDS:
 - !points — Check your balance (free)
 - !toppoints / !leaderboard — Top 3 point holders (free)
+- !givepoints (amount) (target) — Give points to another viewer (free). YouTube: no @ needed. Example: !givepoints 50 bob. Spends chat points first, then donor points if needed.
 - !spawn (monster) — Table price for that mob vs current depth and where it normally first appears: half off if you're deeper than that (min 1 pt). If you're still above that depth, extra cost depends on chapter gap—the dungeon is five chapters of five floors each (sewers → prison → caves → city → halls). You pay the listed price, or +20% on it, or +40% on it (rounded). Examples: !spawn rat, !spawn bat, !spawn scorpio
 - !champion (monster) — 2× that adjusted !spawn cost (not 2× raw table). Random type: Blazing, Projecting, Antimagic, Giant, Blessed, Growing. Examples: !champion rat, !champion eye
 - !gold (amount) — Drop gold near the hero (5 pts per gold, 1–100). Example: !gold 25
-- !curse — Curse a random equipped item (100 pts)
+- !curse — Curse a random equipped item (100 base pts; cost doubles for each item already cursed on you: 100 → 200 → 400 → 800 → 1600 → 3200)
 - !gas — Spawn random gas (75 pts). Toxic, confusion, storm clouds, inferno, and more!
 - !scroll — Use a random scroll (100 pts). Like +10 Unstable Spellbook — 50% chance for exotic version!
 - !row — Ring of Wealth bonus loot near the hero (100 pts). Scales by dungeon chapter; always at least one drop.
 - !trap — Place a random visible trap nearby (50 pts). Shocking, toxic, burning, teleport, summon, and more!
+- !plant — Plant a random seed nearby (30 pts). Fails if the Barren Land challenge is enabled.
 - !bomb — Drop a weighted random lit bomb nearby (75 pts). Regular and alchemy bombs; fuse like a thrown bomb.
 - !transmute — Transmute a random transmutable item from bag or equipped (150 pts). Same rules as Scroll of Transmutation.
 - !bee — Summon an allied bee for 150 turns (40 pts). Fights for you like honeyed healing!

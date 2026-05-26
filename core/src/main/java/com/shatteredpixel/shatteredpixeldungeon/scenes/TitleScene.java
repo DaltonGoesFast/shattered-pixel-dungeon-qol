@@ -310,11 +310,6 @@ public class TitleScene extends PixelScene {
 	public void updateFade() {
 		float alpha = GameMath.gate(0f, uiAlpha, 1f);
 
-		title.am = alpha;
-		leftFB.am = alpha;
-		rightFB.am = alpha;
-		//signs.am = alpha; handles this itself
-
 		btnPlay.enable(alpha != 0);
 		btnSupport.enable(alpha != 0);
 		btnRankings.enable(alpha != 0);

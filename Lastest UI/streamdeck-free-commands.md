@@ -1,5 +1,7 @@
 # Stream Deck — free promos (PowerShell plugin)
 
+**Instant Batch-PowerShell** (`.cmd` buttons, `streamer_debug.py`, overlay start): see **[streamdeck-instant-batch.md](streamdeck-instant-batch.md)** for the shared `OVERLAY_DIR` + `cd` + `python` template.
+
 Use these as **script lines** in plugins that wrap your text in a `.ps1` file.  
 Do **not** paste `powershell.exe`, `-NoProfile`, or `-File` here.
 
@@ -75,6 +77,7 @@ Pattern:
 & "c:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\streamdeck_cost_free.ps1" cost_per_scroll
 & "c:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\streamdeck_cost_free.ps1" cost_per_ring_of_wealth
 & "c:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\streamdeck_cost_free.ps1" cost_per_trap
+& "c:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\streamdeck_cost_free.ps1" cost_per_plant
 & "c:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\streamdeck_cost_free.ps1" cost_per_bomb
 & "c:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\streamdeck_cost_free.ps1" cost_per_transmute
 & "c:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\streamdeck_cost_free.ps1" cost_per_ally_bee
@@ -174,6 +177,7 @@ Typical viewer/chat commands are shown as **`!command`** (your bot may use diffe
 | `cost_per_scroll` | `!scroll` |
 | `cost_per_ring_of_wealth` | `!row` (Ring of Wealth) |
 | `cost_per_trap` | `!trap` |
+| `cost_per_plant` | `!plant` |
 | `cost_per_bomb` | `!bomb` |
 | `cost_per_transmute` | `!transmute` |
 | `cost_per_ally_bee` | `!bee` |

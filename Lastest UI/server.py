@@ -223,7 +223,7 @@ def _game_ws_on_message(ws, message):
     try:
         data = json.loads(message)
         # Handle spawn/gold result (game reports success/failure)
-        if data.get('type') in ('ping_result', 'spawn_result', 'champion_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result', 'trap_result', 'bomb_result', 'transmute_result', 'summon_bee_result', 'ward_result', 'heal_result', 'cleanse_result', 'dew_result', 'corrupt_ally_result', 'hex_result', 'degrade_result', 'sabotage_result', 'ring_of_wealth_result'):
+        if data.get('type') in ('ping_result', 'spawn_result', 'champion_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result', 'trap_result', 'plant_result', 'bomb_result', 'transmute_result', 'summon_bee_result', 'ward_result', 'heal_result', 'cleanse_result', 'dew_result', 'corrupt_ally_result', 'hex_result', 'degrade_result', 'sabotage_result', 'ring_of_wealth_result', 'streamer_debug_result'):
             rid = data.get('request_id')
             ok = data.get('success', False)
             if rid:
@@ -267,6 +267,10 @@ def _game_ws_on_message(ws, message):
                         if data.get('type') == 'trap_result' and data.get('trap_name'):
                             pending_spawns[rid]['trap_name'] = data.get('trap_name')
                         if data.get('type') == 'trap_result' and data.get('error'):
+                            pending_spawns[rid]['error'] = data.get('error')
+                        if data.get('type') == 'plant_result' and data.get('plant_name'):
+                            pending_spawns[rid]['plant_name'] = data.get('plant_name')
+                        if data.get('type') == 'plant_result' and data.get('error'):
                             pending_spawns[rid]['error'] = data.get('error')
                         if data.get('type') == 'bomb_result' and data.get('bomb_name'):
                             pending_spawns[rid]['bomb_name'] = data.get('bomb_name')
@@ -317,6 +321,10 @@ def _game_ws_on_message(ws, message):
                         if data.get('type') == 'ring_of_wealth_result' and data.get('detail'):
                             pending_spawns[rid]['detail'] = data.get('detail')
                         if data.get('type') == 'ring_of_wealth_result' and data.get('error'):
+                            pending_spawns[rid]['error'] = data.get('error')
+                        if data.get('type') == 'streamer_debug_result' and data.get('detail'):
+                            pending_spawns[rid]['detail'] = data.get('detail')
+                        if data.get('type') == 'streamer_debug_result' and data.get('error'):
                             pending_spawns[rid]['error'] = data.get('error')
                         pending_spawns[rid]['event'].set()
             print(f"Game {data.get('type')}: request_id={rid} success={ok}")
@@ -533,6 +541,7 @@ def points_config_api():
                 data.setdefault("cost_per_heal", 100)
                 data.setdefault("cost_per_cleanse", 150)
                 data.setdefault("cost_per_dew", 30)
+                data.setdefault("cost_per_plant", 30)
                 data.setdefault("cost_per_hex", 75)
                 data.setdefault("cost_per_degrade", 100)
                 data.setdefault("cost_per_sabotage", 75)
@@ -566,6 +575,7 @@ def points_config_api():
                     "cost_per_heal": 100,
                     "cost_per_cleanse": 150,
                     "cost_per_dew": 30,
+                    "cost_per_plant": 30,
                     "cost_per_hex": 75,
                     "cost_per_degrade": 100,
                     "cost_per_sabotage": 75,
@@ -606,6 +616,7 @@ def points_config_api():
             "cost_per_heal": max(1, int(data.get("cost_per_heal", 100))),
             "cost_per_cleanse": max(1, int(data.get("cost_per_cleanse", 150))),
             "cost_per_dew": max(1, int(data.get("cost_per_dew", 30))),
+            "cost_per_plant": max(1, int(data.get("cost_per_plant", 30))),
             "cost_per_hex": max(1, int(data.get("cost_per_hex", 75))),
             "cost_per_degrade": max(1, int(data.get("cost_per_degrade", 100))),
             "cost_per_sabotage": max(1, int(data.get("cost_per_sabotage", 75))),
@@ -1397,10 +1408,8 @@ def curse_command():
             data = request.form.to_dict()
         slot = (data.get('slot') or '').strip().lower()
         username = (data.get('username') or '').strip() or None
-        if not slot:
-            return jsonify({'ok': False, 'error': 'Missing slot'}), 400
         valid_slots = {'weapon', 'armor', 'ring', 'artifact', 'misc'}
-        if slot not in valid_slots:
+        if slot and slot not in valid_slots:
             return jsonify({'ok': False, 'error': f'Invalid slot. Options: weapon, armor, ring, artifact, misc (middle slot)'}), 400
         if not game_ws_app:
             return jsonify({'ok': False, 'error': 'Game not connected'}), 503
@@ -1409,10 +1418,12 @@ def curse_command():
         with spawn_lock:
             pending_spawns[request_id] = {'event': ev, 'success': False}
         try:
-            payload = {'command': 'curse', 'slot': slot, 'request_id': request_id}
+            payload = {'command': 'curse', 'request_id': request_id}
+            if slot:
+                payload['slot'] = slot
             if username:
                 payload['username'] = username
-            print(f"Curse send to game: slot={slot} request_id={request_id}")
+            print(f"Curse send to game: slot={slot or 'random'} request_id={request_id}")
             game_ws_app.send(json.dumps(payload))
         except Exception as e:
             with spawn_lock:
@@ -1429,11 +1440,11 @@ def curse_command():
                 pending_spawns.pop(request_id, None)
             return jsonify({'ok': False, 'error': 'Curse timed out'}), 504
         if success:
-            print(f"Curse OK: {slot} ({item_name}) for {username}")
-            _record_command_event(username, 'curse', slot, True)
-            return jsonify({'ok': True, 'slot': slot, 'item_name': item_name})
-        err = curse_error or f'No item in {slot} slot or already cursed'
-        _record_command_event(username, 'curse', slot, False)
+            print(f"Curse OK: {slot or 'random'} ({item_name}) for {username}")
+            _record_command_event(username, 'curse', slot or 'random', True)
+            return jsonify({'ok': True, 'slot': slot or None, 'item_name': item_name})
+        err = curse_error or 'No curseable equipped item (all slots empty or already cursed)'
+        _record_command_event(username, 'curse', slot or 'random', False)
         return jsonify({'ok': False, 'error': err}), 200
     except Exception as e:
         print(f"Curse 400 exception: {e}")
@@ -1924,6 +1935,158 @@ def _forward_chat_command(cmd, result_key, default_err):
         return jsonify({'ok': False, 'error': str(e)}), 400
 
 
+def _forward_streamer_debug(ws_cmd, default_err='Command failed', extra_payload=None):
+    """Forward a streamer-only debug command to the game (no points)."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        if not game_ws_app:
+            return jsonify({'ok': False, 'error': 'Game not connected'}), 503
+        request_id = str(uuid.uuid4())
+        ev = threading.Event()
+        with spawn_lock:
+            pending_spawns[request_id] = {'event': ev, 'success': False}
+        try:
+            payload = {'command': ws_cmd, 'request_id': request_id}
+            if extra_payload:
+                payload.update(extra_payload)
+            print(f"streamer debug send to game: {ws_cmd} request_id={request_id}")
+            game_ws_app.send(json.dumps(payload))
+        except Exception as e:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': str(e)}), 503
+        if ev.wait(timeout=SPAWN_RESULT_TIMEOUT):
+            with spawn_lock:
+                pending = pending_spawns.pop(request_id, {})
+                success = pending.get('success', False)
+                detail = pending.get('detail', '')
+                err_val = pending.get('error')
+        else:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': f'{ws_cmd} timed out'}), 504
+        if success:
+            print(f"streamer debug OK: {detail}")
+            return jsonify({'ok': True, 'detail': detail})
+        err = err_val or default_err
+        return jsonify({'ok': False, 'error': err}), 200
+    except Exception as e:
+        print(f"streamer debug exception: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 400
+
+
+@app.route('/api/streamer-debug/heal-all', methods=['POST', 'OPTIONS'])
+def streamer_debug_heal_all():
+    """Streamer debug: full heal, all debuffs removed, all curses cleansed."""
+    return _forward_streamer_debug('streamer_heal_all', 'Heal-all failed')
+
+
+@app.route('/api/streamer-debug/identify-all', methods=['POST', 'OPTIONS'])
+def streamer_debug_identify_all():
+    """Streamer debug: identify all inventory and equipped items."""
+    return _forward_streamer_debug('streamer_identify_all', 'Identify-all failed')
+
+
+@app.route('/api/streamer-debug/reveal-map', methods=['POST', 'OPTIONS'])
+def streamer_debug_reveal_map():
+    """Streamer debug: magic mapping for current floor."""
+    return _forward_streamer_debug('streamer_reveal_map', 'Reveal-map failed')
+
+
+@app.route('/api/streamer-debug/goto-stairs-down', methods=['POST', 'OPTIONS'])
+def streamer_debug_goto_stairs_down():
+    """Streamer debug: teleport to floor exit (stairs down)."""
+    return _forward_streamer_debug('streamer_goto_stairs_down', 'Goto stairs down failed')
+
+
+@app.route('/api/streamer-debug/goto-stairs-up', methods=['POST', 'OPTIONS'])
+def streamer_debug_goto_stairs_up():
+    """Streamer debug: teleport to floor entrance (stairs up)."""
+    return _forward_streamer_debug('streamer_goto_stairs_up', 'Goto stairs up failed')
+
+
+@app.route('/api/streamer-debug/search', methods=['POST', 'OPTIONS'])
+def streamer_debug_search():
+    """Streamer debug: search item names. Body: {query, limit?}. Works without an active run."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        query = (data.get('query') or '').strip()
+        if not query:
+            return jsonify({'ok': False, 'error': 'Missing query'}), 400
+        limit = max(1, min(25, int(data.get('limit', 12) or 12)))
+        return _forward_streamer_debug(
+            'streamer_search_items',
+            'Search failed',
+            extra_payload={'query': query, 'limit': limit},
+        )
+    except (TypeError, ValueError) as e:
+        return jsonify({'ok': False, 'error': str(e)}), 400
+
+
+@app.route('/api/streamer-debug/buff', methods=['POST', 'OPTIONS'])
+def streamer_debug_buff():
+    """Streamer debug: apply named buff. Body: {buff, duration?} (duration in turns, 0 = default)."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        buff = (data.get('buff') or '').strip()
+        if not buff:
+            return jsonify({'ok': False, 'error': 'Missing buff'}), 400
+        duration = max(0.0, min(9999.0, float(data.get('duration', 0) or 0)))
+        return _forward_streamer_debug(
+            'streamer_apply_buff',
+            'Apply buff failed',
+            extra_payload={'buff': buff, 'duration': duration},
+        )
+    except (TypeError, ValueError) as e:
+        return jsonify({'ok': False, 'error': str(e)}), 400
+
+
+@app.route('/api/streamer-debug/debuff', methods=['POST', 'OPTIONS'])
+def streamer_debug_debuff():
+    """Streamer debug: apply named debuff. Body: {debuff, duration?}."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        debuff = (data.get('debuff') or '').strip()
+        if not debuff:
+            return jsonify({'ok': False, 'error': 'Missing debuff'}), 400
+        duration = max(0.0, min(9999.0, float(data.get('duration', 0) or 0)))
+        return _forward_streamer_debug(
+            'streamer_apply_debuff',
+            'Apply debuff failed',
+            extra_payload={'debuff': debuff, 'duration': duration},
+        )
+    except (TypeError, ValueError) as e:
+        return jsonify({'ok': False, 'error': str(e)}), 400
+
+
+@app.route('/api/streamer-debug/give', methods=['POST', 'OPTIONS'])
+def streamer_debug_give():
+    """Streamer debug: give item. Body: {item, quantity?, level?}."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        item = (data.get('item') or '').strip()
+        if not item:
+            return jsonify({'ok': False, 'error': 'Missing item'}), 400
+        quantity = max(1, min(999, int(data.get('quantity', 1) or 1)))
+        level = max(0, min(99, int(data.get('level', 0) or 0)))
+        return _forward_streamer_debug(
+            'streamer_give_item',
+            'Give item failed',
+            extra_payload={'item': item, 'quantity': quantity, 'level': level},
+        )
+    except (TypeError, ValueError) as e:
+        return jsonify({'ok': False, 'error': str(e)}), 400
+
+
 @app.route('/api/heal-command', methods=['POST', 'OPTIONS'])
 def heal_command():
     """Chat command: heal hero ~15% HP."""
@@ -1940,6 +2103,12 @@ def cleanse_command():
 def dew_command():
     """Chat command: drop dewdrop near hero."""
     return _forward_chat_command('dew', 'item_name', 'No space for dewdrop')
+
+
+@app.route('/api/plant-command', methods=['POST', 'OPTIONS'])
+def plant_command():
+    """Chat command: plant a random seed near hero (fails if Barren Land enabled)."""
+    return _forward_chat_command('plant', 'plant_name', 'No space to plant')
 
 
 @app.route('/api/corrupt-ally-command', methods=['POST', 'OPTIONS'])

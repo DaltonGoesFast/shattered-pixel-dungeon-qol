@@ -169,6 +169,8 @@ public class GameStateSnapshot {
 		Map<String, Object> s = new LinkedHashMap<>();
 		s.put("name", item.getClass().getSimpleName());
 		s.put("level", item.level());
+		s.put("cursed", item.cursed);
+		s.put("cursedKnown", item.cursedKnown);
 		if (item instanceof Weapon) {
 			Weapon w = (Weapon) item;
 			if (w.enchantment != null) s.put("enchantment", w.enchantment.getClass().getSimpleName());
