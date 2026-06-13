@@ -52,6 +52,8 @@ import com.shatteredpixel.shatteredpixeldungeon.windows.WndTextInput;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndTitledMessage;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndVictoryCongrats;
 import com.watabou.gltextures.TextureCache;
+import com.badlogic.gdx.Input;
+import com.watabou.input.KeyEvent;
 import com.watabou.input.PointerEvent;
 import com.watabou.noosa.Camera;
 import com.watabou.noosa.ColorBlock;
@@ -64,6 +66,7 @@ import com.watabou.noosa.tweeners.Tweener;
 import com.watabou.noosa.ui.Component;
 import com.watabou.utils.DeviceCompat;
 import com.watabou.utils.GameMath;
+import com.watabou.utils.Signal;
 import com.watabou.utils.PlatformSupport;
 import com.watabou.utils.PointF;
 import com.watabou.utils.Random;
@@ -91,6 +94,8 @@ public class HeroSelectScene extends PixelScene {
 	private IconButton btnOptions;
 	private GameOptions optionsPane;
 	private IconButton btnExit;
+
+	private Signal.Listener<KeyEvent> enterListener;
 
 	private RectF insets;
 
@@ -151,16 +156,7 @@ public class HeroSelectScene extends PixelScene {
 			@Override
 			protected void onClick() {
 				super.onClick();
-
-				if (GamesInProgress.selectedClass == null) return;
-
-				Dungeon.hero = null;
-				Dungeon.daily = Dungeon.dailyReplay = false;
-				Dungeon.initSeed();
-				ActionIndicator.clearAction();
-				InterlevelScene.mode = InterlevelScene.Mode.DESCEND;
-
-				Game.switchScene( InterlevelScene.class );
+				startGame();
 			}
 		};
 		startBtn.icon(Icons.get(Icons.ENTER));
@@ -168,6 +164,16 @@ public class HeroSelectScene extends PixelScene {
 		startBtn.textColor(Window.TITLE_COLOR);
 		add(startBtn);
 		startBtn.visible = startBtn.active = false;
+		KeyEvent.addKeyListener(enterListener = new Signal.Listener<KeyEvent>() {
+			@Override
+			public boolean onSignal(KeyEvent event) {
+				if (event.pressed && event.code == Input.Keys.ENTER
+						&& startBtn.active && GamesInProgress.selectedClass != null) {
+					startGame();
+				}
+				return false;
+			}
+		});
 
 		infoButton = new IconButton(Icons.get(Icons.INFO)){
 			@Override
@@ -399,6 +405,24 @@ public class HeroSelectScene extends PixelScene {
 
 		fadeIn();
 
+	}
+
+	private void startGame() {
+		if (GamesInProgress.selectedClass == null) return;
+
+		Dungeon.hero = null;
+		Dungeon.daily = Dungeon.dailyReplay = false;
+		Dungeon.initSeed();
+		ActionIndicator.clearAction();
+		InterlevelScene.mode = InterlevelScene.Mode.DESCEND;
+
+		Game.switchScene( InterlevelScene.class );
+	}
+
+	@Override
+	public void destroy() {
+		KeyEvent.removeKeyListener(enterListener);
+		super.destroy();
 	}
 
 	private void updateOptionsColor(){
