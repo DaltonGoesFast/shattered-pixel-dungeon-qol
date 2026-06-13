@@ -46,6 +46,8 @@ import com.shatteredpixel.shatteredpixeldungeon.windows.WndOptions;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndSettings;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndVictoryCongrats;
 import com.watabou.glwrap.Blending;
+import com.badlogic.gdx.Input;
+import com.watabou.input.KeyEvent;
 import com.watabou.input.PointerEvent;
 import com.watabou.noosa.BitmapText;
 import com.watabou.noosa.Camera;
@@ -56,6 +58,7 @@ import com.watabou.noosa.audio.Music;
 import com.watabou.noosa.tweeners.Tweener;
 import com.watabou.utils.ColorMath;
 import com.watabou.utils.DeviceCompat;
+import com.watabou.utils.Signal;
 import com.watabou.utils.GameMath;
 import com.watabou.utils.RectF;
 
@@ -80,6 +83,8 @@ public class TitleScene extends PixelScene {
 	private BitmapText version;
 	private IconButton btnFade;
 	private ExitButton btnExit;
+
+	private Signal.Listener<KeyEvent> enterListener;
 
 	@Override
 	public void create() {
@@ -148,15 +153,9 @@ public class TitleScene extends PixelScene {
 		btnPlay = new StyledButton(GREY_TR, Messages.get(this, "enter")){
 			@Override
 			protected void onClick() {
-				if (GamesInProgress.checkAll().size() == 0){
-					GamesInProgress.selectedClass = null;
-					GamesInProgress.curSlot = 1;
-					ShatteredPixelDungeon.switchScene(HeroSelectScene.class);
-				} else {
-					ShatteredPixelDungeon.switchNoFade( StartScene.class );
-				}
+				enterDungeon();
 			}
-			
+
 			@Override
 			protected boolean onLongClick() {
 				//making it easier to start runs quickly while debugging
@@ -171,6 +170,15 @@ public class TitleScene extends PixelScene {
 		};
 		btnPlay.icon(Icons.get(Icons.ENTER));
 		add(btnPlay);
+		KeyEvent.addKeyListener(enterListener = new Signal.Listener<KeyEvent>() {
+			@Override
+			public boolean onSignal(KeyEvent event) {
+				if (event.pressed && event.code == Input.Keys.ENTER && btnPlay.active) {
+					enterDungeon();
+				}
+				return false;
+			}
+		});
 
 		btnSupport = new SupportButton(GREY_TR, Messages.get(this, "support"));
 		//add(btnSupport); // disabled for custom build
@@ -303,6 +311,22 @@ public class TitleScene extends PixelScene {
 		}
 
 		fadeIn();
+	}
+
+	private void enterDungeon() {
+		if (GamesInProgress.checkAll().size() == 0){
+			GamesInProgress.selectedClass = null;
+			GamesInProgress.curSlot = 1;
+			ShatteredPixelDungeon.switchScene(HeroSelectScene.class);
+		} else {
+			ShatteredPixelDungeon.switchNoFade( StartScene.class );
+		}
+	}
+
+	@Override
+	public void destroy() {
+		KeyEvent.removeKeyListener(enterListener);
+		super.destroy();
 	}
 
 	private float uiAlpha;

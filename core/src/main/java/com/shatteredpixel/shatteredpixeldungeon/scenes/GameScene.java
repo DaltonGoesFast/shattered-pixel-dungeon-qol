@@ -126,8 +126,10 @@ import com.shatteredpixel.shatteredpixeldungeon.windows.WndResurrect;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndUpgrade;
 import com.watabou.gltextures.TextureCache;
 import com.watabou.glwrap.Blending;
+import com.badlogic.gdx.Input;
 import com.watabou.input.ControllerHandler;
 import com.watabou.input.KeyBindings;
+import com.watabou.input.KeyEvent;
 import com.watabou.input.PointerEvent;
 import com.watabou.noosa.Camera;
 import com.watabou.noosa.Game;
@@ -149,6 +151,7 @@ import com.watabou.utils.Point;
 import com.watabou.utils.PointF;
 import com.watabou.utils.Random;
 import com.watabou.utils.RectF;
+import com.watabou.utils.Signal;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -158,6 +161,8 @@ import java.util.Locale;
 public class GameScene extends PixelScene {
 
 	static GameScene scene;
+
+	private static Signal.Listener<KeyEvent> gameOverEnterListener;
 
 	private SkinnedBlock water;
 	private DungeonTerrainTilemap tiles;
@@ -785,7 +790,11 @@ public class GameScene extends PixelScene {
 	}
 	
 	public void destroy() {
-		
+		if (gameOverEnterListener != null) {
+			KeyEvent.removeKeyListener(gameOverEnterListener);
+			gameOverEnterListener = null;
+		}
+
 		//tell the actor thread to finish, then wait for it to complete any actions it may be doing.
 		if (!waitForActorThread( 4500, true )){
 			Throwable t = new Throwable();
@@ -1546,9 +1555,7 @@ public class GameScene extends PixelScene {
 		StyledButton restart = new StyledButton(Chrome.Type.GREY_BUTTON_TR, Messages.get(StartScene.class, "new"), 9){
 			@Override
 			protected void onClick() {
-				GamesInProgress.selectedClass = Dungeon.hero.heroClass;
-				GamesInProgress.curSlot = GamesInProgress.firstEmpty();
-				ShatteredPixelDungeon.switchScene(HeroSelectScene.class);
+				newGameAfterDeath();
 			}
 
 			@Override
@@ -1567,6 +1574,16 @@ public class GameScene extends PixelScene {
 				align(uiCamera, (restart.camera.height - restart.height()) / 2 + 8 - offset)
 		);
 		scene.add(restart);
+		if (gameOverEnterListener != null) KeyEvent.removeKeyListener(gameOverEnterListener);
+		KeyEvent.addKeyListener(gameOverEnterListener = new Signal.Listener<KeyEvent>() {
+			@Override
+			public boolean onSignal(KeyEvent event) {
+				if (event.pressed && event.code == Input.Keys.ENTER && restart.active) {
+					newGameAfterDeath();
+				}
+				return false;
+			}
+		});
 
 		StyledButton menu = new StyledButton(Chrome.Type.GREY_BUTTON_TR, Messages.get(WndKeyBindings.class, "menu"), 9){
 			@Override
@@ -1591,6 +1608,12 @@ public class GameScene extends PixelScene {
 		scene.add(menu);
 	}
 	
+	private static void newGameAfterDeath() {
+		GamesInProgress.selectedClass = Dungeon.hero.heroClass;
+		GamesInProgress.curSlot = GamesInProgress.firstEmpty();
+		ShatteredPixelDungeon.switchScene(HeroSelectScene.class);
+	}
+
 	public static void bossSlain() {
 		if (Dungeon.hero.isAlive()) {
 			Banner bossSlain = new Banner( BannerSprites.get( BannerSprites.Type.BOSS_SLAIN ) );
