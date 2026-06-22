@@ -24,7 +24,7 @@ package com.shatteredpixel.shatteredpixeldungeon.actors.buffs;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
-import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.TimekeepersHourglass;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.TimeFreeze;
 import com.shatteredpixel.shatteredpixeldungeon.plants.Swiftthistle;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.CharSprite;
@@ -66,7 +66,7 @@ public class Levitation extends FlavourBuff {
 			return false;
 		}
 
-		if (target.buff(TimekeepersHourglass.timeFreeze.class) != null){
+		if (target.buff(TimeFreeze.class) != null){
 			return false;
 		}
 

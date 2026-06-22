@@ -511,7 +511,10 @@ public class Toolbar extends Component {
 	@Override
 	protected void layout() {
 
-		float right = width;
+		// Right edge of the toolbar in absolute screen coordinates. Buttons inside the toolbar
+		// are positioned using absolute coords (e.g. btnInventory.setPos(right - btnInventory.width(), y))
+		// so this must include x for the HUD edit mode horizontal offset to actually move the buttons.
+		float right = x + width;
 
 		int quickslotsToShow = 4;
 		if (PixelScene.uiCamera.width > 152) quickslotsToShow ++;
@@ -635,7 +638,7 @@ public class Toolbar extends Component {
 					if (slot.visible) toolbarWidth += slot.width();
 				}
 				if (btnSwap.visible) toolbarWidth += btnSwap.width()-2;
-				right = (width + toolbarWidth)/2;
+				right = x + (width + toolbarWidth)/2;
 
 			case GROUP:
 				btnWait.setPos(right - btnWait.width(), y);
@@ -666,7 +669,9 @@ public class Toolbar extends Component {
 			}
 		}
 
-		right = width;
+		// Mirror anchor: 2 * (x + width/2) so buttons mirror around the toolbar's actual
+		// horizontal center even when x != 0 (HUD edit mode horizontal offset).
+		right = 2 * x + width;
 
 		if (SPDSettings.flipToolbar()) {
 

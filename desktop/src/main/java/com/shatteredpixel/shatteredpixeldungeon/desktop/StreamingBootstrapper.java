@@ -17,6 +17,7 @@ import com.badlogic.gdx.Gdx;
 import com.google.gson.Gson;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GameStateSnapshot;
 import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingUI;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -42,6 +43,12 @@ public final class StreamingBootstrapper {
 			try {
 				server.start();
 				System.out.println("[Streaming] WebSocket server started on ws://127.0.0.1:" + port);
+				StreamingUI.setListener( layout -> {
+					StreamingServer s = serverRef.get();
+					if ( s != null ) {
+						s.broadcastUILayout( layout );
+					}
+				} );
 			} catch (Exception e) {
 				serverRef.compareAndSet(server, null);
 				System.err.println("[Streaming] Could not start WebSocket server on port " + port + " (is it in use?): " + e.getMessage());
@@ -95,6 +102,7 @@ public final class StreamingBootstrapper {
 	/** Stops the server in a background thread so the caller is not blocked. */
 	public static void stop() {
 		running = false;
+		StreamingUI.clearListener();
 		StreamingServer s = serverRef.getAndSet(null);
 		if (s != null) {
 			Thread stopper = new Thread(() -> {

@@ -28,7 +28,7 @@ echo.
 echo Main:       http://localhost:5000 (config, viewer points, game inspector)
 echo OBS:        http://localhost:5000/overlay (add as Browser Source)
 echo Game WS:    ws://127.0.0.1:5001 (enable in game Settings)
-echo OBS relay:  item_info_open / item_info_closed -^> Advanced Scene Switcher
+echo OBS inv:    dynamic Crop/Pad via obs_inv_layout.json (OBS WebSocket)
 echo.
 echo Add http://localhost:5000/overlay as a Browser Source in OBS
 echo.

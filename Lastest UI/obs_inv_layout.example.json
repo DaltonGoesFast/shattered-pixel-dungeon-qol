@@ -1,0 +1,20 @@
+{
+  "enabled": true,
+  "obs_ws_url": "ws://127.0.0.1:4455",
+  "source_group": "V - INV HUD GROUP",
+  "filter_crop": "Crop/Pad",
+  "source_hud": "V - INV HUD",
+  "filter_mask": "Image Mask/Blend",
+  "crop_top_closed": 683,
+  "crop_top_min": 390,
+  "crop_top_boost": 0,
+  "game_top_at_crop_min": 70,
+  "game_top_at_crop_closed": 215,
+  "full_expand_top_max": 85,
+  "full_expand_height_min": 130,
+  "short_box_height_max": 85,
+  "short_box_crop_add": 250,
+  "no_expand_max_height": 100,
+  "margin_px": 12,
+  "ui_to_obs_scale": 1.0
+}

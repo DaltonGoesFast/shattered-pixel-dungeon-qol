@@ -284,6 +284,21 @@ public class StatusPane extends Component {
 			busy.y = y + 37;
 		}
 
+		// Reposition level text relative to the (possibly HUD-offset) pane.
+		// The level text content is set in update() on level-up; layout() keeps it in sync
+		// with the current x/y so dragging StatusPane in HUD edit mode moves it too.
+		if ( lastLvl != -1 ) {
+			level.measure();
+			if (large) {
+				level.x = x + (30f - level.width()) / 2f;
+				level.y = y + 33f - level.baseLine() / 2f;
+			} else {
+				level.x = x + heroPaneExtraWidth + 25.5f - level.width() / 2f;
+				level.y = y + 31.0f - level.baseLine() / 2f;
+			}
+			PixelScene.align(level);
+		}
+
 		// OBS mask: solid black behind HP bar, buffs, and turn wheel for chroma-key
 		if (large) {
 			// Extend right past turn wheel (~half the arc radius)

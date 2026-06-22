@@ -108,6 +108,9 @@ public class GameStateSnapshot {
 		if (scene instanceof GameScene || scene instanceof TitleScene) {
 			ui.put("open_windows", buildOpenWindows());
 		}
+		if (scene instanceof GameScene) {
+			ui.put("item_info", ItemInfoLayout.build());
+		}
 		return ui;
 	}
 

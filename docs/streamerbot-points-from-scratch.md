@@ -26,6 +26,8 @@ Use this list when updating an **existing** setup. Game code fixes (corrupt `!al
 |------|-----|----------------|
 | **`!wand` Run a Program** | Unified wand: **one** cost (`cost_per_wand`), weighted random effect in the game. | [Action 18](#action-18-cursed-wand-effect-wand-with-points) |
 | **Cheer + Super Chat optional args** | So bits / Super Chat get the same **stacking 2×** as chat (!doublepoints, sub/member, optional top farder). Without the extra args, only global double points applies. | This doc: [Action 20](#action-20-earn-points-cheer), [Action 21](#action-21-earn-points-super-chat), [argument reference](#cheer--super-chat--argument-reference). |
+| **Gift sub / gift membership** | Not automatic — add [Action 40](#action-40-earn-points-gift-sub--gift-membership). | [Action 40](#action-40-earn-points-gift-sub--gift-membership) (after `!plant`). |
+| **Super Chat / Cheer** | Donation points require Actions 20–21 on the points queue; see HTTP fallback if Run Program fails. | [Action 20](#action-20-earn-points-cheer), [Action 21](#action-21-earn-points-super-chat). |
 | **Chat → donor by %** | Transfer part of chat-only points into donor points from the overlay. | Open **points-config** in the browser (`/points-config`): set **Chat→Donor %** next to the button, then **Chat → Donor**. Not a Streamer.bot change. |
 
 **Files the Python script writes (for your paths):**
@@ -74,6 +76,7 @@ Use this list when updating an **existing** setup. Game code fixes (corrupt `!al
 | 31 | !sabotage | !sabotage | Remove one random buff |
 | 36 | Bomb | !bomb | Spend points; weighted random lit bomb 1–4 tiles from hero |
 | 37 | Ring of Wealth loot | !row | Spend points; RoW-style drops by chapter, always ≥1 item |
+| 40 | Earn Points (Gift sub / membership) | Twitch Gift Sub / Gift Bomb; YouTube Gift Membership | Configurable per tier (`points_config.json`) |
 
 ---
 
@@ -1986,60 +1989,133 @@ public class CPHInline
 
 ## Action 20: Earn Points (Cheer)
 
+**Not automatic** until this action exists, is enabled, and is on your **points queue**. Same for [Action 21](#action-21-earn-points-super-chat) (Super Chat) and [Action 40](#action-40-earn-points-gift-sub--gift-membership) (gift subs).
+
 **Rate:** 100 bits = $1 = 100 points base. **Stacks** with !doublepoints, subscriber/member 2×, and optional top-farder (same as chat earning) when you pass the optional CLI args below.
 
 **Add this action to your points queue** (same blocking queue as earn/spend) to avoid race conditions.
 
-**Trigger:** Twitch → Triggers → Cheer
+**Trigger:** Twitch → Triggers → **Cheer**
 
-**Sub-Action:** Run Program
-- **Program:** `python`
-- **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" cheer %bits% %userName% %isSubscribed% %userIsSponsor% 0`
-- **Working directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+**Sub-Actions (recommended order):**
 
-**Note:** Anonymous cheers are skipped (no username to credit). Trailing `0` is **topFarder** (use `1` if your C# sets a top-farder flag). Omit extra args entirely to default all flags off (only global double points still applies from the file).
+1. **Run a Program**
+   - **Program:** `python` (or full path to `python.exe`)
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" cheer %bits% %userName% %isSubscribed% %userIsSponsor% 0`
+   - **Working directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI` (literal path — see [portable setup](streamerbot-global-paths-example-scroll.md#portable-setup-recommended-junction--fixed-path--global))
+   - **Wait maximum:** `15` seconds
+
+2. **Optional — thank-you chat:** Execute C# Code reads `donation_result.txt` in `Lastest UI` (same folder as the script). Format: `ok|150` = 150 points earned; `skip|0` = anonymous cheer skipped.
+
+**Notes:** Anonymous cheers are skipped (no username). Trailing `0` is **topFarder** (use `1` if your C# sets a top-farder flag). Omit optional args entirely to default flags off (global !doublepoints still applies).
+
+### Cheer — HTTP alternative (if Run Program fails)
+
+Overlay server must be running (`python server.py` in `Lastest UI`).
+
+**Sub-Action:** Web Request → POST `http://127.0.0.1:5000/api/donation/cheer`  
+**Content-Type:** `application/json`  
+**Body:**
+
+```json
+{
+  "bits": "%bits%",
+  "username": "%userName%",
+  "isSubscribed": "%isSubscribed%",
+  "userIsSponsor": "%userIsSponsor%"
+}
+```
+
+Response `{"ok":true,"pointsAdded":100}` on success.
 
 ### Cheer — what to change if you already had this action
 
 1. Open your **Cheer** action → **Run Program** sub-action.
-2. Replace the **Arguments** field with the line above (same path to `points_command.py`, ending with `%isSubscribed% %userIsSponsor% 0`).
-3. **Save.** Next cheer: subscriber 2× applies when Twitch sets `isSubscribed`; `userIsSponsor` is usually unused on Twitch (empty/false is fine).
-4. If you use a **top farder** bonus in chat: change the final `0` to a variable or `1` from your own logic (must be last argument).
+2. Replace the **Arguments** field with the line above (ending with `%isSubscribed% %userIsSponsor% 0`).
+3. Confirm **Working directory** is your real `Lastest UI` folder (not empty, not `%variables%`).
+4. **Save.** Subscriber 2× applies when Twitch sets `isSubscribed`; `userIsSponsor` is usually unused on Twitch (safe to pass).
+5. If you use **top farder** in chat: change the final `0` to `1` or your variable (must be the last argument).
 
 ---
 
 ## Action 21: Earn Points (Super Chat)
 
-**Rate:** 1 point per $0.01 USD base. Uses the [Frankfurter API](https://www.frankfurter.app/) for currency conversion (no API key). **Stacks** with !doublepoints, subscriber/member 2×, and optional top-farder when you pass optional trailing args (see Arguments below).
+**Not automatic** until this action exists, is enabled, and is on your **points queue**.
 
-**Add this action to your points queue** (same blocking queue as earn/spend) to avoid race conditions.
+**Rate:** 1 point per $0.01 USD base. Uses the [Frankfurter API](https://www.frankfurter.app/) for currency conversion (no API key). **Stacks** with !doublepoints, subscriber/member 2×, and optional top-farder when you pass optional trailing args (see [argument reference](#cheer--super-chat--argument-reference) below).
 
-### YouTube Super Chat (Setup from Scratch)
+**Add this action to your points queue** (same blocking queue as earn/spend).
 
-1. **Create a new action** (e.g. "Super Chat Points").
+### YouTube Super Chat (setup from scratch)
+
+1. **Create a new action** (e.g. **40 Super Chat Points** — name is up to you; action **number** in this doc is **21**).
 2. **Add trigger:** YouTube → Triggers → **Super Chat**.
-3. **Add sub-action:** Run Program
+3. **Add sub-action:** Run a Program
    - **Program:** `python` (or full path to `python.exe`, e.g. `C:\Python313\python.exe`)
    - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" superchat %microAmount% %currencyCode% %userName% %isSubscribed% %userIsSponsor% 0`
    - **Working directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
-4. **Add this action to your points queue** (same queue as earn/spend).
+   - **Wait maximum:** `15` seconds (Frankfurter currency lookup can take a few seconds)
+4. **Add this action to your points queue** (same queue as earn/spend and Action 20).
 
-**Streamer.bot Super Chat variables:** `%microAmount%` (e.g. 1000000 = $1), `%currencyCode%` (e.g. USD), `%userName%` (login) or `%user%` (display name). If `%userName%` is empty for real Super Chats, try `%user%` instead in the Arguments. Optional trailing args: `%isSubscribed%`, `%userIsSponsor%`, then `0` or `1` for **topFarder** (omit all three to default off; global double points still applies).
+**Streamer.bot variables:**
+
+| Variable | Example | Notes |
+|----------|---------|--------|
+| `%microAmount%` | `1000000` | Micro-units: **1_000_000 = $1**. Do **not** use dollar display fields here unless you remove `%microAmount%` (script also accepts `1.50` or `5` as dollars). |
+| `%currencyCode%` | `USD` | ISO code |
+| `%userName%` | login | If empty on live events, use `%user%` (display name) as the 3rd argument after currency |
+| `%isSubscribed%` | `true` / `false` | Optional 2× (Twitch-style; often empty on YouTube) |
+| `%userIsSponsor%` | `true` / `false` | YouTube **channel member** 2× |
+| Last arg `0` | top farder off | Use `1` or your variable for top-farder 2× |
+
+**Optional thank-you:** C# step reads `donation_result.txt` → `ok|150` means 150 points earned. Example message: `Thanks for the Super Chat! You earned %pointsEarned% points!` (parse the number after `|`).
+
+### Super Chat — HTTP alternative (if Run Program fails)
+
+**Sub-Action:** Web Request → POST `http://127.0.0.1:5000/api/donation/superchat`  
+**Content-Type:** `application/json`  
+**Body:**
+
+```json
+{
+  "microAmount": "%microAmount%",
+  "currencyCode": "%currencyCode%",
+  "username": "%userName%",
+  "isSubscribed": "%isSubscribed%",
+  "userIsSponsor": "%userIsSponsor%"
+}
+```
+
+If `%userName%` is empty on live Super Chats, use `"username": "%user%"` instead.
 
 ### Super Chat — what to change if you already had this action
 
-1. Open your **Super Chat** action → **Run Program** sub-action.
-2. Replace the **Arguments** field with the line in step 3 above (must include `%isSubscribed% %userIsSponsor% 0` at the end, or your chosen top-farder value instead of `0`).
-3. On **YouTube**, channel membership is typically reflected in **`userIsSponsor`** (not Twitch’s `isSubscribed`). Passing both variables lets one action line work when you mirror triggers later.
-4. **Save.**
+1. Open your **Super Chat** action → **Run Program**.
+2. Replace **Arguments** with the line in step 3 above (**must** include `%isSubscribed% %userIsSponsor% 0` at the end, or your top-farder value instead of `0`).
+3. Set **Working directory** to your `Lastest UI` folder (literal path).
+4. On **YouTube**, member status is usually **`%userIsSponsor%`**, not `%isSubscribed%`.
+5. **Save** and test with a real Super Chat or `python points_command.py superchat 1000000 USD YourName` from `Lastest UI`.
 
-**Optional:** Add a C# step to read `donation_result.txt` (format: `ok|150` = 150 points earned). Split by `|`, use second part for a thank-you message: `Thanks for the super chat! You earned %points% points!`
+#### Troubleshooting: test trigger works, real Super Chats don't
 
-#### Troubleshooting: Test Trigger works, real Super Chats don't
+| Symptom | Fix |
+|---------|-----|
+| No points, no error | Action not on **points queue**, or wrong **working directory** |
+| `ok\|0` in `donation_result.txt` | Amount parsed as $0 — check `%microAmount%` (use micro-units, not `$1.00` display text unless script gets decimals) |
+| Wrong user credited | `%userName%` empty → use `%user%` |
+| Script never runs | Try [HTTP alternative](#super-chat--http-alternative-if-run-program-fails) above |
+| YouTube not firing | Reconnect YouTube in Streamer.bot → Settings → Platforms |
+| Debug args | Create empty `Lastest UI/superchat_debug.txt`; next Super Chat logs to `superchat_debug.log` |
 
-- **YouTube platform:** Ensure YouTube is connected in Streamer.bot (Settings → Platforms → YouTube). Reconnect if needed.
-- **Variable names:** If `%userName%` is empty for real events, change the last argument to `%user%` (display name).
-- **Debug logging:** Create an empty file `superchat_debug.txt` in `Lastest UI`. The next Super Chat will append a log line to `superchat_debug.log` with the exact args received. Remove the file when done debugging.
+**Local test (no Streamer.bot):**
+
+```text
+cd Lastest UI
+python points_command.py superchat 1000000 USD YourName 0 0 0
+type donation_result.txt
+```
+
+Expect `ok|100` for a $1 Super Chat.
 
 ---
 
@@ -2063,6 +2139,8 @@ public class CPHInline
 - If you **omit** the optional args entirely, only **global double points** (when `!doublepoints` is active) multiplies donation points; sub/member/top farder do not.
 - Empty or unknown strings for flags are treated as **off** (same as `0`).
 - Adjust the **file paths** in all **Arguments** and C# `const` strings if your `Lastest UI` folder is not under the path used in this doc.
+
+**Donation commands (CLI):** `cheer`, `superchat`, `giftmembership` — see [Action 20](#action-20-earn-points-cheer), [Action 21](#action-21-earn-points-super-chat), [Action 40](#action-40-earn-points-gift-sub--gift-membership). HTTP: `/api/donation/cheer`, `/api/donation/superchat`, `/api/donation/gift-membership`.
 
 ---
 
@@ -3294,6 +3372,110 @@ public class CPHInline
 
 ---
 
+## Action 40: Earn Points (Gift sub / gift membership)
+
+**Not automatic** until you create this action and add it to your **points queue**. Super Chats and cheers need [Action 21](#action-21-earn-points-super-chat) and [Action 20](#action-20-earn-points-cheer) separately.
+
+**Script:** `points_command.py giftmembership <username> [tier] [isSubscribed] [userIsSponsor] [topFarder]`
+
+**Defaults** (`points_config.json`): tier 1 / YouTube gift = **500** pts, tier 2 = **1000**, tier 3 = **2500** (≈ $5 / $10 / $25 at 1 pt per cent). Keys: `points_per_gift_sub_tier1`, `points_per_gift_sub_tier2`, `points_per_gift_sub_tier3`, `points_per_gift_membership`, `points_per_gift_sub_prime`.
+
+**Stacks** the same donation multipliers as Super Chat: !doublepoints → sub/member → top farder ([argument reference](#cheer--super-chat--argument-reference)).
+
+---
+
+### Twitch — Gift Subscription (single gift)
+
+1. **Create action** (e.g. **40 Gift Sub Points**).
+2. **Trigger:** Twitch → Subscriptions → **Gift Subscription**
+3. **Sub-Action:** Run a Program
+   - **Program:** `python`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" giftmembership %recipientUserName% %tier% %isSubscribed% %userIsSponsor% 0`
+   - **Working directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait maximum:** `10` seconds
+4. Credits the **recipient** (`%recipientUserName%`), not the gifter.
+5. **Add to points queue.**
+
+**Optional thank-you:** Read `donation_result.txt` → `ok|500` = 500 points to recipient.
+
+---
+
+### Twitch — Gift Bomb (many gifts at once)
+
+**Trigger:** Twitch → Subscriptions → **Gift Bomb**
+
+Streamer.bot exposes indexed recipients: `%gift.recipientUserName0%`, `%gift.recipientUserName1%`, … up to `%totalGifts% - 1`.
+
+**Option A — one action, C# loop:** Execute C# that loops `0 .. totalGifts-1` and runs `giftmembership` per index (or POST to `/api/donation/gift-membership` per recipient).
+
+**Option B — duplicate Run Program sub-actions** for each index you expect (fragile for large bombs).
+
+Example **Run Program** for recipient 0 only (repeat pattern or use C#):
+
+```text
+points_command.py giftmembership %gift.recipientUserName0% %tier% %isSubscribed% %userIsSponsor% 0
+```
+
+---
+
+### YouTube — Gift Membership Received
+
+**Trigger:** YouTube → Membership → **Gift Membership Received**
+
+YouTube’s API (via Streamer.bot) exposes the **gifter** only — there is **no recipient login** variable. Credit the **gifter** who paid:
+
+- **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" giftmembership %gifterUserName% %tier% 0 %userIsSponsor% 0`
+
+(`0` = not Twitch-subscribed; `%userIsSponsor%` if the gifter is already a member for 2×.)
+
+| Variable | Role |
+|----------|------|
+| `%gifterUserName%` | Who gets the points (payer) |
+| `%tier%` | Membership tier for point amount |
+| `%gifterIsSponsor%` | Optional; map to `userIsSponsor` if you prefer |
+
+---
+
+### Action 40 — HTTP alternative
+
+**POST** `http://127.0.0.1:5000/api/donation/gift-membership`  
+**Content-Type:** `application/json`
+
+**Twitch gift sub (recipient):**
+
+```json
+{
+  "username": "%recipientUserName%",
+  "tier": "%tier%",
+  "isSubscribed": "%isSubscribed%",
+  "userIsSponsor": "%userIsSponsor%"
+}
+```
+
+**YouTube gift membership (gifter):**
+
+```json
+{
+  "username": "%gifterUserName%",
+  "tier": "%tier%",
+  "userIsSponsor": "%gifterIsSponsor%"
+}
+```
+
+---
+
+### Action 40 — local test
+
+```text
+cd Lastest UI
+python points_command.py giftmembership testviewer "tier 1" 0 0 0
+type donation_result.txt
+```
+
+Expect `ok|500` (tier 1 default). Tier 2: `giftmembership testviewer "tier 2"` → `ok|1000`.
+
+---
+
 ## Commands Quick Reference
 
 | Command | Usage | Cost | Description |
@@ -3354,7 +3536,7 @@ public class CPHInline
 | 18 | Cursed Wand | !wand | Fixed cost; weighted random cursed-wand effect |
 | 19 | Double Points | !doublepoints | Streamer only: 2× points for N min |
 | 20 | Earn Points (Cheer) | Twitch Cheer | 1 pt per bit; optional args for stacked 2× |
-| 21 | Earn Points (Super Chat) | YouTube Super Chat | 1 pt per $0.01; same optional args |
+| 21 | Earn Points (Super Chat) | YouTube Super Chat | 1 pt per $0.01; optional stacked 2× |
 | 22 | Reset Points | Stream Started | Clear non-donor points |
 | 23 | Spend OFF | Hotkey | Disable spend commands |
 | 24 | Spend ON | Hotkey | Enable spend commands |
@@ -3368,6 +3550,7 @@ public class CPHInline
 | 36 | Bomb | !bomb | Spend points; weighted random lit bomb near hero |
 | 37 | Ring of Wealth | !row | Spend points; RoW-style loot by chapter |
 | 39 | Plant | !plant | Spend points; plant a random seed near hero (fails if Barren Land enabled) |
+| 40 | Earn Points (Gift sub / membership) | Twitch Gift Sub / Gift Bomb; YouTube Gift Membership | Configurable per tier; recipient on Twitch, gifter on YouTube |
 
 *Legacy Streamer.bot actions (omit):* Helpers/Hurters OFF/ON, `!myside`, `!switch` — for historical setup only, see the sections **"Action 25: Helpers/Hurters OFF"** through **"Action 28: !switch"** earlier in this document (not the Summary row numbers in this table).
 
@@ -3383,7 +3566,7 @@ public class CPHInline
 - Edit `POINTS_PER_MESSAGE`, `POINTS_PER_TICK`, and `COOLDOWN_SEC` (in Earn Points on chat for chat, Earn Points passive for passive) in the C# code. Edit points costs via http://localhost:5000/points-config or `points_config.json`.
 - **Double points** persists until the duration ends. To clear it when the stream starts, add `File.WriteAllText(DOUBLE_FILE, "0");` to the Reset Points action.
 - **Top farder 2x:** The earn actions read from `TOP_FARDER_FILE` (default: `OBS files\textread\leader.txt`). Expected format: `Top Farder: USERNAME - 45`. Change the path if your fard counter writes to a different file.
-- **Super Chat / Cheer:** Uses `points_command.py` (superchat/cheer subcommands). Currency conversion via Frankfurter (free, no key). Add these actions to the same blocking queue as earn/spend. Anonymous cheers are skipped.
+- **Super Chat / Cheer / gifts:** Require Streamer.bot Actions **20**, **21**, and **40** (or HTTP `/api/donation/*`). Uses `points_command.py` (`superchat`, `cheer`, `giftmembership`). Super Chat currency via Frankfurter (free, no key). Add all donation actions to the same blocking queue as earn/spend. Anonymous cheers are skipped.
 
 ---
 

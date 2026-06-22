@@ -32,6 +32,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfRage;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfRecharging;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfRemoveCurse;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfRetribution;
+import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfStasis;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfTeleportation;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfTerror;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfTransmutation;
@@ -82,6 +83,9 @@ public abstract class ExoticScroll extends Scroll {
 		
 		regToExo.put(ScrollOfTransmutation.class, ScrollOfMetamorphosis.class);
 		exoToReg.put(ScrollOfMetamorphosis.class, ScrollOfTransmutation.class);
+
+		regToExo.put(ScrollOfStasis.class, ScrollOfTimeFreeze.class);
+		exoToReg.put(ScrollOfTimeFreeze.class, ScrollOfStasis.class);
 	}
 	
 	@Override

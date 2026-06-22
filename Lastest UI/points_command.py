@@ -22,6 +22,7 @@ Usage:
   wand:     python points_command.py wand <username>  (weighted random cursed-wand effect; legacy tier arg optional)
   superchat: python points_command.py superchat <microAmount> <currencyCode> <username> [isSubscribed 0|1] [userIsSponsor 0|1] [topFarder 0|1]
   cheer:    python points_command.py cheer <bits> <username> [isSubscribed 0|1] [userIsSponsor 0|1] [topFarder 0|1]
+  giftmembership: python points_command.py giftmembership <username> [tier] [isSubscribed 0|1] [userIsSponsor 0|1] [topFarder 0|1]
 
 All spend commands write to spawn_result.txt (ok or ok|extra|pts). The last value is remaining points. Donation writes to donation_result.txt.
 Transmute uses four fields: ok|<original_item_name>|<result_item_name>|<points> (original may be empty if the game build omits it).
@@ -92,10 +93,91 @@ def donation_earn_multiplier(is_subscribed=False, is_sponsor=False, top_farder=F
     return m
 
 
+def _parse_positive_int(s, default=0):
+    if s is None:
+        return default
+    t = str(s).strip().replace(",", "")
+    if not t:
+        return default
+    try:
+        return max(0, int(float(t)))
+    except ValueError:
+        return default
+
+
+def _parse_micro_amount(s):
+    """Super Chat amount: micro-units (1_000_000 = $1) or decimal/whole dollars."""
+    if s is None:
+        return 0
+    t = str(s).strip().replace(",", "").replace("$", "")
+    if not t:
+        return 0
+    try:
+        if "." in t:
+            return max(0, int(round(float(t) * 1_000_000)))
+        v = int(t)
+        if v < 10000:
+            return v * 1_000_000
+        return v
+    except ValueError:
+        try:
+            return max(0, int(round(float(t) * 1_000_000)))
+        except ValueError:
+            return 0
+
+
+def _looks_like_tier(s):
+    t = str(s).strip().lower()
+    return "tier" in t or t in ("prime", "1", "2", "3", "1000", "2000", "3000")
+
+
+def gift_sub_points(tier_str, cfg):
+    """Points for one gifted sub/membership (configurable per tier)."""
+    tier = (tier_str or "tier 1").strip().lower()
+    if "tier 3" in tier or tier in ("3", "3000"):
+        base = int(cfg.get("points_per_gift_sub_tier3", 2500))
+    elif "tier 2" in tier or tier in ("2", "2000"):
+        base = int(cfg.get("points_per_gift_sub_tier2", 1000))
+    elif "prime" in tier:
+        base = int(cfg.get("points_per_gift_sub_prime", cfg.get("points_per_gift_sub_tier1", 500)))
+    else:
+        base = int(cfg.get("points_per_gift_sub_tier1", cfg.get("points_per_gift_membership", 500)))
+    return base
+
+
+def award_donation_points(username, to_add, is_subscribed=False, is_sponsor=False, top_farder=False):
+    """Add donation points. Returns (result_file, message)."""
+    if not username or str(username).strip().lower() in ("", "anonymous"):
+        return DONATION_RESULT_FILE, "skip|0"
+    to_add = max(0, int(to_add))
+    if to_add <= 0:
+        return DONATION_RESULT_FILE, "ok|0"
+    to_add *= donation_earn_multiplier(is_subscribed, is_sponsor, top_farder)
+    key = str(username).strip().lower()
+    try:
+        with points_lock():
+            data = read_points()
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            pts += to_add
+            data[key] = (pts, last, donation_pts + to_add, role)
+            write_points(data)
+        return DONATION_RESULT_FILE, f"ok|{to_add}"
+    except TimeoutError:
+        return DONATION_RESULT_FILE, "Points file busy. Please try again in a moment."
+
+
+def _donation_flags_from_args(args, start_idx):
+    """Parse optional [isSubscribed] [userIsSponsor] [topFarder] from tail of args."""
+    is_sub = _arg_bool(args[start_idx], False) if len(args) > start_idx else False
+    is_sponsor = _arg_bool(args[start_idx + 1], False) if len(args) > start_idx + 1 else False
+    top_farder = _arg_bool(args[start_idx + 2], False) if len(args) > start_idx + 2 else False
+    return is_sub, is_sponsor, top_farder
+
+
 NATIVE_DEPTH = {
     "rat": 1, "albino": 1, "snake": 1, "gnoll": 2, "crab": 3, "slime": 4,
     "swarm": 3, "thief": 4, "skeleton": 6, "dm100": 7, "guard": 7,
-    "necromancer": 8, "bat": 9, "brute": 11, "shaman": 11, "spinner": 12,
+    "necromancer": 8, "bat": 11, "brute": 11, "shaman": 11, "spinner": 12,
     "ghoul": 14, "elemental": 16, "warlock": 16, "monk": 17, "golem": 18,
     "succubus": 19, "eye": 21, "scorpio": 23,
 }
@@ -1343,67 +1425,44 @@ def cmd_superchat(args):
             f.write(f"{datetime.datetime.now().isoformat()} args={args!r} len={len(args)}\n")
     if len(args) < 3:
         return DONATION_RESULT_FILE, "invalid|0"
-    try:
-        micro_amount = int(args[0])
-        currency = (args[1] or "USD").upper()[:3]
-    except (ValueError, IndexError):
-        return DONATION_RESULT_FILE, "invalid|0"
+    micro_amount = _parse_micro_amount(args[0])
+    currency = (args[1] or "USD").upper()[:3]
     username = args[2]
-    if not username or username.lower() == "anonymous":
-        return DONATION_RESULT_FILE, "skip|0"
-    is_sub = _arg_bool(args[3], False) if len(args) > 3 else False
-    is_sponsor = _arg_bool(args[4], False) if len(args) > 4 else False
-    top_farder = _arg_bool(args[5], False) if len(args) > 5 else False
+    is_sub, is_sponsor, top_farder = _donation_flags_from_args(args, 3)
 
-    key = username.lower()
     amount_in_currency = micro_amount / 1_000_000
     rate = fetch_usd_rate(currency)
     amount_usd = amount_in_currency * rate
     to_add = max(0, int(round(amount_usd * 100)))
-    if to_add <= 0:
-        return DONATION_RESULT_FILE, "ok|0"
-    to_add *= donation_earn_multiplier(is_sub, is_sponsor, top_farder)
-    try:
-        with points_lock():
-            data = read_points()
-            pts, last, donation_pts, role = _get_user_data(data, key)
-            pts += to_add
-            data[key] = (pts, last, donation_pts + to_add, role)
-            write_points(data)
-        return DONATION_RESULT_FILE, f"ok|{to_add}"
-    except TimeoutError:
-        return DONATION_RESULT_FILE, "Points file busy. Please try again in a moment."
+    return award_donation_points(username, to_add, is_sub, is_sponsor, top_farder)
 
 
 def cmd_cheer(args):
     if len(args) < 2:
         return DONATION_RESULT_FILE, "invalid|0"
-    try:
-        bits = max(0, int(args[0]))
-    except ValueError:
-        return DONATION_RESULT_FILE, "invalid|0"
+    bits = _parse_positive_int(args[0], 0)
     username = args[1]
-    if not username or username.lower() == "anonymous":
-        return DONATION_RESULT_FILE, "skip|0"
-    is_sub = _arg_bool(args[2], False) if len(args) > 2 else False
-    is_sponsor = _arg_bool(args[3], False) if len(args) > 3 else False
-    top_farder = _arg_bool(args[4], False) if len(args) > 4 else False
+    is_sub, is_sponsor, top_farder = _donation_flags_from_args(args, 2)
+    return award_donation_points(username, bits, is_sub, is_sponsor, top_farder)
 
-    key = username.lower()
-    to_add = bits
-    if to_add <= 0:
-        return DONATION_RESULT_FILE, "ok|0"
-    to_add *= donation_earn_multiplier(is_sub, is_sponsor, top_farder)
-    try:
-        with points_lock():
-            data = read_points()
-            pts, last, donation_pts, role = _get_user_data(data, key)
-            pts += to_add
-            data[key] = (pts, last, donation_pts + to_add, role)
-            write_points(data)
-        return DONATION_RESULT_FILE, f"ok|{to_add}"
-    except TimeoutError:
-        return DONATION_RESULT_FILE, "Points file busy. Please try again in a moment."
+
+def cmd_giftmembership(args):
+    """Award points for a gifted sub (Twitch) or gift membership (YouTube).
+
+    Args: <username> [tier] [isSubscribed] [userIsSponsor] [topFarder]
+    Twitch: credit %recipientUserName%. YouTube gift membership: use %gifterUserName% (no recipient in API).
+    """
+    if len(args) < 1:
+        return DONATION_RESULT_FILE, "invalid|0"
+    username = args[0]
+    tier = "tier 1"
+    flag_idx = 1
+    if len(args) > 1 and _looks_like_tier(args[1]):
+        tier = args[1]
+        flag_idx = 2
+    is_sub, is_sponsor, top_farder = _donation_flags_from_args(args, flag_idx)
+    to_add = gift_sub_points(tier, get_config())
+    return award_donation_points(username, to_add, is_sub, is_sponsor, top_farder)
 
 
 def cmd_heal(args):
@@ -1819,6 +1878,9 @@ COMMANDS = {
     "sabotage": cmd_sabotage,
     "superchat": cmd_superchat,
     "cheer": cmd_cheer,
+    "giftmembership": cmd_giftmembership,
+    "gift_membership": cmd_giftmembership,
+    "giftsub": cmd_giftmembership,
 }
 
 
@@ -1826,7 +1888,7 @@ def main():
     args = [a.strip() for a in sys.argv[1:] if a.strip()]
     if len(args) < 1:
         with open(SPAWN_RESULT_FILE, "w", encoding="utf-8") as f:
-            f.write("Usage: points_command.py <spawn|champion|gold|transfer|givepoints|curse|gas|scroll|row|trap|plant|bomb|transmute|bee|ward|corruptally|buff|debuff|wand|heal|cleanse|dew|hex|degrade|sabotage|superchat|cheer> [args...]")
+            f.write("Usage: points_command.py <spawn|champion|gold|transfer|givepoints|curse|gas|scroll|row|trap|plant|bomb|transmute|bee|ward|corruptally|buff|debuff|wand|heal|cleanse|dew|hex|degrade|sabotage|superchat|cheer|giftmembership> [args...]")
         sys.exit(0)
 
     cmd = args[0].lower()

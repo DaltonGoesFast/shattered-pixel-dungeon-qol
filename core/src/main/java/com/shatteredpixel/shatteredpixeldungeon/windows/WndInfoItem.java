@@ -24,6 +24,7 @@ package com.shatteredpixel.shatteredpixeldungeon.windows;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingUI;
 import com.shatteredpixel.shatteredpixeldungeon.ui.ItemSlot;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RenderedTextBlock;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
@@ -43,13 +44,28 @@ public class WndInfoItem extends Window {
 		return INSTANCE != null;
 	}
 
+	/** Active window for layout streaming; game thread only. */
+	public static WndInfoItem activeInstance() {
+		return INSTANCE;
+	}
+
+	/** Top edge of the popup chrome in UI/screen pixels (game thread only). */
+	public int streamTop() {
+		if (camera == null) return 0;
+		return (int) Math.floor(camera.y / camera.zoom + camera.scroll.y);
+	}
+
+	/** Bottom edge of the popup chrome in UI/screen pixels (game thread only). */
+	public int streamBottom() {
+		if (camera == null) return 0;
+		return (int) Math.ceil(streamTop() + camera.screenHeight() / camera.zoom);
+	}
+
 	public WndInfoItem( Heap heap ) {
 
 		super();
 
-		if (INSTANCE != null){
-			INSTANCE.hide();
-		}
+		replaceInstance();
 		INSTANCE = this;
 
 		if (heap.type == Heap.Type.HEAP) {
@@ -64,20 +80,36 @@ public class WndInfoItem extends Window {
 	public WndInfoItem( Item item ) {
 		super();
 
-		if (INSTANCE != null){
-			INSTANCE.hide();
-		}
+		replaceInstance();
 		INSTANCE = this;
 		
 		fillFields( item );
 	}
 
+	/** Hide prior popup without sending a streaming "closed" event (new window follows immediately). */
+	private static void replaceInstance() {
+		if ( INSTANCE != null ) {
+			WndInfoItem old = INSTANCE;
+			INSTANCE = null;
+			old.hide();
+		}
+	}
+
+	@Override
+	public void offset( int xOffset, int yOffset ) {
+		super.offset( xOffset, yOffset );
+		if ( INSTANCE == this ) {
+			StreamingUI.notifyItemInfoLayout();
+		}
+	}
+
 	@Override
 	public void hide() {
-		super.hide();
-		if (INSTANCE == this){
+		if ( INSTANCE == this ) {
 			INSTANCE = null;
+			StreamingUI.notifyItemInfoLayout();
 		}
+		super.hide();
 	}
 
 	private void fillFields(Heap heap ) {
@@ -132,5 +164,6 @@ public class WndInfoItem extends Window {
 		add( info );
 
 		resize( width, (int)(info.bottom() + 2) );
+		StreamingUI.notifyItemInfoLayout();
 	}
 }

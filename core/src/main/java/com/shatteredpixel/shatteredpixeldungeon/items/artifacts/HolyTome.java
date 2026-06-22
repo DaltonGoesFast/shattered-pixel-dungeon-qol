@@ -365,7 +365,7 @@ public class HolyTome extends Artifact {
 
 				if (quickSpell.targetingFlags() != -1 && Dungeon.quickslot.contains(HolyTome.this)){
 					targetingSpell = quickSpell;
-					QuickSlotButton.useTargeting(Dungeon.quickslot.getSlot(HolyTome.this));
+					QuickSlotButton.useTargetingForStorageSlot(Dungeon.quickslot.getSlot(HolyTome.this));
 				}
 			}
 		}

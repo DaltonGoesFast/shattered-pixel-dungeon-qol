@@ -59,9 +59,49 @@ GAME_WS_URL = "ws://127.0.0.1:5001"   # Game streaming port (default in game Set
 USE_GAME_WEBSOCKET = True             # If True, connect to game WS for live data (same shape as inspector)
 GAME_WS_RECONNECT_INTERVAL = 10       # Seconds between reconnect attempts when game isn't running
 
-# OBS Advanced Scene Switcher: send item_info_open / item_info_closed when ui.open_windows changes
-OBS_WS_URL = "ws://127.0.0.1:4455"    # OBS WebSocket (Tools → WebSocket Server Settings)
-USE_OBS_ITEM_INFO_RELAY = True       # If True, send messages to Advanced Scene Switcher when item_info window opens/closes
+# OBS inventory crop: direct SetSourceFilterSettings from game item_info geometry
+OBS_INV_LAYOUT_FILE = os.path.join(SCRIPT_DIR, "obs_inv_layout.json")
+OBS_INV_LAYOUT_EXAMPLE = os.path.join(SCRIPT_DIR, "obs_inv_layout.example.json")
+
+_DEFAULT_OBS_INV_LAYOUT = {
+    "enabled": True,
+    "obs_ws_url": "ws://127.0.0.1:4455",
+    "source_group": "V - INV HUD GROUP",
+    "filter_crop": "Crop/Pad",
+    "source_hud": "V - INV HUD",
+    "filter_mask": "Image Mask/Blend",
+    "crop_top_closed": 683,
+    "crop_top_min": 390,
+    "margin_px": 12,
+    "ui_to_obs_scale": 1.0,
+    "crop_top_boost": 0,
+    "game_top_at_crop_min": 70,
+    "game_top_at_crop_closed": 215,
+    "full_expand_top_max": 85,
+    "full_expand_height_min": 130,
+    "short_box_height_max": 85,
+    "short_box_crop_add": 250,
+    "no_expand_max_height": 100,
+}
+
+
+def load_obs_inv_layout():
+    """Load OBS inv crop settings from obs_inv_layout.json or the example file."""
+    cfg = dict(_DEFAULT_OBS_INV_LAYOUT)
+    for path in (OBS_INV_LAYOUT_FILE, OBS_INV_LAYOUT_EXAMPLE):
+        try:
+            if os.path.exists(path):
+                with open(path, encoding="utf-8") as f:
+                    user = json.load(f)
+                if isinstance(user, dict):
+                    cfg.update(user)
+                break
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"Warning: could not load {path}: {e}")
+    return cfg
+
+
+obs_inv_config = load_obs_inv_layout()
 
 @app.after_request
 def add_headers(response):
@@ -79,9 +119,16 @@ data_lock = threading.Lock()
 
 last_ws_update_time = 0.0   # when we last got data from game WS; parser skips overwrite if recent
 
-# OBS Advanced Scene Switcher relay: track item_info state, queue messages to send
-last_item_info_open = None
-obs_message_queue = queue.Queue()
+# OBS inventory crop relay (direct filter control)
+obs_layout_queue = queue.Queue()
+obs_layout_wakeup = threading.Event()
+snapshot_write_queue = queue.Queue(maxsize=1)
+last_obs_crop_top = None
+last_obs_mask_enabled = None
+last_open_best_crop = None
+last_open_layout_key = None
+last_item_info_ignore_open_until = 0.0
+ITEM_INFO_IGNORE_OPEN_AFTER_CLOSE_SEC = 0.5
 game_ws_received_count = 0
 last_ignored_source_log_time = 0.0
 IGNORED_SOURCE_LOG_INTERVAL = 60.0
@@ -162,13 +209,155 @@ def update_game_data():
         time.sleep(UPDATE_INTERVAL)
 
 
-def _send_obs_message(msg):
-    """Queue a message for the OBS relay thread (e.g. item_info_open, item_info_closed)."""
-    if USE_OBS_ITEM_INFO_RELAY and websocket:
+def _map_game_top_to_crop(item_top, closed, expand_most, top_for_min, top_for_closed, boost):
+    """Map game popup top (Y px) to OBS Crop/Pad top between expand_most and closed."""
+    if top_for_closed <= top_for_min:
+        top_for_closed = top_for_min + 1
+    if item_top <= top_for_min:
+        crop = expand_most
+    elif item_top >= top_for_closed:
+        crop = closed
+    else:
+        t = (item_top - top_for_min) / (top_for_closed - top_for_min)
+        crop = int(round(expand_most + t * (closed - expand_most)))
+    crop = max(expand_most, min(closed, crop + boost))
+    return crop
+
+
+def _compute_obs_crop(item_info):
+    """Return (crop_top, mask_enabled) for OBS Crop/Pad and mask from game item_info bounds.
+
+    crop_top_closed / crop_top_min: OBS Crop/Pad top values (683 closed, 390 largest box).
+    game_top_at_crop_min: game item_info.top when crop should be crop_top_min.
+    game_top_at_crop_closed: game item_info.top when crop should be crop_top_closed.
+    crop_top_boost: added to OBS crop top (positive = less upward expansion).
+    """
+    scale = float(obs_inv_config.get("ui_to_obs_scale", 1.0))
+    closed = int(obs_inv_config.get("crop_top_closed", 683))
+    expand_most = int(obs_inv_config.get("crop_top_min", 390))
+    boost = int(obs_inv_config.get("crop_top_boost", 0))
+    top_for_min = float(obs_inv_config.get("game_top_at_crop_min", 70))
+    top_for_closed = float(obs_inv_config.get("game_top_at_crop_closed", 215))
+    full_expand_top = float(obs_inv_config.get("full_expand_top_max", 85))
+    full_expand_height = float(obs_inv_config.get("full_expand_height_min", 130))
+    short_height = float(obs_inv_config.get("short_box_height_max", 85))
+    short_crop_add = int(obs_inv_config.get("short_box_crop_add", 250))
+
+    if not item_info or not item_info.get("open"):
+        return closed, True
+
+    item_top = float(item_info.get("top", 0)) * scale
+    height = float(item_info.get("height", 0)) * scale
+    inv_top = float(item_info.get("inv_top", 0)) * scale
+    no_expand_max_height = float(obs_inv_config.get("no_expand_max_height", 100))
+
+    # Popups this tall or shorter (e.g. Cursed Metal Shard) need no crop/mask change
+    if height > 0 and height <= no_expand_max_height:
+        return closed, True
+
+    if obs_inv_config.get("skip_expand_above_inv", False) and inv_top > 0:
+        item_bottom = float(item_info.get("bottom", 0)) * scale
+        if item_bottom <= inv_top:
+            return closed, False
+
+    crop_top = _map_game_top_to_crop(
+        item_top, closed, expand_most, top_for_min, top_for_closed, boost
+    )
+    # Kinetic-staff class: high on screen + tall -> full expansion (390)
+    if item_top <= full_expand_top and height >= full_expand_height:
+        crop_top = min(crop_top, expand_most)
+    # Short popups (e.g. top~213 height~61): stay near closed
+    elif height <= short_height:
+        crop_top = max(crop_top, expand_most + short_crop_add)
+    return crop_top, False
+
+
+def _queue_obs_layout(update):
+    """Keep only the latest pending OBS layout update (drop stale queued items)."""
+    try:
+        while True:
+            obs_layout_queue.get_nowait()
+    except queue.Empty:
+        pass
+    try:
+        obs_layout_queue.put_nowait(update)
+    except queue.Full:
+        pass
+    obs_layout_wakeup.set()
+
+
+def _enqueue_snapshot_write(data):
+    """Write game_summary off the WS thread so ui_layout is never blocked by fsync."""
+    try:
+        while True:
+            snapshot_write_queue.get_nowait()
+    except queue.Empty:
+        pass
+    try:
+        snapshot_write_queue.put_nowait(data)
+    except queue.Full:
+        pass
+
+
+def snapshot_writer_thread():
+    """Background writer for game_summary.json / .txt from 1 Hz snapshots."""
+    while True:
+        data = snapshot_write_queue.get()
         try:
-            obs_message_queue.put_nowait(msg)
-        except queue.Full:
-            pass
+            with open(GAME_SUMMARY_JSON, "w", encoding='utf-8') as f:
+                json.dump(data, f, indent=4)
+                f.flush()
+                os.fsync(f.fileno())
+            summary_text = parser.generate_summary_text(data)
+            with open(GAME_SUMMARY_TXT, "w", encoding='utf-8') as f:
+                f.write(summary_text)
+                f.flush()
+                os.fsync(f.fileno())
+        except Exception as e:
+            print(f"Error writing game_summary from WS: {e}")
+
+
+def _apply_obs_inv_layout(item_info, force=False, *, immediate=False):
+    """Queue OBS filter updates when crop or mask state changes."""
+    global last_obs_crop_top, last_obs_mask_enabled, last_open_best_crop, last_open_layout_key
+    global last_item_info_ignore_open_until
+    if not obs_inv_config.get("enabled", True) or not websocket:
+        return
+    now = time.time()
+    is_open = bool(item_info and item_info.get("open"))
+    if is_open and now < last_item_info_ignore_open_until:
+        return
+    if not is_open:
+        last_item_info_ignore_open_until = now + ITEM_INFO_IGNORE_OPEN_AFTER_CLOSE_SEC
+        last_open_best_crop = None
+        last_open_layout_key = None
+    crop_top, mask_enabled = _compute_obs_crop(item_info)
+    computed = crop_top
+    if is_open:
+        layout_key = (
+            int(round(float(item_info.get("top", 0)))),
+            int(round(float(item_info.get("height", 0)))),
+        )
+        if layout_key != last_open_layout_key:
+            last_open_layout_key = layout_key
+            last_open_best_crop = None
+        if last_open_best_crop is None:
+            last_open_best_crop = crop_top
+        else:
+            last_open_best_crop = min(last_open_best_crop, crop_top)
+        crop_top = last_open_best_crop
+    if not force and not immediate and crop_top == last_obs_crop_top and mask_enabled == last_obs_mask_enabled:
+        return
+    state = "open" if is_open else "closed"
+    extra = f" computed={computed}" if is_open and computed != crop_top else ""
+    print(
+        f"OBS inv crop: {state} top={crop_top} mask={mask_enabled}{extra} "
+        f"(game top={item_info.get('top') if item_info else None} "
+        f"height={item_info.get('height') if item_info else None})"
+    )
+    last_obs_crop_top = crop_top
+    last_obs_mask_enabled = mask_enabled
+    _queue_obs_layout({"crop_top": crop_top, "mask_enabled": mask_enabled})
 
 
 def _load_score_data():
@@ -219,7 +408,7 @@ def _handle_score_event(data):
 
 def _game_ws_on_message(ws, message):
     """Handle message from game WebSocket: update live data (same JSON shape as inspector)."""
-    global current_game_data, last_ws_update_time, last_item_info_open, game_ws_received_count
+    global current_game_data, last_ws_update_time, last_obs_crop_top, game_ws_received_count
     try:
         data = json.loads(message)
         # Handle spawn/gold result (game reports success/failure)
@@ -332,6 +521,9 @@ def _game_ws_on_message(ws, message):
         if data.get('type') in ('hero_died', 'boss_slain') and data.get('source') == 'shattered-pixel-dungeon':
             _handle_score_event(data)
             return
+        if data.get('type') == 'ui_layout' and data.get('source') == 'shattered-pixel-dungeon':
+            _apply_obs_inv_layout(data.get('item_info'), force=True, immediate=True)
+            return
         if data.get('source') != 'shattered-pixel-dungeon':
             global last_ignored_source_log_time
             now = time.time()
@@ -344,32 +536,7 @@ def _game_ws_on_message(ws, message):
         last_ws_update_time = time.time()
         with data_lock:
             current_game_data = data
-        try:
-            with open(GAME_SUMMARY_JSON, "w", encoding='utf-8') as f:
-                json.dump(data, f, indent=4)
-                f.flush()
-                os.fsync(f.fileno())
-            # Generate text summary (parser expects same shape as game_summary.json)
-            summary_text = parser.generate_summary_text(data)
-            with open(GAME_SUMMARY_TXT, "w", encoding='utf-8') as f:
-                f.write(summary_text)
-                f.flush()
-                os.fsync(f.fileno())
-        except Exception as e:
-            print(f"Error writing game_summary from WS: {e}")
-        # OBS Advanced Scene Switcher: send item_info_open / item_info_closed when state changes
-        if USE_OBS_ITEM_INFO_RELAY:
-            ui = data.get('ui') or {}
-            open_windows = ui.get('open_windows') or []
-            item_info_open = 'item_info' in open_windows
-            if last_item_info_open is None:
-                # First valid snapshot - send current state so ASS starts in correct state
-                msg = 'item_info_open' if item_info_open else 'item_info_closed'
-                _send_obs_message(msg)
-            elif item_info_open != last_item_info_open:
-                msg = 'item_info_open' if item_info_open else 'item_info_closed'
-                _send_obs_message(msg)
-            last_item_info_open = item_info_open
+        _enqueue_snapshot_write(data)
     except Exception as e:
         print(f"Game WS message error: {e}")
 
@@ -402,14 +569,45 @@ def double_points_countdown_thread():
         time.sleep(1.0)
 
 
+def _obs_ws_send(ws, request_type, request_data, wait_response=False):
+    """Send one OBS WebSocket v5 request. Layout updates skip waiting for faster swaps."""
+    req_id = f'spd-{uuid.uuid4()}'
+    ws.send(json.dumps({
+        'op': 6,
+        'd': {
+            'requestType': request_type,
+            'requestId': req_id,
+            'requestData': request_data,
+        }
+    }))
+    if not wait_response:
+        return None
+    try:
+        ws.settimeout(2.0)
+        while True:
+            raw = ws.recv()
+            msg = json.loads(raw)
+            if msg.get('op') == 7 and msg.get('d', {}).get('requestId') == req_id:
+                return msg.get('d', {})
+    except Exception:
+        return None
+    finally:
+        try:
+            ws.settimeout(None)
+        except Exception:
+            pass
+    return None
+
+
 def obs_relay_thread():
-    """Connect to OBS WebSocket and send Advanced Scene Switcher messages from the queue."""
+    """Connect to OBS WebSocket and apply inventory Crop/Pad + mask from the layout queue."""
     last_obs_error_print = 0.0
     OBS_ERROR_THROTTLE = 60.0  # seconds
-    while USE_OBS_ITEM_INFO_RELAY and websocket:
+    obs_url = obs_inv_config.get('obs_ws_url', 'ws://127.0.0.1:4455')
+    while obs_inv_config.get('enabled', True) and websocket:
         try:
-            ws = websocket.create_connection(OBS_WS_URL)
-            last_obs_error_print = 0.0  # reset once connected
+            ws = websocket.create_connection(obs_url)
+            last_obs_error_print = 0.0
             msg = json.loads(ws.recv())
             if msg.get('op') != 0:
                 ws.close()
@@ -425,46 +623,69 @@ def obs_relay_thread():
                 time.sleep(5)
                 continue
             while True:
+                obs_layout_wakeup.wait(timeout=1.0)
+                obs_layout_wakeup.clear()
+                update = None
                 try:
-                    message = obs_message_queue.get(timeout=0.5)
+                    update = obs_layout_queue.get_nowait()
+                    while True:
+                        update = obs_layout_queue.get_nowait()
                 except queue.Empty:
+                    pass
+                if update is None:
                     continue
-                req = {
-                    'op': 6,
-                    'd': {
-                        'requestType': 'CallVendorRequest',
-                        'requestId': f'spd-{uuid.uuid4()}',
-                        'requestData': {
-                            'vendorName': 'AdvancedSceneSwitcher',
-                            'requestType': 'AdvancedSceneSwitcherMessage',
-                            'requestData': {'message': message}
-                        }
-                    }
-                }
-                ws.send(json.dumps(req))
+                crop_top = update['crop_top']
+                mask_enabled = update['mask_enabled']
+                _obs_ws_send(ws, 'SetSourceFilterSettings', {
+                    'sourceName': obs_inv_config['source_group'],
+                    'filterName': obs_inv_config['filter_crop'],
+                    'filterSettings': {'top': crop_top},
+                    'overlay': True,
+                }, wait_response=False)
+                _obs_ws_send(ws, 'SetSourceFilterEnabled', {
+                    'sourceName': obs_inv_config['source_hud'],
+                    'filterName': obs_inv_config['filter_mask'],
+                    'filterEnabled': mask_enabled,
+                }, wait_response=False)
+                try:
+                    ws.settimeout(0)
+                    while True:
+                        ws.recv()
+                except Exception:
+                    pass
+                finally:
+                    try:
+                        ws.settimeout(None)
+                    except Exception:
+                        pass
         except Exception as e:
             now = time.time()
             is_refused = (getattr(e, 'errno', None) == 10061 or 'refused' in str(e).lower())
             if is_refused and (now - last_obs_error_print) < OBS_ERROR_THROTTLE:
-                pass  # skip log when OBS not running
+                pass
             else:
                 if is_refused:
                     last_obs_error_print = now
-                print(f"OBS relay error: {e}")
+                print(f"OBS inv layout error: {e}")
         time.sleep(5)
 
 
 def game_ws_thread():
     """Connect to game WebSocket and keep receiving; reconnect on disconnect."""
-    global last_item_info_open, game_ws_received_count, game_ws_app
+    global last_obs_crop_top, last_obs_mask_enabled, game_ws_received_count, game_ws_app
     last_error_print = -999.0  # So first failure prints immediately
     while USE_GAME_WEBSOCKET and websocket:
         try:
             def on_open(conn):
                 pass
             def on_close(conn, code, reason):
-                global last_item_info_open, game_ws_received_count, game_ws_app
-                last_item_info_open = None
+                global last_obs_crop_top, last_obs_mask_enabled, last_open_best_crop, last_open_layout_key
+                global last_item_info_ignore_open_until, game_ws_received_count, game_ws_app
+                last_obs_crop_top = None
+                last_obs_mask_enabled = None
+                last_open_best_crop = None
+                last_open_layout_key = None
+                last_item_info_ignore_open_until = 0.0
                 game_ws_received_count = 0
                 game_ws_app = None
             def on_error(ws, err):
@@ -2186,6 +2407,88 @@ def wand_command():
         return jsonify({'ok': False, 'error': str(e)}), 400
 
 
+def _donation_json_response(result_msg):
+    """Parse points_command donation result (ok|N, skip|0, invalid|0) into JSON."""
+    parts = (result_msg or "").split("|", 1)
+    status = parts[0].strip().lower() if parts else "error"
+    added = 0
+    if len(parts) > 1:
+        try:
+            added = int(parts[1].strip())
+        except ValueError:
+            added = 0
+    if status == "ok":
+        return jsonify({"ok": True, "pointsAdded": added, "result": result_msg})
+    if status == "skip":
+        return jsonify({"ok": False, "skipped": True, "reason": "anonymous or empty username", "result": result_msg})
+    if status == "invalid":
+        return jsonify({"ok": False, "error": "invalid arguments", "result": result_msg}), 400
+    return jsonify({"ok": False, "error": result_msg, "result": result_msg}), 503
+
+
+@app.route('/api/donation/superchat', methods=['POST', 'OPTIONS'])
+def donation_superchat_api():
+    """Award Super Chat points (same logic as points_command.py superchat)."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        from points_command import cmd_superchat
+        body = request.get_json(force=True, silent=True) or {}
+        args = [
+            str(body.get('microAmount') or body.get('micro_amount') or ''),
+            str(body.get('currencyCode') or body.get('currency') or 'USD'),
+            str(body.get('username') or body.get('userName') or ''),
+        ]
+        for key in ('isSubscribed', 'is_subscribed', 'userIsSponsor', 'user_is_sponsor', 'topFarder', 'top_farder'):
+            if key in body:
+                args.append(str(body[key]))
+        _, msg = cmd_superchat(args)
+        return _donation_json_response(msg)
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route('/api/donation/cheer', methods=['POST', 'OPTIONS'])
+def donation_cheer_api():
+    """Award Twitch cheer/bits points."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        from points_command import cmd_cheer
+        body = request.get_json(force=True, silent=True) or {}
+        args = [
+            str(body.get('bits') or body.get('amount') or 0),
+            str(body.get('username') or body.get('userName') or ''),
+        ]
+        for key in ('isSubscribed', 'is_subscribed', 'userIsSponsor', 'user_is_sponsor', 'topFarder', 'top_farder'):
+            if key in body:
+                args.append(str(body[key]))
+        _, msg = cmd_cheer(args)
+        return _donation_json_response(msg)
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route('/api/donation/gift-membership', methods=['POST', 'OPTIONS'])
+def donation_gift_membership_api():
+    """Award points for gifted sub / gift membership."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        from points_command import cmd_giftmembership
+        body = request.get_json(force=True, silent=True) or {}
+        args = [str(body.get('username') or body.get('userName') or '')]
+        if body.get('tier'):
+            args.append(str(body['tier']))
+        for key in ('isSubscribed', 'is_subscribed', 'userIsSponsor', 'user_is_sponsor', 'topFarder', 'top_farder'):
+            if key in body:
+                args.append(str(body[key]))
+        _, msg = cmd_giftmembership(args)
+        return _donation_json_response(msg)
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @app.route('/api/double-points-remaining')
 def double_points_remaining():
     """Return 2x points countdown for OBS Browser Source."""
@@ -2260,9 +2563,10 @@ if __name__ == '__main__':
     
     # Start game WebSocket relay when enabled (transmit data to HTTP /api/game-data and game_summary.json)
     if USE_GAME_WEBSOCKET and websocket:
+        threading.Thread(target=snapshot_writer_thread, daemon=True).start()
         threading.Thread(target=game_ws_thread, daemon=True).start()
-    # Start OBS relay when enabled (sends item_info_open / item_info_closed to Advanced Scene Switcher)
-    if USE_OBS_ITEM_INFO_RELAY and websocket:
+    # OBS inventory crop relay (direct filter control from game geometry)
+    if obs_inv_config.get('enabled', True) and websocket:
         threading.Thread(target=obs_relay_thread, daemon=True).start()
     # Double points countdown for OBS (writes to double_points_countdown.txt every second)
     threading.Thread(target=double_points_countdown_thread, daemon=True).start()
@@ -2284,8 +2588,8 @@ if __name__ == '__main__':
     print(f"Add this URL as a Browser Source in OBS")
     if USE_GAME_WEBSOCKET and websocket:
         print(f"Game WebSocket: {GAME_WS_URL} (live data → /api/game-data, game_summary.txt/json)")
-    if USE_OBS_ITEM_INFO_RELAY and websocket:
-        print(f"OBS Item Info Relay: {OBS_WS_URL} (item_info_open / item_info_closed → Advanced Scene Switcher)")
+    if obs_inv_config.get('enabled', True) and websocket:
+        print(f"OBS Inv Layout: {obs_inv_config.get('obs_ws_url')} (dynamic Crop/Pad via obs_inv_layout.json)")
     print(f"Chat spawn: POST /api/spawn-command {{\"monster\": \"rat\"}} (cooldown: {SPAWN_COOLDOWN_SEC}s)")
     print(f"Connection test: GET /api/game-ping (returns version if game connected)")
     print(f"Streamer vs Chat: {STREAMER_CHAT_SCORE_TXT} (OBS Read from file)")

@@ -24,8 +24,10 @@ package com.shatteredpixel.shatteredpixeldungeon.actors.mobs;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ChatSpawned;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Cripple;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Light;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SpawnScaled;
 import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.Potion;
@@ -37,6 +39,21 @@ import com.watabou.utils.Random;
 import com.watabou.utils.Reflection;
 
 public class Scorpio extends Mob {
+
+	private static final int CHAT_DAMAGE_MIN = 24;
+	private static final int CHAT_DAMAGE_MAX = 32;
+	private static final float CHAT_CRIPPLE_DURATION = 5f;
+	private static final float CHAT_ATTACK_SKILL_SCALE_FLOOR = 0.33f;
+	private static final int CHAT_ATTACK_SKILL_MIN = 9;
+
+	private boolean isChatSpawned() {
+		return buff( ChatSpawned.class ) != null;
+	}
+
+	private float chatSpawnScale() {
+		SpawnScaled scaled = buff( SpawnScaled.class );
+		return scaled != null ? scaled.scale : 1f;
+	}
 	
 	{
 		spriteClass = ScorpioSprite.class;
@@ -56,11 +73,18 @@ public class Scorpio extends Mob {
 	
 	@Override
 	public int damageRoll() {
+		if ( isChatSpawned() ) {
+			return Random.NormalIntRange( CHAT_DAMAGE_MIN, CHAT_DAMAGE_MAX );
+		}
 		return Random.NormalIntRange( 30, 40 );
 	}
 	
 	@Override
 	public int attackSkill( Char target ) {
+		if ( isChatSpawned() ) {
+			float scale = chatSpawnScale();
+			return Math.max( CHAT_ATTACK_SKILL_MIN, Math.round( 36 * Math.max( CHAT_ATTACK_SKILL_SCALE_FLOOR, scale ) ) );
+		}
 		return 36;
 	}
 	
@@ -78,7 +102,11 @@ public class Scorpio extends Mob {
 	@Override
 	public int attackProc( Char enemy, int damage ) {
 		damage = super.attackProc( enemy, damage );
-		if (Random.Int( 2 ) == 0) {
+		if ( isChatSpawned() ) {
+			if ( Random.Int( 3 ) == 0 ) {
+				Buff.prolong( enemy, Cripple.class, CHAT_CRIPPLE_DURATION );
+			}
+		} else if ( Random.Int( 2 ) == 0 ) {
 			Buff.prolong( enemy, Cripple.class, Cripple.DURATION );
 		}
 		

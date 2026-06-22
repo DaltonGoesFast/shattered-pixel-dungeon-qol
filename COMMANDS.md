@@ -77,11 +77,16 @@ These are **before** half-off when deeper or chapter-gap surcharge (+20% per ste
 
 ## Streamer.bot (points script)
 
-### Super Chat and Cheer (donation points)
+### Super Chat, Cheer, and gift subs (donation points)
+
+These do **not** run by themselves — **Streamer.bot** must call `points_command.py` (or POST to the overlay server) on the matching trigger. See `docs/streamerbot-points-from-scratch.md` **Actions 20, 21, and 40**.
 
 `points_command.py` applies the same stacking multipliers as chat earning: global **!doublepoints** 2×, then **subscriber / member** 2× (`isSubscribed` on Twitch, `userIsSponsor` on YouTube), then optional **top farder** 2×. Pass optional trailing CLI args (default `0`):
 
 - `superchat <microAmount> <currencyCode> <username> [isSubscribed] [userIsSponsor] [topFarder]`
 - `cheer <bits> <username> [isSubscribed] [userIsSponsor] [topFarder]`
+- `giftmembership <username> [tier] [isSubscribed] [userIsSponsor] [topFarder]` — Twitch: `%recipientUserName%`; YouTube gift membership: `%gifterUserName%` (API has no recipient name)
 
-Example args from Streamer.bot: `%rawInput0%` … then `%isSubscribed%`, `%userIsSponsor%`, and `0` or `1` for top farder if you compute it in C#.
+**HTTP alternative** (overlay server must be running): `POST http://127.0.0.1:5000/api/donation/superchat`, `/api/donation/cheer`, `/api/donation/gift-membership` with JSON body (`username`, `microAmount` / `bits` / `tier`, optional flags).
+
+Example Streamer.bot args: `points_command.py superchat %microAmount% %currencyCode% %userName% %isSubscribed% %userIsSponsor% 0` — if real Super Chats get 0 points, try `%user%` instead of `%userName%`, or enable debug via empty `Lastest UI/superchat_debug.txt`.

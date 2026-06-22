@@ -157,6 +157,17 @@ public class Image extends Visual {
 		if (texture == null || (!dirty && buffer == null))
 			return;
 		
+		beforeQuadDrawSetup();
+
+		NoosaScript script = script();
+		
+		renderTexturedQuad( script );
+		
+	}
+
+	/** Visual/matrix prep + vertex sync; callers may draw {@link #renderTexturedQuad(NoosaScript)} multiple times after scissor tweaks. */
+	protected void beforeQuadDrawSetup() {
+
 		super.draw();
 
 		if (dirty) {
@@ -169,19 +180,27 @@ public class Image extends Visual {
 			dirty = false;
 		}
 
-		NoosaScript script = script();
-		
 		texture.bind();
-		
+	}
+
+	/** Sets camera uniforms, tint, and issues the quad draw call. Pair with {@link #beforeQuadDrawSetup()}. */
+	protected void renderTexturedQuad(NoosaScript script) {
+
 		script.camera( camera() );
-		
+		renderTexturedQuadAfterCamera( script );
+
+	}
+
+	/** Quad draw assuming {@link NoosaScript#camera(Camera)} was already applied (or scissor tweaked right after). */
+	protected void renderTexturedQuadAfterCamera(NoosaScript script) {
+
 		script.uModel.valueM4( matrix );
 		script.lighting(
 			rm, gm, bm, am,
 			ra, ga, ba, aa );
 
 		script.drawQuad( buffer );
-		
+
 	}
 
 	protected NoosaScript script(){

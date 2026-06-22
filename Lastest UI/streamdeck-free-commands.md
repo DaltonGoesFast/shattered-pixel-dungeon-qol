@@ -77,6 +77,7 @@ Pattern:
 & "c:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\streamdeck_cost_free.ps1" cost_per_scroll
 & "c:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\streamdeck_cost_free.ps1" cost_per_ring_of_wealth
 & "c:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\streamdeck_cost_free.ps1" cost_per_trap
+# !plant
 & "c:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\streamdeck_cost_free.ps1" cost_per_plant
 & "c:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\streamdeck_cost_free.ps1" cost_per_bomb
 & "c:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\streamdeck_cost_free.ps1" cost_per_transmute

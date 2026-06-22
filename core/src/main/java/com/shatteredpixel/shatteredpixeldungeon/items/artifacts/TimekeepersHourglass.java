@@ -28,6 +28,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Hunger;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.TimeFreeze;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Invisibility;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.MagicImmune;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Regeneration;
@@ -240,7 +241,7 @@ public class TimekeepersHourglass extends Artifact {
 		if (bundle.contains( BUFF )){
 			Bundle buffBundle = bundle.getBundle( BUFF );
 
-			if (buffBundle.contains( timeFreeze.PRESSES ))
+			if (buffBundle.contains( TimeFreeze.PRESSES ))
 				activeBuff = new timeFreeze();
 			else
 				activeBuff = new timeStasis();
@@ -348,16 +349,11 @@ public class TimekeepersHourglass extends Artifact {
 		}
 	}
 
-	public class timeFreeze extends ArtifactBuff {
-		
-		{
-			type = buffType.POSITIVE;
-		}
+	public class timeFreeze extends TimeFreeze {
 
 		float turnsToCost = 2f;
 
-		ArrayList<Integer> presses = new ArrayList<>();
-
+		@Override
 		public void processTime(float time){
 			turnsToCost -= time;
 
@@ -376,84 +372,11 @@ public class TimekeepersHourglass extends Artifact {
 
 		}
 
-		public void setDelayedPress(int cell){
-			if (!presses.contains(cell))
-				presses.add(cell);
-		}
-
-		public void triggerPresses(){
-			ArrayList<Integer> toTrigger = presses;
-			presses = new ArrayList<>();
-			Actor.add(new Actor() {
-				{
-					actPriority = VFX_PRIO;
-				}
-
-				@Override
-				protected boolean act() {
-					for (int cell : toTrigger){
-						Plant p = Dungeon.level.plants.get(cell);
-						if (p != null){
-							p.trigger();
-						}
-						Trap t = Dungeon.level.traps.get(cell);
-						if (t != null){
-							t.trigger();
-						}
-					}
-					Actor.remove(this);
-					return true;
-				}
-			});
-		}
-
-		public void disarmPresses(){
-			for (int cell : presses){
-				Plant p = Dungeon.level.plants.get(cell);
-				if (p != null && !(p instanceof Rotberry)) {
-					Dungeon.level.uproot(cell);
-				}
-				Trap t = Dungeon.level.traps.get(cell);
-				if (t != null && t.disarmedByActivation) {
-					t.disarm();
-				}
-			}
-
-			presses = new ArrayList<>();
-		}
-
 		@Override
 		public void detach(){
 			updateQuickslot();
-			super.detach();
 			activeBuff = null;
-			triggerPresses();
-			target.next();
-		}
-
-		@Override
-		public void fx(boolean on) {
-			if (!(target instanceof Hero)) return;
-			Emitter.freezeEmitters = on;
-			if (on){
-				for (Mob mob : Dungeon.level.mobs.toArray(new Mob[0])) {
-					if (mob.sprite != null) mob.sprite.add(CharSprite.State.PARALYSED);
-				}
-			} else {
-				for (Mob mob : Dungeon.level.mobs.toArray(new Mob[0])) {
-					if (mob.paralysed <= 0) mob.sprite.remove(CharSprite.State.PARALYSED);
-				}
-			}
-		}
-
-		@Override
-		public int icon() {
-			return BuffIndicator.TIME;
-		}
-
-		@Override
-		public void tintIcon(Image icon) {
-			icon.hardlight(1f, 0.5f, 0);
+			super.detach();
 		}
 
 		@Override
@@ -471,29 +394,17 @@ public class TimekeepersHourglass extends Artifact {
 			return Messages.get(this, "desc", Messages.decimalFormat("#.##", Math.max(0, turnsToCost)));
 		}
 
-		private static final String PRESSES = "presses";
 		private static final String TURNSTOCOST = "turnsToCost";
 
 		@Override
 		public void storeInBundle(Bundle bundle) {
 			super.storeInBundle(bundle);
-
-			int[] values = new int[presses.size()];
-			for (int i = 0; i < values.length; i ++)
-				values[i] = presses.get(i);
-			bundle.put( PRESSES , values );
-
 			bundle.put( TURNSTOCOST , turnsToCost);
 		}
 
 		@Override
 		public void restoreFromBundle(Bundle bundle) {
 			super.restoreFromBundle(bundle);
-
-			int[] values = bundle.getIntArray( PRESSES );
-			for (int value : values)
-				presses.add(value);
-
 			turnsToCost = bundle.getFloat( TURNSTOCOST );
 		}
 	}

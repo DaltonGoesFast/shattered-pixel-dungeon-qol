@@ -22,8 +22,10 @@
 package com.shatteredpixel.shatteredpixeldungeon.desktop;
 
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
+import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
@@ -60,6 +62,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Blindness;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Corruption;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ChampionEnemy;
+import com.shatteredpixel.shatteredpixeldungeon.ui.ActionIndicator;
 import com.shatteredpixel.shatteredpixeldungeon.ui.BuffIndicator;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ChatSpawned;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Cripple;
@@ -67,6 +70,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Daze;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Haste;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.WaterOfHealth;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Degrade;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Fury;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Healing;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Hunger;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Hex;
@@ -186,6 +190,7 @@ public final class StreamingCommandHandler {
 	private static final float SPAWN_DELAY = 0f;  // 0 = spawn immediately (was 2f)
 	private static final int SPAWN_RADIUS = 4;  // tiles away from hero (1–4)
 	private static final float MIN_HP_SCALE = 0.25f;  // minimum HP when spawning late-game mobs early
+	private static final float SCORPIO_MIN_HP_SCALE = 0.15f;  // chat scorpios scale down further when spawned early
 
 	/** Earliest depth each monster appears (from MobSpawner). Used to scale HP when spawned in earlier areas. */
 	private static final Map<String, Integer> NATIVE_DEPTH = new HashMap<>();
@@ -194,7 +199,7 @@ public final class StreamingCommandHandler {
 		NATIVE_DEPTH.put("gnoll", 2);     NATIVE_DEPTH.put("crab", 3);     NATIVE_DEPTH.put("slime", 4);
 		NATIVE_DEPTH.put("swarm", 3);     NATIVE_DEPTH.put("thief", 4);    NATIVE_DEPTH.put("skeleton", 6);
 		NATIVE_DEPTH.put("dm100", 7);     NATIVE_DEPTH.put("guard", 7);   NATIVE_DEPTH.put("necromancer", 8);
-		NATIVE_DEPTH.put("bat", 9);       NATIVE_DEPTH.put("brute", 11);  NATIVE_DEPTH.put("shaman", 11);
+		NATIVE_DEPTH.put("bat", 11);      NATIVE_DEPTH.put("brute", 11);  NATIVE_DEPTH.put("shaman", 11);
 		NATIVE_DEPTH.put("spinner", 12);  NATIVE_DEPTH.put("ghoul", 14);  NATIVE_DEPTH.put("elemental", 16);
 		NATIVE_DEPTH.put("warlock", 16); NATIVE_DEPTH.put("monk", 17);    NATIVE_DEPTH.put("golem", 18);
 		NATIVE_DEPTH.put("succubus", 19); NATIVE_DEPTH.put("eye", 21);    NATIVE_DEPTH.put("scorpio", 23);
@@ -202,15 +207,21 @@ public final class StreamingCommandHandler {
 
 	/**
 	 * Whether chat-spawn HP/damage/armor ({@link SpawnScaled}) should be reduced at the current depth.
-	 * Cross-chapter spawns use an earlier region. Within the Sewers, mobs whose natural first floor is 3+
-	 * ({@link MobSpawner}: swarm, crab, slime) also scale when spawned shallower (e.g. crab on 1–2).
+	 * Scales whenever the hero is above the mob's natural first floor (e.g. bat on prison 6–10, brute on prison 10).
 	 */
 	private static boolean shouldApplyChatSpawnStatScaling(Integer nativeDepth) {
-		if (nativeDepth == null || Dungeon.depth >= nativeDepth) return false;
-		int currentRegion = (Dungeon.depth - 1) / 5;
-		int nativeRegion = (nativeDepth - 1) / 5;
-		if (currentRegion < nativeRegion) return true;
-		return nativeDepth >= 3 && nativeDepth <= 5;
+		return nativeDepth != null && Dungeon.depth < nativeDepth;
+	}
+
+	private static void applyChatSpawnStatScaling(Mob mob, Class<? extends Mob> mobClass, Integer nativeDepth) {
+		if (!shouldApplyChatSpawnStatScaling(nativeDepth)) return;
+		float minScale = Scorpio.class.isAssignableFrom(mobClass) ? SCORPIO_MIN_HP_SCALE : MIN_HP_SCALE;
+		float scale = Math.max(minScale, (float) Dungeon.depth / nativeDepth);
+		int newHT = Math.max(1, Math.round(mob.HT * scale));
+		int newHP = Math.max(1, Math.round(mob.HP * scale));
+		mob.HT = newHT;
+		mob.HP = newHP;
+		SpawnScaled.affect(mob, scale);
 	}
 
 	/** Called from main thread via Gdx.app.postRunnable. Returns null on success, error message on failure. */
@@ -255,16 +266,7 @@ public final class StreamingCommandHandler {
 			}
 		}
 
-		// Scale down HP, damage, and armor when spawning before the mob's natural first floor (see shouldApplyChatSpawnStatScaling).
-		Integer nativeDepth = NATIVE_DEPTH.get(monsterName);
-		if (shouldApplyChatSpawnStatScaling(nativeDepth)) {
-			float scale = Math.max(MIN_HP_SCALE, (float) Dungeon.depth / nativeDepth);
-			int newHT = Math.max(1, Math.round(mob.HT * scale));
-			int newHP = Math.max(1, Math.round(mob.HP * scale));
-			mob.HT = newHT;
-			mob.HP = newHP;
-			SpawnScaled.affect(mob, scale);
-		}
+		applyChatSpawnStatScaling(mob, mobClass, NATIVE_DEPTH.get(monsterName));
 
 		int heroPos = Dungeon.hero.pos;
 		boolean[] spawnPassable = new boolean[Dungeon.level.length()];
@@ -344,15 +346,7 @@ public final class StreamingCommandHandler {
 			}
 		}
 
-		Integer nativeDepth = NATIVE_DEPTH.get(monsterName);
-		if (shouldApplyChatSpawnStatScaling(nativeDepth)) {
-			float scale = Math.max(MIN_HP_SCALE, (float) Dungeon.depth / nativeDepth);
-			int newHT = Math.max(1, Math.round(mob.HT * scale));
-			int newHP = Math.max(1, Math.round(mob.HP * scale));
-			mob.HT = newHT;
-			mob.HP = newHP;
-			SpawnScaled.affect(mob, scale);
-		}
+		applyChatSpawnStatScaling(mob, mobClass, NATIVE_DEPTH.get(monsterName));
 
 		int heroPos = Dungeon.hero.pos;
 		boolean[] spawnPassable = new boolean[Dungeon.level.length()];
@@ -1289,6 +1283,14 @@ public final class StreamingCommandHandler {
 		return "Degrade";
 	}
 
+	/** Subclass/core mechanics that !sabotage must not strip (e.g. monk energy, combo, duelist charges). */
+	private static boolean isSabotageProtected(Buff b) {
+		if (b.revivePersists) return true;
+		if (b instanceof ActionIndicator.Action) return true;
+		if (b instanceof Fury) return true;
+		return false;
+	}
+
 	/** Chat command: remove one random positive buff. Returns buff name on success, ERR:... on failure. */
 	public static String handleChatSabotage(String username) {
 		if (Dungeon.hero == null || Dungeon.level == null)
@@ -1300,7 +1302,11 @@ public final class StreamingCommandHandler {
 
 		ArrayList<Buff> positives = new ArrayList<>();
 		for (Buff b : Dungeon.hero.buffs()) {
-			if (b.type == Buff.buffType.POSITIVE && b.icon() != BuffIndicator.NONE) positives.add(b);
+			if (b.type == Buff.buffType.POSITIVE
+					&& b.icon() != BuffIndicator.NONE
+					&& !isSabotageProtected(b)) {
+				positives.add(b);
+			}
 		}
 		if (positives.isEmpty())
 			return "ERR:No visible buff to remove";
@@ -1464,14 +1470,14 @@ public final class StreamingCommandHandler {
 		level = Math.max(0, Math.min(level, 99));
 
 		if (clazz == Gold.class) {
-			Item gold = Reflection.newInstance(Gold.class);
-			if (gold == null) return "ERR:Failed to create item";
-			gold.quantity(quantity);
-			if (!gold.collect(hero.belongings.backpack))
-				return "ERR:Inventory full";
-			Item.updateQuickslot();
-			GLog.p(Messages.get(StreamingCommandHandler.class, "streamer_give_item", gold.name()));
-			return gold.name() + " x" + quantity;
+			Dungeon.gold += quantity;
+			Statistics.goldCollected += quantity;
+			Badges.validateGoldCollected();
+			hero.sprite.showStatusWithIcon(CharSprite.NEUTRAL, Integer.toString(quantity), FloatingText.GOLD);
+			Sample.INSTANCE.play(Assets.Sounds.GOLD, 1, 1, Random.Float(0.9f, 1.1f));
+			String detail = quantity + " gold";
+			GLog.p(Messages.get(StreamingCommandHandler.class, "streamer_give_item", detail));
+			return detail;
 		}
 
 		int remaining = quantity;

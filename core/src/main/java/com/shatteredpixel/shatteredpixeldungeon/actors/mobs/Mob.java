@@ -67,7 +67,8 @@ import com.shatteredpixel.shatteredpixeldungeon.effects.particles.ShadowParticle
 import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.MasterThievesArmband;
-import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.TimekeepersHourglass;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.TimeFreeze;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamerBossScroll;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.exotic.ExoticPotion;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.Ring;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfWealth;
@@ -648,7 +649,7 @@ public abstract class Mob extends Char {
 	@Override
 	public void updateSpriteState() {
 		super.updateSpriteState();
-		if (Dungeon.hero.buff(TimekeepersHourglass.timeFreeze.class) != null
+		if (Dungeon.hero.buff(TimeFreeze.class) != null
 				|| Dungeon.hero.buff(Swiftthistle.TimeBubble.class) != null)
 			sprite.add( CharSprite.State.PARALYSED );
 	}
@@ -905,6 +906,8 @@ public abstract class Mob extends Char {
 			}
 
 			rollToDropLoot();
+
+			StreamerBossScroll.tryDrop(this, pos);
 
 			if (cause == Dungeon.hero || cause instanceof Weapon || cause instanceof Weapon.Enchantment){
 				if (Dungeon.hero.hasTalent(Talent.LETHAL_MOMENTUM)

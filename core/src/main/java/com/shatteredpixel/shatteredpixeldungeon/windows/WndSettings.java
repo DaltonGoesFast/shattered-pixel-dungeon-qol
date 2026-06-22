@@ -23,6 +23,7 @@ package com.shatteredpixel.shatteredpixeldungeon.windows;
 
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Chrome;
+import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Languages;
@@ -36,10 +37,12 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.CheckBox;
 import com.shatteredpixel.shatteredpixeldungeon.ui.GameLog;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Icons;
 import com.shatteredpixel.shatteredpixeldungeon.ui.OptionSlider;
+import com.shatteredpixel.shatteredpixeldungeon.ui.HudLayout;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RedButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RenderedTextBlock;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Toolbar;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
+import com.shatteredpixel.shatteredpixeldungeon.utils.TalentAutoPlan;
 import com.watabou.input.ControllerHandler;
 import com.watabou.noosa.ColorBlock;
 import com.watabou.noosa.Game;
@@ -428,6 +431,7 @@ public class WndSettings extends WndTabbed {
 		ColorBlock sep2;
 		CheckBox chkFont;
 		CheckBox chkVibrate;
+		RedButton btnResetHudLayout;
 
 		@Override
 		protected void createChildren() {
@@ -637,6 +641,16 @@ public class WndSettings extends WndTabbed {
 				chkFlipTags.checked(SPDSettings.flipTags());
 				add(chkFlipTags);
 
+				if (HudLayout.isActive()) {
+					btnResetHudLayout = new RedButton(Messages.get(this, "reset_hud_layout"), 9) {
+						@Override
+						protected void onClick() {
+							HudLayout.reset();
+						}
+					};
+					add(btnResetHudLayout);
+				}
+
 				chkShowQuickslotSwapButton = new CheckBox(Messages.get(this, "quickslot_swap_button")) {
 					@Override
 					protected void onClick() {
@@ -676,6 +690,9 @@ public class WndSettings extends WndTabbed {
 				protected void onClick() {
 					super.onClick();
 					SPDSettings.autoTalentPlan(checked());
+					if (checked() && Dungeon.hero != null && Dungeon.hero.isAlive()) {
+						TalentAutoPlan.tryApply( Dungeon.hero );
+					}
 				}
 			};
 			chkAutoTalentPlan.checked(SPDSettings.autoTalentPlan());
@@ -751,6 +768,10 @@ public class WndSettings extends WndTabbed {
 			} else {
 				chkFlipTags.setRect(0, height + GAP, width, BTN_HEIGHT);
 				height = chkFlipTags.bottom();
+				if (btnResetHudLayout != null) {
+					btnResetHudLayout.setRect(0, height + GAP, width, BTN_HEIGHT);
+					height = btnResetHudLayout.bottom();
+				}
 				chkShowQuickslotSwapButton.setRect(0, height + GAP, width, BTN_HEIGHT);
 				height = chkShowQuickslotSwapButton.bottom();
 			}
@@ -915,6 +936,8 @@ public class WndSettings extends WndTabbed {
 		CheckBox chkStreaming;
 		OptionSlider optStreamingPort;
 		CheckBox chkObsChromaMasks;
+		CheckBox chkTransparentVoid;
+		CheckBox chkStreamerBossStasisScroll;
 
 		@Override
 		protected void createChildren() {
@@ -1003,6 +1026,24 @@ public class WndSettings extends WndTabbed {
 				};
 				chkObsChromaMasks.checked(SPDSettings.obsChromaMasks());
 				add(chkObsChromaMasks);
+				chkTransparentVoid = new CheckBox(Messages.get(this, "transparent_void")) {
+					@Override
+					protected void onClick() {
+						super.onClick();
+						SPDSettings.transparentVoidEnabled(checked());
+					}
+				};
+				chkTransparentVoid.checked(SPDSettings.transparentVoidEnabled());
+				add(chkTransparentVoid);
+				chkStreamerBossStasisScroll = new CheckBox(Messages.get(this, "streamer_boss_stasis_scroll")) {
+					@Override
+					protected void onClick() {
+						super.onClick();
+						SPDSettings.streamerBossStasisScroll(checked());
+					}
+				};
+				chkStreamerBossStasisScroll.checked(SPDSettings.streamerBossStasisScroll());
+				add(chkStreamerBossStasisScroll);
 			}
 		}
 
@@ -1046,6 +1087,10 @@ public class WndSettings extends WndTabbed {
 				pos = optStreamingPort.bottom();
 				chkObsChromaMasks.setRect(0, pos + GAP, width, BTN_HEIGHT);
 				pos = chkObsChromaMasks.bottom();
+				chkTransparentVoid.setRect(0, pos + GAP, width, BTN_HEIGHT);
+				pos = chkTransparentVoid.bottom();
+				chkStreamerBossStasisScroll.setRect(0, pos + GAP, width, BTN_HEIGHT);
+				pos = chkStreamerBossStasisScroll.bottom();
 			}
 
 			height = pos;

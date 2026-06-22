@@ -210,7 +210,7 @@ public class Trinity extends ArmorAbility {
 						Dungeon.hero.sprite.operate(Dungeon.hero.pos);
 
 						if (((Item) mindForm).usesTargeting && Dungeon.quickslot.contains(armor)){
-							QuickSlotButton.useTargeting(Dungeon.quickslot.getSlot(armor));
+							QuickSlotButton.useTargetingForStorageSlot(Dungeon.quickslot.getSlot(armor));
 						}
 					}
 				};

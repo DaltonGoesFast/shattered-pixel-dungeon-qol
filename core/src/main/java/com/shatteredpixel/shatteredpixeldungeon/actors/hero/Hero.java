@@ -478,6 +478,11 @@ public class Hero extends Char {
 		return Math.max( 0, talentPointsAvailable( tier ) );
 	}
 
+	/** Level-up talent points only; divine-inspiration bonus is handled in a separate pass. */
+	public int talentPointsAvailableExcludingBonus( int tier ){
+		return Math.max( 0, talentPointsAvailable( tier ) - bonusTalentPoints( tier ) );
+	}
+
 	public ArrayList<String> talentAutoOrderForTier( int tier ) {
 		switch (tier) {
 			case 1: return talentAutoOrderTier1;

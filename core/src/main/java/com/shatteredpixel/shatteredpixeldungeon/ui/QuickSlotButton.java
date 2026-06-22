@@ -335,11 +335,32 @@ public class QuickSlotButton extends Button {
 		slot.setMargins(left, top, right, bottom);
 	}
 
-	public static void useTargeting(int idx){
-		instance[idx].useTargeting();
+	/** Uses targeting for a visible toolbar slot index (0-5). */
+	public static void useTargeting(int displaySlot){
+		if (displaySlot >= 0 && displaySlot < instance.length && instance[displaySlot] != null) {
+			instance[displaySlot].useTargeting();
+		}
+	}
+
+	/** Uses targeting for a quickslot storage index (0-11), e.g. from {@link QuickSlot#getSlot(Item)}. */
+	public static void useTargetingForStorageSlot(int actualSlot){
+		if (actualSlot < 0) {
+			return;
+		}
+		for (int i = 0; i < lastVisible && i < instance.length; i++) {
+			if (instance[i] != null && getActualSlot(i) == actualSlot) {
+				instance[i].useTargeting();
+				return;
+			}
+		}
+		beginTargeting(actualSlot, null);
 	}
 
 	private void useTargeting() {
+		beginTargeting(getActualSlot(slotNum), this);
+	}
+
+	private static void beginTargeting(int actualSlot, QuickSlotButton btn) {
 
 		if (lastTarget != null &&
 				Actor.chars().contains( lastTarget ) &&
@@ -347,16 +368,21 @@ public class QuickSlotButton extends Button {
 				lastTarget.alignment != Char.Alignment.ALLY &&
 				Dungeon.level.heroFOV[lastTarget.pos]) {
 
-			targetingSlot = getActualSlot(slotNum);
+			targetingSlot = actualSlot;
 			CharSprite sprite = lastTarget.sprite;
 
 			if (sprite.parent != null) {
-				sprite.parent.addToFront(crossM);
-				crossM.point(sprite.center(crossM));
+				Image cross = btn != null ? btn.crossM : anyCrossM();
+				if (cross != null) {
+					sprite.parent.addToFront(cross);
+					cross.point(sprite.center(cross));
+				}
 			}
 
-			crossB.point(slot.sprite.center(crossB));
-			crossB.visible = true;
+			if (btn != null) {
+				btn.crossB.point(btn.slot.sprite.center(btn.crossB));
+				btn.crossB.visible = true;
+			}
 
 		} else {
 
@@ -365,6 +391,15 @@ public class QuickSlotButton extends Button {
 
 		}
 
+	}
+
+	private static Image anyCrossM() {
+		for (QuickSlotButton b : instance) {
+			if (b != null) {
+				return b.crossM;
+			}
+		}
+		return null;
 	}
 
 	public static int autoAim(Char target){

@@ -70,8 +70,6 @@ public class MenuPane extends Component {
 	private BitmapText version;
 	private NinePatch versionOverflowBG;
 
-	private DangerIndicator danger;
-
 	public static final int WIDTH = 31;
 
 	@Override
@@ -153,9 +151,6 @@ public class MenuPane extends Component {
 		btnMenu = new MenuButton();
 		add( btnMenu );
 
-		danger = new DangerIndicator();
-		add( danger );
-
 		add( pickedUp = new Toolbar.PickedUpItem());
 	}
 
@@ -221,13 +216,6 @@ public class MenuPane extends Component {
 		obsMaskDepthChallenges.y = y;
 		obsMaskDepthChallenges.size(maskRight - maskLeft, maskBottom - y);
 		obsMaskDepthChallenges.visible = SPDSettings.obsChromaMasks();
-
-		danger.setPos( x + WIDTH - danger.width(), y + bg.height + 1 );
-		float rightEdge = camera.width;
-		if (Game.scene() instanceof PixelScene) {
-			rightEdge = camera.width - ((PixelScene) Game.scene()).getCommonInsets().right;
-		}
-		danger.setSize( rightEdge - danger.left(), danger.height());
 	}
 
 	@Override

@@ -38,6 +38,7 @@ public class TalentAutoPlan {
 				if (order == null || order.isEmpty()) {
 					continue;
 				}
+				int normalBudget = hero.talentPointsAvailableExcludingBonus( tier );
 				for (int i = 0; i < order.size(); i++) {
 					String name = order.get( i );
 					Talent t;
@@ -51,13 +52,14 @@ public class TalentAutoPlan {
 					if (!hero.talents.get( tier - 1 ).containsKey( t )) {
 						continue;
 					}
-					if (hero.talentPointsAvailableForAuto( tier ) <= 0) {
+					if (normalBudget <= 0) {
 						continue;
 					}
 					if (hero.pointsInTalent( t ) >= t.maxPoints()) {
 						continue;
 					}
 					hero.upgradeTalent( t );
+					normalBudget--;
 					hero.appendTalentAutoSpendHistory( tier, name );
 					order.remove( i );
 					i--;
@@ -71,43 +73,39 @@ public class TalentAutoPlan {
 		}
 
 		for (int tier = 1; tier <= Talent.MAX_TALENT_TIERS; tier++) {
-			if (hero.bonusTalentPoints( tier ) > 0) {
-				spendRemainingUsingHistoryOrFallback( hero, tier );
+			if (hero.bonusTalentPoints( tier ) <= 0) {
+				continue;
 			}
+			hero.pruneStaleTalentAutoPlanEntries( tier );
+			ArrayList<String> order = hero.talentAutoOrderForTier( tier );
+			if (order == null || order.isEmpty()) {
+				continue;
+			}
+			spendRemainingBonusPoints( hero, tier );
 		}
 	}
 
 	/**
-	 * Spend divine-inspiration bonus points when the pending queue no longer covers them:
-	 * repeat the recorded auto-plan order, then tier talent order as a last resort.
-	 * <p>
-	 * Only spends up to {@link Hero#bonusTalentPoints(int)} per call &mdash; normal level
-	 * talent points must stay for the queue (first pass) or manual assignment; otherwise
-	 * this fallback would drain the whole tier (e.g. after King's Crown / Tengu's Mask
-	 * clears the queue and history while inspiration is active).
+	 * Spend divine-inspiration bonus points only on remaining queue entries (one per entry).
+	 * Does not use spend history — a queued pip is the only authorization for auto-spend.
 	 */
-	private static void spendRemainingUsingHistoryOrFallback( Hero hero, int tier ) {
+	private static void spendRemainingBonusPoints( Hero hero, int tier ) {
+		ArrayList<String> order = hero.talentAutoOrderForTier( tier );
+		if (order == null || order.isEmpty()) {
+			return;
+		}
 		int bonusBudget = hero.bonusTalentPoints( tier );
 		int guard = 0;
-		while (bonusBudget > 0 && hero.talentPointsAvailable( tier ) > 0 && guard++ < 64) {
+		while (bonusBudget > 0 && hero.talentPointsAvailable( tier ) > 0 && !order.isEmpty() && guard++ < 64) {
 			boolean progressed = false;
-			ArrayList<String> hist = hero.talentAutoSpendHistoryForTier( tier );
-			if (hist != null) {
-				for (String name : hist) {
-					if (tryUpgradeNamed( hero, tier, name )) {
-						progressed = true;
-						bonusBudget--;
-						break;
-					}
-				}
-			}
-			if (!progressed) {
-				for (Talent t : hero.talents.get( tier - 1 ).keySet()) {
-					if (tryUpgradeNamed( hero, tier, t.name() )) {
-						progressed = true;
-						bonusBudget--;
-						break;
-					}
+			for (int i = 0; i < order.size(); i++) {
+				String name = order.get( i );
+				if (tryUpgradeNamed( hero, tier, name )) {
+					hero.appendTalentAutoSpendHistory( tier, name );
+					order.remove( i );
+					progressed = true;
+					bonusBudget--;
+					break;
 				}
 			}
 			if (!progressed) {

@@ -24,10 +24,12 @@ package com.shatteredpixel.shatteredpixeldungeon;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Languages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
+import com.shatteredpixel.shatteredpixeldungeon.ui.HudRegion;
 import com.watabou.noosa.Game;
 import com.watabou.noosa.audio.Music;
 import com.watabou.noosa.audio.Sample;
 import com.watabou.utils.DeviceCompat;
+import com.watabou.utils.GameMath;
 import com.watabou.utils.GameSettings;
 import com.watabou.utils.Point;
 
@@ -240,6 +242,44 @@ public class SPDSettings extends GameSettings {
 	}
 	
 	public static boolean flipTags(){ return getBoolean(KEY_FLIPTAGS, false); }
+
+	// Per-region HUD layout (desktop full UI); offsets in tenths of a pixel, scale in percent (100 = 1.0)
+	private static String hudKey( HudRegion r, String suffix ) {
+		return "hud_" + r.name().toLowerCase() + "_" + suffix;
+	}
+
+	public static void hudOffsetX( HudRegion r, float value ) {
+		put( hudKey( r, "ox" ), Math.round( value * 10 ) );
+	}
+
+	public static float hudOffsetX( HudRegion r ) {
+		return getInt( hudKey( r, "ox" ), 0 ) / 10f;
+	}
+
+	public static void hudOffsetY( HudRegion r, float value ) {
+		put( hudKey( r, "oy" ), Math.round( value * 10 ) );
+	}
+
+	public static float hudOffsetY( HudRegion r ) {
+		return getInt( hudKey( r, "oy" ), 0 ) / 10f;
+	}
+
+	public static void hudScale( HudRegion r, float value ) {
+		put( hudKey( r, "scale" ), Math.round( value * 100 ) );
+	}
+
+	public static float hudScale( HudRegion r ) {
+		int pct = getInt( hudKey( r, "scale" ), 100 );
+		return GameMath.gate( 75, pct, 150 ) / 100f;
+	}
+
+	public static void resetHudLayout() {
+		for ( HudRegion r : HudRegion.values() ) {
+			hudOffsetX( r, 0 );
+			hudOffsetY( r, 0 );
+			hudScale( r, 1f );
+		}
+	}
 
 	public static void centerOnCycleNoEnemies( boolean value ) {
 		put( KEY_CENTER_ON_CYCLE_NO_ENEMIES, value );
@@ -552,6 +592,8 @@ public class SPDSettings extends GameSettings {
 	public static final String KEY_STREAMING_ENABLED = "streaming_enabled";
 	public static final String KEY_STREAMING_PORT    = "streaming_port";
 	public static final String KEY_OBS_CHROMA_MASKS  = "obs_chroma_masks";
+	/** Transparent undiscovered dungeon void for OBS composite (desktop; requires restart). */
+	public static final String KEY_TRANSPARENT_VOID  = "transparent_void";
 
 	public static void streamingEnabled( boolean value ) {
 		put( KEY_STREAMING_ENABLED, value );
@@ -575,6 +617,24 @@ public class SPDSettings extends GameSettings {
 
 	public static boolean obsChromaMasks() {
 		return getBoolean( KEY_OBS_CHROMA_MASKS, false );
+	}
+
+	public static void transparentVoidEnabled( boolean value ) {
+		put( KEY_TRANSPARENT_VOID, value );
+	}
+
+	public static boolean transparentVoidEnabled() {
+		return getBoolean( KEY_TRANSPARENT_VOID, false );
+	}
+
+	public static final String KEY_STREAMER_BOSS_STASIS_SCROLL = "streamer_boss_stasis_scroll";
+
+	public static void streamerBossStasisScroll( boolean value ) {
+		put( KEY_STREAMER_BOSS_STASIS_SCROLL, value );
+	}
+
+	public static boolean streamerBossStasisScroll() {
+		return getBoolean( KEY_STREAMER_BOSS_STASIS_SCROLL, false );
 	}
 
 	public static final String KEY_AUTO_TALENT_PLAN = "auto_talent_plan";

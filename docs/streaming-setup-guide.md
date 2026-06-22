@@ -100,7 +100,7 @@ A bundled Streamer.bot export is included for parity with the maintainer’s set
 **After importing, do not assume it will work unchanged on your machine.**
 
 1. **Reconcile with the canonical walkthrough** — Step through [streamerbot-points-from-scratch.md](streamerbot-points-from-scratch.md) and compare: commands, **Execute Python** / **Execute C#** steps, URLs like `http://127.0.0.1:5000/...`, and especially **absolute paths** to `points_command.py`, `Lastest UI`, and any files the actions read/write. Update every path to your clone location.
-2. **WebSocket connections** — Imports do not reliably carry working connections to **your** game or OBS. In Streamer.bot, open the **WebSocket Client** (or related) plugins and ensure you have a connection to the **game** stream, typically **`ws://127.0.0.1:5001`** (or whatever port **Settings → Streaming** shows). If you use the OBS Advanced Scene Switcher relay from `server.py`, that targets **`ws://127.0.0.1:4455`** by default — only enable if your OBS WebSocket matches. Recreate or fix these entries after import.
+2. **WebSocket connections** — Imports do not reliably carry working connections to **your** game. In Streamer.bot, open the **WebSocket Client** (or related) plugins and ensure you have a connection to the **game** stream, typically **`ws://127.0.0.1:5001`** (or whatever port **Settings → Streaming** shows). Recreate or fix these entries after import.
 3. **Overlay server** — `python server.py` must be running on port **5000** (or change Streamer.bot HTTP calls to match).
 
 ### 4.2 Streamer.bot: build from scratch
@@ -111,6 +111,19 @@ If you prefer not to use the export, follow [streamerbot-points-from-scratch.md]
 
 - Add a **Browser Source**: `http://localhost:5000/overlay`
 - Optional: `http://localhost:5000/double-points-countdown` for 2× points text, or read `streamer_chat_score.txt` / use `/api/streamer-chat-score` per your layout.
+
+#### Vertical layout: dynamic inventory crop (item info popup)
+
+When the overlay server and game streaming are running, `server.py` drives OBS **Crop/Pad** and the inventory **mask** directly over OBS WebSocket (no Advanced Scene Switcher macros required).
+
+1. Copy `Lastest UI/obs_inv_layout.example.json` to `Lastest UI/obs_inv_layout.json` and set source/filter names to match your scene (`V - INV HUD GROUP`, `V - INV HUD`, etc.).
+2. Enable **WebSocket Server** in OBS (default `ws://127.0.0.1:4455`, no password).
+3. Enable **WebSocket streaming** in game **Settings → Data** and run `python server.py`.
+4. **Disable** old ASS macros (`INV EXPAND UP`, `INV EXPAND UP 2`) so they do not fight the relay.
+
+The game sends immediate `ui_layout` events with popup bounds; the server expands the crop only when the item info window overlaps the cropped HUD strip, and only as much as needed.
+
+**Tuning:** Crop/Pad `top` on `V - INV HUD GROUP`: `crop_top_closed` (**683**), `crop_top_min` (**390** for kinetic staff). Popups with `height` ≤ `no_expand_max_height` (**100**, Cursed Metal Shard size) keep closed crop and mask on. Larger popups use the linear `top` map and disable the mask. Log: `OBS inv crop: open top=... (game top=... height=...)`. Copy `obs_inv_layout.example.json` to `obs_inv_layout.json` for your own values. Set `"enabled": false` to turn the relay off.
 
 **Paths to update** (any machine-specific Streamer.bot step):
 - All `FILE`, `DOUBLE_FILE`, `TOP_FARDER_FILE`, and Python invocations pointing at `Lastest UI`

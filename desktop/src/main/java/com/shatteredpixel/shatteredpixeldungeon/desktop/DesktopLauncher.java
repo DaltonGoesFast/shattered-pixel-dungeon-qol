@@ -201,6 +201,9 @@ public class DesktopLauncher {
 		if (SPDSettings.streamingEnabled()) {
 			StreamingBootstrapper.start(SPDSettings.streamingPort());
 		}
+		if (SPDSettings.transparentVoidEnabled()) {
+			config.setTransparentFramebuffer(true);
+		}
 		new Lwjgl3Application(new ShatteredPixelDungeon(new DesktopPlatformSupport()), config);
 	}
 }

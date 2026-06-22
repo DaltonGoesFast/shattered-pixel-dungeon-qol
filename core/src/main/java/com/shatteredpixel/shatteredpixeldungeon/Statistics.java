@@ -21,6 +21,7 @@
 
 package com.shatteredpixel.shatteredpixeldungeon;
 
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.watabou.utils.Bundle;
 import com.watabou.utils.Random;
 import com.watabou.utils.SparseArray;
@@ -85,6 +86,9 @@ public class Statistics {
 	/** When true, cave floors use {@code 01}-prefixed cave tiles/water for the whole run. */
 	public static boolean cavesAltTileset = false;
 	
+	/** Main chapter bosses that have already dropped a streamer stasis scroll this run. */
+	public static HashSet<Class<? extends Mob>> streamerStasisBossDropped = new HashSet<>();
+	
 	public static void reset() {
 		
 		goldCollected	= 0;
@@ -118,6 +122,8 @@ public class Statistics {
 		spawnersAlive   = 0;
 		
 		duration	    = 0;
+		
+		streamerStasisBossDropped.clear();
 		
 		qualifiedForNoKilling = false;
 		qualifiedForBossRemainsBadge = false;
@@ -192,6 +198,8 @@ public class Statistics {
 	private static final String PRISON_ALT_TILESET = "prison_alt_tileset";
 	private static final String CAVES_ALT_TILESET = "caves_alt_tileset";
 	
+	private static final String STREAMER_STASIS_BOSSES = "streamer_stasis_bosses";
+	
 	public static void storeInBundle( Bundle bundle ) {
 		bundle.put( GOLD,		goldCollected );
 		bundle.put( DEEPEST,	deepestFloor );
@@ -241,6 +249,7 @@ public class Statistics {
 		bundle.put( SEWERS_ALT_TILESET, sewersAltTileset );
 		bundle.put( PRISON_ALT_TILESET, prisonAltTileset );
 		bundle.put( CAVES_ALT_TILESET, cavesAltTileset );
+		bundle.put( STREAMER_STASIS_BOSSES, streamerStasisBossDropped.toArray(new Class[0]) );
 	}
 	
 	public static void restoreFromBundle( Bundle bundle ) {
@@ -306,6 +315,20 @@ public class Statistics {
 		sewersAltTileset = bundle.contains( SEWERS_ALT_TILESET ) && bundle.getBoolean( SEWERS_ALT_TILESET );
 		prisonAltTileset = bundle.contains( PRISON_ALT_TILESET ) && bundle.getBoolean( PRISON_ALT_TILESET );
 		cavesAltTileset = bundle.contains( CAVES_ALT_TILESET ) && bundle.getBoolean( CAVES_ALT_TILESET );
+
+		if (bundle.contains( STREAMER_STASIS_BOSSES )) {
+			Class<?>[] dropped = bundle.getClassArray(STREAMER_STASIS_BOSSES);
+			streamerStasisBossDropped = new HashSet<>();
+			for (Class<?> cls : dropped) {
+				if (cls != null && Mob.class.isAssignableFrom(cls)) {
+					@SuppressWarnings("unchecked")
+					Class<? extends Mob> mobClass = (Class<? extends Mob>) cls;
+					streamerStasisBossDropped.add(mobClass);
+				}
+			}
+		} else {
+			streamerStasisBossDropped.clear();
+		}
 	}
 	
 	public static void preview( GamesInProgress.Info info, Bundle bundle ){

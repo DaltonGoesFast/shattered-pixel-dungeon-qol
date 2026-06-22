@@ -24,6 +24,7 @@ package com.shatteredpixel.shatteredpixeldungeon.tiles;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
+import com.shatteredpixel.shatteredpixeldungeon.utils.TransparentVoid;
 import com.watabou.gltextures.TextureCache;
 import com.watabou.noosa.Image;
 import com.watabou.noosa.NoosaScript;
@@ -113,8 +114,8 @@ public class FogOfWar extends Image {
 		String key = "FogOfWar" + width2 + "x" + height2;
 		texture(TextureCache.create(key, width2, height2));
 
-		//sets contents to all black
-		texture.bitmap.setColor( 0x000000FF );
+		//opaque black by default; transparent when OBS void mode (alpha from pixmap)
+		texture.bitmap.setColor( TransparentVoid.enabled() ? 0x00000000 : 0x000000FF );
 		texture.bitmap.fill();
 
 		texture.bind();
@@ -202,7 +203,7 @@ public class FogOfWar extends Image {
 						//we skip filling cells here if it isn't a full update
 						// because they must already be dark
 						if (fullUpdate)
-							fillCell(fog, j, i, FOG_COLORS[INVISIBLE][brightness]);
+							fillCell(fog, j, i, invisibleFogColor());
 						cell++;
 						continue;
 					}
@@ -212,7 +213,7 @@ public class FogOfWar extends Image {
 						
 						//always dark if nothing is beneath them
 						if (cell + mapWidth >= mapLength) {
-							fillCell(fog, j, i, FOG_COLORS[INVISIBLE][brightness]);
+							fillCell(fog, j, i, invisibleFogColor());
 							
 						//internal wall tiles, need to check both the left and right side,
 						// to account for only one half of them being seen
@@ -226,7 +227,7 @@ public class FogOfWar extends Image {
 									
 									//if below-left is also a wall, then we should be dark no matter what.
 									if (wall(cell + mapWidth - 1)) {
-										fillLeft(fog, j, i, FOG_COLORS[INVISIBLE][brightness]);
+										fillLeft(fog, j, i, invisibleFogColor());
 									} else {
 										fillLeft(fog, j, i, FOG_COLORS[Math.max(getCellFog(cell), Math.max(getCellFog(cell + mapWidth - 1), getCellFog(cell - 1)))][brightness]);
 									}
@@ -236,7 +237,7 @@ public class FogOfWar extends Image {
 								}
 								
 							} else {
-								fillLeft(fog, j, i, FOG_COLORS[INVISIBLE][brightness]);
+								fillLeft(fog, j, i, invisibleFogColor());
 							}
 							
 							//right side
@@ -247,7 +248,7 @@ public class FogOfWar extends Image {
 									
 									//if below-right is also a wall, then we should be dark no matter what.
 									if (wall(cell + mapWidth + 1)) {
-										fillRight(fog, j, i, FOG_COLORS[INVISIBLE][brightness]);
+										fillRight(fog, j, i, invisibleFogColor());
 									} else {
 										fillRight(fog, j, i, FOG_COLORS[Math.max(getCellFog(cell), Math.max(getCellFog(cell + mapWidth + 1), getCellFog(cell + 1)))][brightness]);
 									}
@@ -257,7 +258,7 @@ public class FogOfWar extends Image {
 								}
 								
 							} else {
-								fillRight(fog, j, i, FOG_COLORS[INVISIBLE][brightness]);
+								fillRight(fog, j, i, invisibleFogColor());
 							}
 							
 						//camera-facing wall tiles
@@ -296,6 +297,13 @@ public class FogOfWar extends Image {
 		} else {
 			return INVISIBLE;
 		}
+	}
+
+	private int invisibleFogColor() {
+		if (TransparentVoid.enabled()) {
+			return 0x00000000;
+		}
+		return FOG_COLORS[INVISIBLE][brightness];
 	}
 	
 	private void fillLeft( Pixmap fog, int x, int y, int color){

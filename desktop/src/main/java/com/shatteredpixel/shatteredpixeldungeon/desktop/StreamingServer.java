@@ -68,6 +68,17 @@ public class StreamingServer extends WebSocketServer {
 		broadcast(obj.toString());
 	}
 
+	/** Immediate item info bounds for OBS inventory crop (nested under {@code item_info}). */
+	public void broadcastUILayout( Map<String, Object> itemInfo ) {
+		JsonObject obj = new JsonObject();
+		obj.addProperty( "type", "ui_layout" );
+		obj.addProperty( "source", "shattered-pixel-dungeon" );
+		if ( itemInfo != null ) {
+			obj.add( "item_info", GSON.toJsonTree( itemInfo ) );
+		}
+		broadcast( obj.toString() );
+	}
+
 	/** Echo chatter name on command results so read-only clients (e.g. Godot) don’t rely only on UDP pairing. */
 	private void addChatter(JsonObject resp, String chatter) {
 		if (chatter != null && !chatter.isEmpty()) {

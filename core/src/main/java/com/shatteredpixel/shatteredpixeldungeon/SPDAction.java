@@ -102,6 +102,9 @@ public class SPDAction extends GameAction {
 	public static final GameAction CAMERA_W     = new SPDAction("camera_w");
 	public static final GameAction CAMERA_E     = new SPDAction("camera_e");
 
+	/** Toggle gameplay HUD layout edit mode (desktop full UI). */
+	public static final GameAction HUD_LAYOUT_EDIT = new SPDAction("hud_layout_edit");
+
 	private static final LinkedHashMap<Integer, GameAction> defaultBindings = new LinkedHashMap<>();
 	static {
 		defaultBindings.put( Input.Keys.ESCAPE,         SPDAction.BACK );
@@ -160,6 +163,8 @@ public class SPDAction extends GameAction {
 		defaultBindings.put( Input.Keys.PLUS,           SPDAction.ZOOM_IN );
 		defaultBindings.put( Input.Keys.EQUALS,         SPDAction.ZOOM_IN );
 		defaultBindings.put( Input.Keys.MINUS,          SPDAction.ZOOM_OUT );
+
+		defaultBindings.put( Input.Keys.F8,             SPDAction.HUD_LAYOUT_EDIT );
 	}
 
 	public static LinkedHashMap<Integer, GameAction> getDefaults() {

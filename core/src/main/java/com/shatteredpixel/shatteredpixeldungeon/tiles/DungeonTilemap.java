@@ -23,6 +23,7 @@ package com.shatteredpixel.shatteredpixeldungeon.tiles;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
+import com.shatteredpixel.shatteredpixeldungeon.utils.TransparentVoid;
 import com.watabou.noosa.Image;
 import com.watabou.noosa.TextureFilm;
 import com.watabou.noosa.Tilemap;
@@ -39,6 +40,11 @@ public abstract class DungeonTilemap extends Tilemap {
 
 	public DungeonTilemap(String tex) {
 		super(tex, new TextureFilm( tex, SIZE, SIZE ) );
+	}
+
+	@Override
+	protected boolean needsRender(int pos) {
+		return super.needsRender(pos) && !TransparentVoid.hidesCell(pos);
 	}
 
 	@Override

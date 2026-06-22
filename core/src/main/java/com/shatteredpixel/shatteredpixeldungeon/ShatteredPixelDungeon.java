@@ -21,6 +21,7 @@
 
 package com.shatteredpixel.shatteredpixeldungeon;
 
+import com.badlogic.gdx.Gdx;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.TitleScene;
@@ -52,6 +53,18 @@ public class ShatteredPixelDungeon extends Game {
 				com.shatteredpixel.shatteredpixeldungeon.items.keys.WornKey.class,
 				"com.shatteredpixel.shatteredpixeldungeon.items.keys.SkeletonKey" );
 
+	}
+
+	@Override
+	public void render() {
+		if (DeviceCompat.isDesktop()
+				&& SPDSettings.transparentVoidEnabled()
+				&& scene instanceof GameScene) {
+			Gdx.gl.glClearColor(0, 0, 0, 0);
+		} else {
+			Gdx.gl.glClearColor(0, 0, 0, 1);
+		}
+		super.render();
 	}
 	
 	@Override

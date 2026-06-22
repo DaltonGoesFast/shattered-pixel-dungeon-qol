@@ -71,7 +71,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.Stylus;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.TalismanOfForesight;
-import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.TimekeepersHourglass;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.TimeFreeze;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfStrength;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfUpgrade;
@@ -588,7 +588,7 @@ public abstract class Level implements Bundlable {
 	public static void beforeTransition(){
 
 		//time freeze effects need to resolve their pressed cells before transitioning
-		TimekeepersHourglass.timeFreeze timeFreeze = Dungeon.hero.buff(TimekeepersHourglass.timeFreeze.class);
+		TimeFreeze timeFreeze = Dungeon.hero.buff(TimeFreeze.class);
 		if (timeFreeze != null) timeFreeze.disarmPresses();
 		Swiftthistle.TimeBubble timeBubble = Dungeon.hero.buff(Swiftthistle.TimeBubble.class);
 		if (timeBubble != null) timeBubble.disarmPresses();
@@ -1244,8 +1244,8 @@ public abstract class Level implements Bundlable {
 			break;
 		}
 
-		TimekeepersHourglass.timeFreeze timeFreeze =
-				Dungeon.hero.buff(TimekeepersHourglass.timeFreeze.class);
+		TimeFreeze timeFreeze =
+				Dungeon.hero.buff(TimeFreeze.class);
 
 		Swiftthistle.TimeBubble bubble =
 				Dungeon.hero.buff(Swiftthistle.TimeBubble.class);

@@ -3,7 +3,6 @@
   "cost_per_curse": 100,
   "cost_per_gas": 75,
   "cost_per_scroll": 100,
-  "cost_per_ring_of_wealth": 100,
   "cost_per_trap": 50,
   "cost_per_bomb": 75,
   "cost_per_transmute": 150,
@@ -42,9 +41,11 @@
   "cost_per_heal": 25,
   "cost_per_cleanse": 25,
   "cost_per_dew": 5,
+  "cost_per_plant": 30,
   "cost_per_hex": 75,
   "cost_per_degrade": 75,
   "cost_per_sabotage": 75,
   "cost_per_corrupt_ally": 40,
+  "cost_per_ring_of_wealth": 100,
   "command_allowed_roles": {}
 }
