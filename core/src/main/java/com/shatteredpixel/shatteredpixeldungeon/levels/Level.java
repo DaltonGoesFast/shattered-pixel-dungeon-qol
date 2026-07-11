@@ -588,7 +588,7 @@ public abstract class Level implements Bundlable {
 	public static void beforeTransition(){
 
 		//time freeze effects need to resolve their pressed cells before transitioning
-		TimeFreeze timeFreeze = Dungeon.hero.buff(TimeFreeze.class);
+		TimeFreeze timeFreeze = TimeFreeze.on(Dungeon.hero);
 		if (timeFreeze != null) timeFreeze.disarmPresses();
 		Swiftthistle.TimeBubble timeBubble = Dungeon.hero.buff(Swiftthistle.TimeBubble.class);
 		if (timeBubble != null) timeBubble.disarmPresses();
@@ -1244,8 +1244,7 @@ public abstract class Level implements Bundlable {
 			break;
 		}
 
-		TimeFreeze timeFreeze =
-				Dungeon.hero.buff(TimeFreeze.class);
+		TimeFreeze timeFreeze = TimeFreeze.on(Dungeon.hero);
 
 		Swiftthistle.TimeBubble bubble =
 				Dungeon.hero.buff(Swiftthistle.TimeBubble.class);

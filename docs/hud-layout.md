@@ -37,6 +37,10 @@ While edit mode is active, dungeon input is blocked so you can drag, nudge, and 
 
 Each region renders through its own `Camera` whose zoom equals `uiCamera.zoom × regionScale`, with a scroll offset chosen so the region's natural corner (e.g. bottom-left for the status bar, top-right for the menu) stays fixed in screen space. Because the leaf visuals are untouched, internal animations (HP bar fill, busy spinner, buff icons) keep working at any scale.
 
+## Flip status pane
+
+Settings → UI → **Flip Status Pane** mirrors the `Status` region horizontally — hero portrait, level, and turn wheel move to the right of the HP/EXP bars. Only available on desktop + Large UI. The `STATUS` slot bounds and HUD edit mode behavior are unchanged; the pane still drags as a single unit.
+
 ## Reset
 
 Settings → UI → **Reset HUD layout** restores all regions to default position and scale.

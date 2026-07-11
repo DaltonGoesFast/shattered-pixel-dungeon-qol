@@ -12,12 +12,13 @@ This guide helps you emulate the full streaming setup so you can test and verify
 | **Shattered Pixel Dungeon QoL** | The game (this mod) with streaming enabled |
 | **Streamer.bot** | Connects chat to actions (optional for basic testing) |
 | **OBS Studio** | Displays the overlay; optional for API testing |
+| **Godot companion** (optional) | **SPD Companion 3** at `Documents/spd-companion-3` — polls `/api/summon-march` |
 
 ---
 
 ## 1. Overlay Server
 
-The Flask server exposes **`/api/game-data`**, **`/api/points-config`** (GET/POST), viewer-points APIs (including bulk ops), **`/api/streamer-chat-score`**, double-points endpoints, **`/api/activity-commands`**, and many forwarded chat routes such as **`/api/spawn-command`**, **`/api/champion-command`**, **`/api/gold-command`**, **`/api/trap-command`**, **`/api/transmute-command`**, **`/api/summon-bee-command`**, **`/api/ward-command`**, **`/api/corrupt-ally-command`**, **`/api/heal-command`**, **`/api/hex-command`**, and related spend routes, **`/api/wand-command`**, etc. See `Lastest UI/server.py` for the full list, or open **`http://localhost:5000/ws-inspect`** for a combined inspector.
+The Flask server exposes **`/api/game-data`**, **`/api/points-config`** (GET/POST), viewer-points APIs (including bulk ops), **`/api/streamer-chat-score`**, double-points endpoints, **`/api/activity-commands`**, **`/api/summon-march`** (Godot companion queue), **`/api/top-summoner`**, and many forwarded chat routes such as **`/api/spawn-command`**, **`/api/champion-command`**, **`/api/gold-command`**, **`/api/trap-command`**, **`/api/transmute-command`**, **`/api/summon-bee-command`**, **`/api/ward-command`**, **`/api/corrupt-ally-command`**, **`/api/heal-command`**, **`/api/hex-command`**, and related spend routes, **`/api/wand-command`**, etc. See `Lastest UI/server.py` for the full list, or open **`http://localhost:5000/ws-inspect`** for a combined inspector.
 
 ```bash
 cd "Lastest UI"
@@ -43,6 +44,8 @@ Game WebSocket: ws://127.0.0.1:5001
 | `/overlay` | OBS browser source (game summary overlay) |
 | `/points-config` | Costs (including heal/cleanse/dew/corrupt ally/hex/degrade/sabotage), viewer points table, streamer vs chat score |
 | `/double-points-countdown` | Optional OBS text source for 2× countdown |
+| `/api/summon-march` | Godot companion: poll queued monster marches (`GET ?since=id`) |
+| `/api/top-summoner` | Current session top summoner for OBS |
 | `/ws-inspect` | Live game JSON + config snapshot |
 
 ---
@@ -83,6 +86,16 @@ python points_command.py scroll YourUsername
 curl -X POST http://localhost:5000/api/spawn-command -H "Content-Type: application/json" -d "{\"monster\": \"rat\", \"username\": \"test\"}"
 ```
 - This bypasses the points check (points are enforced in `points_command.py`, not the server). Use for testing spawn delivery only.
+
+### Summon march (Godot companion — no game required)
+```bash
+curl -X POST http://localhost:5000/api/summon-march -H "Content-Type: application/json" -d "{\"username\": \"test\", \"monster\": \"rat\"}"
+curl "http://localhost:5000/api/summon-march"
+curl http://localhost:5000/api/top-summoner
+```
+- Requires overlay server only (game can be offline). Events append to `Lastest UI/summon_march_queue.jsonl`.
+- Streamer.bot setup: [streamerbot-summon-march-apply.md](streamerbot-summon-march-apply.md). System spec: [summon-march-system.md](summon-march-system.md).
+- Viewer-facing copy: [user-facing-summary.md](user-facing-summary.md), [youtube-description.md](youtube-description.md), [twitch-panel.md](twitch-panel.md), [COMMANDS.md](../COMMANDS.md).
 
 ---
 
@@ -126,7 +139,7 @@ The game sends immediate `ui_layout` events with popup bounds; the server expand
 **Tuning:** Crop/Pad `top` on `V - INV HUD GROUP`: `crop_top_closed` (**683**), `crop_top_min` (**390** for kinetic staff). Popups with `height` ≤ `no_expand_max_height` (**100**, Cursed Metal Shard size) keep closed crop and mask on. Larger popups use the linear `top` map and disable the mask. Log: `OBS inv crop: open top=... (game top=... height=...)`. Copy `obs_inv_layout.example.json` to `obs_inv_layout.json` for your own values. Set `"enabled": false` to turn the relay off.
 
 **Paths to update** (any machine-specific Streamer.bot step):
-- All `FILE`, `DOUBLE_FILE`, `TOP_FARDER_FILE`, and Python invocations pointing at `Lastest UI`
+- All `FILE`, `DOUBLE_FILE`, and Python invocations pointing at `Lastest UI`
 - `points_command.py` resolves `viewer_points.txt` and config next to the script (`SCRIPT_DIR`)
 
 ---

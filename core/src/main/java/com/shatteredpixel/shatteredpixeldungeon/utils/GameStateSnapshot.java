@@ -21,15 +21,22 @@
 
 package com.shatteredpixel.shatteredpixeldungeon.utils;
 
+import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Belongings;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroSubClass;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
+import com.shatteredpixel.shatteredpixeldungeon.items.bags.Bag;
+import com.shatteredpixel.shatteredpixeldungeon.items.bags.MagicalHolster;
+import com.shatteredpixel.shatteredpixeldungeon.items.bags.PotionBandolier;
+import com.shatteredpixel.shatteredpixeldungeon.items.bags.ScrollHolder;
+import com.shatteredpixel.shatteredpixeldungeon.items.bags.VelvetPouch;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.Potion;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.Ring;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.Scroll;
@@ -47,9 +54,18 @@ import com.shatteredpixel.shatteredpixeldungeon.scenes.RankingsScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.StartScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.TitleScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.WelcomeScene;
+import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSprite;
+import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSpriteSheet;
+import com.shatteredpixel.shatteredpixeldungeon.ui.BuffIcon;
+import com.shatteredpixel.shatteredpixeldungeon.ui.BuffIndicator;
+import com.shatteredpixel.shatteredpixeldungeon.ui.Icons;
+import com.watabou.noosa.Image;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndBag;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndInfoItem;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndJournal;
+import com.watabou.gltextures.TextureCache;
+import com.watabou.noosa.TextureFilm;
+import com.watabou.utils.RectF;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -64,6 +80,10 @@ import java.util.Map;
 public class GameStateSnapshot {
 
 	private static final String SOURCE_ID = "shattered-pixel-dungeon";
+
+	private static TextureFilm largeBuffFilm;
+	private static int largeBuffTexW;
+	private static int largeBuffTexH;
 
 	public static Map<String, Object> build() {
 		Map<String, Object> out = new LinkedHashMap<>();
@@ -88,12 +108,14 @@ public class GameStateSnapshot {
 		out.put("identification", buildIdentification());
 		out.put("stats", buildStats());
 		out.put("challenges", buildChallenges());
+		out.put("hud", buildHud());
 		out.put("won", Statistics.gameWon);
 		out.put("ascended", Statistics.ascended);
 		out.put("seed", buildSeed());
 		out.put("duration", (int) Statistics.duration);
 		out.put("upgrades_used", Statistics.upgradesUsed);
 		out.put("combat_stats", buildCombatStats());
+		out.put("sheets", buildSheets());
 		out.put("buffs", buildBuffs(hero));
 		out.put("talents", buildTalents(hero));
 		out.put("quests", buildQuests());
@@ -152,6 +174,7 @@ public class GameStateSnapshot {
 		h.put("hp", hero.HP);
 		h.put("ht", hero.HT);
 		h.put("exp", hero.exp);
+		h.put("maxExp", hero.maxExp());
 		h.put("lvl", hero.lvl);
 		h.put("str", hero.STR);
 		return h;
@@ -172,8 +195,20 @@ public class GameStateSnapshot {
 		Map<String, Object> s = new LinkedHashMap<>();
 		s.put("name", item.getClass().getSimpleName());
 		s.put("level", item.level());
+		s.put("quantity", item.quantity());
+		s.put("image", item.image());
+		Map<String, Object> sprite = itemSpriteRect(item.image());
+		if (sprite != null) s.put("sprite", sprite);
+		if (itemIconVisible(item)) {
+			s.put("icon", item.icon);
+			Map<String, Object> iconSprite = itemIconSpriteRect(item.icon);
+			if (iconSprite != null) s.put("iconSprite", iconSprite);
+		}
 		s.put("cursed", item.cursed);
 		s.put("cursedKnown", item.cursedKnown);
+		s.put("displayName", Messages.titleCase(item.name()));
+		putItemGlow(s, item);
+		putItemSlotOverlays(s, item);
 		if (item instanceof Weapon) {
 			Weapon w = (Weapon) item;
 			if (w.enchantment != null) s.put("enchantment", w.enchantment.getClass().getSimpleName());
@@ -185,17 +220,102 @@ public class GameStateSnapshot {
 		return s;
 	}
 
-	private static List<Map<String, Object>> buildInventory(Belongings b) {
-		List<Map<String, Object>> inv = new ArrayList<>();
-		if (b.backpack == null) return inv;
-		for (Item item : b.backpack) {
-			Map<String, Object> e = new LinkedHashMap<>();
-			e.put("name", item.getClass().getSimpleName());
-			e.put("quantity", item.quantity());
-			e.put("level", item.level());
-			inv.add(e);
+	private static boolean itemIconVisible(Item item) {
+		return item.icon != -1
+				&& (item.isIdentified() || (item instanceof Ring && ((Ring) item).isKnown()));
+	}
+
+	private static void putItemGlow(Map<String, Object> s, Item item) {
+		ItemSprite.Glowing glow = item.glowing();
+		if (glow == null) return;
+		Map<String, Object> g = new LinkedHashMap<>();
+		g.put("color", String.format("#%06X", glow.color & 0xFFFFFF));
+		g.put("r", glow.red);
+		g.put("g", glow.green);
+		g.put("b", glow.blue);
+		s.put("glow", g);
+	}
+
+	private static void putItemSlotOverlays(Map<String, Object> s, Item item) {
+		String status = item.status();
+		if (status != null && !status.isEmpty()) {
+			s.put("status", status);
 		}
-		return inv;
+		int buffedLvl = item.buffedVisiblyUpgraded();
+		int trueLvl = item.visiblyUpgraded();
+		if (buffedLvl != 0 || trueLvl != 0) {
+			s.put("levelText", (buffedLvl > 0 ? "+" : "") + buffedLvl);
+			if (trueLvl == buffedLvl || buffedLvl <= 0) {
+				s.put("levelStyle", buffedLvl > 0 ? "upgraded" : "degraded");
+			} else {
+				s.put("levelStyle", buffedLvl > trueLvl ? "enhanced" : "warning");
+			}
+		}
+	}
+
+	private static Map<String, Object> itemIconSpriteRect(int icon) {
+		if (icon < 0) return null;
+		try {
+			RectF r = ItemSpriteSheet.Icons.film.get(icon);
+			if (r == null) return null;
+			var tex = TextureCache.get(Assets.Sprites.ITEM_ICONS);
+			return rectToPixels(r, tex.width, tex.height);
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
+	private static List<Map<String, Object>> buildInventory(Belongings b) {
+		List<Map<String, Object>> sections = new ArrayList<>();
+		if (b.backpack == null) return sections;
+		for (Bag bag : b.getBags()) {
+			Map<String, Object> section = bagSection(bag, bag == b.backpack);
+			if (!((List<?>) section.get("items")).isEmpty()) {
+				sections.add(section);
+			}
+		}
+		return sections;
+	}
+
+	private static Map<String, Object> bagSection(Bag bag, boolean mainBackpack) {
+		Map<String, Object> section = new LinkedHashMap<>();
+		section.put("id", bagId(bag));
+		section.put("name", Messages.titleCase(bag.name()));
+		section.put("icon", bagIconRect(bag));
+		section.put("capacity", bag.capacity());
+		List<Map<String, Object>> items = new ArrayList<>();
+		if (mainBackpack) {
+			// Bag.iterator() recurses into nested bags; only list direct backpack contents.
+			for (Item item : bag.items) {
+				if (item instanceof Bag) continue;
+				items.add(itemSlot(item));
+			}
+		} else {
+			for (Item item : bag) {
+				items.add(itemSlot(item));
+			}
+		}
+		section.put("items", items);
+		return section;
+	}
+
+	private static String bagId(Bag bag) {
+		if (bag instanceof Belongings.Backpack) return "backpack";
+		if (bag instanceof VelvetPouch) return "velvet_pouch";
+		if (bag instanceof ScrollHolder) return "scroll_holder";
+		if (bag instanceof MagicalHolster) return "magical_holster";
+		if (bag instanceof PotionBandolier) return "potion_bandolier";
+		return bag.getClass().getSimpleName();
+	}
+
+	private static Map<String, Object> bagIconRect(Bag bag) {
+		Icons type;
+		if (bag instanceof VelvetPouch) type = Icons.SEED_POUCH;
+		else if (bag instanceof ScrollHolder) type = Icons.SCROLL_HOLDER;
+		else if (bag instanceof MagicalHolster) type = Icons.WAND_HOLSTER;
+		else if (bag instanceof PotionBandolier) type = Icons.POTION_BANDOLIER;
+		else type = Icons.BACKPACK;
+		return uiIconRect(Icons.get(type));
 	}
 
 	private static Map<String, Object> buildStats() {
@@ -223,6 +343,29 @@ public class GameStateSnapshot {
 		return list;
 	}
 
+	private static Map<String, Object> buildHud() {
+		Map<String, Object> hud = new LinkedHashMap<>();
+		hud.put("feelingIcon", uiIconRect(Icons.get(Dungeon.level.feeling)));
+		hud.put("goldIcon", uiIconRect(Icons.get(Icons.COIN_SML)));
+		hud.put("energyIcon", uiIconRect(Icons.get(Icons.ENERGY_SML)));
+		if (Challenges.activeChallenges() > 0) {
+			hud.put("challengeIcon", uiIconRect(Icons.get(Icons.CHAL_COUNT)));
+		}
+		return hud;
+	}
+
+	private static Map<String, Object> uiIconRect(Image icon) {
+		if (icon == null) return null;
+		RectF r = icon.frame();
+		if (r == null) return null;
+		try {
+			var tex = TextureCache.get(Assets.Interfaces.ICONS);
+			return rectToPixels(r, tex.width, tex.height);
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
 	private static String buildSeed() {
 		if (Dungeon.customSeedText != null && !Dungeon.customSeedText.isEmpty()) {
 			return Dungeon.customSeedText;
@@ -242,12 +385,132 @@ public class GameStateSnapshot {
 		return c;
 	}
 
-	private static List<String> buildBuffs(Hero hero) {
-		List<String> list = new ArrayList<>();
-		for (com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff b : hero.buffs()) {
-			list.add(b.getClass().getSimpleName());
+	private static List<Map<String, Object>> buildBuffs(Hero hero) {
+		List<Map<String, Object>> list = new ArrayList<>();
+		if (hero == Dungeon.hero && ShatteredPixelDungeon.scene() instanceof GameScene) {
+			for (Buff b : BuffIndicator.visibleHeroBuffs()) {
+				list.add(buffEntry(b));
+			}
+			return list;
+		}
+		for (Buff b : hero.buffs()) {
+			if (b.icon() != BuffIndicator.NONE) {
+				list.add(buffEntry(b));
+			}
 		}
 		return list;
+	}
+
+	private static Map<String, Object> buffEntry(Buff b) {
+		Map<String, Object> m = new LinkedHashMap<>();
+		m.put("name", b.getClass().getSimpleName());
+		int icon = b.icon();
+		m.put("icon", icon);
+		Map<String, Object> sprite = buffSpriteRect(icon);
+		if (sprite != null) m.put("sprite", sprite);
+
+		BuffIcon iconView = new BuffIcon(b, true);
+		b.tintIcon(iconView);
+		Map<String, Object> tint = new LinkedHashMap<>();
+		tint.put("r", iconView.rm);
+		tint.put("g", iconView.gm);
+		tint.put("b", iconView.bm);
+		m.put("tint", tint);
+
+		String iconText = b.iconTextDisplay();
+		if (iconText != null && !iconText.isEmpty()) {
+			m.put("iconText", iconText);
+			if (b.type == Buff.buffType.POSITIVE) {
+				m.put("iconTextColor", "#00FF00");
+			} else if (b.type == Buff.buffType.NEGATIVE) {
+				m.put("iconTextColor", "#FF0000");
+			} else {
+				m.put("iconTextColor", "#FFFFFF");
+			}
+		}
+
+		switch (b.type) {
+			case POSITIVE: m.put("buffType", "positive"); break;
+			case NEGATIVE: m.put("buffType", "negative"); break;
+			default: m.put("buffType", "neutral");
+		}
+		return m;
+	}
+
+	private static Map<String, Object> buildSheets() {
+		Map<String, Object> sheets = new LinkedHashMap<>();
+		try {
+			var itemsTex = TextureCache.get(Assets.Sprites.ITEMS);
+			Map<String, Object> items = new LinkedHashMap<>();
+			items.put("path", Assets.Sprites.ITEMS);
+			items.put("w", itemsTex.width);
+			items.put("h", itemsTex.height);
+			sheets.put("items", items);
+
+			ensureLargeBuffFilm();
+			Map<String, Object> buffs = new LinkedHashMap<>();
+			buffs.put("path", Assets.Interfaces.BUFFS_LARGE);
+			buffs.put("w", largeBuffTexW);
+			buffs.put("h", largeBuffTexH);
+			sheets.put("buffs", buffs);
+
+			var iconsTex = TextureCache.get(Assets.Sprites.ITEM_ICONS);
+			Map<String, Object> icons = new LinkedHashMap<>();
+			icons.put("path", Assets.Sprites.ITEM_ICONS);
+			icons.put("w", iconsTex.width);
+			icons.put("h", iconsTex.height);
+			sheets.put("icons", icons);
+
+			var hudTex = TextureCache.get(Assets.Interfaces.ICONS);
+			Map<String, Object> hud = new LinkedHashMap<>();
+			hud.put("path", Assets.Interfaces.ICONS);
+			hud.put("w", hudTex.width);
+			hud.put("h", hudTex.height);
+			sheets.put("hud", hud);
+		} catch (Exception ignored) {
+		}
+		return sheets;
+	}
+
+	private static void ensureLargeBuffFilm() {
+		if (largeBuffFilm == null) {
+			var tex = TextureCache.get(Assets.Interfaces.BUFFS_LARGE);
+			largeBuffTexW = tex.width;
+			largeBuffTexH = tex.height;
+			largeBuffFilm = new TextureFilm(tex, BuffIndicator.SIZE_LARGE, BuffIndicator.SIZE_LARGE);
+		}
+	}
+
+	private static Map<String, Object> itemSpriteRect(int imageId) {
+		RectF r = ItemSpriteSheet.film.get(imageId);
+		if (r == null) return null;
+		try {
+			var tex = TextureCache.get(Assets.Sprites.ITEMS);
+			return rectToPixels(r, tex.width, tex.height);
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
+	private static Map<String, Object> buffSpriteRect(int icon) {
+		if (icon == BuffIndicator.NONE) return null;
+		try {
+			ensureLargeBuffFilm();
+			RectF r = largeBuffFilm.get(icon);
+			if (r == null) return null;
+			return rectToPixels(r, largeBuffTexW, largeBuffTexH);
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
+	private static Map<String, Object> rectToPixels(RectF r, int texW, int texH) {
+		Map<String, Object> m = new LinkedHashMap<>();
+		m.put("x", (int) (r.left * texW));
+		m.put("y", (int) (r.top * texH));
+		m.put("w", (int) (r.width() * texW));
+		m.put("h", (int) (r.height() * texH));
+		return m;
 	}
 
 	private static Map<String, Map<String, Integer>> buildTalents(Hero hero) {

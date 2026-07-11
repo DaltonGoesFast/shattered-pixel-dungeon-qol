@@ -66,7 +66,7 @@ public class Levitation extends FlavourBuff {
 			return false;
 		}
 
-		if (target.buff(TimeFreeze.class) != null){
+		if (TimeFreeze.on(target) != null){
 			return false;
 		}
 

@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=1080, height=1920, initial-scale=1">
+  <title>SPD Vertical Overlay</title>
+  <style>
+    @font-face {
+      font-family: 'PixelFont';
+      src: url('/fonts/pixel_font.ttf') format('truetype');
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 1080px;
+      height: 1920px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'PixelFont', system-ui, sans-serif;
+      color: #f0f0f0;
+      -webkit-font-smoothing: none;
+    }
+
+    /* OBS 1080×1920 — safe inset keeps UI off capture edges */
+    :root {
+      --safe: 24px;
+      --top-h: 168px;
+      --bottom-h: 332px;
+      --pad-x: 14px;
+      --pad-y: 10px;
+      --accent: #7f5af0;
+      --panel: rgba(10, 10, 22, 0.94);
+      --muted: #94a1b2;
+      --gold: #ffd700;
+      --hp: #e53e3e;
+      --xp: #ecc94b;
+      --equip-slot: 48px;
+      --buff-slot: 32px;
+    }
+
+    .top {
+      position: absolute;
+      top: var(--safe);
+      left: var(--safe);
+      right: var(--safe);
+      height: var(--top-h);
+      padding: var(--pad-y) var(--pad-x);
+      background: var(--panel);
+      border-bottom: 2px solid var(--accent);
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .bottom {
+      position: absolute;
+      bottom: var(--safe);
+      left: var(--safe);
+      right: var(--safe);
+      height: var(--bottom-h);
+      padding: var(--pad-y) var(--pad-x);
+      background: var(--panel);
+      border-top: 2px solid var(--accent);
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .hud-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 0;
+    }
+
+    .hero-info {
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 6px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .hero-title {
+      font-size: 26px;
+      font-weight: 700;
+      text-shadow: 1px 1px 0 #000;
+      white-space: nowrap;
+    }
+
+    .hero-sub {
+      font-size: 20px;
+      color: var(--muted);
+      text-shadow: 1px 1px 0 #000;
+      white-space: nowrap;
+    }
+
+    .depth-hud {
+      margin-left: auto;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .depth-stack {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1px;
+    }
+
+    .depth-stack .hud-icon {
+      display: block;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    .depth-num {
+      font-size: 16px;
+      line-height: 1;
+      color: #cacfc2;
+      text-shadow: 1px 1px 0 #000;
+    }
+
+    .depth-fallback {
+      font-size: 22px;
+      color: var(--gold);
+      text-shadow: 1px 1px 0 #000;
+      white-space: nowrap;
+    }
+
+    .bars-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 10px;
+    }
+
+    .bar-wrap { margin: 0; }
+
+    .bar-label {
+      font-size: 17px;
+      margin-bottom: 1px;
+      display: flex;
+      justify-content: space-between;
+      color: var(--muted);
+      text-shadow: 1px 1px 0 #000;
+    }
+
+    .bar {
+      height: 20px;
+      background: #1a1a2e;
+      border: 1px solid #333;
+      border-radius: 1px;
+      overflow: hidden;
+    }
+
+    .bar > span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      transition: width 0.25s ease-out;
+    }
+
+    .bar-hp { background: var(--hp); }
+    .bar-xp { background: var(--xp); }
+
+    .buffs {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px;
+      max-height: calc(var(--buff-slot) + 2px);
+      overflow: hidden;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .buff {
+      display: inline-flex;
+      align-items: center;
+      font-size: 14px;
+      padding: 2px 5px;
+      background: #2d3748;
+      border: 1px solid #4a5568;
+      border-radius: 1px;
+      white-space: nowrap;
+    }
+
+    .buff.buff-icon-only {
+      padding: 0;
+      background: transparent;
+      border: none;
+    }
+
+    .buff-slot {
+      position: relative;
+      width: var(--buff-slot);
+      height: var(--buff-slot);
+      flex-shrink: 0;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .buff-icon-text {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      font-size: 12px;
+      line-height: 1;
+      font-family: 'PixelFont', system-ui, monospace;
+      text-shadow: 1px 1px 0 #000, -1px -1px 0 #000;
+      pointer-events: none;
+    }
+
+    .sprite {
+      display: inline-block;
+      background-repeat: no-repeat;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      flex-shrink: 0;
+    }
+
+    .sprite-stack {
+      position: relative;
+      display: inline-block;
+      flex-shrink: 0;
+      isolation: isolate;
+    }
+
+    .sprite-stack .sprite-tint {
+      position: absolute;
+      left: 0;
+      top: 0;
+      pointer-events: none;
+      mix-blend-mode: multiply;
+    }
+
+    .bottom-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      min-height: var(--equip-slot);
+      overflow: visible;
+    }
+
+    .equip-compact {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      align-items: center;
+      flex: 1;
+      min-width: 0;
+      overflow: visible;
+    }
+
+    .equip-icon-slot {
+      position: relative;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: visible;
+    }
+
+    .equip-icon-slot .item-sprite-stack {
+      transform-origin: center center;
+    }
+
+    .equip-lvl {
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      font-size: 13px;
+      line-height: 1;
+      color: var(--gold);
+      text-shadow: 1px 1px 0 #000, -1px -1px 0 #000;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .equip-status {
+      position: absolute;
+      top: 0;
+      left: 1px;
+      font-size: 13px;
+      line-height: 1;
+      color: #fff;
+      text-shadow: 1px 1px 0 #000, -1px -1px 0 #000;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .currency {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+
+    .currency-row {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      line-height: 1;
+    }
+
+    .currency-row:empty,
+    .currency-row.hidden { display: none; }
+
+    .currency-icon {
+      display: block;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      flex-shrink: 0;
+    }
+
+    .currency-val {
+      font-size: 20px;
+      text-shadow: 1px 1px 0 #000;
+    }
+
+    .currency-val.gold { color: var(--gold); }
+    .currency-val.energy { color: #44ccff; }
+
+    .equip-list { flex-shrink: 0; }
+
+    .item-sprite-stack {
+      position: relative;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+
+    .item-sprite-stack .sprite.item-base {
+      position: absolute;
+    }
+
+    .item-sprite-stack .item-icon-overlay {
+      position: absolute;
+      pointer-events: none;
+    }
+
+    .item-sprite-stack .item-glow-overlay {
+      position: absolute;
+      pointer-events: none;
+      mix-blend-mode: screen;
+    }
+
+    .inv-scroll {
+      overflow: hidden;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+    }
+
+    .inv-fit {
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .inv-bags {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      transform-origin: top left;
+    }
+
+    .inv-bag-section {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 3px;
+      min-width: 0;
+    }
+
+    .inv-bag-head {
+      flex-shrink: 0;
+      width: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      align-self: center;
+      overflow: visible;
+      opacity: 0.9;
+    }
+
+    .inv-bag-head .bag-head-icon {
+      display: block;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    .inv-bag-label {
+      font-size: 8px;
+      line-height: 1;
+      color: var(--muted);
+      text-shadow: 1px 1px 0 #000;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      letter-spacing: 0.5px;
+    }
+
+    .inv-bag-section .inv-grid {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .inv-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1px;
+      align-content: flex-start;
+      transform-origin: top left;
+    }
+
+    .inv-slot {
+      position: relative;
+      width: var(--inv-slot, 32px);
+      height: var(--inv-slot, 32px);
+      background: rgba(83, 86, 77, 0.85);
+      flex-shrink: 0;
+    }
+
+    .inv-slot-inner {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .inv-slot .item-sprite-stack {
+      transform-origin: center center;
+    }
+
+    .inv-status {
+      position: absolute;
+      top: 0;
+      left: 1px;
+      font-size: max(10px, calc(var(--inv-slot, 32px) * 0.36));
+      line-height: 1;
+      color: #fff;
+      text-shadow: 1px 1px 0 #000, -1px -1px 0 #000;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .inv-level {
+      position: absolute;
+      right: 1px;
+      bottom: 0;
+      font-size: max(10px, calc(var(--inv-slot, 32px) * 0.36));
+      text-shadow: 1px 1px 0 #000, -1px -1px 0 #000;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .inv-level-upgraded { color: #44ff44; }
+    .inv-level-degraded { color: #ff4444; }
+    .inv-level-warning { color: #ff8800; }
+    .inv-level-enhanced { color: #3399ff; }
+
+    .waiting {
+      opacity: 0.55;
+      font-style: italic;
+      font-size: 16px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #666;
+      flex-shrink: 0;
+    }
+
+    .status-dot.live { background: #48bb78; }
+    .status-dot.stale { background: #ecc94b; }
+    .status-dot.offline { background: #e53e3e; }
+  </style>
+</head>
+<body>
+  <div class="top">
+    <header class="hud-head">
+      <span class="status-dot offline" id="statusDot" title="Data connection"></span>
+      <div class="hero-info">
+        <span class="hero-title" id="heroClass">Waiting for game…</span>
+        <span class="hero-sub" id="heroSub"></span>
+      </div>
+      <div class="depth-hud" id="depth">—</div>
+    </header>
+    <div class="bars-grid">
+      <div class="bar-wrap">
+        <div class="bar-label"><span>HP</span><span id="hpText">—</span></div>
+        <div class="bar"><span class="bar-hp" id="hpBar"></span></div>
+      </div>
+      <div class="bar-wrap">
+        <div class="bar-label"><span>XP</span><span id="xpText">—</span></div>
+        <div class="bar"><span class="bar-xp" id="xpBar"></span></div>
+      </div>
+    </div>
+    <div class="buffs" id="buffs"></div>
+  </div>
+
+  <div class="bottom">
+    <div class="bottom-bar">
+      <div class="equip-compact" id="equipped">—</div>
+      <div class="currency">
+        <div class="currency-row" id="goldRow"></div>
+        <div class="currency-row" id="energyRow"></div>
+      </div>
+    </div>
+    <div class="inv-scroll" id="inventory">—</div>
+  </div>
+
+  <script>
+    const API = '/api/game-data';
+    const POLL_MS = 1000;
+    const STALE_MS = 3500;
+    const SPRITE_SCALE = 2;
+    const INV_ICON_BOOST = 1.5;
+    const SAFE_INSET = 24;
+    const PANEL_PAD_X = 14;
+    const EQUIP_SLOT = 48;
+    const HUD_ICON_SCALE = 3;
+    const BAG_HEAD_SCALE = 3;
+    const CURRENCY_ICON_SCALE = 3;
+    const BUFF_SPRITE_SCALE = 2;
+
+    const DEFAULT_SHEETS = {
+      items: { path: 'sprites/items.png', w: 256, h: 512 },
+      buffs: { path: 'interfaces/large_buffs.png', w: 256, h: 128 },
+      icons: { path: 'sprites/item_icons.png', w: 128, h: 64 },
+      hud: { path: 'interfaces/icons.png', w: 256, h: 128 },
+    };
+
+    let lastOk = 0;
+    let sheetCache = DEFAULT_SHEETS;
+    let lastInventorySections = [];
+
+    const INV_MIN_SCALE = 3;
+    const INV_MAX_SCALE = Math.max(INV_MIN_SCALE, Math.round(SPRITE_SCALE * INV_ICON_BOOST));
+    const INV_EQUIP_SCALE = 3;
+    const BAG_GAP = 2;
+    const BAG_PANEL_W = 1080 - SAFE_INSET * 2 - PANEL_PAD_X * 2;
+    const BAG_HEAD_W = 32;
+    const BAG_SECTION_GAP = 3;
+
+    function itemCellSize(item) {
+      if (!item || !item.sprite) return 16;
+      return Math.max(16, item.sprite.w || 16, item.sprite.h || 16);
+    }
+
+    function sectionSlotPx(items, itemScale) {
+      let cell = 16;
+      items.forEach(function (item) {
+        cell = Math.max(cell, itemCellSize(item));
+      });
+      return cell * itemScale;
+    }
+
+    function sectionSlotCount(section) {
+      return bagItems(section).length;
+    }
+
+    function bagItems(section) {
+      return (section.items || []).filter(function (i) { return i && i.sprite; });
+    }
+
+    function normalizeInventory(inv) {
+      if (!inv || !inv.length) return [];
+      if (inv[0] && Array.isArray(inv[0].items)) return inv;
+      return [{ id: 'backpack', name: 'Backpack', items: inv }];
+    }
+
+    function activeInventorySections(sections) {
+      return sections.filter(function (sec) { return bagItems(sec).length > 0; });
+    }
+
+    function sectionGridHeight(itemCount, slot, itemW) {
+      if (itemCount <= 0) return 0;
+      const cols = Math.max(1, Math.floor((itemW + BAG_GAP) / (slot + BAG_GAP)));
+      const rows = Math.ceil(itemCount / cols);
+      return rows * slot + (rows - 1) * BAG_GAP;
+    }
+
+    function computeInvLayout(sections, availW, availH) {
+      const active = activeInventorySections(sections);
+      if (active.length === 0 || availW <= 0 || availH <= 0) {
+        return { itemScale: INV_MAX_SCALE };
+      }
+
+      const itemW = Math.max(64, availW - BAG_HEAD_W);
+      const scales = [];
+      for (let sc = INV_MAX_SCALE; sc >= INV_MIN_SCALE; sc--) {
+        scales.push(sc);
+      }
+
+      for (let i = 0; i < scales.length; i++) {
+        const itemScale = scales[i];
+        let totalH = 0;
+        for (let s = 0; s < active.length; s++) {
+          const items = bagItems(active[s]);
+          const slot = sectionSlotPx(items, itemScale);
+          totalH += sectionGridHeight(items.length, slot, itemW);
+          if (s < active.length - 1) totalH += BAG_SECTION_GAP;
+        }
+        if (totalH <= availH) return { itemScale: itemScale };
+      }
+
+      return { itemScale: INV_MIN_SCALE };
+    }
+
+    function estimateInvAreaHeight() {
+      return 332 - 20 - 48 - 6;
+    }
+
+    function fmtName(className) {
+      if (!className) return '?';
+      return className
+        .replace(/([A-Z])/g, ' $1')
+        .replace(/^ /, '')
+        .trim();
+    }
+
+    function fmtItem(item, slotLabel) {
+      if (!item) return null;
+      let s = fmtName(item.name);
+      if (item.level > 0) s += ' +' + item.level;
+      if (item.quantity > 1) s += ' ×' + item.quantity;
+      const extra = item.enchantment || item.glyph;
+      if (extra) s += ' (' + fmtName(extra) + ')';
+      if (slotLabel) s = slotLabel + ' ' + s;
+      return s;
+    }
+
+    function buffName(b) {
+      if (typeof b === 'string') return b;
+      return b?.name || '';
+    }
+
+    function sheetInfo(key) {
+      const s = sheetCache[key] || DEFAULT_SHEETS[key];
+      return {
+        url: '/game-assets/' + s.path,
+        w: s.w,
+        h: s.h,
+      };
+    }
+
+    function makeSprite(sheetKey, sprite, scale) {
+      const el = document.createElement('span');
+      el.className = 'sprite';
+      if (!sprite || !sprite.w || !sprite.h) return el;
+      const sc = Math.max(1, Math.round(scale || SPRITE_SCALE));
+      const sheet = sheetInfo(sheetKey);
+      el.style.width = Math.round(sprite.w * sc) + 'px';
+      el.style.height = Math.round(sprite.h * sc) + 'px';
+      el.style.backgroundImage = 'url(' + sheet.url + ')';
+      el.style.backgroundSize = Math.round(sheet.w * sc) + 'px ' + Math.round(sheet.h * sc) + 'px';
+      el.style.backgroundPosition = Math.round(-sprite.x * sc) + 'px ' + Math.round(-sprite.y * sc) + 'px';
+      return el;
+    }
+
+    function makeHudStack(iconSprite, numText, title) {
+      const stack = document.createElement('div');
+      stack.className = 'depth-stack';
+      if (title) stack.title = title;
+      if (iconSprite && iconSprite.w && iconSprite.h) {
+        const icon = makeSprite('hud', iconSprite, HUD_ICON_SCALE);
+        icon.classList.add('hud-icon');
+        stack.appendChild(icon);
+      }
+      const num = document.createElement('span');
+      num.className = 'depth-num';
+      num.textContent = numText;
+      stack.appendChild(num);
+      return stack;
+    }
+
+    function renderDepthHud(depthEl, data, stats) {
+      const hud = data.hud || {};
+      const chalList = Array.isArray(data.challenges) ? data.challenges : [];
+      const depthNum = String(stats.depth ?? '?');
+      const feelingTitle = data.feeling || '';
+
+      depthEl.replaceChildren();
+      depthEl.className = 'depth-hud';
+
+      if (hud.feelingIcon) {
+        depthEl.appendChild(makeHudStack(hud.feelingIcon, depthNum, feelingTitle));
+      } else {
+        const fallback = document.createElement('span');
+        fallback.className = 'depth-fallback';
+        fallback.textContent = 'F' + depthNum;
+        if (feelingTitle) fallback.title = feelingTitle;
+        depthEl.appendChild(fallback);
+      }
+
+      if (chalList.length > 0) {
+        depthEl.appendChild(makeHudStack(
+          hud.challengeIcon || null,
+          String(chalList.length),
+          chalList.join(', ')
+        ));
+      }
+    }
+
+    function applySpriteMask(el, sheetKey, sprite, scale) {
+      const sc = Math.max(1, Math.round(scale || SPRITE_SCALE));
+      const sheet = sheetInfo(sheetKey);
+      const url = 'url(' + sheet.url + ')';
+      const size = Math.round(sheet.w * sc) + 'px ' + Math.round(sheet.h * sc) + 'px';
+      const pos = Math.round(-sprite.x * sc) + 'px ' + Math.round(-sprite.y * sc) + 'px';
+      el.style.webkitMaskImage = url;
+      el.style.maskImage = url;
+      el.style.webkitMaskSize = size;
+      el.style.maskSize = size;
+      el.style.webkitMaskPosition = pos;
+      el.style.maskPosition = pos;
+      el.style.webkitMaskRepeat = 'no-repeat';
+      el.style.maskRepeat = 'no-repeat';
+    }
+
+    function makeMaskedTint(sheetKey, sprite, rgb, scale, blendMode, opacity) {
+      const sc = Math.max(1, Math.round(scale || SPRITE_SCALE));
+      const el = document.createElement('span');
+      el.className = 'sprite item-mask-tint';
+      el.style.width = Math.round(sprite.w * sc) + 'px';
+      el.style.height = Math.round(sprite.h * sc) + 'px';
+      el.style.backgroundColor = rgb;
+      el.style.mixBlendMode = blendMode || 'screen';
+      el.style.opacity = String(opacity ?? 1);
+      applySpriteMask(el, sheetKey, sprite, sc);
+      return el;
+    }
+
+    const ITEM_SLOT_PX = 16; // standard inventory / ItemSlot cell size in game pixels
+
+    function makeItemSprite(item, scale) {
+      const stack = document.createElement('div');
+      stack.className = 'item-sprite-stack';
+      if (!item || !item.sprite) return stack;
+
+      const sc = Math.max(1, Math.round(scale || SPRITE_SCALE));
+      const bw = Math.round(item.sprite.w * sc);
+      const bh = Math.round(item.sprite.h * sc);
+      const slotGameW = Math.max(ITEM_SLOT_PX, item.sprite.w);
+      const slotGameH = Math.max(ITEM_SLOT_PX, item.sprite.h);
+      const slotW = Math.round(slotGameW * sc);
+      const slotH = Math.round(slotGameH * sc);
+      const baseLeft = Math.round((slotW - bw) / 2);
+      const baseTop = Math.round((slotH - bh) / 2);
+
+      stack.style.width = slotW + 'px';
+      stack.style.height = slotH + 'px';
+
+      const base = makeSprite('items', item.sprite, sc);
+      base.classList.add('item-base');
+      base.style.left = baseLeft + 'px';
+      base.style.top = baseTop + 'px';
+      stack.appendChild(base);
+
+      if (item.glow) {
+        const v = 0.35;
+        const g = item.glow;
+        const r = Math.round((g.r ?? 0) * 255 * v);
+        const gr = Math.round((g.g ?? 0) * 255 * v);
+        const bl = Math.round((g.b ?? 0) * 255 * v);
+        const rgb = 'rgb(' + r + ',' + gr + ',' + bl + ')';
+
+        const darken = makeMaskedTint('items', item.sprite, 'rgb(0,0,0)', sc, 'multiply', v * 0.45);
+        darken.classList.add('item-glow-overlay');
+        darken.style.left = baseLeft + 'px';
+        darken.style.top = baseTop + 'px';
+        stack.appendChild(darken);
+
+        const glow = makeMaskedTint('items', item.sprite, rgb, sc, 'screen', 0.45 + v * 0.35);
+        glow.classList.add('item-glow-overlay');
+        glow.style.left = baseLeft + 'px';
+        glow.style.top = baseTop + 'px';
+        stack.appendChild(glow);
+      }
+
+      if (item.iconSprite) {
+        const icon = makeSprite('icons', item.iconSprite, sc);
+        icon.classList.add('item-icon-overlay');
+        const iw = Math.round(item.iconSprite.w * sc);
+        const ih = Math.round(item.iconSprite.h * sc);
+        const iconCell = Math.round(8 * sc);
+        if (slotGameW >= 24 || slotGameH >= 24) {
+          icon.style.right = Math.round((iconCell - iw) / 2) + 'px';
+          icon.style.top = Math.round((iconCell - ih) / 2) + 'px';
+        } else {
+          icon.style.right = '0';
+          icon.style.top = '0';
+        }
+        stack.appendChild(icon);
+      }
+
+      return stack;
+    }
+
+    function renderInvSlot(item, slotPx, itemScale) {
+      const slot = document.createElement('div');
+      slot.className = 'inv-slot';
+      slot.style.width = slotPx + 'px';
+      slot.style.height = slotPx + 'px';
+      slot.title = itemLabel(item);
+
+      const inner = document.createElement('div');
+      inner.className = 'inv-slot-inner';
+      if (item.sprite) {
+        inner.appendChild(makeItemSprite(item, itemScale));
+      }
+      slot.appendChild(inner);
+
+      if (item.status) {
+        const st = document.createElement('span');
+        st.className = 'inv-status';
+        st.textContent = item.status;
+        slot.appendChild(st);
+      }
+
+      if (item.levelText) {
+        const lv = document.createElement('span');
+        lv.className = 'inv-level inv-level-' + (item.levelStyle || 'upgraded');
+        lv.textContent = item.levelText;
+        slot.appendChild(lv);
+      }
+
+      return slot;
+    }
+
+    function buildInventoryGrid(items, layout) {
+      const slotPx = sectionSlotPx(items, layout.itemScale);
+      const grid = document.createElement('div');
+      grid.className = 'inv-grid';
+      grid.dataset.itemScale = String(layout.itemScale);
+      grid.style.setProperty('--inv-slot', slotPx + 'px');
+      items.forEach(function (item) {
+        grid.appendChild(renderInvSlot(item, slotPx, layout.itemScale));
+      });
+      return grid;
+    }
+
+    function buildBagSection(section, layout) {
+      const items = bagItems(section);
+      if (!items.length) return null;
+
+      const sec = document.createElement('div');
+      sec.className = 'inv-bag-section';
+
+      const head = document.createElement('div');
+      head.className = 'inv-bag-head';
+      head.title = section.name || fmtName(section.id || 'Bag');
+      if (section.icon && section.icon.w && section.icon.h) {
+        const icon = makeSprite('hud', section.icon, BAG_HEAD_SCALE);
+        icon.classList.add('bag-head-icon');
+        head.appendChild(icon);
+      } else {
+        const lbl = document.createElement('span');
+        lbl.className = 'inv-bag-label';
+        lbl.textContent = (section.name || 'Bag').slice(0, 4);
+        head.appendChild(lbl);
+      }
+      sec.appendChild(head);
+      sec.appendChild(buildInventoryGrid(items, layout));
+      return sec;
+    }
+
+    function buildInventoryView(sections, layout) {
+      const root = document.createElement('div');
+      root.className = 'inv-bags';
+      activeInventorySections(sections).forEach(function (sec) {
+        const el = buildBagSection(sec, layout);
+        if (el) root.appendChild(el);
+      });
+      return root;
+    }
+
+    function applyInventoryScale(wrap, content) {
+      content.style.transform = 'none';
+      wrap.style.width = '';
+      wrap.style.height = '';
+    }
+
+    function renderInventory(inv) {
+      lastInventorySections = normalizeInventory(inv || []);
+      const container = document.getElementById('inventory');
+      container.innerHTML = '';
+
+      const sections = activeInventorySections(lastInventorySections);
+      const itemCount = sections.reduce(function (n, sec) { return n + bagItems(sec).length; }, 0);
+      if (itemCount === 0) {
+        container.innerHTML = '<span class="waiting">Empty</span>';
+        return;
+      }
+
+      const availW = container.clientWidth || BAG_PANEL_W;
+      let availH = container.clientHeight;
+      if (availH < 8) availH = estimateInvAreaHeight();
+
+      const layout = computeInvLayout(lastInventorySections, availW, availH);
+      const wrap = document.createElement('div');
+      wrap.className = 'inv-fit';
+      const view = buildInventoryView(lastInventorySections, layout);
+      wrap.appendChild(view);
+      container.appendChild(wrap);
+      applyInventoryScale(wrap, view);
+    }
+
+    function reflowInventory() {
+      const container = document.getElementById('inventory');
+      const sections = activeInventorySections(lastInventorySections);
+      const itemCount = sections.reduce(function (n, sec) { return n + bagItems(sec).length; }, 0);
+      if (itemCount === 0) return;
+
+      const availW = container.clientWidth || BAG_PANEL_W;
+      const availH = container.clientHeight;
+      if (availH < 8) return;
+
+      const layout = computeInvLayout(lastInventorySections, availW, availH);
+      const wrap = container.querySelector('.inv-fit');
+      const view = wrap && wrap.querySelector('.inv-bags');
+      if (!view || !wrap) return;
+
+      const grid = view.querySelector('.inv-grid');
+      const currentScale = grid ? Number(grid.dataset.itemScale) : 0;
+      if (currentScale !== layout.itemScale) {
+        container.innerHTML = '';
+        const newWrap = document.createElement('div');
+        newWrap.className = 'inv-fit';
+        const newView = buildInventoryView(lastInventorySections, layout);
+        newWrap.appendChild(newView);
+        container.appendChild(newWrap);
+        applyInventoryScale(newWrap, newView);
+      }
+    }
+
+    function itemLabel(item) {
+      return item?.displayName || fmtName(item?.name);
+    }
+
+    function renderCurrencyRow(rowEl, iconSprite, valueText, valueClass) {
+      rowEl.replaceChildren();
+      rowEl.classList.remove('hidden');
+      if (iconSprite && iconSprite.w && iconSprite.h) {
+        const icon = makeSprite('hud', iconSprite, CURRENCY_ICON_SCALE);
+        icon.classList.add('currency-icon');
+        rowEl.appendChild(icon);
+      }
+      const val = document.createElement('span');
+      val.className = 'currency-val ' + valueClass;
+      val.textContent = valueText;
+      rowEl.appendChild(val);
+    }
+
+    function renderEquipSlot(item) {
+      if (!item) return null;
+      const slotPx = sectionSlotPx([item], INV_EQUIP_SCALE);
+      const slot = document.createElement('div');
+      slot.className = 'equip-icon-slot';
+      slot.style.width = slotPx + 'px';
+      slot.style.height = slotPx + 'px';
+      slot.title = itemLabel(item);
+
+      if (item.sprite) {
+        slot.appendChild(makeItemSprite(item, INV_EQUIP_SCALE));
+      }
+
+      if (item.status) {
+        const st = document.createElement('span');
+        st.className = 'equip-status';
+        st.textContent = item.status;
+        slot.appendChild(st);
+      }
+
+      if (item.level > 0) {
+        const lv = document.createElement('span');
+        lv.className = 'equip-lvl';
+        lv.textContent = '+' + item.level;
+        slot.appendChild(lv);
+      }
+
+      return slot;
+    }
+
+    function needsTint(tint) {
+      if (!tint) return false;
+      const eps = 0.001;
+      return Math.abs((tint.r ?? 1) - 1) > eps
+        || Math.abs((tint.g ?? 1) - 1) > eps
+        || Math.abs((tint.b ?? 1) - 1) > eps;
+    }
+
+    function makeBuffSprite(sheetKey, sprite, tint, scale) {
+      const sc = scale || SPRITE_SCALE;
+      const base = makeSprite(sheetKey, sprite, sc);
+      if (!needsTint(tint)) return base;
+
+      const stack = document.createElement('span');
+      stack.className = 'sprite-stack';
+      stack.appendChild(base);
+
+      const overlay = document.createElement('span');
+      overlay.className = 'sprite-tint';
+      const r = Math.round((tint.r ?? 1) * 255);
+      const g = Math.round((tint.g ?? 1) * 255);
+      const b = Math.round((tint.b ?? 1) * 255);
+      overlay.style.width = base.style.width;
+      overlay.style.height = base.style.height;
+      overlay.style.backgroundColor = 'rgb(' + r + ',' + g + ',' + b + ')';
+      stack.appendChild(overlay);
+      return stack;
+    }
+
+    function makeBuffIcon(b) {
+      const wrap = document.createElement('span');
+      wrap.className = 'buff-slot';
+      wrap.title = fmtName(buffName(b));
+
+      if (b && typeof b === 'object' && b.sprite) {
+        wrap.appendChild(makeBuffSprite('buffs', b.sprite, b.tint, BUFF_SPRITE_SCALE));
+      }
+
+      if (b && typeof b === 'object' && b.iconText) {
+        const t = document.createElement('span');
+        t.className = 'buff-icon-text';
+        t.textContent = b.iconText;
+        t.style.color = b.iconTextColor || '#00FF00';
+        wrap.appendChild(t);
+      }
+
+      return wrap;
+    }
+
+    function setStatus(state) {
+      const dot = document.getElementById('statusDot');
+      dot.className = 'status-dot ' + state;
+    }
+
+    function render(data) {
+      if (!data || data.error || !data.hero) {
+        document.getElementById('heroClass').textContent = 'Waiting for game…';
+        document.getElementById('heroClass').classList.add('waiting');
+        document.getElementById('heroSub').textContent = '';
+        setStatus('offline');
+        return;
+      }
+
+      document.getElementById('heroClass').classList.remove('waiting');
+
+      const age = Date.now() - lastOk;
+      setStatus(age > STALE_MS ? 'stale' : 'live');
+
+      const h = data.hero;
+      const stats = data.stats || {};
+
+      if (data.sheets) {
+        sheetCache = {
+          items: { ...DEFAULT_SHEETS.items, ...(data.sheets.items || {}) },
+          buffs: { ...DEFAULT_SHEETS.buffs, ...(data.sheets.buffs || {}) },
+          icons: { ...DEFAULT_SHEETS.icons, ...(data.sheets.icons || {}) },
+          hud: { ...DEFAULT_SHEETS.hud, ...(data.sheets.hud || {}) },
+        };
+      }
+
+      document.getElementById('heroClass').textContent = h.class || 'Hero';
+      document.getElementById('heroSub').textContent = h.subclass
+        ? fmtName(h.subclass) + ' · Lv' + (h.lvl ?? '?')
+        : 'Lv' + (h.lvl ?? '?');
+
+      renderDepthHud(document.getElementById('depth'), data, stats);
+
+      const hpPct = h.ht ? Math.max(0, Math.min(100, 100 * h.hp / h.ht)) : 0;
+      document.getElementById('hpText').textContent = h.hp + ' / ' + h.ht;
+      document.getElementById('hpBar').style.width = hpPct + '%';
+
+      const maxExp = Number(h.maxExp) || (5 + (Number(h.lvl) || 1) * 5);
+      const xpPct = maxExp ? Math.max(0, Math.min(100, 100 * h.exp / maxExp)) : 0;
+      document.getElementById('xpText').textContent = h.exp + ' / ' + maxExp;
+      document.getElementById('xpBar').style.width = xpPct + '%';
+
+      const buffEl = document.getElementById('buffs');
+      buffEl.innerHTML = '';
+      const buffList = data.buffs || [];
+      if (buffList.length === 0) {
+        const empty = document.createElement('span');
+        empty.className = 'buff';
+        empty.style.opacity = '0.5';
+        empty.textContent = 'No buffs';
+        buffEl.appendChild(empty);
+      } else {
+        buffList.forEach(b => {
+          if (b && typeof b === 'object' && b.sprite) {
+            const slot = makeBuffIcon(b);
+            slot.classList.add('buff', 'buff-icon-only');
+            buffEl.appendChild(slot);
+          } else {
+            const pill = document.createElement('span');
+            pill.className = 'buff';
+            pill.textContent = fmtName(buffName(b));
+            buffEl.appendChild(pill);
+          }
+        });
+      }
+
+      const eq = data.equipped || {};
+      const equipEl = document.getElementById('equipped');
+      equipEl.innerHTML = '';
+      const eqItems = [
+        renderEquipSlot(eq.weapon),
+        renderEquipSlot(eq.armor),
+        renderEquipSlot(eq.artifact),
+        renderEquipSlot(eq.ring),
+        renderEquipSlot(eq.misc),
+      ].filter(Boolean);
+      if (eqItems.length === 0) {
+        equipEl.innerHTML = '<span class="waiting">—</span>';
+      } else {
+        eqItems.forEach(function (el) { equipEl.appendChild(el); });
+      }
+
+      const hud = data.hud || {};
+      renderCurrencyRow(
+        document.getElementById('goldRow'),
+        hud.goldIcon,
+        String(stats.gold ?? 0),
+        'gold'
+      );
+      const energyRow = document.getElementById('energyRow');
+      if (stats.energy != null && stats.energy > 0) {
+        renderCurrencyRow(energyRow, hud.energyIcon, String(stats.energy), 'energy');
+      } else {
+        energyRow.replaceChildren();
+        energyRow.classList.add('hidden');
+      }
+
+      renderInventory(data.inventory || []);
+      requestAnimationFrame(function () { reflowInventory(); });
+    }
+
+    async function tick() {
+      try {
+        const r = await fetch(API, { cache: 'no-store' });
+        if (!r.ok) throw new Error(String(r.status));
+        const data = await r.json();
+        if (data && data.error) throw new Error(data.error);
+        lastOk = Date.now();
+        render(data);
+      } catch (e) {
+        render(null);
+      }
+    }
+
+    tick();
+    setInterval(tick, POLL_MS);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') tick();
+    });
+  </script>
+</body>
+</html>

@@ -425,6 +425,7 @@ public class WndSettings extends WndTabbed {
 		RedButton btnToolbarSettings;
 		CheckBox chkShowQuickslotSwapButton;
 		CheckBox chkFlipTags;
+		CheckBox chkFlipStatusPane;
 		CheckBox chkCenterOnCycleNoEnemies;
 		CheckBox chkBossBarAllEnemies;
 		CheckBox chkAutoTalentPlan;
@@ -642,6 +643,17 @@ public class WndSettings extends WndTabbed {
 				add(chkFlipTags);
 
 				if (HudLayout.isActive()) {
+					chkFlipStatusPane = new CheckBox(Messages.get(this, "flip_status_pane")) {
+						@Override
+						protected void onClick() {
+							super.onClick();
+							SPDSettings.flipStatusPane(checked());
+							GameScene.layoutHud();
+						}
+					};
+					chkFlipStatusPane.checked(SPDSettings.flipStatusPane());
+					add(chkFlipStatusPane);
+
 					btnResetHudLayout = new RedButton(Messages.get(this, "reset_hud_layout"), 9) {
 						@Override
 						protected void onClick() {
@@ -768,6 +780,10 @@ public class WndSettings extends WndTabbed {
 			} else {
 				chkFlipTags.setRect(0, height + GAP, width, BTN_HEIGHT);
 				height = chkFlipTags.bottom();
+				if (chkFlipStatusPane != null) {
+					chkFlipStatusPane.setRect(0, height + GAP, width, BTN_HEIGHT);
+					height = chkFlipStatusPane.bottom();
+				}
 				if (btnResetHudLayout != null) {
 					btnResetHudLayout.setRect(0, height + GAP, width, BTN_HEIGHT);
 					height = btnResetHudLayout.bottom();

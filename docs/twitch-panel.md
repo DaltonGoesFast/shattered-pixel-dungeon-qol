@@ -2,7 +2,23 @@
 
 Spend points to mess with the run! Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also give points.
 
+**2× bonuses (stack — up to 8×):** global !doublepoints + !fard → personal top summoner (!summon leader) → sub/member.
+
 ---
+
+## Free commands (no points)
+
+**!fard** — Once per stream per viewer: OBS flash + sound; extends **global 2×** for everyone (+1 min, +5 min for subs/members). Already used? The command silently does nothing (no chat).
+
+**!summon** — Queue a monster march on the **companion overlay** (not an in-game spawn). **60s** cooldown per user. Optional monster: `!summon rat` (random from spawn pool if omitted)
+
+**!topsummoner** — Session summon leader (most successful !summons). Leader earns **personal 2×** on point gains
+
+**!mysummons** — Your summon count this stream
+
+---
+
+## Spend commands (points)
 
 **!points** — Check your balance (free)
 

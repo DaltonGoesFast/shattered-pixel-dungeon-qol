@@ -10,6 +10,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfStasis;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.exotic.ScrollOfTimeFreeze;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Catalog;
+import com.badlogic.gdx.utils.reflect.ClassReflection;
 import com.watabou.utils.Reflection;
 
 import java.util.ArrayList;
@@ -150,20 +151,6 @@ public class StreamerItemResolver {
 
 		ensureRegistry();
 
-		if (trimmed.contains(".")) {
-			Class<?> c = Reflection.forName(trimmed);
-			if (c != null && Item.class.isAssignableFrom(c)) {
-				return (Class<? extends Item>) c;
-			}
-		}
-
-		for (String pkg : ITEM_PACKAGES) {
-			Class<?> c = Reflection.forName(pkg + trimmed);
-			if (c != null && Item.class.isAssignableFrom(c)) {
-				return (Class<? extends Item>) c;
-			}
-		}
-
 		String key = normalizeKey(trimmed);
 		List<Class<? extends Item>> matches = byKey.get(key);
 		if (matches != null && matches.size() == 1) {
@@ -173,7 +160,30 @@ public class StreamerItemResolver {
 			return null; // ambiguous — caller formats error
 		}
 
-		// substring match on display / class keys
+		Class<? extends Item> partial = findPartialMatch(key);
+		if (partial != null) return partial;
+
+		if (trimmed.contains(".")) {
+			Class<? extends Item> c = tryLoadClass(trimmed);
+			if (c != null) return c;
+		}
+
+		if (isValidSimpleClassName(trimmed)) {
+			Class<? extends Item> c = tryLoadInPackages(trimmed);
+			if (c != null) return c;
+		}
+
+		String pascal = toPascalCase(trimmed);
+		if (!pascal.equals(trimmed)) {
+			Class<? extends Item> c = tryLoadInPackages(pascal);
+			if (c != null) return c;
+		}
+
+		return null;
+	}
+
+	private static Class<? extends Item> findPartialMatch(String key) {
+		if (key.isEmpty()) return null;
 		Class<? extends Item> partial = null;
 		int partialCount = 0;
 		for (Entry e : registry) {
@@ -183,7 +193,51 @@ public class StreamerItemResolver {
 				partialCount++;
 			}
 		}
-		if (partialCount == 1) return partial;
+		return partialCount == 1 ? partial : null;
+	}
+
+	private static boolean isValidSimpleClassName(String name) {
+		if (name == null || name.isEmpty()) return false;
+		if (!Character.isJavaIdentifierStart(name.charAt(0))) return false;
+		for (int i = 1; i < name.length(); i++) {
+			if (!Character.isJavaIdentifierPart(name.charAt(i))) return false;
+		}
+		return true;
+	}
+
+	private static String toPascalCase(String input) {
+		StringBuilder sb = new StringBuilder();
+		boolean capNext = true;
+		for (int i = 0; i < input.length(); i++) {
+			char c = input.charAt(i);
+			if (Character.isLetterOrDigit(c)) {
+				sb.append(capNext ? Character.toUpperCase(c) : Character.toLowerCase(c));
+				capNext = false;
+			} else {
+				capNext = true;
+			}
+		}
+		return sb.toString();
+	}
+
+	@SuppressWarnings("unchecked")
+	private static Class<? extends Item> tryLoadClass(String name) {
+		try {
+			Class<?> c = ClassReflection.forName(name);
+			if (c != null && Item.class.isAssignableFrom(c)) {
+				return (Class<? extends Item>) c;
+			}
+		} catch (Exception ignored) {
+		}
+		return null;
+	}
+
+	private static Class<? extends Item> tryLoadInPackages(String simpleName) {
+		if (!isValidSimpleClassName(simpleName)) return null;
+		for (String pkg : ITEM_PACKAGES) {
+			Class<? extends Item> c = tryLoadClass(pkg + simpleName);
+			if (c != null) return c;
+		}
 		return null;
 	}
 

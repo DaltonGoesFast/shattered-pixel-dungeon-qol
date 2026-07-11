@@ -197,21 +197,48 @@ public class StatusPane extends Component {
 		if (large)  bg.size( 160, bg.height ); //HP bars must be 128px wide atm
 		else        bg.size(hpBarMaxWidth+32, bg.height ); //default max right is 50px health bar + 32
 
-		avatar.x = bg.x - avatar.width / 2f + 15;
+		// Mirror the status pane horizontally so the portrait sits on the right of the HP bar.
+		// Only applies to PC + Large UI; HUD edit mode still moves the pane wholesale (the
+		// STATUS slot's bounds don't change), so this stays compatible.
+		boolean flip = large && SPDSettings.flipStatusPane() && HudLayout.isActive();
+
+		// Render the bg NinePatch mirrored in place. We can't use bg.flipHorizontal() here:
+		// the asset has a 33px portrait frame on the left and only a 4px trim on the right,
+		// so a UV-only flip squashes the 33px patch into 4px. Instead we apply a horizontal
+		// flip transform (origin = center, scale.x = -1), which mirrors the whole rendered
+		// quad set while keeping each patch's proportions intact.
+		bg.origin.set( flip ? bg.width / 2f : 0f, 0f );
+		bg.scale.x = flip ? -1f : 1f;
+
+		if (flip) {
+			avatar.x = bg.x + bg.width - 15 - avatar.width / 2f;
+		} else {
+			avatar.x = bg.x - avatar.width / 2f + 15;
+		}
 		avatar.y = bg.y - avatar.height / 2f + 16;
 		PixelScene.align(avatar);
 
-		heroInfo.setRect( x, y, heroPaneWidth, large ? 40 : 36 );
+		if (flip) {
+			heroInfo.setRect( bg.x + bg.width - heroPaneWidth, y, heroPaneWidth, 40 );
+		} else {
+			heroInfo.setRect( x, y, heroPaneWidth, large ? 40 : 36 );
+		}
 
 		compass.x = avatar.x + avatar.width / 2f - compass.origin.x;
 		compass.y = avatar.y + avatar.height / 2f - compass.origin.y;
 		PixelScene.align(compass);
 
 		if (large) {
-			exp.x = x + 30;
+			if (flip) {
+				// Bars hug the left edge of the pane (2px margin matches the right-side margin
+				// of the unflipped layout, where bars end at bg.x+158 inside a 160-wide bg).
+				exp.x = bg.x + 2;
+				hp.x = shieldHP.x = bg.x + 2;
+			} else {
+				exp.x = x + 30;
+				hp.x = shieldHP.x = x + 30;
+			}
 			exp.y = y + 30;
-
-			hp.x = shieldHP.x = x + 30;
 			hp.y = shieldHP.y = y + 19;
 
 			hpText.x = hp.x + (128 - hpText.width())/2f;
@@ -222,12 +249,20 @@ public class StatusPane extends Component {
 			expText.y = exp.y;
 			PixelScene.align(expText);
 
-			heroInfoOnBar.setRect(heroInfo.right(), y + 19, 130, 20);
-
-			//little extra for 14th buff
-			buffs.setRect(x + 31, y, 142, 16);
-
-			busy.x = x + bg.width + 1;
+			if (flip) {
+				// Bar-click hit area covers the bar region (to the left of the portrait).
+				heroInfoOnBar.setRect(heroInfo.left() - 130, y + 19, 130, 20);
+				// Buffs above the HP bar, capped to 128 (HP bar width) so they wrap to a
+				// second row instead of overlapping the portrait when many are active.
+				buffs.setRect(bg.x + 3, y, 128, 16);
+				// Turn wheel just outside the left edge of the pane.
+				busy.x = bg.x - busy.width() - 1;
+			} else {
+				heroInfoOnBar.setRect(heroInfo.right(), y + 19, 130, 20);
+				//little extra for 14th buff
+				buffs.setRect(x + 31, y, 142, 16);
+				busy.x = x + bg.width + 1;
+			}
 			busy.y = y + bg.height - 9;
 		} else {
 			exp.x = x+2;
@@ -290,7 +325,11 @@ public class StatusPane extends Component {
 		if ( lastLvl != -1 ) {
 			level.measure();
 			if (large) {
-				level.x = x + (30f - level.width()) / 2f;
+				if (flip) {
+					level.x = bg.x + bg.width - 15 - level.width() / 2f;
+				} else {
+					level.x = x + (30f - level.width()) / 2f;
+				}
 				level.y = y + 33f - level.baseLine() / 2f;
 			} else {
 				level.x = x + heroPaneExtraWidth + 25.5f - level.width() / 2f;
@@ -301,11 +340,20 @@ public class StatusPane extends Component {
 
 		// OBS mask: solid black behind HP bar, buffs, and turn wheel for chroma-key
 		if (large) {
-			// Extend right past turn wheel (~half the arc radius)
-			float maskRight = busy.x + busy.width() + 9;
-			obsMaskHpBuffs.x = hp.x;
-			obsMaskHpBuffs.y = y;
-			obsMaskHpBuffs.size(maskRight - hp.x, height);
+			if (flip) {
+				// Mask spans from the (left-side) turn wheel to the right edge of the HP bar.
+				float maskLeft = Math.min(busy.x, hp.x);
+				float maskRight = hp.x + 128;
+				obsMaskHpBuffs.x = maskLeft;
+				obsMaskHpBuffs.y = y;
+				obsMaskHpBuffs.size(maskRight - maskLeft, height);
+			} else {
+				// Extend right past turn wheel (~half the arc radius)
+				float maskRight = busy.x + busy.width() + 9;
+				obsMaskHpBuffs.x = hp.x;
+				obsMaskHpBuffs.y = y;
+				obsMaskHpBuffs.size(maskRight - hp.x, height);
+			}
 		} else {
 			// Extend left/down to cover turn wheel at bottom-left
 			float maskLeft = Math.min(hp.x, busy.x);
@@ -397,7 +445,11 @@ public class StatusPane extends Component {
 			if (large){
 				level.text( "lv. " + lastLvl );
 				level.measure();
-				level.x = x + (30f - level.width()) / 2f;
+				if (SPDSettings.flipStatusPane() && HudLayout.isActive()) {
+					level.x = bg.x + bg.width - 15 - level.width() / 2f;
+				} else {
+					level.x = x + (30f - level.width()) / 2f;
+				}
 				level.y = y + 33f - level.baseLine() / 2f;
 			} else {
 				level.text( Integer.toString( lastLvl ) );

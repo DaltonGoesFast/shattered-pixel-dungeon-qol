@@ -649,7 +649,7 @@ public abstract class Mob extends Char {
 	@Override
 	public void updateSpriteState() {
 		super.updateSpriteState();
-		if (Dungeon.hero.buff(TimeFreeze.class) != null
+		if (TimeFreeze.on(Dungeon.hero) != null
 				|| Dungeon.hero.buff(Swiftthistle.TimeBubble.class) != null)
 			sprite.add( CharSprite.State.PARALYSED );
 	}

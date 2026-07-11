@@ -5,15 +5,16 @@ Copy the block below for your YouTube channel description or video descriptions.
 ---
 
 ```
-Channel Assets by Channel Member Grunt Frostwolf https://x.com/gruntfrostwolf and myself!
+Channel Assets by Channel Member Grunt Frostwolf and myself!
 
 Stream Commands:
-!fard
+!fard — once per stream per viewer; OBS + sound; extends global 2× for everyone (+1 min, +5 min for subs/members)
+!summon — free monster march on the companion overlay (60s cooldown); !summon rat or random monster
+!topsummoner — session summon leader (earns personal 2× points)
+!mysummons — your summon count this stream
 !kesha
 !challenges
 !seed
-!topfarder
-!myfards
 
 Streaming VERTICAL and HORIZONTAL on YouTube!
 
@@ -24,6 +25,13 @@ Join our Discord! https://discord.gg/Xrv52j4mEf
 CHAT COMMANDS — Spend points to mess with the run!
 
 Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also give points!
+
+2× BONUSES (stack — up to 8× on your earns):
+- Global 2×: !doublepoints (streamer) + !fard extensions
+- Personal 2×: top summoner (!summon leader this stream)
+- Sub/member 2×
+
+FREE (no points): !fard, !summon, !topsummoner, !mysummons — see Stream Commands above.
 
 COMMANDS:
 - !points — Check your balance (free)

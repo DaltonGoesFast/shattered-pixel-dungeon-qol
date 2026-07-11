@@ -10,6 +10,11 @@ import threading
 import time
 from datetime import datetime
 
+if os.name == "nt":
+    import msvcrt
+else:
+    import fcntl
+
 try:
     import websocket
 except ImportError:
@@ -19,6 +24,7 @@ app = Flask(__name__, static_folder='.')
 CORS(app)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+GAME_ASSETS_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, '..', 'core', 'src', 'main', 'assets'))
 
 def _default_save_directory():
     """Platform-aware default save directory."""
@@ -53,6 +59,9 @@ VIEWER_POINTS_LOCK_FILE = VIEWER_POINTS_FILE + ".lock"
 DOUBLE_POINTS_COUNTDOWN_FILE = os.path.join(SCRIPT_DIR, "double_points_countdown.txt")
 STREAMER_CHAT_SCORE_FILE = os.path.join(SCRIPT_DIR, "streamer_chat_score.json")
 STREAMER_CHAT_SCORE_TXT = os.path.join(SCRIPT_DIR, "streamer_chat_score.txt")
+TOP_SUMMONER_FILE = os.path.join(SCRIPT_DIR, "top_summoner.txt")
+SUMMON_MARCH_QUEUE_FILE = os.path.join(SCRIPT_DIR, "summon_march_queue.jsonl")
+SUMMON_MARCH_QUEUE_MAX = 500
 
 # Game WebSocket: receive live stream from game and serve via HTTP /api/game-data and game_summary.json
 GAME_WS_URL = "ws://127.0.0.1:5001"   # Game streaming port (default in game Settings; change if you set a different port)
@@ -137,6 +146,14 @@ IGNORED_SOURCE_LOG_INTERVAL = 60.0
 game_ws_app = None
 pending_spawns = {}  # request_id -> {"event": Event, "success": bool}
 spawn_lock = threading.Lock()
+game_ws_send_lock = threading.Lock()
+
+
+def _send_to_game(payload):
+    """Thread-safe send on the single game WebSocket (library send is not thread-safe)."""
+    with game_ws_send_lock:
+        game_ws_app.send(json.dumps(payload))
+
 # Activity feed: recent command events for overlay (max 100, each: time, username, command, detail, success)
 recent_command_events = []
 COMMAND_EVENTS_MAX = 100
@@ -157,7 +174,7 @@ def _record_command_event(username, command, detail, success):
             recent_command_events.pop(0)
 
 
-SPAWN_RESULT_TIMEOUT = 18.0  # seconds to wait for game to report spawn/gold result (game may be slow if not in run or main thread busy)
+SPAWN_RESULT_TIMEOUT = 9.0  # must match GAME_COMMAND_TIMEOUT in points_command.py (Streamer.bot waits 10s)
 SPAWN_WHITELIST = frozenset([
     'rat', 'albino', 'snake', 'gnoll', 'crab', 'slime', 'swarm', 'thief',
     'skeleton', 'bat', 'brute', 'shaman', 'spinner', 'dm100', 'guard',
@@ -166,6 +183,98 @@ SPAWN_WHITELIST = frozenset([
 ])
 SPAWN_COOLDOWN_SEC = 0  # 0 = disabled; handle cooldown in Streamer.bot
 last_spawn_time = 0.0
+
+# Summon march queue (Godot companion app polls GET /api/summon-march)
+summon_march_events = []
+summon_march_lock = threading.Lock()
+
+
+def _parse_top_summoner_file():
+    """Parse top_summoner.txt → (display_name, count) or (None, 0)."""
+    try:
+        if not os.path.exists(TOP_SUMMONER_FILE):
+            return None, 0, ""
+        with open(TOP_SUMMONER_FILE, encoding="utf-8") as f:
+            line = f.readline().strip()
+        if not line:
+            return None, 0, ""
+        prefix = "Top Summoner: "
+        if not line.startswith(prefix):
+            return None, 0, line
+        rest = line[len(prefix):]
+        dash = rest.rfind(" - ")
+        if dash < 0:
+            return rest.strip() or None, 0, line
+        name = rest[:dash].strip()
+        count = 0
+        try:
+            count = int(rest[dash + 3:].strip())
+        except ValueError:
+            pass
+        return name or None, count, line
+    except OSError:
+        return None, 0, ""
+
+
+def _write_summon_march_queue_to_disk(events):
+    """Replace jsonl with the given event list (caller holds summon_march_lock if needed)."""
+    tmp = SUMMON_MARCH_QUEUE_FILE + ".tmp"
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            for ev in events:
+                f.write(json.dumps(ev, separators=(",", ":")) + "\n")
+        os.replace(tmp, SUMMON_MARCH_QUEUE_FILE)
+    except OSError as e:
+        print(f"Warning: could not write summon march queue: {e}")
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except OSError:
+            pass
+
+
+def _load_summon_march_queue_from_disk():
+    """Load recent summon march events from jsonl on startup."""
+    events = []
+    try:
+        if not os.path.exists(SUMMON_MARCH_QUEUE_FILE):
+            return events
+        with open(SUMMON_MARCH_QUEUE_FILE, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    ev = json.loads(line)
+                    if isinstance(ev, dict) and ev.get("id"):
+                        events.append(ev)
+                except json.JSONDecodeError:
+                    continue
+        if len(events) > SUMMON_MARCH_QUEUE_MAX:
+            events = events[-SUMMON_MARCH_QUEUE_MAX:]
+            _write_summon_march_queue_to_disk(events)
+    except OSError as e:
+        print(f"Warning: could not load summon march queue: {e}")
+    return events
+
+
+def _append_summon_march_event(event):
+    """Append event to in-memory queue, trim, and persist to jsonl."""
+    with summon_march_lock:
+        summon_march_events.append(event)
+        trimmed = False
+        while len(summon_march_events) > SUMMON_MARCH_QUEUE_MAX:
+            summon_march_events.pop(0)
+            trimmed = True
+        try:
+            if trimmed:
+                _write_summon_march_queue_to_disk(summon_march_events)
+            else:
+                with open(SUMMON_MARCH_QUEUE_FILE, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(event, separators=(",", ":")) + "\n")
+        except OSError as e:
+            print(f"Warning: could not append summon march event: {e}")
+
 
 def update_game_data():
     """Background thread to continuously update game data (from save files). Skipped when game WS is active."""
@@ -541,6 +650,13 @@ def _game_ws_on_message(ws, message):
         print(f"Game WS message error: {e}")
 
 
+def _double_points_display_minutes(secs):
+    """Minutes-only countdown; round up; supports triple digits."""
+    if secs <= 0:
+        return ""
+    return f"{(secs + 59) // 60} min"
+
+
 def double_points_countdown_thread():
     """Write 2x points countdown to file every second for OBS Text source."""
     while True:
@@ -558,8 +674,7 @@ def double_points_countdown_thread():
             now = int(time.time())
             if end_ts > now:
                 secs = end_ts - now
-                mins, secs = divmod(secs, 60)
-                display = f"2x points: {mins}:{secs:02d}"
+                display = f"2x points: {_double_points_display_minutes(secs)}"
             with open(DOUBLE_POINTS_COUNTDOWN_FILE, "w", encoding="utf-8") as f:
                 f.write(display)
                 f.flush()
@@ -725,6 +840,16 @@ def favicon():
 def overlay():
     """Serve the OBS overlay page (game summary text)"""
     return send_from_directory('.', 'index.html')
+
+
+@app.route('/overlay-vertical')
+def overlay_vertical():
+    """Serve vertical 1080×1920 HUD overlay for OBS (top/bottom bars, transparent middle)"""
+    resp = send_from_directory('.', 'overlay-vertical.html')
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
 
 
 @app.route('/double-points-countdown')
@@ -894,31 +1019,54 @@ def cost_free_api():
         return jsonify({"error": str(e)}), 500
 
 
+_viewer_points_lock_local = threading.local()
+
+
 def _acquire_viewer_points_lock():
-    """Acquire lock on viewer_points file. Returns True if acquired."""
-    import time
+    """Acquire OS-level lock on viewer_points lock file. Returns True if acquired.
+
+    Byte-range locks (msvcrt/fcntl) are released by the OS if the process dies,
+    so a crash can never leave a stale lock. Same lock file as points_command.py.
+    The fd is stored per-thread; release with _release_viewer_points_lock()."""
+    fd = os.open(VIEWER_POINTS_LOCK_FILE, os.O_CREAT | os.O_RDWR)
     start = time.monotonic()
     while (time.monotonic() - start) < 10:
         try:
-            fd = os.open(VIEWER_POINTS_LOCK_FILE, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            os.write(fd, str(os.getpid()).encode())
-            os.close(fd)
+            if os.name == "nt":
+                os.lseek(fd, 0, os.SEEK_SET)
+                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+            else:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            _viewer_points_lock_local.fd = fd
             return True
-        except FileExistsError:
+        except OSError:
             time.sleep(0.05)
+    os.close(fd)
     return False
 
 
 def _release_viewer_points_lock():
+    fd = getattr(_viewer_points_lock_local, "fd", None)
+    if fd is None:
+        return
+    _viewer_points_lock_local.fd = None
     try:
-        os.remove(VIEWER_POINTS_LOCK_FILE)
+        if os.name == "nt":
+            os.lseek(fd, 0, os.SEEK_SET)
+            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        else:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+    except OSError:
+        pass
+    try:
+        os.close(fd)
     except OSError:
         pass
 
 
 @app.route('/api/viewer-points', methods=['GET', 'POST', 'OPTIONS'])
 def viewer_points_api():
-    """Get or update viewer points (username -> {points, last}). Uses same lock file as C# and Python."""
+    """Get or update viewer points (username -> {points, last}). Uses same lock file as points_command.py."""
     if request.method == 'OPTIONS':
         return '', 204
     if request.method == 'GET':
@@ -1236,6 +1384,28 @@ def viewer_points_clear_all():
         _release_viewer_points_lock()
 
 
+@app.route('/api/viewer-points/balance/<username>', methods=['GET', 'OPTIONS'])
+def viewer_points_balance(username):
+    """Fast balance lookup for !points (Streamer.bot HTTP). Same lock as other viewer_points access."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    username = (username or '').strip()
+    if not username:
+        return jsonify({"error": "username required", "points": 0}), 400
+    if not _acquire_viewer_points_lock():
+        return jsonify({"error": "Points file busy", "points": 0}), 503
+    try:
+        data = _read_viewer_points_raw()
+        key = username.lower()
+        if key not in data:
+            return jsonify({"points": 0})
+        p, _, d, _ = data[key]
+        pts = (p + d) if (d > 0 and p < d) else p
+        return jsonify({"points": pts})
+    finally:
+        _release_viewer_points_lock()
+
+
 @app.route('/api/viewer-points/<username>', methods=['DELETE', 'OPTIONS'])
 def viewer_points_delete(username):
     """Remove a viewer from the points file."""
@@ -1260,6 +1430,15 @@ def viewer_points_delete(username):
 def serve_font(filename):
     """Serve font files for OBS countdown (pixel font from game)"""
     return send_from_directory('fonts', filename)
+
+
+@app.route('/game-assets/<path:filename>')
+def game_assets(filename):
+    """Serve game sprite sheets for overlay HUD (items.png, large_buffs.png, etc.)"""
+    resp = send_from_directory(GAME_ASSETS_DIR, filename)
+    resp.headers['Cache-Control'] = 'public, max-age=3600'
+    return resp
+
 
 @app.route('/game_summary.txt')
 def serve_summary():
@@ -1330,7 +1509,7 @@ def game_ping():
     with spawn_lock:
         pending_spawns[request_id] = {'event': ev, 'success': False}
     try:
-        game_ws_app.send(json.dumps({'command': 'ping', 'request_id': request_id}))
+        _send_to_game({'command': 'ping', 'request_id': request_id})
     except Exception as e:
         with spawn_lock:
             pending_spawns.pop(request_id, None)
@@ -1423,7 +1602,7 @@ def spawn_command():
             if username:
                 payload['username'] = username
             print(f"Spawn send to game: {monster} request_id={request_id}")
-            game_ws_app.send(json.dumps(payload))
+            _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
                 pending_spawns.pop(request_id, None)
@@ -1489,7 +1668,7 @@ def champion_command():
             payload = {'command': 'champion', 'monster': monster, 'request_id': request_id}
             if username:
                 payload['username'] = username
-            game_ws_app.send(json.dumps(payload))
+            _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
                 pending_spawns.pop(request_id, None)
@@ -1544,7 +1723,7 @@ def gold_command():
             if username:
                 payload['username'] = username
             print(f"Gold send to game: amount={amount} request_id={request_id} (waiting up to {SPAWN_RESULT_TIMEOUT}s for response)")
-            game_ws_app.send(json.dumps(payload))
+            _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
                 pending_spawns.pop(request_id, None)
@@ -1591,7 +1770,7 @@ def gas_command():
             if username:
                 payload['username'] = username
             print(f"Gas send to game: request_id={request_id}")
-            game_ws_app.send(json.dumps(payload))
+            _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
                 pending_spawns.pop(request_id, None)
@@ -1645,7 +1824,7 @@ def curse_command():
             if username:
                 payload['username'] = username
             print(f"Curse send to game: slot={slot or 'random'} request_id={request_id}")
-            game_ws_app.send(json.dumps(payload))
+            _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
                 pending_spawns.pop(request_id, None)
@@ -1693,7 +1872,7 @@ def scroll_command():
             if username:
                 payload['username'] = username
             print(f"Scroll send to game: request_id={request_id}")
-            game_ws_app.send(json.dumps(payload))
+            _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
                 pending_spawns.pop(request_id, None)
@@ -1741,7 +1920,7 @@ def ring_of_wealth_command():
             if username:
                 payload['username'] = username
             print(f"Ring of wealth send to game: request_id={request_id}")
-            game_ws_app.send(json.dumps(payload))
+            _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
                 pending_spawns.pop(request_id, None)
@@ -1789,7 +1968,7 @@ def trap_command():
             if username:
                 payload['username'] = username
             print(f"Trap send to game: request_id={request_id}")
-            game_ws_app.send(json.dumps(payload))
+            _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
                 pending_spawns.pop(request_id, None)
@@ -1837,7 +2016,7 @@ def bomb_command():
             if username:
                 payload['username'] = username
             print(f"Bomb send to game: request_id={request_id}")
-            game_ws_app.send(json.dumps(payload))
+            _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
                 pending_spawns.pop(request_id, None)
@@ -1885,7 +2064,7 @@ def transmute_command():
             if username:
                 payload['username'] = username
             print(f"Transmute send to game: request_id={request_id}")
-            game_ws_app.send(json.dumps(payload))
+            _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
                 pending_spawns.pop(request_id, None)
@@ -1938,7 +2117,7 @@ def ward_command():
             if username:
                 payload['username'] = username
             print(f"Ward send to game: request_id={request_id}")
-            game_ws_app.send(json.dumps(payload))
+            _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
                 pending_spawns.pop(request_id, None)
@@ -1986,7 +2165,7 @@ def summon_bee_command():
             if username:
                 payload['username'] = username
             print(f"Summon bee send to game: request_id={request_id}")
-            game_ws_app.send(json.dumps(payload))
+            _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
                 pending_spawns.pop(request_id, None)
@@ -2034,7 +2213,7 @@ def buff_command():
             if username:
                 payload['username'] = username
             print(f"Buff send to game: request_id={request_id}")
-            game_ws_app.send(json.dumps(payload))
+            _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
                 pending_spawns.pop(request_id, None)
@@ -2082,7 +2261,7 @@ def debuff_command():
             if username:
                 payload['username'] = username
             print(f"Debuff send to game: request_id={request_id}")
-            game_ws_app.send(json.dumps(payload))
+            _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
                 pending_spawns.pop(request_id, None)
@@ -2129,7 +2308,7 @@ def _forward_chat_command(cmd, result_key, default_err):
             if username:
                 payload['username'] = username
             print(f"{cmd} send to game: request_id={request_id}")
-            game_ws_app.send(json.dumps(payload))
+            _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
                 pending_spawns.pop(request_id, None)
@@ -2172,7 +2351,7 @@ def _forward_streamer_debug(ws_cmd, default_err='Command failed', extra_payload=
             if extra_payload:
                 payload.update(extra_payload)
             print(f"streamer debug send to game: {ws_cmd} request_id={request_id}")
-            game_ws_app.send(json.dumps(payload))
+            _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
                 pending_spawns.pop(request_id, None)
@@ -2379,7 +2558,7 @@ def wand_command():
                 payload['username'] = username
             payload['tier'] = int(tier) if tier is not None else -1
             print(f"Wand send to game: request_id={request_id} tier={tier}")
-            game_ws_app.send(json.dumps(payload))
+            _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
                 pending_spawns.pop(request_id, None)
@@ -2506,9 +2685,8 @@ def double_points_remaining():
         if end_ts <= now:
             return jsonify({"active": False, "seconds_left": 0, "display": ""}), 200, resp_headers
         secs = end_ts - now
-        mins, secs = divmod(secs, 60)
-        display = f"{mins}:{secs:02d}"
-        return jsonify({"active": True, "seconds_left": end_ts - now, "display": display}), 200, resp_headers
+        display = _double_points_display_minutes(secs)
+        return jsonify({"active": True, "seconds_left": secs, "display": display}), 200, resp_headers
     except Exception as e:
         return jsonify({"active": False, "error": str(e)}), 500, resp_headers
 
@@ -2530,6 +2708,78 @@ def double_points_start():
         return jsonify({"ok": True, "minutes": minutes, "end_ts": end_ts})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/summon-march', methods=['GET', 'POST', 'OPTIONS'])
+def summon_march():
+    """Queue summon-march events for Godot companion; Streamer.bot POSTs new summons."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    if request.method == 'POST':
+        try:
+            data = request.get_json(force=True, silent=True) or {}
+            if not data and request.form:
+                data = request.form.to_dict()
+            username = (data.get('username') or data.get('userName') or '').strip()
+            monster = (data.get('monster') or '').strip().lower()
+            layout = (data.get('layout') or 'horizontal').strip().lower()
+            if layout not in ('horizontal', 'vertical'):
+                layout = 'horizontal'
+            if not monster or monster not in SPAWN_WHITELIST:
+                return jsonify({'ok': False, 'error': 'Invalid or missing monster'}), 400
+            event_id = str(uuid.uuid4())
+            ts = int(time.time())
+            event = {
+                'id': event_id,
+                'ts': ts,
+                'username': username,
+                'monster': monster,
+                'layout': layout,
+            }
+            _append_summon_march_event(event)
+            _record_command_event(username, 'summon_march', monster, True)
+            print(f"Summon march queued: {monster} for {username or '?'} ({event_id})")
+            return jsonify({'ok': True, 'id': event_id, 'event': event})
+        except Exception as e:
+            print(f"Summon march POST error: {e}")
+            return jsonify({'ok': False, 'error': str(e)}), 500
+    # GET — poll events since id or unix timestamp
+    try:
+        since = request.args.get('since', '').strip()
+        with summon_march_lock:
+            events = list(summon_march_events)
+        if not since:
+            out = events
+        elif since.isdigit():
+            since_ts = int(since)
+            out = [e for e in events if e.get('ts', 0) > since_ts]
+        else:
+            found = False
+            out = []
+            for e in events:
+                if found:
+                    out.append(e)
+                elif e.get('id') == since:
+                    found = True
+        return jsonify({'events': out, 'count': len(out)})
+    except Exception as e:
+        return jsonify({'error': str(e), 'events': []}), 500
+
+
+@app.route('/api/top-summoner')
+def top_summoner_api():
+    """Return parsed top summoner for OBS browser sources."""
+    resp_headers = {'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0'}
+    try:
+        username, count, display = _parse_top_summoner_file()
+        return jsonify({
+            'username': username or '',
+            'count': count,
+            'display': display or (f'Top Summoner: {username} - {count}' if username else ''),
+            'has_leader': bool(username),
+        }), 200, resp_headers
+    except Exception as e:
+        return jsonify({'error': str(e), 'username': '', 'count': 0, 'display': '', 'has_leader': False}), 500, resp_headers
 
 
 @app.route('/api/activity-commands')
@@ -2580,17 +2830,23 @@ if __name__ == '__main__':
     # Ensure streamer_chat_score.txt exists for OBS Read from file
     _save_score_data(_load_score_data())
 
+    # Load summon march queue from disk for Godot catch-up
+    summon_march_events[:] = _load_summon_march_queue_from_disk()
+
     print("\n" + "="*50)
     print("SPD Overlay Server Starting...")
     print("="*50)
     print(f"Save Directory: {SAVE_DIRECTORY}")
     print(f"Server URL: http://localhost:5000")
+    print(f"Vertical HUD overlay: http://localhost:5000/overlay-vertical (1080×1920 Browser Source)")
     print(f"Add this URL as a Browser Source in OBS")
     if USE_GAME_WEBSOCKET and websocket:
         print(f"Game WebSocket: {GAME_WS_URL} (live data → /api/game-data, game_summary.txt/json)")
     if obs_inv_config.get('enabled', True) and websocket:
         print(f"OBS Inv Layout: {obs_inv_config.get('obs_ws_url')} (dynamic Crop/Pad via obs_inv_layout.json)")
     print(f"Chat spawn: POST /api/spawn-command {{\"monster\": \"rat\"}} (cooldown: {SPAWN_COOLDOWN_SEC}s)")
+    print(f"Summon march: POST/GET /api/summon-march (Godot companion; queue: {len(summon_march_events)} events)")
+    print(f"Top summoner: GET /api/top-summoner ({TOP_SUMMONER_FILE})")
     print(f"Connection test: GET /api/game-ping (returns version if game connected)")
     print(f"Streamer vs Chat: {STREAMER_CHAT_SCORE_TXT} (OBS Read from file)")
     print("="*50 + "\n")
@@ -2605,4 +2861,4 @@ if __name__ == '__main__':
     logging.getLogger('werkzeug').addFilter(_QuietPollFilter())
 
     # Run Flask server
-    app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
+    app.run(host='127.0.0.1', port=5000, debug=False, threaded=True)

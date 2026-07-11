@@ -2,7 +2,7 @@
 
 Copy the block below for your YouTube description, Twitch panels, or channel About section.
 
-- **YouTube (full):** See [youtube-description.md](youtube-description.md) for a complete YouTube description including channel assets, stream commands (!fard, !kesha, etc.), Discord, and chat commands.
+- **YouTube (full):** See [youtube-description.md](youtube-description.md) for a complete YouTube description including channel assets, stream commands (!fard, !summon, !kesha, etc.), Discord, and chat commands.
 - **Twitch panels:** See [twitch-panel.md](twitch-panel.md) for a formatted version with line breaks.
 
 ---
@@ -11,6 +11,17 @@ Copy the block below for your YouTube description, Twitch panels, or channel Abo
 CHAT COMMANDS — Spend points to mess with the run!
 
 Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also give points!
+
+2× BONUSES (stack on your earns — up to 8×):
+- Global 2×: streamer !doublepoints + community !fard (+1 min, +5 min for subs/members)
+- Personal 2×: top summoner (most !summon uses this stream)
+- Sub/member 2× (Twitch sub or YouTube member)
+
+FREE COMMANDS (no points):
+- !fard — Once per stream per viewer: OBS flash + sound; extends global 2× for everyone (+1 min, +5 min subs/members)
+- !summon — Free monster march on the companion overlay (60s cooldown). Optional monster: !summon rat (random if omitted). Same monster list as !spawn
+- !topsummoner — Who has the most summons this stream (top summoner earns personal 2× points)
+- !mysummons — Your summon count this stream
 
 COMMANDS (points):
 - !points / !toppoints / !leaderboard — Free

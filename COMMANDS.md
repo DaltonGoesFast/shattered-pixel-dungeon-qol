@@ -2,6 +2,21 @@
 
 Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also give points!
 
+**2× bonuses (stack — up to 8×):** global !doublepoints + !fard → personal top summoner (!summon leader) → sub/member.
+
+---
+
+## Free commands (no points)
+
+| Command | Description |
+|---------|-------------|
+| **!fard** | Once per stream per viewer: OBS flash + sound; extends **global 2×** for everyone (+1 min, +5 min for subs/members) |
+| **!summon** | Monster march on the **companion overlay** (not in-game). **60s** cooldown. `!summon rat` or random monster (same pool as !spawn) |
+| **!topsummoner** | Session summon leader — earns **personal 2×** on point gains |
+| **!mysummons** | Your summon count this stream |
+
+*Technical setup:* [docs/fard-system.md](docs/fard-system.md), [docs/summon-march-system.md](docs/summon-march-system.md).
+
 ---
 
 ## Extra chat spend commands
@@ -81,12 +96,12 @@ These are **before** half-off when deeper or chapter-gap surcharge (+20% per ste
 
 These do **not** run by themselves — **Streamer.bot** must call `points_command.py` (or POST to the overlay server) on the matching trigger. See `docs/streamerbot-points-from-scratch.md` **Actions 20, 21, and 40**.
 
-`points_command.py` applies the same stacking multipliers as chat earning: global **!doublepoints** 2×, then **subscriber / member** 2× (`isSubscribed` on Twitch, `userIsSponsor` on YouTube), then optional **top farder** 2×. Pass optional trailing CLI args (default `0`):
+`points_command.py` applies the same stacking multipliers as chat earning: global **!doublepoints** (and **!fard** extensions) 2×, then **top summoner** 2× (`top_summoner.txt` from `!summon`), then **subscriber / member** 2× (`isSubscribed` on Twitch, `userIsSponsor` on YouTube). Pass optional trailing CLI args for sub/member (default off):
 
-- `superchat <microAmount> <currencyCode> <username> [isSubscribed] [userIsSponsor] [topFarder]`
-- `cheer <bits> <username> [isSubscribed] [userIsSponsor] [topFarder]`
-- `giftmembership <username> [tier] [isSubscribed] [userIsSponsor] [topFarder]` — Twitch: `%recipientUserName%`; YouTube gift membership: `%gifterUserName%` (API has no recipient name)
+- `superchat <microAmount> <currencyCode> <username> [isSubscribed] [userIsSponsor]`
+- `cheer <bits> <username> [isSubscribed] [userIsSponsor]`
+- `giftmembership <username> [tier] [isSubscribed] [userIsSponsor]` — Twitch: `%recipientUserName%`; YouTube gift membership: `%gifterUserName%` (API has no recipient name)
 
 **HTTP alternative** (overlay server must be running): `POST http://127.0.0.1:5000/api/donation/superchat`, `/api/donation/cheer`, `/api/donation/gift-membership` with JSON body (`username`, `microAmount` / `bits` / `tier`, optional flags).
 
-Example Streamer.bot args: `points_command.py superchat %microAmount% %currencyCode% %userName% %isSubscribed% %userIsSponsor% 0` — if real Super Chats get 0 points, try `%user%` instead of `%userName%`, or enable debug via empty `Lastest UI/superchat_debug.txt`.
+Example Streamer.bot args: `points_command.py superchat %microAmount% %currencyCode% %userName% %isSubscribed% %userIsSponsor%` — if real Super Chats get 0 points, try `%user%` instead of `%userName%`, or enable debug via empty `Lastest UI/superchat_debug.txt`.

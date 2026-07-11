@@ -25,7 +25,8 @@ Use this list when updating an **existing** setup. Game code fixes (corrupt `!al
 | What | Why | Where to look |
 |------|-----|----------------|
 | **`!wand` Run a Program** | Unified wand: **one** cost (`cost_per_wand`), weighted random effect in the game. | [Action 18](#action-18-cursed-wand-effect-wand-with-points) |
-| **Cheer + Super Chat optional args** | So bits / Super Chat get the same **stacking 2×** as chat (!doublepoints, sub/member, optional top farder). Without the extra args, only global double points applies. | This doc: [Action 20](#action-20-earn-points-cheer), [Action 21](#action-21-earn-points-super-chat), [argument reference](#cheer--super-chat--argument-reference). |
+| **Cheer + Super Chat optional args** | So bits / Super Chat get the same **stacking 2×** as chat (!doublepoints, **top summoner**, sub/member). Without the extra args, only global double points + top summoner apply on donations. | [Action 20](#action-20-earn-points-cheer), [Action 21](#action-21-earn-points-super-chat), [argument reference](#cheer--super-chat--argument-reference). |
+| **Top summoner 2× (chat earn)** | Session leader from `!summon` earns **2×** on chat, passive, and First Words. Add `IsTopSummoner` to Earn Points C# (Actions 01–03) if your export predates summon march. | [Top summoner 2×](#top-summoner-2-personal-points), [streamerbot-summon-march-apply.md](streamerbot-summon-march-apply.md). |
 | **Gift sub / gift membership** | Not automatic — add [Action 40](#action-40-earn-points-gift-sub--gift-membership). | [Action 40](#action-40-earn-points-gift-sub--gift-membership) (after `!plant`). |
 | **Super Chat / Cheer** | Donation points require Actions 20–21 on the points queue; see HTTP fallback if Run Program fails. | [Action 20](#action-20-earn-points-cheer), [Action 21](#action-21-earn-points-super-chat). |
 | **Chat → donor by %** | Transfer part of chat-only points into donor points from the overlay. | Open **points-config** in the browser (`/points-config`): set **Chat→Donor %** next to the button, then **Chat → Donor**. Not a Streamer.bot change. |
@@ -33,6 +34,7 @@ Use this list when updating an **existing** setup. Game code fixes (corrupt `!al
 **Files the Python script writes (for your paths):**
 
 - `Lastest UI/spawn_result.txt` — result of spend commands (often deleted by the next C# step).
+- `Lastest UI/top_summoner.txt` — session summon leader for **2× personal points** (written by `summon_march_post.py` from `!summon`).
 
 ---
 
@@ -42,7 +44,7 @@ Use this list when updating an **existing** setup. Game code fixes (corrupt `!al
 
 | # | Action | Trigger | Purpose |
 |---|--------|---------|---------|
-| 01 | Earn Points (on chat) | Message Received | +1 per message (30s cooldown) |
+| 01 | Earn Points (on chat) | Message Received | +1 per message (30s cooldown; stacks 2×) |
 | 02 | Earn Points (passive) | Present Viewers | +1 per tick for users already in file |
 | 03 | First Words Bonus | (add to First Words) | +5 on first chat |
 | 04 | Check Points | !points | Show viewer their balance |
@@ -63,7 +65,7 @@ Use this list when updating an **existing** setup. Game code fixes (corrupt `!al
 | 19 | Double Points | !doublepoints | Streamer only: 2× points for N minutes |
 | 20 | Earn Points (Cheer) | Twitch Cheer | 1 pt per bit; optional args for stacked 2× |
 | 21 | Earn Points (Super Chat) | YouTube Super Chat | 1 pt per $0.01; same optional args |
-| 22 | Reset Points | Stream Started | Clear non-donor points |
+| 22 | Reset Summon March | Stream Started | Clear top summoner + session summon counts |
 | 23 | Spend OFF | Hotkey (Stream Deck OFF) | Disable spend commands |
 | 24 | Spend ON | Hotkey (Stream Deck ON) | Enable spend commands |
 | 25 | !heal | !heal | Heal hero ~15% HP |
@@ -162,6 +164,75 @@ The file is created automatically when the first action runs.
 
 **Double points:** Stored in `double_points_end.txt` (Unix timestamp when 2x ends; `0` = off). Created when you first use `!doublepoints`.
 
+**Top summoner:** Stored in `top_summoner.txt` (`Top Summoner: name - count`). Updated when someone uses `!summon`. The leader earns **2× personal points** on chat, passive, First Words, and donations (see [Top summoner 2×](#top-summoner-2-personal-points)).
+
+---
+
+## Top summoner 2× (personal points)
+
+Replaces the removed **top farder** bonus. Whoever has the most successful `!summon` uses **this stream** is the top summoner and earns **2×** on personal point gains (stacks with !doublepoints and sub/member).
+
+**Multiplier order** (each step doubles when active):
+
+1. Global **!doublepoints** (and `!fard` extensions)
+2. **Top summoner** (`top_summoner.txt`)
+3. **Subscriber OR channel member**
+
+Examples: sub + top summoner = **4×** base; all three = **8×** base.
+
+| Earn path | Where 2× is applied |
+|-----------|---------------------|
+| Chat message (Action 01) | C# `IsTopSummoner()` |
+| Passive tick (Action 02) | C# `IsTopSummoner()` |
+| First Words (Action 03) | C# `IsTopSummoner()` |
+| Cheer / Super Chat / gift (Actions 20, 21, 40) | `points_command.py` reads `top_summoner.txt` automatically — **no extra Streamer.bot args** |
+
+**Setup:** [streamerbot-summon-march-apply.md](streamerbot-summon-march-apply.md) (`!summon`, `!topsummoner`, stream reset).
+
+### What to change if your Earn Points C# predates summon march
+
+In **Earn Points (chat)**, **Earn Points (passive)**, and **First Words** C#:
+
+1. Add next to your other `const` paths:
+
+```csharp
+const string TOP_SUMMONER_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\top_summoner.txt";
+```
+
+2. Replace your multiplier line with:
+
+```csharp
+int mult = (IsDoublePointsActive(unixNow) ? 2 : 1)
+         * (IsTopSummoner(key) ? 2 : 1)
+         * (IsSubscriberOrMember() ? 2 : 1);
+```
+
+(First Words uses `user.ToLowerInvariant()` instead of `key` where applicable.)
+
+3. Add **before** `IsSubscriberOrMember()`:
+
+```csharp
+bool IsTopSummoner(string userKey)
+{
+    try
+    {
+        if (string.IsNullOrEmpty(userKey) || !File.Exists(TOP_SUMMONER_FILE)) return false;
+        string line = File.ReadAllText(TOP_SUMMONER_FILE).Trim();
+        const string prefix = "Top Summoner: ";
+        if (!line.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return false;
+        string rest = line.Substring(prefix.Length);
+        int dash = rest.LastIndexOf(" - ");
+        string leader = dash >= 0 ? rest.Substring(0, dash).Trim() : rest.Trim();
+        return leader.Equals(userKey, StringComparison.OrdinalIgnoreCase);
+    }
+    catch { return false; }
+}
+```
+
+4. **Action 22** on Stream Started runs `"summon_march_post.py" reset` so the leaderboard clears each stream (see below). Points reset is manual / optional.
+
+**Donations:** If `points_command.py` is up to date, cheer/Super Chat/gift already honor top summoner — no Run Program argument changes.
+
 ---
 
 ## Configuration (edit in the C# code)
@@ -173,8 +244,9 @@ The file is created automatically when the first action runs.
 - **Passive cooldown:** `60` seconds (change `COOLDOWN_SEC` in Earn Points passive; shares `lastEarn` with chat)
 - **Points costs:** Edit `points_config.json` or open **http://localhost:5000** in your browser (main control page; overlay server must be running). The overlay also has **Delete all points** (clears non-donor only; donors keep donation) and **Delete all donor points** (full wipe).
 - **Donation rate:** 1 point per $0.01 (Super Chat uses Frankfurter API for conversion; not in points config)
-- **Top farder 2x:** Set `TOP_FARDER_FILE` to the path of the text file (default: `OBS files\textread\leader.txt`). Expected format: `Top Farder: USERNAME - 45`. That user always earns 2x points.
-- **Subscriber / member 2x:** Twitch subscribers and YouTube channel members earn 2x points. Uses Streamer.bot variables `isSubscribed` (Twitch) and `userIsSponsor` (YouTube). Stacks with double points and top farder (e.g. 4x or 8x when multiple apply).
+- **Fard extends 2×:** Viewers use `!fard` once per stream to add +1 min (+5 min for subs/members) to global 2×. See [fard-system.md](fard-system.md) and [streamerbot-fard-rework-apply.md](streamerbot-fard-rework-apply.md).
+- **Top summoner 2×:** Session `!summon` leader earns 2× on personal points (chat, passive, First Words, donations). See [Top summoner 2×](#top-summoner-2-personal-points).
+- **Subscriber / member 2×:** Twitch subscribers and YouTube channel members earn 2× points. Uses Streamer.bot variables `isSubscribed` (Twitch) and `userIsSponsor` (YouTube). Stacks with double points and top summoner (e.g. **8×** when all three apply).
 
 ---
 
@@ -184,7 +256,15 @@ The file is created automatically when the first action runs.
 
 **Sub-Action:** Execute C# Code (Inline)
 
-Uses plain-text format (no JSON) to avoid System.Core dependency. **All code that reads or writes `viewer_points.txt` must use the same lock file** (`viewer_points.txt.lock`) so Earn Points, Passive earn, !points, !toppoints, First Words, Reset, the overlay server, and Python (superchat, spawn, etc.) don't overwrite each other. Earn Points on chat, Earn Points passive, First Words, Check Points, Top Points, and Reset Points all use this lock.
+**Multipliers:** `POINTS_PER_MESSAGE` × !doublepoints × **top summoner** × sub/member (see [Top summoner 2×](#top-summoner-2-personal-points)).
+
+Uses plain-text format (no JSON) to avoid System.Core dependency. **All code that reads or writes `viewer_points.txt` must use the same lock file** (`viewer_points.txt.lock`) so Earn Points, Passive earn, !points, !toppoints, First Words, Reset, the overlay server, and Python (superchat, spawn, etc.) don't overwrite each other. Each C# block below opens the **persistent** lock file and uses `FileStream.Lock` (matches Python `msvcrt` / server `fcntl`). Do **not** use `FileMode.CreateNew` + delete — that waits 10s whenever the lock file exists.
+
+**Skip chat commands:** Message Received also fires on `!spawn`, `!scroll`, etc. Those lines have their own Command actions on the same **blocking queue**. If this action runs first, it can sit in `AcquirePointsLock()` for up to 10 seconds before spend commands start (multi-second chat delay). The C# below returns immediately when the message starts with `!`, **before** acquiring the lock. Optional alternative: add a trigger filter on this action (Message does not start with `!`) instead of the C# check.
+
+**Paste the entire block below** into Streamer.bot Action 01 (replace all existing C#). After **Save and Compile**, search your live code for `CreateNew` — if it still appears, the old lock is still in place and **earn will silently fail** whenever `viewer_points.txt.lock` exists on disk. The working version uses `OpenOrCreate`, `_pointsLockStream`, and `FileStream.Lock(0, 1)`.
+
+**Earn fires but no points?** In Action History, a `return false` with no error usually means: (1) old `CreateNew` lock — `AcquirePointsLock()` failed after 10s; (2) **30s cooldown** — same user chatted within `COOLDOWN_SEC`; (3) message starts with `!`; (4) user is `BOT_USER`. A successful earn shows the C# sub-action completing with return **true**.
 
 ```csharp
 using System;
@@ -199,7 +279,7 @@ public class CPHInline
     const string COUNTER_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\helper_hurter_counter.txt";
     const string ASSIGNED_ROLE_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\assigned_role.txt";
     const string DOUBLE_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\double_points_end.txt";
-    const string TOP_FARDER_FILE = @"C:\Users\dalto\Documents\OBS files\textread\leader.txt";  // Format: "Top Farder: USERNAME - 45"
+    const string TOP_SUMMONER_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\top_summoner.txt";
     const int POINTS_PER_MESSAGE = 1;
     const int COOLDOWN_SEC = 30;  // 0 = no cooldown
 
@@ -210,6 +290,12 @@ public class CPHInline
         string user = CPH.TryGetArg("userName", out string u) ? u : null;
         if (string.IsNullOrEmpty(user)) return false;
         if (user.Equals(BOT_USER, StringComparison.OrdinalIgnoreCase)) return false;
+
+        // Skip chat commands (!spawn, !scroll, etc.) — they have their own actions on the blocking queue.
+        string chatMsg = CPH.TryGetArg("message", out string cm) ? cm : null;
+        if (string.IsNullOrEmpty(chatMsg)) CPH.TryGetArg("rawMessage", out chatMsg);
+        if (!string.IsNullOrEmpty(chatMsg) && chatMsg.TrimStart().StartsWith("!"))
+            return false;
 
         try
         {
@@ -248,7 +334,7 @@ public class CPHInline
                     justAssigned = true;
                 }
 
-                int mult = (IsDoublePointsActive(unixNow) ? 2 : 1) * (IsTopFarder(key) ? 2 : 1) * (IsSubscriberOrMember() ? 2 : 1);
+                int mult = (IsDoublePointsActive(unixNow) ? 2 : 1) * (IsTopSummoner(key) ? 2 : 1) * (IsSubscriberOrMember() ? 2 : 1);
                 int toAdd = POINTS_PER_MESSAGE * mult;
                 pts += toAdd;
                 data[key] = Tuple.Create(pts, unixNow, donationPts, role);
@@ -262,24 +348,40 @@ public class CPHInline
         catch (Exception ex) { CPH.LogInfo("Earn points: " + ex.Message); return false; }
     }
 
+    FileStream _pointsLockStream;
+
     bool AcquirePointsLock()
     {
         for (int i = 0; i < 200; i++)  // 10 sec at 50ms
         {
             try
             {
-                using (var fs = new FileStream(LOCK_FILE, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-                    fs.WriteByte(0);
+                _pointsLockStream = new FileStream(LOCK_FILE, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+                _pointsLockStream.Lock(0, 1);
                 return true;
             }
-            catch (IOException) { Thread.Sleep(50); }
+            catch (IOException)
+            {
+                try { _pointsLockStream?.Dispose(); } catch { }
+                _pointsLockStream = null;
+                Thread.Sleep(50);
+            }
         }
         return false;
     }
 
     void ReleasePointsLock()
     {
-        try { if (File.Exists(LOCK_FILE)) File.Delete(LOCK_FILE); } catch { }
+        try
+        {
+            if (_pointsLockStream != null)
+            {
+                _pointsLockStream.Unlock(0, 1);
+                _pointsLockStream.Dispose();
+                _pointsLockStream = null;
+            }
+        }
+        catch { }
     }
 
     Dictionary<string, Tuple<int, long, int, string>> ReadAll()
@@ -331,26 +433,23 @@ public class CPHInline
         catch { return false; }
     }
 
-    bool IsTopFarder(string userKey)
+    // Twitch: isSubscribed. YouTube: userIsSponsor (channel member). Stacks with double points and top summoner.
+    bool IsTopSummoner(string userKey)
     {
         try
         {
-            if (!File.Exists(TOP_FARDER_FILE)) return false;
-            string content = File.ReadAllText(TOP_FARDER_FILE).Trim();
-            const string prefix = "Top Farder: ";
-            const string suffix = " - ";
-            int p = content.IndexOf(prefix, StringComparison.OrdinalIgnoreCase);
-            if (p < 0) return false;
-            int start = p + prefix.Length;
-            int s = content.IndexOf(suffix, start, StringComparison.Ordinal);
-            if (s < 0) return false;
-            string username = content.Substring(start, s - start).Trim();
-            return !string.IsNullOrEmpty(username) && userKey.Equals(username, StringComparison.OrdinalIgnoreCase);
+            if (string.IsNullOrEmpty(userKey) || !File.Exists(TOP_SUMMONER_FILE)) return false;
+            string line = File.ReadAllText(TOP_SUMMONER_FILE).Trim();
+            const string prefix = "Top Summoner: ";
+            if (!line.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return false;
+            string rest = line.Substring(prefix.Length);
+            int dash = rest.LastIndexOf(" - ");
+            string leader = dash >= 0 ? rest.Substring(0, dash).Trim() : rest.Trim();
+            return leader.Equals(userKey, StringComparison.OrdinalIgnoreCase);
         }
         catch { return false; }
     }
 
-    // Twitch: isSubscribed. YouTube: userIsSponsor (channel member). Stacks with double points & top farder.
     bool IsSubscriberOrMember()
     {
         if (CPH.TryGetArg("isSubscribed", out string tw) && tw.Equals("True", StringComparison.OrdinalIgnoreCase)) return true;
@@ -410,9 +509,13 @@ public class CPHInline
 
 **Trigger:** Present Viewers (Twitch → Triggers → Present Viewers)
 
+**Multipliers:** Same stacking as Action 01 (!doublepoints × **top summoner** × sub/member).
+
 Adds points over time to viewers who are already in the file (have chatted at least once). Enable **Live Update** under Platform → Twitch → Settings and set the interval (e.g. 5 minutes).
 
 **Note:** The C# tries both `userName` and `presentUserName`. If Present Viewers uses a list, add **Add Present User** (index 0, 1, 2, …) in a loop before the C# so each viewer gets processed. Subscriber/member 2x applies when Streamer.bot provides `isSubscribed` or `userIsSponsor` for that viewer (Message Received does; Present Viewers may not, depending on your setup).
+
+**Paste the entire block below** and search live code for `CreateNew` after compile — same lock fix as Action 01. Passive earn only adds to viewers **already in** `viewer_points.txt` (must chat once first). Shares `lastEarn` / **60s cooldown** with Action 01 on the same row.
 
 **Sub-Action:** Execute C# Code (Inline)
 
@@ -427,7 +530,7 @@ public class CPHInline
     const string FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt";
     const string LOCK_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt.lock";
     const string DOUBLE_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\double_points_end.txt";
-    const string TOP_FARDER_FILE = @"C:\Users\dalto\Documents\OBS files\textread\leader.txt";  // Format: "Top Farder: USERNAME - 45"
+    const string TOP_SUMMONER_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\top_summoner.txt";
     const int POINTS_PER_TICK = 1;
     const int COOLDOWN_SEC = 60;  // 0 = no cooldown (shares lastEarn with message earn)
     const string BOT_USER = "daltongoesslow";  // Bot never earns points (case-insensitive)
@@ -455,7 +558,7 @@ public class CPHInline
                 if (COOLDOWN_SEC > 0 && lastEarn > 0 && unixNow - lastEarn < COOLDOWN_SEC)
                     return false;
 
-                int mult = (IsDoublePointsActive(unixNow) ? 2 : 1) * (IsTopFarder(key) ? 2 : 1) * (IsSubscriberOrMember() ? 2 : 1);
+                int mult = (IsDoublePointsActive(unixNow) ? 2 : 1) * (IsTopSummoner(key) ? 2 : 1) * (IsSubscriberOrMember() ? 2 : 1);
                 int toAdd = POINTS_PER_TICK * mult;
                 pts += toAdd;
                 int donationPts = data[key].Item3;
@@ -469,24 +572,40 @@ public class CPHInline
         catch (Exception ex) { CPH.LogInfo("Passive earn: " + ex.Message); return false; }
     }
 
+    FileStream _pointsLockStream;
+
     bool AcquirePointsLock()
     {
         for (int i = 0; i < 200; i++)  // 10 sec at 50ms
         {
             try
             {
-                using (var fs = new FileStream(LOCK_FILE, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-                    fs.WriteByte(0);
+                _pointsLockStream = new FileStream(LOCK_FILE, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+                _pointsLockStream.Lock(0, 1);
                 return true;
             }
-            catch (IOException) { Thread.Sleep(50); }
+            catch (IOException)
+            {
+                try { _pointsLockStream?.Dispose(); } catch { }
+                _pointsLockStream = null;
+                Thread.Sleep(50);
+            }
         }
         return false;
     }
 
     void ReleasePointsLock()
     {
-        try { if (File.Exists(LOCK_FILE)) File.Delete(LOCK_FILE); } catch { }
+        try
+        {
+            if (_pointsLockStream != null)
+            {
+                _pointsLockStream.Unlock(0, 1);
+                _pointsLockStream.Dispose();
+                _pointsLockStream = null;
+            }
+        }
+        catch { }
     }
 
     Dictionary<string, Tuple<int, long, int, string>> ReadAll()
@@ -538,21 +657,18 @@ public class CPHInline
         catch { return false; }
     }
 
-    bool IsTopFarder(string userKey)
+    bool IsTopSummoner(string userKey)
     {
         try
         {
-            if (!File.Exists(TOP_FARDER_FILE)) return false;
-            string content = File.ReadAllText(TOP_FARDER_FILE).Trim();
-            const string prefix = "Top Farder: ";
-            const string suffix = " - ";
-            int p = content.IndexOf(prefix, StringComparison.OrdinalIgnoreCase);
-            if (p < 0) return false;
-            int start = p + prefix.Length;
-            int s = content.IndexOf(suffix, start, StringComparison.Ordinal);
-            if (s < 0) return false;
-            string username = content.Substring(start, s - start).Trim();
-            return !string.IsNullOrEmpty(username) && userKey.Equals(username, StringComparison.OrdinalIgnoreCase);
+            if (string.IsNullOrEmpty(userKey) || !File.Exists(TOP_SUMMONER_FILE)) return false;
+            string line = File.ReadAllText(TOP_SUMMONER_FILE).Trim();
+            const string prefix = "Top Summoner: ";
+            if (!line.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return false;
+            string rest = line.Substring(prefix.Length);
+            int dash = rest.LastIndexOf(" - ");
+            string leader = dash >= 0 ? rest.Substring(0, dash).Trim() : rest.Trim();
+            return leader.Equals(userKey, StringComparison.OrdinalIgnoreCase);
         }
         catch { return false; }
     }
@@ -570,9 +686,32 @@ public class CPHInline
 
 ## Action 03: First Words Bonus (add to your existing First Words action)
 
-Add this as a **sub-action** to your existing First Words action (before or after the shout out). Gives 5 points the first time a user chats.
+Add the points C# as a **sub-action inside your existing First Words action** (OBS overlay, sound, etc.). Gives bonus points the first time a user chats (`FIRST_WORDS_BONUS`, default 5 in doc — you may use e.g. 50).
 
-**Sub-Action:** Execute C# Code (Inline)
+### First Words overlay feels delayed?
+
+Two common causes:
+
+1. **Blocking points queue** — If the whole First Words action is on the same **blocking queue** as `!spawn` / earn, the **entire** action (OBS + sound + C#) waits until everything ahead of it finishes. **Fix:** move First Words to the **Default** queue (or a dedicated **presentation** queue), **not** the spend/earn blocking queue. File locking still keeps points safe without Streamer.bot queue serialization.
+
+2. **Sub-action order** — If **Execute C# Code (points)** is **first**, OBS/sound do not run until the lock is acquired and `viewer_points.txt` is read/written. **Fix:** run **OBS text → show group → play sound first**, then **Execute C# Code**, then your hide delay. Example order:
+
+   1. OBS GDI Text (set name)
+   2. OBS Source Visibility (show)
+   3. Play sound
+   4. **Execute C# Code** (points bonus) ← after overlay is visible
+   5. Delay (e.g. 7000 ms)
+   6. OBS Source Visibility (hide)
+
+   Points may grant a moment after the overlay appears; that is fine.
+
+**Optional split:** Two actions on the same First Words trigger — **(A)** OBS/sound on Default queue; **(B)** points C# only on Default queue or points queue. Presentation never waits on spawns.
+
+**Paste the entire C# block below** and search live code for `CreateNew` after compile — same lock fix as Action 01. First Words runs on a user's **first chat** of the session; if Action 01 already ran on that message, both can fire (chat earn + first-words bonus).
+
+**Multipliers:** Same stacking as Action 01 (!doublepoints × **top summoner** × sub/member).
+
+**Sub-Action:** Execute C# Code (Inline) — place **after** OBS show + sound (see order above), not before.
 
 ```csharp
 using System;
@@ -585,7 +724,7 @@ public class CPHInline
     const string FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt";
     const string LOCK_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt.lock";
     const string DOUBLE_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\double_points_end.txt";
-    const string TOP_FARDER_FILE = @"C:\Users\dalto\Documents\OBS files\textread\leader.txt";  // Format: "Top Farder: USERNAME - 45"
+    const string TOP_SUMMONER_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\top_summoner.txt";
     const int FIRST_WORDS_BONUS = 5;
 
     public bool Execute()
@@ -604,7 +743,7 @@ public class CPHInline
                 int pts = data.ContainsKey(key) ? data[key].Item1 : 0;
                 int donationPts = data.ContainsKey(key) ? data[key].Item3 : 0;
                 string role = data.ContainsKey(key) ? (data[key].Item4 ?? "") : "";
-                int mult = (IsDoublePointsActive(unixNow) ? 2 : 1) * (IsTopFarder(key) ? 2 : 1) * (IsSubscriberOrMember() ? 2 : 1);
+                int mult = (IsDoublePointsActive(unixNow) ? 2 : 1) * (IsTopSummoner(key) ? 2 : 1) * (IsSubscriberOrMember() ? 2 : 1);
                 int toAdd = FIRST_WORDS_BONUS * mult;
                 pts += toAdd;
                 data[key] = Tuple.Create(pts, unixNow, donationPts, role);
@@ -616,24 +755,40 @@ public class CPHInline
         catch (Exception ex) { CPH.LogInfo("First words bonus: " + ex.Message); return false; }
     }
 
+    FileStream _pointsLockStream;
+
     bool AcquirePointsLock()
     {
         for (int i = 0; i < 200; i++)  // 10 sec at 50ms
         {
             try
             {
-                using (var fs = new FileStream(LOCK_FILE, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-                    fs.WriteByte(0);
+                _pointsLockStream = new FileStream(LOCK_FILE, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+                _pointsLockStream.Lock(0, 1);
                 return true;
             }
-            catch (IOException) { Thread.Sleep(50); }
+            catch (IOException)
+            {
+                try { _pointsLockStream?.Dispose(); } catch { }
+                _pointsLockStream = null;
+                Thread.Sleep(50);
+            }
         }
         return false;
     }
 
     void ReleasePointsLock()
     {
-        try { if (File.Exists(LOCK_FILE)) File.Delete(LOCK_FILE); } catch { }
+        try
+        {
+            if (_pointsLockStream != null)
+            {
+                _pointsLockStream.Unlock(0, 1);
+                _pointsLockStream.Dispose();
+                _pointsLockStream = null;
+            }
+        }
+        catch { }
     }
 
     Dictionary<string, Tuple<int, long, int, string>> ReadAll()
@@ -685,21 +840,18 @@ public class CPHInline
         catch { return false; }
     }
 
-    bool IsTopFarder(string userKey)
+    bool IsTopSummoner(string userKey)
     {
         try
         {
-            if (!File.Exists(TOP_FARDER_FILE)) return false;
-            string content = File.ReadAllText(TOP_FARDER_FILE).Trim();
-            const string prefix = "Top Farder: ";
-            const string suffix = " - ";
-            int p = content.IndexOf(prefix, StringComparison.OrdinalIgnoreCase);
-            if (p < 0) return false;
-            int start = p + prefix.Length;
-            int s = content.IndexOf(suffix, start, StringComparison.Ordinal);
-            if (s < 0) return false;
-            string username = content.Substring(start, s - start).Trim();
-            return !string.IsNullOrEmpty(username) && userKey.Equals(username, StringComparison.OrdinalIgnoreCase);
+            if (string.IsNullOrEmpty(userKey) || !File.Exists(TOP_SUMMONER_FILE)) return false;
+            string line = File.ReadAllText(TOP_SUMMONER_FILE).Trim();
+            const string prefix = "Top Summoner: ";
+            if (!line.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return false;
+            string rest = line.Substring(prefix.Length);
+            int dash = rest.LastIndexOf(" - ");
+            string leader = dash >= 0 ? rest.Substring(0, dash).Trim() : rest.Trim();
+            return leader.Equals(userKey, StringComparison.OrdinalIgnoreCase);
         }
         catch { return false; }
     }
@@ -721,95 +873,64 @@ Edit `FIRST_WORDS_BONUS` to change the amount (default 5).
 
 **Trigger:** Command Triggered → create command `!points` (enable **both Twitch and YouTube** as sources)
 
+**Queue:** Do **not** add this action to the same **blocking queue** as spend commands (`!spawn`, `!scroll`, etc.). Putting `!points` on the spend queue makes it wait behind every queued spawn during promos. Use the default queue or a separate **fast reads** queue.
+
 **Sub-Actions (in order):**
 
-1. **Execute C# Code** (Inline):
+1. **Run a Program**
+   - **Program:** `python`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" balance %userName%`
+   - **Working directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
+   - **Wait for Exit:** `5` seconds (**required** — Streamer.bot label may be **Wait maximum** or **Wait for Exit**. If this is `0`, the next step runs before Python finishes and `%userPoints%` stays `0`.)
+
+2. **Execute C# Code** (Inline) — reads **`%output0%`** from step 1 (Python prints `ok|123`). File read is fallback only:
 
 ```csharp
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Threading;
 
 public class CPHInline
 {
-    const string FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt";
-    const string LOCK_FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\viewer_points.txt.lock";
+    const string FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_balance_result.txt";
 
     public bool Execute()
     {
-        string user = CPH.TryGetArg("userName", out string u) ? u : null;
-        if (string.IsNullOrEmpty(user)) { CPH.SetArgument("userPoints", "0"); return true; }
+        string userPoints = "0";
+        string line = null;
 
-        try
+        if (CPH.TryGetArg("output0", out string stdout) && !string.IsNullOrWhiteSpace(stdout))
+            line = stdout.Trim();
+        else if (File.Exists(FILE))
+            line = File.ReadAllText(FILE).Trim();
+
+        if (!string.IsNullOrEmpty(line) && line.StartsWith("ok|", StringComparison.OrdinalIgnoreCase))
         {
-            if (!AcquirePointsLock()) { CPH.SetArgument("userPoints", "0"); return true; }
-            try
-            {
-                var data = ReadAll();
-                int pts = 0;
-                if (data.TryGetValue(user.ToLowerInvariant(), out var t))
-                {
-                    int p = t.Item1, d = t.Item3;
-                    pts = (d > 0 && p < d) ? (p + d) : p;
-                }
-                CPH.SetArgument("userPoints", pts.ToString());
-                return true;
-            }
-            finally { ReleasePointsLock(); }
+            string[] parts = line.Split('|');
+            if (parts.Length >= 2 && !string.IsNullOrWhiteSpace(parts[1]))
+                userPoints = parts[1].Trim();
         }
-        catch { CPH.SetArgument("userPoints", "0"); return true; }
-    }
 
-    bool AcquirePointsLock()
-    {
-        for (int i = 0; i < 200; i++)  // 10 sec at 50ms
-        {
-            try
-            {
-                using (var fs = new FileStream(LOCK_FILE, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-                    fs.WriteByte(0);
-                return true;
-            }
-            catch (IOException) { Thread.Sleep(50); }
-        }
-        return false;
-    }
-
-    void ReleasePointsLock()
-    {
-        try { if (File.Exists(LOCK_FILE)) File.Delete(LOCK_FILE); } catch { }
-    }
-
-    Dictionary<string, Tuple<int, long, int, string>> ReadAll()
-    {
-        var result = new Dictionary<string, Tuple<int, long, int, string>>(StringComparer.OrdinalIgnoreCase);
-        if (!File.Exists(FILE)) return result;
-        try
-        {
-            foreach (string line in File.ReadAllLines(FILE))
-            {
-                string[] parts = line.Split('|');
-                if (parts.Length >= 3)
-                {
-                    string k = parts[0].Trim();
-                    int p; long l; int d = 0;
-                    if (int.TryParse(parts[1].Trim(), out p) && long.TryParse(parts[2].Trim(), out l))
-                    {
-                        if (parts.Length >= 4) int.TryParse(parts[3].Trim(), out d);
-                        string role = (parts.Length >= 5 && (parts[4] == "helper" || parts[4] == "hurter")) ? parts[4] : "";
-                        result[k] = Tuple.Create(p, l, d, role);
-                    }
-                }
-            }
-        }
-        catch { }
-        return result;
+        CPH.SetArgument("userPoints", userPoints);
+        try { if (File.Exists(FILE)) File.Delete(FILE); } catch { }
+        return true;
     }
 }
 ```
 
-2. **Response message:** Use commandSource pattern:
+**Sub-action order (all three required):** (1) Run Program → (2) C# above → (3) chat message below. Do not skip step 2.
+
+**If everyone still shows 0:** In Streamer.bot **Action History** → inspect the `!points` run → check `output0` (should be `ok|123`) and `userName`. If `userName` is empty on YouTube, change Arguments to use `%user%` instead of `%userName%` for that platform.
+
+**Test manually:** `python "Lastest UI\points_command.py" balance YourUsername` → prints `ok|123` and writes the same to `points_balance_result.txt`.
+
+<details>
+<summary>Alternative: single C# step with file lock (no Run Program)</summary>
+
+Use only if you cannot add Run Program. Must use `OpenOrCreate` + `FileStream.Lock` — **not** `CreateNew` + delete (10s stall whenever `viewer_points.txt.lock` exists). Copy `AcquirePointsLock` / `ReleasePointsLock` / `ReadAll` from [Action 05](#action-05-top-points-toppoints); set `%userPoints%` from the user's row (same `(p + d)` rule as Action 04 had previously).
+
+</details>
+
+3. **Response message:** Use commandSource pattern:
    - `if ("%commandSource%" Equals (Ignore Case) "youtube")` → **True:** YouTube Message: `%userName%, you have %userPoints% points. Spawn costs vary by monster (5–80).`
    - `if ("%commandSource%" Equals (Ignore Case) "twitch")` → **True:** Twitch Message: same text
    - Leave **False Result** empty for both.
@@ -881,24 +1002,40 @@ public class CPHInline
         catch (Exception ex) { CPH.SetArgument("topPointsResult", "Error: " + ex.Message); return true; }
     }
 
+    FileStream _pointsLockStream;
+
     bool AcquirePointsLock()
     {
         for (int i = 0; i < 200; i++)  // 10 sec at 50ms
         {
             try
             {
-                using (var fs = new FileStream(LOCK_FILE, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-                    fs.WriteByte(0);
+                _pointsLockStream = new FileStream(LOCK_FILE, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+                _pointsLockStream.Lock(0, 1);
                 return true;
             }
-            catch (IOException) { Thread.Sleep(50); }
+            catch (IOException)
+            {
+                try { _pointsLockStream?.Dispose(); } catch { }
+                _pointsLockStream = null;
+                Thread.Sleep(50);
+            }
         }
         return false;
     }
 
     void ReleasePointsLock()
     {
-        try { if (File.Exists(LOCK_FILE)) File.Delete(LOCK_FILE); } catch { }
+        try
+        {
+            if (_pointsLockStream != null)
+            {
+                _pointsLockStream.Unlock(0, 1);
+                _pointsLockStream.Dispose();
+                _pointsLockStream = null;
+            }
+        }
+        catch { }
     }
 }
 ```
@@ -1981,7 +2118,7 @@ public class CPHInline
 
 **Note for !doublepoints:** Ensure the command passes the duration. In Streamer.bot command settings, enable "Arguments" so `!doublepoints 5` passes `5` as `input1` or `rawInput`. If `input1` is empty, the code falls back to `rawInput`.
 
-**OBS countdown timer:** Add a **Browser source** → URL = `http://127.0.0.1:5000/double-points-countdown`. Shows gold "2x points: M:SS" when active, hides when inactive. Requires the overlay server running on port 5000.
+**OBS countdown timer:** Add a **Browser source** → URL = `http://127.0.0.1:5000/double-points-countdown`. Shows gold `2x points: N min` when active (minutes only, triple-digit safe), hides when inactive. Requires the overlay server running on port 5000.
 
 **If it doesn't update after restarting OBS:** The page now uses no-cache headers and auto-reloads after 5 failed fetches (e.g. if the server wasn't ready). Also enable **"Refresh browser when scene becomes active"** in the Browser Source properties — it refreshes when you switch to that scene.
 
@@ -1991,7 +2128,7 @@ public class CPHInline
 
 **Not automatic** until this action exists, is enabled, and is on your **points queue**. Same for [Action 21](#action-21-earn-points-super-chat) (Super Chat) and [Action 40](#action-40-earn-points-gift-sub--gift-membership) (gift subs).
 
-**Rate:** 100 bits = $1 = 100 points base. **Stacks** with !doublepoints, subscriber/member 2×, and optional top-farder (same as chat earning) when you pass the optional CLI args below.
+**Rate:** 100 bits = $1 = 100 points base. **Stacks** with !doublepoints, **top summoner**, and subscriber/member 2× when you pass the optional CLI args below (top summoner is automatic via `top_summoner.txt`).
 
 **Add this action to your points queue** (same blocking queue as earn/spend) to avoid race conditions.
 
@@ -2001,13 +2138,13 @@ public class CPHInline
 
 1. **Run a Program**
    - **Program:** `python` (or full path to `python.exe`)
-   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" cheer %bits% %userName% %isSubscribed% %userIsSponsor% 0`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" cheer %bits% %userName% %isSubscribed% %userIsSponsor%`
    - **Working directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI` (literal path — see [portable setup](streamerbot-global-paths-example-scroll.md#portable-setup-recommended-junction--fixed-path--global))
    - **Wait maximum:** `15` seconds
 
 2. **Optional — thank-you chat:** Execute C# Code reads `donation_result.txt` in `Lastest UI` (same folder as the script). Format: `ok|150` = 150 points earned; `skip|0` = anonymous cheer skipped.
 
-**Notes:** Anonymous cheers are skipped (no username). Trailing `0` is **topFarder** (use `1` if your C# sets a top-farder flag). Omit optional args entirely to default flags off (global !doublepoints still applies).
+**Notes:** Anonymous cheers are skipped (no username). Omit optional args entirely to default sub/member flags off (global !doublepoints still applies).
 
 ### Cheer — HTTP alternative (if Run Program fails)
 
@@ -2031,10 +2168,9 @@ Response `{"ok":true,"pointsAdded":100}` on success.
 ### Cheer — what to change if you already had this action
 
 1. Open your **Cheer** action → **Run Program** sub-action.
-2. Replace the **Arguments** field with the line above (ending with `%isSubscribed% %userIsSponsor% 0`).
+2. Replace the **Arguments** field with the line above (ending with `%isSubscribed% %userIsSponsor%`).
 3. Confirm **Working directory** is your real `Lastest UI` folder (not empty, not `%variables%`).
 4. **Save.** Subscriber 2× applies when Twitch sets `isSubscribed`; `userIsSponsor` is usually unused on Twitch (safe to pass).
-5. If you use **top farder** in chat: change the final `0` to `1` or your variable (must be the last argument).
 
 ---
 
@@ -2042,7 +2178,7 @@ Response `{"ok":true,"pointsAdded":100}` on success.
 
 **Not automatic** until this action exists, is enabled, and is on your **points queue**.
 
-**Rate:** 1 point per $0.01 USD base. Uses the [Frankfurter API](https://www.frankfurter.app/) for currency conversion (no API key). **Stacks** with !doublepoints, subscriber/member 2×, and optional top-farder when you pass optional trailing args (see [argument reference](#cheer--super-chat--argument-reference) below).
+**Rate:** 1 point per $0.01 USD base. Uses the [Frankfurter API](https://www.frankfurter.app/) for currency conversion (no API key). **Stacks** with !doublepoints, **top summoner**, and subscriber/member 2× when you pass optional trailing args (see [argument reference](#cheer--super-chat--argument-reference) below; top summoner is automatic via `top_summoner.txt`).
 
 **Add this action to your points queue** (same blocking queue as earn/spend).
 
@@ -2052,7 +2188,7 @@ Response `{"ok":true,"pointsAdded":100}` on success.
 2. **Add trigger:** YouTube → Triggers → **Super Chat**.
 3. **Add sub-action:** Run a Program
    - **Program:** `python` (or full path to `python.exe`, e.g. `C:\Python313\python.exe`)
-   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" superchat %microAmount% %currencyCode% %userName% %isSubscribed% %userIsSponsor% 0`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" superchat %microAmount% %currencyCode% %userName% %isSubscribed% %userIsSponsor%`
    - **Working directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
    - **Wait maximum:** `15` seconds (Frankfurter currency lookup can take a few seconds)
 4. **Add this action to your points queue** (same queue as earn/spend and Action 20).
@@ -2066,7 +2202,6 @@ Response `{"ok":true,"pointsAdded":100}` on success.
 | `%userName%` | login | If empty on live events, use `%user%` (display name) as the 3rd argument after currency |
 | `%isSubscribed%` | `true` / `false` | Optional 2× (Twitch-style; often empty on YouTube) |
 | `%userIsSponsor%` | `true` / `false` | YouTube **channel member** 2× |
-| Last arg `0` | top farder off | Use `1` or your variable for top-farder 2× |
 
 **Optional thank-you:** C# step reads `donation_result.txt` → `ok|150` means 150 points earned. Example message: `Thanks for the Super Chat! You earned %pointsEarned% points!` (parse the number after `|`).
 
@@ -2091,7 +2226,7 @@ If `%userName%` is empty on live Super Chats, use `"username": "%user%"` instead
 ### Super Chat — what to change if you already had this action
 
 1. Open your **Super Chat** action → **Run Program**.
-2. Replace **Arguments** with the line in step 3 above (**must** include `%isSubscribed% %userIsSponsor% 0` at the end, or your top-farder value instead of `0`).
+2. Replace **Arguments** with the line in step 3 above (**must** include `%isSubscribed% %userIsSponsor%` at the end).
 3. Set **Working directory** to your `Lastest UI` folder (literal path).
 4. On **YouTube**, member status is usually **`%userIsSponsor%`**, not `%isSubscribed%`.
 5. **Save** and test with a real Super Chat or `python points_command.py superchat 1000000 USD YourName` from `Lastest UI`.
@@ -2111,7 +2246,7 @@ If `%userName%` is empty on live Super Chats, use `"username": "%user%"` instead
 
 ```text
 cd Lastest UI
-python points_command.py superchat 1000000 USD YourName 0 0 0
+python points_command.py superchat 1000000 USD YourName 0 0
 type donation_result.txt
 ```
 
@@ -2121,22 +2256,20 @@ Expect `ok|100` for a $1 Super Chat.
 
 ## Cheer / Super Chat — argument reference
 
-`points_command.py` applies multipliers in this **order** (each step doubles when active): global **!doublepoints** → **subscriber OR channel member** → **top farder**.
+`points_command.py` applies multipliers in this **order** (each step doubles when active): global **!doublepoints** → **top summoner** (`top_summoner.txt`, from `!summon`) → **subscriber OR channel member**.
 
 | Position | Meaning | Typical Streamer.bot value |
 |----------|---------|----------------------------|
 | **Cheer:** 3rd arg after `cheer` | `isSubscribed` | `%isSubscribed%` (Twitch) |
 | **Cheer:** 4th | `userIsSponsor` | `%userIsSponsor%` (often unused on Twitch; safe to pass) |
-| **Cheer:** 5th (last optional) | `topFarder` | `0` or `1` |
 | **Super Chat:** 4th arg after `superchat` | `isSubscribed` | `%isSubscribed%` |
 | **Super Chat:** 5th | `userIsSponsor` | `%userIsSponsor%` (YouTube member) |
-| **Super Chat:** 6th (last optional) | `topFarder` | `0` or `1` |
 
-**Cheer** full argument order: `cheer <bits> <username> [isSubscribed] [userIsSponsor] [topFarder]`.
+**Cheer** full argument order: `cheer <bits> <username> [isSubscribed] [userIsSponsor]`.
 
-**Super Chat** full argument order: `superchat <microAmount> <currencyCode> <username> [isSubscribed] [userIsSponsor] [topFarder]`.
+**Super Chat** full argument order: `superchat <microAmount> <currencyCode> <username> [isSubscribed] [userIsSponsor]`.
 
-- If you **omit** the optional args entirely, only **global double points** (when `!doublepoints` is active) multiplies donation points; sub/member/top farder do not.
+- If you **omit** the optional sub/member args entirely, **global double points** (when `!doublepoints` is active) and **top summoner** still multiply donation points; sub/member do not.
 - Empty or unknown strings for flags are treated as **off** (same as `0`).
 - Adjust the **file paths** in all **Arguments** and C# `const` strings if your `Lastest UI` folder is not under the path used in this doc.
 
@@ -2144,13 +2277,32 @@ Expect `ok|100` for a $1 Super Chat.
 
 ---
 
-## Action 22: Reset Points (every stream)
+## Action 22: Reset Summon March (every stream)
 
 **Trigger:** Stream Started (Twitch → Triggers → Stream Started). For YouTube, use the equivalent "Stream Online" or "Stream Started" trigger.
 
-**Sub-Action:** Execute C# Code (Inline)
+Clears **summon session data only** — not viewer points. Use this if you reset points manually (overlay **Delete all points** or your own workflow).
 
-Clears non-donor points when you go live. Donors (Super Chat / Cheer) keep their donation amount; everyone else starts fresh.
+**Sub-Actions (single step):**
+
+1. **Run a Program**
+   - **Target:** `python`
+   - **Arguments:** `"summon_march_post.py" reset`
+   - **Working directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI` (literal path — same as other `Lastest UI` actions)
+   - **Wait maximum:** `2` seconds
+
+Deletes/resets: `top_summoner.txt`, `totalsummons.txt`, `summon_session_counts.json`, and any stale `summon_result.txt`. Godot march queue is unchanged (server keeps its own queue).
+
+**Test:** Run the action once → `!topsummoner` should report no summons until someone uses `!summon` again.
+
+See also: [streamerbot-summon-march-apply.md](streamerbot-summon-march-apply.md).
+
+<details>
+<summary>Optional: auto-reset chat points on stream start (legacy Action 22)</summary>
+
+If you want **non-donor points cleared automatically** when you go live (instead of manual reset), add a **second sub-action** before or after the summon reset, or use a separate action:
+
+**Execute C# Code (Inline)** — clears non-donor chat points; donors (Super Chat / Cheer) keep donation amount:
 
 ```csharp
 using System;
@@ -2181,7 +2333,6 @@ public class CPHInline
                         toWrite[kv.Key] = Tuple.Create(donationPts, 0L, donationPts, role);
                 }
                 WriteAll(toWrite);
-                // Reset Helpers vs Hurters counter for new stream
                 try { File.WriteAllText(COUNTER_FILE, "0"); } catch { }
                 return true;
             }
@@ -2227,27 +2378,45 @@ public class CPHInline
         File.WriteAllLines(FILE, lines.ToArray());
     }
 
+    FileStream _pointsLockStream;
+
     bool AcquirePointsLock()
     {
-        for (int i = 0; i < 200; i++)
+        for (int i = 0; i < 200; i++)  // 10 sec at 50ms
         {
             try
             {
-                using (var fs = new FileStream(LOCK_FILE, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-                    fs.WriteByte(0);
+                _pointsLockStream = new FileStream(LOCK_FILE, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+                _pointsLockStream.Lock(0, 1);
                 return true;
             }
-            catch (IOException) { Thread.Sleep(50); }
+            catch (IOException)
+            {
+                try { _pointsLockStream?.Dispose(); } catch { }
+                _pointsLockStream = null;
+                Thread.Sleep(50);
+            }
         }
         return false;
     }
 
     void ReleasePointsLock()
     {
-        try { if (File.Exists(LOCK_FILE)) File.Delete(LOCK_FILE); } catch { }
+        try
+        {
+            if (_pointsLockStream != null)
+            {
+                _pointsLockStream.Unlock(0, 1);
+                _pointsLockStream.Dispose();
+                _pointsLockStream = null;
+            }
+        }
+        catch { }
     }
 }
 ```
+
+</details>
 
 ---
 
@@ -3376,11 +3545,11 @@ public class CPHInline
 
 **Not automatic** until you create this action and add it to your **points queue**. Super Chats and cheers need [Action 21](#action-21-earn-points-super-chat) and [Action 20](#action-20-earn-points-cheer) separately.
 
-**Script:** `points_command.py giftmembership <username> [tier] [isSubscribed] [userIsSponsor] [topFarder]`
+**Script:** `points_command.py giftmembership <username> [tier] [isSubscribed] [userIsSponsor]`
 
 **Defaults** (`points_config.json`): tier 1 / YouTube gift = **500** pts, tier 2 = **1000**, tier 3 = **2500** (≈ $5 / $10 / $25 at 1 pt per cent). Keys: `points_per_gift_sub_tier1`, `points_per_gift_sub_tier2`, `points_per_gift_sub_tier3`, `points_per_gift_membership`, `points_per_gift_sub_prime`.
 
-**Stacks** the same donation multipliers as Super Chat: !doublepoints → sub/member → top farder ([argument reference](#cheer--super-chat--argument-reference)).
+**Stacks** the same donation multipliers as Super Chat: !doublepoints → **top summoner** → sub/member ([argument reference](#cheer--super-chat--argument-reference)). Top summoner requires no extra args — `points_command.py` reads `top_summoner.txt`.
 
 ---
 
@@ -3390,7 +3559,7 @@ public class CPHInline
 2. **Trigger:** Twitch → Subscriptions → **Gift Subscription**
 3. **Sub-Action:** Run a Program
    - **Program:** `python`
-   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" giftmembership %recipientUserName% %tier% %isSubscribed% %userIsSponsor% 0`
+   - **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" giftmembership %recipientUserName% %tier% %isSubscribed% %userIsSponsor%`
    - **Working directory:** `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI`
    - **Wait maximum:** `10` seconds
 4. Credits the **recipient** (`%recipientUserName%`), not the gifter.
@@ -3413,7 +3582,7 @@ Streamer.bot exposes indexed recipients: `%gift.recipientUserName0%`, `%gift.rec
 Example **Run Program** for recipient 0 only (repeat pattern or use C#):
 
 ```text
-points_command.py giftmembership %gift.recipientUserName0% %tier% %isSubscribed% %userIsSponsor% 0
+points_command.py giftmembership %gift.recipientUserName0% %tier% %isSubscribed% %userIsSponsor%
 ```
 
 ---
@@ -3424,9 +3593,9 @@ points_command.py giftmembership %gift.recipientUserName0% %tier% %isSubscribed%
 
 YouTube’s API (via Streamer.bot) exposes the **gifter** only — there is **no recipient login** variable. Credit the **gifter** who paid:
 
-- **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" giftmembership %gifterUserName% %tier% 0 %userIsSponsor% 0`
+- **Arguments:** `"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\points_command.py" giftmembership %gifterUserName% %tier% 0 %userIsSponsor%`
 
-(`0` = not Twitch-subscribed; `%userIsSponsor%` if the gifter is already a member for 2×.)
+(`0` = not Twitch-subscribed on YouTube; `%userIsSponsor%` if the gifter is already a member for 2×.)
 
 | Variable | Role |
 |----------|------|
@@ -3515,9 +3684,9 @@ Expect `ok|500` (tier 1 default). Tier 2: `giftmembership testviewer "tier 2"` �
 
 | # | Action | Trigger | Purpose |
 |---|--------|---------|---------|
-| 01 | Earn Points (on chat) | Message Received | +1 per message (30s cooldown; 2x double/top farder/sub) |
-| 02 | Earn Points (passive) | Present Viewers | +1 per tick (60s cooldown) |
-| 03 | First Words Bonus | (add to First Words) | +5 on first chat |
+| 01 | Earn Points (on chat) | Message Received | +1 per message (30s cooldown; stacks 2× double / top summoner / sub) |
+| 02 | Earn Points (passive) | Present Viewers | +1 per tick (60s cooldown; same multipliers) |
+| 03 | First Words Bonus | (add to First Words) | +5 on first chat (same multipliers) |
 | 04 | Check Points | !points | Show viewer their balance |
 | 05 | Top Points | !toppoints | Show top 3 point holders |
 | 38 | Give Points | !givepoints | Viewer-to-viewer transfer (chat points first, then donor points) |
@@ -3535,9 +3704,9 @@ Expect `ok|500` (tier 1 default). Tier 2: `giftmembership testviewer "tier 2"` �
 | 17 | Random Debuff | !debuff | Spend points to apply random debuff |
 | 18 | Cursed Wand | !wand | Fixed cost; weighted random cursed-wand effect |
 | 19 | Double Points | !doublepoints | Streamer only: 2× points for N min |
-| 20 | Earn Points (Cheer) | Twitch Cheer | 1 pt per bit; optional args for stacked 2× |
-| 21 | Earn Points (Super Chat) | YouTube Super Chat | 1 pt per $0.01; optional stacked 2× |
-| 22 | Reset Points | Stream Started | Clear non-donor points |
+| 20 | Earn Points (Cheer) | Twitch Cheer | 1 pt per bit; stacks 2× (double / top summoner / sub) |
+| 21 | Earn Points (Super Chat) | YouTube Super Chat | 1 pt per $0.01; same stacked 2× |
+| 22 | Reset Summon March | Stream Started | Clear top summoner + session summon counts |
 | 23 | Spend OFF | Hotkey | Disable spend commands |
 | 24 | Spend ON | Hotkey | Enable spend commands |
 | 25 | !heal | !heal | Heal hero ~15% HP |
@@ -3556,22 +3725,52 @@ Expect `ok|500` (tier 1 default). Tier 2: `giftmembership testviewer "tier 2"` �
 
 ---
 
+## Points lock compatibility
+
+Python (`points_command.py`) and the overlay server keep `viewer_points.txt.lock` on disk and use OS byte-range locks. Streamer.bot C# must **not** use `FileMode.CreateNew` + `File.Delete` on that path — that waits up to 10 seconds whenever the file exists, even when nothing holds the lock.
+
+All inline C# blocks in this guide (Actions 01–05 and optional stream-start reset) use the same helpers:
+
+- `FileStream _pointsLockStream` — instance field on `CPHInline`
+- `AcquirePointsLock()` — `FileMode.OpenOrCreate`, then `Lock(0, 1)` on byte 0
+- `ReleasePointsLock()` — `Unlock`, dispose stream, **do not delete** the lock file
+
+If you update from an older export, replace `AcquirePointsLock` / `ReleasePointsLock` in each action and add the `_pointsLockStream` field. Action 01 also skips messages starting with `!` before acquiring the lock (spend commands on the blocking queue).
+
+**Actions using this lock pattern:** 01 (chat earn), 02 (passive), 03 (First Words), 05 (`!toppoints`), optional Action 22 points reset C#. **Action 04 (`!points`)** uses `points_command.py balance` (Run Program) instead of C# file lock.
+
+### Slow !points or First Words?
+
+| Symptom | Likely cause | Fix |
+|--------|----------------|-----|
+| `!points` slow; `!spawn` fast | `!points` on **blocking spend queue** | Remove `!points` from spend queue (default or fast-reads queue) |
+| `!points` compile errors (`System.Net`) | Old doc used `WebClient` — not available in Streamer.bot inline C# | Use Action 04 **Run Program + balance** + result C# from this guide |
+| First Words overlay slow | Points C# **before** OBS/sound, or whole action on **blocking spend queue** | OBS + sound first; move First Words off blocking queue (Default queue) |
+| First Words slow (points only) | Old lock helpers in First Words C# | Paste updated lock helpers from Action 03 |
+| Both slow ~10s | Old `FileMode.CreateNew` lock still in live Streamer.bot | Search action C# for `CreateNew` — replace with `OpenOrCreate` + `Lock` |
+| Action fires, no points earned | Old `CreateNew` lock in live Action **01/02/03**, or cooldown / `!` skip | Paste full C# from this guide for each earn action; search Streamer.bot for `CreateNew` |
+| `!points` shows 0 for everyone | **Wait for Exit** is `0`, step 2 C# missing, or empty `%userName%` | Set Wait to **5**; add C# between Run Program and message; check Action History `output0` |
+
+---
+
 ## Notes
 
-- **Reset Points** runs when your stream goes live. Non-donors lose all points; donors (Super Chat / Cheer) keep their donation amount.
+- **Reset Summon March (Action 22)** runs on stream start — clears `top_summoner.txt`, summon counts, and related session files. **Viewer points** are not reset unless you do that manually (overlay **Delete all points**) or add the optional points-reset C# under Action 22.
 - **Passive earn** only adds to users already in the file—they must send at least one message first. Enable **Live Update** under Platform → Twitch → Settings for Present Viewers to work.
-- **Message Received** fires on every chat message. Ensure the Earn action does not also fire on bot messages or your own messages if you want to exclude them (add a conditional if needed).
+- **Points lock file:** All earn/check/reset C# in this guide uses `FileStream.Lock` on the persistent lock file (see [Points lock compatibility](#points-lock-compatibility)). Paste updated C# into Streamer.bot if your live actions still use `CreateNew` + delete.
 - For `!spawn`, the Command Triggered must pass `input1` (the text after the command). Use `%rawInput%` or `%input1%` depending on your Streamer.bot version.
 - For **`!wand`**, the opposite: **do not** require extra text after the command for the script — use **`wand %userName%`** in Run a Program.
 - Edit `POINTS_PER_MESSAGE`, `POINTS_PER_TICK`, and `COOLDOWN_SEC` (in Earn Points on chat for chat, Earn Points passive for passive) in the C# code. Edit points costs via http://localhost:5000/points-config or `points_config.json`.
-- **Double points** persists until the duration ends. To clear it when the stream starts, add `File.WriteAllText(DOUBLE_FILE, "0");` to the Reset Points action.
-- **Top farder 2x:** The earn actions read from `TOP_FARDER_FILE` (default: `OBS files\textread\leader.txt`). Expected format: `Top Farder: USERNAME - 45`. Change the path if your fard counter writes to a different file.
+- **Double points** persists until the duration ends. To clear it when the stream starts, add `File.WriteAllText(DOUBLE_FILE, "0");` to an optional points-reset action (see Action 22 collapsible).
+- **Fard / 2× timer:** `!fard` extends global 2× (see [fard-system.md](fard-system.md)). Countdown displays minutes only via overlay server.
+- **Top summoner:** `!summon` session leader earns 2× personal points — [Top summoner 2×](#top-summoner-2-personal-points), [summon apply guide](streamerbot-summon-march-apply.md).
 - **Super Chat / Cheer / gifts:** Require Streamer.bot Actions **20**, **21**, and **40** (or HTTP `/api/donation/*`). Uses `points_command.py` (`superchat`, `cheer`, `giftmembership`). Super Chat currency via Frankfurter (free, no key). Add all donation actions to the same blocking queue as earn/spend. Anonymous cheers are skipped.
 
 ---
 
 ## User-Facing Summary
 
-- **[youtube-description.md](youtube-description.md)** — Full YouTube description (channel assets, stream commands, Discord, chat commands)
+- **[youtube-description.md](youtube-description.md)** — Full YouTube description (channel assets, stream commands !fard/!summon, Discord, chat commands)
 - **[user-facing-summary.md](user-facing-summary.md)** — Chat commands only (copy-paste block)
 - **[twitch-panel.md](twitch-panel.md)** — Formatted version for Twitch panels
+- **[COMMANDS.md](../COMMANDS.md)** — Full command reference including free !fard / !summon

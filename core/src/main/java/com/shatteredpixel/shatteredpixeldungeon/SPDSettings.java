@@ -183,6 +183,7 @@ public class SPDSettings extends GameSettings {
 	public static final String KEY_SHOW_QUICKSLOT_SWAP_BUTTON = "show_quickslot_swap_button";
 	public static final String KEY_FLIPTOOLBAR	= "flipped_ui";
 	public static final String KEY_FLIPTAGS 	= "flip_tags";
+	public static final String KEY_FLIPSTATUSPANE = "flip_status_pane";
 	public static final String KEY_CENTER_ON_CYCLE_NO_ENEMIES = "center_on_cycle_no_enemies";
 	public static final String KEY_BOSS_BAR_ALL_ENEMIES = "boss_bar_all_enemies";
 	public static final String KEY_BARMODE		= "toolbar_mode";
@@ -242,6 +243,12 @@ public class SPDSettings extends GameSettings {
 	}
 	
 	public static boolean flipTags(){ return getBoolean(KEY_FLIPTAGS, false); }
+
+	public static void flipStatusPane( boolean value ) {
+		put( KEY_FLIPSTATUSPANE, value );
+	}
+
+	public static boolean flipStatusPane(){ return getBoolean( KEY_FLIPSTATUSPANE, false ); }
 
 	// Per-region HUD layout (desktop full UI); offsets in tenths of a pixel, scale in percent (100 = 1.0)
 	private static String hudKey( HudRegion r, String suffix ) {

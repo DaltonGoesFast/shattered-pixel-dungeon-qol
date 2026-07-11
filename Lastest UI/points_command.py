@@ -20,9 +20,10 @@ Usage:
   buff:     python points_command.py buff <username>
   debuff:   python points_command.py debuff <username>
   wand:     python points_command.py wand <username>  (weighted random cursed-wand effect; legacy tier arg optional)
-  superchat: python points_command.py superchat <microAmount> <currencyCode> <username> [isSubscribed 0|1] [userIsSponsor 0|1] [topFarder 0|1]
-  cheer:    python points_command.py cheer <bits> <username> [isSubscribed 0|1] [userIsSponsor 0|1] [topFarder 0|1]
-  giftmembership: python points_command.py giftmembership <username> [tier] [isSubscribed 0|1] [userIsSponsor 0|1] [topFarder 0|1]
+  superchat: python points_command.py superchat <microAmount> <currencyCode> <username> [isSubscribed 0|1] [userIsSponsor 0|1]
+  cheer:    python points_command.py cheer <bits> <username> [isSubscribed 0|1] [userIsSponsor 0|1]
+  giftmembership: python points_command.py giftmembership <username> [tier] [isSubscribed 0|1] [userIsSponsor 0|1]
+  balance:  python points_command.py balance <username>  (!points lookup; writes points_balance_result.txt)
 
 All spend commands write to spawn_result.txt (ok or ok|extra|pts). The last value is remaining points. Donation writes to donation_result.txt.
 Transmute uses four fields: ok|<original_item_name>|<result_item_name>|<points> (original may be empty if the game build omits it).
@@ -36,17 +37,30 @@ import random
 import datetime
 from contextlib import contextmanager
 
+if os.name == "nt":
+    import msvcrt
+else:
+    import fcntl
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 POINTS_FILE = os.path.join(SCRIPT_DIR, "viewer_points.txt")
 POINTS_LOCK_FILE = POINTS_FILE + ".lock"
 POINTS_LOCK_TIMEOUT = 10.0  # seconds to wait for lock
+SPEND_COMMAND_LOCK_FILE = os.path.join(SCRIPT_DIR, "spend_command.lock")
+SPEND_COMMAND_LOCK_TIMEOUT = 3.0  # fail fast if another python is still running; don't block chat 12s
+# Must finish before Streamer.bot Run Program "Wait maximum" (10s) so C# reads after we write.
+GAME_COMMAND_TIMEOUT = 9.0
 SPAWN_RESULT_FILE = os.path.join(SCRIPT_DIR, "spawn_result.txt")
+SPAWN_RESULT_LAST_FILE = os.path.join(SCRIPT_DIR, "spawn_result_last.txt")
+POINTS_COMMAND_TRACE_FILE = os.path.join(SCRIPT_DIR, "points_command_trace.log")
 DONATION_RESULT_FILE = os.path.join(SCRIPT_DIR, "donation_result.txt")
+BALANCE_RESULT_FILE = os.path.join(SCRIPT_DIR, "points_balance_result.txt")
 CONFIG_FILE = os.path.join(SCRIPT_DIR, "points_config.json")
 FREE_UNTIL_FILE = os.path.join(SCRIPT_DIR, "free_until.json")
 SPEND_DISABLED_FILE = os.path.join(SCRIPT_DIR, "spend_disabled.txt")
 GAME_DATA_URL = "http://127.0.0.1:5000/api/game-data"
 DOUBLE_POINTS_END_FILE = os.path.join(SCRIPT_DIR, "double_points_end.txt")
+TOP_SUMMONER_FILE = os.path.join(SCRIPT_DIR, "top_summoner.txt")
 
 
 def is_spend_disabled():
@@ -81,14 +95,37 @@ def _arg_bool(s, default=False):
     return t in ("1", "true", "yes", "on")
 
 
-def donation_earn_multiplier(is_subscribed=False, is_sponsor=False, top_farder=False):
-    """Stack global 2×, subscriber/member 2×, and optional top-farder 2× (matches chat earning)."""
+def is_top_summoner(username):
+    """True if username matches top_summoner.txt leader (case-insensitive)."""
+    if not username:
+        return False
+    try:
+        if not os.path.exists(TOP_SUMMONER_FILE):
+            return False
+        with open(TOP_SUMMONER_FILE, encoding="utf-8") as f:
+            line = f.readline().strip()
+        prefix = "Top Summoner: "
+        if not line.startswith(prefix):
+            return False
+        rest = line[len(prefix):]
+        dash = rest.rfind(" - ")
+        if dash < 0:
+            leader = rest.strip()
+        else:
+            leader = rest[:dash].strip()
+        return leader.lower() == str(username).strip().lower()
+    except OSError:
+        return False
+
+
+def donation_earn_multiplier(is_subscribed=False, is_sponsor=False, username=None):
+    """Stack global 2×, top summoner 2×, and subscriber/member 2× (matches chat earning)."""
     m = 1
     if is_double_points_active():
         m *= 2
-    if is_subscribed or is_sponsor:
+    if username and is_top_summoner(username):
         m *= 2
-    if top_farder:
+    if is_subscribed or is_sponsor:
         m *= 2
     return m
 
@@ -145,15 +182,15 @@ def gift_sub_points(tier_str, cfg):
     return base
 
 
-def award_donation_points(username, to_add, is_subscribed=False, is_sponsor=False, top_farder=False):
+def award_donation_points(username, to_add, is_subscribed=False, is_sponsor=False):
     """Add donation points. Returns (result_file, message)."""
     if not username or str(username).strip().lower() in ("", "anonymous"):
         return DONATION_RESULT_FILE, "skip|0"
     to_add = max(0, int(to_add))
     if to_add <= 0:
         return DONATION_RESULT_FILE, "ok|0"
-    to_add *= donation_earn_multiplier(is_subscribed, is_sponsor, top_farder)
     key = str(username).strip().lower()
+    to_add *= donation_earn_multiplier(is_subscribed, is_sponsor, username=key)
     try:
         with points_lock():
             data = read_points()
@@ -167,11 +204,10 @@ def award_donation_points(username, to_add, is_subscribed=False, is_sponsor=Fals
 
 
 def _donation_flags_from_args(args, start_idx):
-    """Parse optional [isSubscribed] [userIsSponsor] [topFarder] from tail of args."""
+    """Parse optional [isSubscribed] [userIsSponsor] from tail of args."""
     is_sub = _arg_bool(args[start_idx], False) if len(args) > start_idx else False
     is_sponsor = _arg_bool(args[start_idx + 1], False) if len(args) > start_idx + 1 else False
-    top_farder = _arg_bool(args[start_idx + 2], False) if len(args) > start_idx + 2 else False
-    return is_sub, is_sponsor, top_farder
+    return is_sub, is_sponsor
 
 
 NATIVE_DEPTH = {
@@ -339,28 +375,42 @@ FALLBACK_RATES = {
 
 
 def _acquire_points_lock():
-    """Acquire exclusive lock on points file. Returns lock fd or None. Caller must call _release_points_lock."""
+    """Acquire exclusive OS-level lock on the lock file. Returns fd or None.
+
+    Uses msvcrt/fcntl byte-range locks: the OS releases them automatically if the
+    process dies, so a crash can never leave a stale lock behind. The lock file
+    itself is persistent and never deleted (deleting would race other lockers)."""
+    fd = os.open(POINTS_LOCK_FILE, os.O_CREAT | os.O_RDWR)
     start = time.monotonic()
     while (time.monotonic() - start) < POINTS_LOCK_TIMEOUT:
         try:
-            fd = os.open(POINTS_LOCK_FILE, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            os.write(fd, str(os.getpid()).encode())
+            if os.name == "nt":
+                os.lseek(fd, 0, os.SEEK_SET)
+                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+            else:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             return fd
-        except FileExistsError:
+        except OSError:
             time.sleep(0.05)
+    os.close(fd)
     return None
 
 
 def _release_points_lock(fd):
-    if fd is not None:
-        try:
-            os.close(fd)
-        except OSError:
-            pass
-        try:
-            os.remove(POINTS_LOCK_FILE)
-        except OSError:
-            pass
+    if fd is None:
+        return
+    try:
+        if os.name == "nt":
+            os.lseek(fd, 0, os.SEEK_SET)
+            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        else:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+    except OSError:
+        pass
+    try:
+        os.close(fd)
+    except OSError:
+        pass
 
 
 @contextmanager
@@ -373,6 +423,53 @@ def points_lock():
         yield
     finally:
         _release_points_lock(fd)
+
+
+def _acquire_spend_command_lock():
+    """Serialize full spend pipelines so spawn_result.txt is not raced between Streamer.bot actions."""
+    fd = os.open(SPEND_COMMAND_LOCK_FILE, os.O_CREAT | os.O_RDWR)
+    start = time.monotonic()
+    while (time.monotonic() - start) < SPEND_COMMAND_LOCK_TIMEOUT:
+        try:
+            if os.name == "nt":
+                os.lseek(fd, 0, os.SEEK_SET)
+                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+            else:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return fd
+        except OSError:
+            time.sleep(0.05)
+    os.close(fd)
+    return None
+
+
+def _release_spend_command_lock(fd):
+    if fd is None:
+        return
+    try:
+        if os.name == "nt":
+            os.lseek(fd, 0, os.SEEK_SET)
+            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        else:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+    except OSError:
+        pass
+    try:
+        os.close(fd)
+    except OSError:
+        pass
+
+
+@contextmanager
+def spend_command_lock():
+    """Hold for an entire spend command (reserve + game round-trip + result write)."""
+    fd = _acquire_spend_command_lock()
+    if fd is None:
+        raise TimeoutError("Another spend command is in progress")
+    try:
+        yield
+    finally:
+        _release_spend_command_lock(fd)
 
 
 def read_points():
@@ -528,6 +625,33 @@ def _get_user_data(data, key):
     return (pts, last, donation_pts, role)
 
 
+def _trace(label):
+    """Append timing line for debugging slow commands (check points_command_trace.log)."""
+    try:
+        with open(POINTS_COMMAND_TRACE_FILE, "a", encoding="utf-8") as f:
+            f.write(f"{time.strftime('%H:%M:%S')} pid={os.getpid()} {label}\n")
+    except OSError:
+        pass
+
+
+def _write_result(cmd, result_file, msg):
+    """Write spawn/donation result for Streamer.bot C# and keep a debug copy."""
+    with open(result_file, "w", encoding="utf-8") as f:
+        f.write(msg)
+    if result_file == SPAWN_RESULT_FILE:
+        try:
+            with open(SPAWN_RESULT_LAST_FILE, "w", encoding="utf-8") as f:
+                f.write(f"{cmd}|{msg}\n")
+        except OSError:
+            pass
+    print(msg, flush=True)
+
+
+def _caller_username(args):
+    """Trusted chat user from Streamer.bot (%userName%) — always the last CLI arg."""
+    return (args[-1] or "").strip()
+
+
 def not_enough_points_msg(username: str, cost: int, total: int, detail: str = "") -> str:
     """Chat error when a viewer cannot afford a spend command (no | — safe for spawn_result parser)."""
     name = username.strip()
@@ -540,126 +664,150 @@ def not_enough_points_msg(username: str, cost: int, total: int, detail: str = ""
     return f"{prefix}Not enough points! {need}, you have {total}."
 
 
-def cmd_spawn(args):
-    if is_spend_disabled():
-        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
-    if len(args) < 2:
-        return SPAWN_RESULT_FILE, "Usage: !spawn <monster> (e.g. !spawn rat)"
-    monster = args[0].lower()
-    username = args[1]
-    if monster not in VALID_MONSTERS:
-        return SPAWN_RESULT_FILE, f"Unknown monster: {monster}"
+def reserve_points(username, command_id, base_cost, detail=""):
+    """Deduct cost up-front under a short-lived lock (reserve-then-refund pattern).
 
-    base_cost = effective_cost("cost_per_monster." + monster, compute_spawn_cost(monster))
+    Returns (reservation, None) on success or (None, error_msg) on failure.
+    The lock is held only for the read-modify-write, never during the game
+    round-trip. If the game call later fails, call refund_points(reservation)."""
     key = username.lower()
     try:
         with points_lock():
             data = read_points()
             pts, last, donation_pts, role = _get_user_data(data, key)
-            ok, err = check_command_access("spawn", role)
+            ok, err = check_command_access(command_id, role)
             if not ok:
-                return SPAWN_RESULT_FILE, err
-            cost = apply_role_discount(base_cost, "spawn", role)
+                return None, err
+            cost = apply_role_discount(base_cost, command_id, role)
             total = effective_total(pts, donation_pts)
             if total < cost:
-                return SPAWN_RESULT_FILE, not_enough_points_msg(username, cost, total)
-
-            url = "http://127.0.0.1:5000/api/spawn-command"
-            payload = {"monster": monster, "username": username}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-            req.add_header("Content-Type", "application/json")
-
-            try:
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    raw = resp.read().decode("utf-8", errors="replace")
-                    if not raw.strip():
-                        return SPAWN_RESULT_FILE, "Spawn failed (empty response from server)"
-                    try:
-                        body = json.loads(raw)
-                    except json.JSONDecodeError:
-                        return SPAWN_RESULT_FILE, "Spawn failed (server error). Is the overlay running?"
-                    if not body.get("ok"):
-                        return SPAWN_RESULT_FILE, body.get("error", "Spawn failed")
-            except urllib.error.HTTPError as e:
-                return SPAWN_RESULT_FILE, _http_error_msg(
-                    e, "Spawn timed out. Is the game running and in an active run (not title screen)?"
-                )
-            except urllib.error.URLError as e:
-                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
-            except Exception as e:
-                msg = str(e).strip() if e else ""
-                return SPAWN_RESULT_FILE, "Spawn failed. " + (msg if msg else "Check overlay server and try again.")
-
+                return None, not_enough_points_msg(username, cost, total, detail)
             new_pts, new_donation = deduct_points(pts, donation_pts, cost)
             data[key] = (new_pts, last, new_donation, role)
             write_points(data)
-            return SPAWN_RESULT_FILE, f"ok|{new_pts}"
+            return {
+                "key": key,
+                "cost": cost,
+                "new_pts": new_pts,
+                "donation_used": donation_pts - new_donation,
+            }, None
     except TimeoutError:
-        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+        return None, "Points file busy. Please try again in a moment."
+
+
+def cmd_balance(args):
+    if len(args) != 1:
+        return BALANCE_RESULT_FILE, "Usage: balance <username>"
+    username = args[0].strip()
+    if not username:
+        return BALANCE_RESULT_FILE, "ok|0"
+    try:
+        with points_lock():
+            data = read_points()
+            pts, _, donation_pts, _ = _get_user_data(data, username.lower())
+            p, d = pts, donation_pts
+            display = (p + d) if (d > 0 and p < d) else p
+            return BALANCE_RESULT_FILE, f"ok|{display}"
+    except TimeoutError:
+        return BALANCE_RESULT_FILE, "Points file busy. Please try again in a moment."
+
+
+def refund_points(res):
+    """Give reserved points back after a failed game call (additive, so safe even if the balance changed meanwhile)."""
+    if not res:
+        return
+    if res["cost"] <= 0 and res["donation_used"] <= 0:
+        return
+    try:
+        with points_lock():
+            data = read_points()
+            pts, last, donation_pts, role = _get_user_data(data, res["key"])
+            data[res["key"]] = (pts + res["cost"], last, donation_pts + res["donation_used"], role)
+            write_points(data)
+    except TimeoutError:
+        pass
+
+
+def _post_game_command(endpoint, payload, fail_prefix, timeout_msg):
+    """POST a command to the overlay server. Returns (body, None) on success or (None, error_msg)."""
+    url = "http://127.0.0.1:5000" + endpoint
+    req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
+    req.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(req, timeout=GAME_COMMAND_TIMEOUT) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+        if not raw.strip():
+            return None, f"{fail_prefix} (empty response from server)"
+        try:
+            body = json.loads(raw)
+        except json.JSONDecodeError:
+            return None, f"{fail_prefix} (server error). Is the overlay running?"
+        if not body.get("ok"):
+            return None, body.get("error", fail_prefix)
+        return body, None
+    except urllib.error.HTTPError as e:
+        return None, _http_error_msg(e, timeout_msg)
+    except urllib.error.URLError:
+        return None, "Overlay server not reachable. Is it running?"
+    except Exception as e:
+        msg = str(e).strip() if e else ""
+        return None, f"{fail_prefix}. " + (msg if msg else "Check overlay server and try again.")
+
+
+def cmd_spawn(args):
+    if is_spend_disabled():
+        return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
+    if len(args) != 2:
+        return SPAWN_RESULT_FILE, "Usage: !spawn <monster> (e.g. !spawn rat)"
+    monster = args[0].lower()
+    username = _caller_username(args)
+    if monster not in VALID_MONSTERS:
+        return SPAWN_RESULT_FILE, f"Unknown monster: {monster}"
+
+    base_cost = effective_cost("cost_per_monster." + monster, compute_spawn_cost(monster))
+    res, err = reserve_points(username, "spawn", base_cost)
+    if err:
+        return SPAWN_RESULT_FILE, err
+
+    body, err = _post_game_command(
+        "/api/spawn-command", {"monster": monster, "username": username},
+        "Spawn failed", "Spawn timed out. Is the game running and in an active run (not title screen)?"
+    )
+    if err:
+        refund_points(res)
+        return SPAWN_RESULT_FILE, err
+    return SPAWN_RESULT_FILE, f"ok|{res['new_pts']}"
 
 
 def cmd_champion(args):
     if is_spend_disabled():
         return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
-    if len(args) < 2:
+    if len(args) != 2:
         return SPAWN_RESULT_FILE, "Usage: !champion <monster> (e.g. !champion rat). Costs 2× zone-adjusted spawn cost."
     monster = args[0].lower()
-    username = args[1]
+    username = _caller_username(args)
     if monster not in VALID_MONSTERS:
         return SPAWN_RESULT_FILE, f"Unknown monster: {monster}"
 
     base_cost = effective_cost("cost_per_monster." + monster, compute_champion_cost(monster))
-    key = username.lower()
-    try:
-        with points_lock():
-            data = read_points()
-            pts, last, donation_pts, role = _get_user_data(data, key)
-            ok, err = check_command_access("champion", role)
-            if not ok:
-                return SPAWN_RESULT_FILE, err
-            cost = apply_role_discount(base_cost, "champion", role)
-            total = effective_total(pts, donation_pts)
-            if total < cost:
-                return SPAWN_RESULT_FILE, not_enough_points_msg(username, cost, total, f"for champion {monster}")
+    res, err = reserve_points(username, "champion", base_cost, f"for champion {monster}")
+    if err:
+        return SPAWN_RESULT_FILE, err
 
-            url = "http://127.0.0.1:5000/api/champion-command"
-            payload = {"monster": monster, "username": username}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-            req.add_header("Content-Type", "application/json")
-
-            try:
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    raw = resp.read().decode("utf-8", errors="replace")
-                    if not raw.strip():
-                        return SPAWN_RESULT_FILE, "Champion spawn failed (empty response from server)"
-                    try:
-                        body = json.loads(raw)
-                    except json.JSONDecodeError:
-                        return SPAWN_RESULT_FILE, "Champion spawn failed (server error). Is the overlay running?"
-                    if not body.get("ok"):
-                        return SPAWN_RESULT_FILE, body.get("error", "Champion spawn failed")
-            except urllib.error.HTTPError as e:
-                return SPAWN_RESULT_FILE, _http_error_msg(
-                    e, "Champion spawn timed out. Is the game running and in an active run?"
-                )
-            except urllib.error.URLError as e:
-                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
-            except Exception as e:
-                msg = str(e).strip() if e else ""
-                return SPAWN_RESULT_FILE, "Champion spawn failed. " + (msg if msg else "Check overlay server and try again.")
-
-            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation, role)
-            write_points(data)
-            return SPAWN_RESULT_FILE, "ok|" + body.get("monster", monster) + f"|{new_pts}"
-    except TimeoutError:
-        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+    body, err = _post_game_command(
+        "/api/champion-command", {"monster": monster, "username": username},
+        "Champion spawn failed", "Champion spawn timed out. Is the game running and in an active run?"
+    )
+    if err:
+        refund_points(res)
+        return SPAWN_RESULT_FILE, err
+    return SPAWN_RESULT_FILE, "ok|" + body.get("monster", monster) + f"|{res['new_pts']}"
 
 
 def cmd_gold(args):
     if is_spend_disabled():
         return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
-    if len(args) < 2:
+    if len(args) != 2:
         return SPAWN_RESULT_FILE, "Usage: !gold <amount> (e.g. !gold 10)"
     try:
         amount = int(args[0])
@@ -667,54 +815,21 @@ def cmd_gold(args):
         return SPAWN_RESULT_FILE, "Usage: !gold <amount> (e.g. !gold 10). Amount must be 1-100."
     if amount < 1 or amount > 100:
         return SPAWN_RESULT_FILE, "Amount must be 1-100. Example: !gold 10"
-    username = args[1]
+    username = _caller_username(args)
 
     base_cost = effective_cost("cost_per_gold", amount * get_config()["cost_per_gold"])
-    key = username.lower()
-    try:
-        with points_lock():
-            data = read_points()
-            pts, last, donation_pts, role = _get_user_data(data, key)
-            ok, err = check_command_access("gold", role)
-            if not ok:
-                return SPAWN_RESULT_FILE, err
-            cost = apply_role_discount(base_cost, "gold", role)
-            total = effective_total(pts, donation_pts)
-            if total < cost:
-                return SPAWN_RESULT_FILE, not_enough_points_msg(username, cost, total, f"for {amount} gold")
+    res, err = reserve_points(username, "gold", base_cost, f"for {amount} gold")
+    if err:
+        return SPAWN_RESULT_FILE, err
 
-            url = "http://127.0.0.1:5000/api/gold-command"
-            payload = {"amount": amount, "username": username}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-            req.add_header("Content-Type", "application/json")
-
-            try:
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    raw = resp.read().decode("utf-8", errors="replace")
-                    if not raw.strip():
-                        return SPAWN_RESULT_FILE, "Gold drop failed (empty response from server)"
-                    try:
-                        body = json.loads(raw)
-                    except json.JSONDecodeError:
-                        return SPAWN_RESULT_FILE, "Gold drop failed (server error). Is the overlay running?"
-                    if not body.get("ok"):
-                        return SPAWN_RESULT_FILE, body.get("error", "Gold drop failed")
-            except urllib.error.HTTPError as e:
-                return SPAWN_RESULT_FILE, _http_error_msg(
-                    e, "Gold drop timed out. Is the game running and in an active run (not title screen)?"
-                )
-            except urllib.error.URLError as e:
-                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
-            except Exception as e:
-                msg = str(e).strip() if e else ""
-                return SPAWN_RESULT_FILE, "Gold drop failed. " + (msg if msg else "Check overlay server and try again.")
-
-            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation, role)
-            write_points(data)
-            return SPAWN_RESULT_FILE, f"ok|{amount}|{new_pts}"
-    except TimeoutError:
-        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+    body, err = _post_game_command(
+        "/api/gold-command", {"amount": amount, "username": username},
+        "Gold drop failed", "Gold drop timed out. Is the game running and in an active run (not title screen)?"
+    )
+    if err:
+        refund_points(res)
+        return SPAWN_RESULT_FILE, err
+    return SPAWN_RESULT_FILE, f"ok|{amount}|{res['new_pts']}"
 
 
 def cmd_curse(args):
@@ -726,51 +841,19 @@ def cmd_curse(args):
 
     base_cost = effective_cost("cost_per_curse", get_config()["cost_per_curse"])
     scaled_cost = curse_cost_for_equipped_curses(base_cost, count_known_cursed_equipped())
-    key = username.lower()
-    try:
-        with points_lock():
-            data = read_points()
-            pts, last, donation_pts, role = _get_user_data(data, key)
-            ok, err = check_command_access("curse", role)
-            if not ok:
-                return SPAWN_RESULT_FILE, err
-            cost = apply_role_discount(scaled_cost, "curse", role)
-            total = effective_total(pts, donation_pts)
-            if total < cost:
-                return SPAWN_RESULT_FILE, not_enough_points_msg(username, cost, total, "to curse")
+    res, err = reserve_points(username, "curse", scaled_cost, "to curse")
+    if err:
+        return SPAWN_RESULT_FILE, err
 
-            url = "http://127.0.0.1:5000/api/curse-command"
-            payload = {"username": username}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-            req.add_header("Content-Type", "application/json")
-
-            try:
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    raw = resp.read().decode("utf-8", errors="replace")
-                    if not raw.strip():
-                        return SPAWN_RESULT_FILE, "Curse failed (empty response from server)"
-                    try:
-                        body = json.loads(raw)
-                    except json.JSONDecodeError:
-                        return SPAWN_RESULT_FILE, "Curse failed (server error). Is the overlay running?"
-                    if body.get("ok"):
-                        new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-                        data[key] = (new_pts, last, new_donation, role)
-                        write_points(data)
-                        item_name = body.get("item_name", "item")
-                        return SPAWN_RESULT_FILE, f"ok|{item_name}|{new_pts}"
-                    return SPAWN_RESULT_FILE, body.get("error", "Curse failed")
-            except urllib.error.HTTPError as e:
-                return SPAWN_RESULT_FILE, _http_error_msg(
-                    e, "Curse timed out. Is the game running and in an active run?"
-                )
-            except urllib.error.URLError:
-                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
-            except Exception as e:
-                msg = str(e).strip() if e else ""
-                return SPAWN_RESULT_FILE, "Curse failed. " + (msg if msg else "Check overlay server and try again.")
-    except TimeoutError:
-        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+    body, err = _post_game_command(
+        "/api/curse-command", {"username": username},
+        "Curse failed", "Curse timed out. Is the game running and in an active run?"
+    )
+    if err:
+        refund_points(res)
+        return SPAWN_RESULT_FILE, err
+    item_name = body.get("item_name", "item")
+    return SPAWN_RESULT_FILE, f"ok|{item_name}|{res['new_pts']}"
 
 
 def cmd_gas(args):
@@ -781,52 +864,19 @@ def cmd_gas(args):
     username = args[0]
 
     base_cost = effective_cost("cost_per_gas", get_config()["cost_per_gas"])
-    key = username.lower()
-    try:
-        with points_lock():
-            data = read_points()
-            pts, last, donation_pts, role = _get_user_data(data, key)
-            ok, err = check_command_access("gas", role)
-            if not ok:
-                return SPAWN_RESULT_FILE, err
-            cost = apply_role_discount(base_cost, "gas", role)
-            total = effective_total(pts, donation_pts)
-            if total < cost:
-                return SPAWN_RESULT_FILE, not_enough_points_msg(username, cost, total, "to spew gas")
+    res, err = reserve_points(username, "gas", base_cost, "to spew gas")
+    if err:
+        return SPAWN_RESULT_FILE, err
 
-            url = "http://127.0.0.1:5000/api/gas-command"
-            payload = {"username": username}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-            req.add_header("Content-Type", "application/json")
-
-            try:
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    raw = resp.read().decode("utf-8", errors="replace")
-                    if not raw.strip():
-                        return SPAWN_RESULT_FILE, "Gas spawn failed (empty response from server)"
-                    try:
-                        body = json.loads(raw)
-                    except json.JSONDecodeError:
-                        return SPAWN_RESULT_FILE, "Gas spawn failed (server error). Is the overlay running?"
-                    if not body.get("ok"):
-                        return SPAWN_RESULT_FILE, body.get("error", "Gas spawn failed")
-            except urllib.error.HTTPError as e:
-                return SPAWN_RESULT_FILE, _http_error_msg(
-                    e, "Gas command timed out. Is the game running and in an active run?"
-                )
-            except urllib.error.URLError as e:
-                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
-            except Exception as e:
-                msg = str(e).strip() if e else ""
-                return SPAWN_RESULT_FILE, "Gas spawn failed. " + (msg if msg else "Check overlay server and try again.")
-
-            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation, role)
-            write_points(data)
-            gas_name = body.get("gas_name", "gas")
-            return SPAWN_RESULT_FILE, f"ok|{gas_name}|{new_pts}"
-    except TimeoutError:
-        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+    body, err = _post_game_command(
+        "/api/gas-command", {"username": username},
+        "Gas spawn failed", "Gas command timed out. Is the game running and in an active run?"
+    )
+    if err:
+        refund_points(res)
+        return SPAWN_RESULT_FILE, err
+    gas_name = body.get("gas_name", "gas")
+    return SPAWN_RESULT_FILE, f"ok|{gas_name}|{res['new_pts']}"
 
 
 def cmd_scroll(args):
@@ -837,52 +887,19 @@ def cmd_scroll(args):
     username = args[0]
 
     base_cost = effective_cost("cost_per_scroll", get_config()["cost_per_scroll"])
-    key = username.lower()
-    try:
-        with points_lock():
-            data = read_points()
-            pts, last, donation_pts, role = _get_user_data(data, key)
-            ok, err = check_command_access("scroll", role)
-            if not ok:
-                return SPAWN_RESULT_FILE, err
-            cost = apply_role_discount(base_cost, "scroll", role)
-            total = effective_total(pts, donation_pts)
-            if total < cost:
-                return SPAWN_RESULT_FILE, not_enough_points_msg(username, cost, total, "for random scroll")
+    res, err = reserve_points(username, "scroll", base_cost, "for random scroll")
+    if err:
+        return SPAWN_RESULT_FILE, err
 
-            url = "http://127.0.0.1:5000/api/scroll-command"
-            payload = {"username": username}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-            req.add_header("Content-Type", "application/json")
-
-            try:
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    raw = resp.read().decode("utf-8", errors="replace")
-                    if not raw.strip():
-                        return SPAWN_RESULT_FILE, "Scroll command failed (empty response from server)"
-                    try:
-                        body = json.loads(raw)
-                    except json.JSONDecodeError:
-                        return SPAWN_RESULT_FILE, "Scroll command failed (server error). Is the overlay running?"
-                    if not body.get("ok"):
-                        return SPAWN_RESULT_FILE, body.get("error", "Scroll command failed")
-            except urllib.error.HTTPError as e:
-                return SPAWN_RESULT_FILE, _http_error_msg(
-                    e, "Scroll command timed out. Is the game running and in an active run?"
-                )
-            except urllib.error.URLError as e:
-                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
-            except Exception as e:
-                msg = str(e).strip() if e else ""
-                return SPAWN_RESULT_FILE, "Scroll command failed. " + (msg if msg else "Check overlay server and try again.")
-
-            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation, role)
-            write_points(data)
-            scroll_name = body.get("scroll_name", "scroll")
-            return SPAWN_RESULT_FILE, f"ok|{scroll_name}|{new_pts}"
-    except TimeoutError:
-        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+    body, err = _post_game_command(
+        "/api/scroll-command", {"username": username},
+        "Scroll command failed", "Scroll command timed out. Is the game running and in an active run?"
+    )
+    if err:
+        refund_points(res)
+        return SPAWN_RESULT_FILE, err
+    scroll_name = body.get("scroll_name", "scroll")
+    return SPAWN_RESULT_FILE, f"ok|{scroll_name}|{res['new_pts']}"
 
 
 def cmd_row(args):
@@ -893,52 +910,19 @@ def cmd_row(args):
     username = args[0]
 
     base_cost = effective_cost("cost_per_ring_of_wealth", get_config()["cost_per_ring_of_wealth"])
-    key = username.lower()
-    try:
-        with points_lock():
-            data = read_points()
-            pts, last, donation_pts, role = _get_user_data(data, key)
-            ok, err = check_command_access("ring_of_wealth", role)
-            if not ok:
-                return SPAWN_RESULT_FILE, err
-            cost = apply_role_discount(base_cost, "ring_of_wealth", role)
-            total = effective_total(pts, donation_pts)
-            if total < cost:
-                return SPAWN_RESULT_FILE, not_enough_points_msg(username, cost, total, "for Ring of Wealth loot")
+    res, err = reserve_points(username, "ring_of_wealth", base_cost, "for Ring of Wealth loot")
+    if err:
+        return SPAWN_RESULT_FILE, err
 
-            url = "http://127.0.0.1:5000/api/ring-of-wealth-command"
-            payload = {"username": username}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-            req.add_header("Content-Type", "application/json")
-
-            try:
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    raw = resp.read().decode("utf-8", errors="replace")
-                    if not raw.strip():
-                        return SPAWN_RESULT_FILE, "Ring of wealth command failed (empty response from server)"
-                    try:
-                        body = json.loads(raw)
-                    except json.JSONDecodeError:
-                        return SPAWN_RESULT_FILE, "Ring of wealth command failed (server error). Is the overlay running?"
-                    if not body.get("ok"):
-                        return SPAWN_RESULT_FILE, body.get("error", "Ring of wealth command failed")
-            except urllib.error.HTTPError as e:
-                return SPAWN_RESULT_FILE, _http_error_msg(
-                    e, "Ring of wealth command timed out. Is the game running and in an active run?"
-                )
-            except urllib.error.URLError:
-                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
-            except Exception as e:
-                msg = str(e).strip() if e else ""
-                return SPAWN_RESULT_FILE, "Ring of wealth command failed. " + (msg if msg else "Check overlay server and try again.")
-
-            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation, role)
-            write_points(data)
-            detail = body.get("detail", "loot")
-            return SPAWN_RESULT_FILE, f"ok|{detail}|{new_pts}"
-    except TimeoutError:
-        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+    body, err = _post_game_command(
+        "/api/ring-of-wealth-command", {"username": username},
+        "Ring of wealth command failed", "Ring of wealth command timed out. Is the game running and in an active run?"
+    )
+    if err:
+        refund_points(res)
+        return SPAWN_RESULT_FILE, err
+    detail = body.get("detail", "loot")
+    return SPAWN_RESULT_FILE, f"ok|{detail}|{res['new_pts']}"
 
 
 def cmd_trap(args):
@@ -949,52 +933,19 @@ def cmd_trap(args):
     username = args[0]
 
     base_cost = effective_cost("cost_per_trap", get_config()["cost_per_trap"])
-    key = username.lower()
-    try:
-        with points_lock():
-            data = read_points()
-            pts, last, donation_pts, role = _get_user_data(data, key)
-            ok, err = check_command_access("trap", role)
-            if not ok:
-                return SPAWN_RESULT_FILE, err
-            cost = apply_role_discount(base_cost, "trap", role)
-            total = effective_total(pts, donation_pts)
-            if total < cost:
-                return SPAWN_RESULT_FILE, not_enough_points_msg(username, cost, total, "to place a trap")
+    res, err = reserve_points(username, "trap", base_cost, "to place a trap")
+    if err:
+        return SPAWN_RESULT_FILE, err
 
-            url = "http://127.0.0.1:5000/api/trap-command"
-            payload = {"username": username}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-            req.add_header("Content-Type", "application/json")
-
-            try:
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    raw = resp.read().decode("utf-8", errors="replace")
-                    if not raw.strip():
-                        return SPAWN_RESULT_FILE, "Trap command failed (empty response from server)"
-                    try:
-                        body = json.loads(raw)
-                    except json.JSONDecodeError:
-                        return SPAWN_RESULT_FILE, "Trap command failed (server error). Is the overlay running?"
-                    if not body.get("ok"):
-                        return SPAWN_RESULT_FILE, body.get("error", "Trap command failed")
-            except urllib.error.HTTPError as e:
-                return SPAWN_RESULT_FILE, _http_error_msg(
-                    e, "Trap command timed out. Is the game running and in an active run?"
-                )
-            except urllib.error.URLError as e:
-                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
-            except Exception as e:
-                msg = str(e).strip() if e else ""
-                return SPAWN_RESULT_FILE, "Trap command failed. " + (msg if msg else "Check overlay server and try again.")
-
-            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation, role)
-            write_points(data)
-            trap_name = body.get("trap_name", "trap")
-            return SPAWN_RESULT_FILE, f"ok|{trap_name}|{new_pts}"
-    except TimeoutError:
-        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+    body, err = _post_game_command(
+        "/api/trap-command", {"username": username},
+        "Trap command failed", "Trap command timed out. Is the game running and in an active run?"
+    )
+    if err:
+        refund_points(res)
+        return SPAWN_RESULT_FILE, err
+    trap_name = body.get("trap_name", "trap")
+    return SPAWN_RESULT_FILE, f"ok|{trap_name}|{res['new_pts']}"
 
 
 def cmd_bomb(args):
@@ -1005,52 +956,19 @@ def cmd_bomb(args):
     username = args[0]
 
     base_cost = effective_cost("cost_per_bomb", get_config()["cost_per_bomb"])
-    key = username.lower()
-    try:
-        with points_lock():
-            data = read_points()
-            pts, last, donation_pts, role = _get_user_data(data, key)
-            ok, err = check_command_access("bomb", role)
-            if not ok:
-                return SPAWN_RESULT_FILE, err
-            cost = apply_role_discount(base_cost, "bomb", role)
-            total = effective_total(pts, donation_pts)
-            if total < cost:
-                return SPAWN_RESULT_FILE, not_enough_points_msg(username, cost, total, "for !bomb")
+    res, err = reserve_points(username, "bomb", base_cost, "for !bomb")
+    if err:
+        return SPAWN_RESULT_FILE, err
 
-            url = "http://127.0.0.1:5000/api/bomb-command"
-            payload = {"username": username}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-            req.add_header("Content-Type", "application/json")
-
-            try:
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    raw = resp.read().decode("utf-8", errors="replace")
-                    if not raw.strip():
-                        return SPAWN_RESULT_FILE, "Bomb command failed (empty response from server)"
-                    try:
-                        body = json.loads(raw)
-                    except json.JSONDecodeError:
-                        return SPAWN_RESULT_FILE, "Bomb command failed (server error). Is the overlay running?"
-                    if not body.get("ok"):
-                        return SPAWN_RESULT_FILE, body.get("error", "Bomb command failed")
-            except urllib.error.HTTPError as e:
-                return SPAWN_RESULT_FILE, _http_error_msg(
-                    e, "Bomb command timed out. Is the game running and in an active run?"
-                )
-            except urllib.error.URLError as e:
-                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
-            except Exception as e:
-                msg = str(e).strip() if e else ""
-                return SPAWN_RESULT_FILE, "Bomb command failed. " + (msg if msg else "Check overlay server and try again.")
-
-            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation, role)
-            write_points(data)
-            bomb_name = body.get("bomb_name", "bomb")
-            return SPAWN_RESULT_FILE, f"ok|{bomb_name}|{new_pts}"
-    except TimeoutError:
-        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+    body, err = _post_game_command(
+        "/api/bomb-command", {"username": username},
+        "Bomb command failed", "Bomb command timed out. Is the game running and in an active run?"
+    )
+    if err:
+        refund_points(res)
+        return SPAWN_RESULT_FILE, err
+    bomb_name = body.get("bomb_name", "bomb")
+    return SPAWN_RESULT_FILE, f"ok|{bomb_name}|{res['new_pts']}"
 
 
 def cmd_transmute(args):
@@ -1061,54 +979,21 @@ def cmd_transmute(args):
     username = args[0]
 
     base_cost = effective_cost("cost_per_transmute", get_config()["cost_per_transmute"])
-    key = username.lower()
-    try:
-        with points_lock():
-            data = read_points()
-            pts, last, donation_pts, role = _get_user_data(data, key)
-            ok, err = check_command_access("transmute", role)
-            if not ok:
-                return SPAWN_RESULT_FILE, err
-            cost = apply_role_discount(base_cost, "transmute", role)
-            total = effective_total(pts, donation_pts)
-            if total < cost:
-                return SPAWN_RESULT_FILE, not_enough_points_msg(username, cost, total, "to transmute")
+    res, err = reserve_points(username, "transmute", base_cost, "to transmute")
+    if err:
+        return SPAWN_RESULT_FILE, err
 
-            url = "http://127.0.0.1:5000/api/transmute-command"
-            payload = {"username": username}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-            req.add_header("Content-Type", "application/json")
-
-            try:
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    raw = resp.read().decode("utf-8", errors="replace")
-                    if not raw.strip():
-                        return SPAWN_RESULT_FILE, "Transmute command failed (empty response from server)"
-                    try:
-                        body = json.loads(raw)
-                    except json.JSONDecodeError:
-                        return SPAWN_RESULT_FILE, "Transmute command failed (server error). Is the overlay running?"
-                    if not body.get("ok"):
-                        return SPAWN_RESULT_FILE, body.get("error", "Transmute command failed")
-            except urllib.error.HTTPError as e:
-                return SPAWN_RESULT_FILE, _http_error_msg(
-                    e, "Transmute command timed out. Is the game running and in an active run?"
-                )
-            except urllib.error.URLError as e:
-                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
-            except Exception as e:
-                msg = str(e).strip() if e else ""
-                return SPAWN_RESULT_FILE, "Transmute command failed. " + (msg if msg else "Check overlay server and try again.")
-
-            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation, role)
-            # Transmute: echo both item names for Streamer.bot/Twitch (matches in-game GLog when game sends original_item_name).
-            write_points(data)
-            item_name = (body.get("item_name") or "item").strip()
-            original_item_name = (body.get("original_item_name") or "").strip()
-            return SPAWN_RESULT_FILE, f"ok|{original_item_name}|{item_name}|{new_pts}"
-    except TimeoutError:
-        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+    body, err = _post_game_command(
+        "/api/transmute-command", {"username": username},
+        "Transmute command failed", "Transmute command timed out. Is the game running and in an active run?"
+    )
+    if err:
+        refund_points(res)
+        return SPAWN_RESULT_FILE, err
+    # Transmute: echo both item names for Streamer.bot/Twitch (matches in-game GLog when game sends original_item_name).
+    item_name = (body.get("item_name") or "item").strip()
+    original_item_name = (body.get("original_item_name") or "").strip()
+    return SPAWN_RESULT_FILE, f"ok|{original_item_name}|{item_name}|{res['new_pts']}"
 
 
 def cmd_ally_bee(args):
@@ -1119,52 +1004,19 @@ def cmd_ally_bee(args):
     username = args[0]
 
     base_cost = effective_cost("cost_per_ally_bee", get_config()["cost_per_ally_bee"])
-    key = username.lower()
-    try:
-        with points_lock():
-            data = read_points()
-            pts, last, donation_pts, role = _get_user_data(data, key)
-            ok, err = check_command_access("bee", role)
-            if not ok:
-                return SPAWN_RESULT_FILE, err
-            cost = apply_role_discount(base_cost, "bee", role)
-            total = effective_total(pts, donation_pts)
-            if total < cost:
-                return SPAWN_RESULT_FILE, not_enough_points_msg(username, cost, total, "to summon a bee")
+    res, err = reserve_points(username, "bee", base_cost, "to summon a bee")
+    if err:
+        return SPAWN_RESULT_FILE, err
 
-            url = "http://127.0.0.1:5000/api/summon-bee-command"
-            payload = {"username": username}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-            req.add_header("Content-Type", "application/json")
-
-            try:
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    raw = resp.read().decode("utf-8", errors="replace")
-                    if not raw.strip():
-                        return SPAWN_RESULT_FILE, "Summon bee failed (empty response from server)"
-                    try:
-                        body = json.loads(raw)
-                    except json.JSONDecodeError:
-                        return SPAWN_RESULT_FILE, "Summon bee failed (server error). Is the overlay running?"
-                    if not body.get("ok"):
-                        return SPAWN_RESULT_FILE, body.get("error", "Summon bee failed")
-            except urllib.error.HTTPError as e:
-                return SPAWN_RESULT_FILE, _http_error_msg(
-                    e, "Summon bee timed out. Is the game running and in an active run?"
-                )
-            except urllib.error.URLError as e:
-                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
-            except Exception as e:
-                msg = str(e).strip() if e else ""
-                return SPAWN_RESULT_FILE, "Summon bee failed. " + (msg if msg else "Check overlay server and try again.")
-
-            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation, role)
-            write_points(data)
-            ally_name = body.get("ally_name", "Bee")
-            return SPAWN_RESULT_FILE, f"ok|{ally_name}|{new_pts}"
-    except TimeoutError:
-        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+    body, err = _post_game_command(
+        "/api/summon-bee-command", {"username": username},
+        "Summon bee failed", "Summon bee timed out. Is the game running and in an active run?"
+    )
+    if err:
+        refund_points(res)
+        return SPAWN_RESULT_FILE, err
+    ally_name = body.get("ally_name", "Bee")
+    return SPAWN_RESULT_FILE, f"ok|{ally_name}|{res['new_pts']}"
 
 
 def cmd_ward(args):
@@ -1175,52 +1027,19 @@ def cmd_ward(args):
     username = args[0]
 
     base_cost = effective_cost("cost_per_ward", get_config()["cost_per_ward"])
-    key = username.lower()
-    try:
-        with points_lock():
-            data = read_points()
-            pts, last, donation_pts, role = _get_user_data(data, key)
-            ok, err = check_command_access("ward", role)
-            if not ok:
-                return SPAWN_RESULT_FILE, err
-            cost = apply_role_discount(base_cost, "ward", role)
-            total = effective_total(pts, donation_pts)
-            if total < cost:
-                return SPAWN_RESULT_FILE, not_enough_points_msg(username, cost, total, "to summon a ward")
+    res, err = reserve_points(username, "ward", base_cost, "to summon a ward")
+    if err:
+        return SPAWN_RESULT_FILE, err
 
-            url = "http://127.0.0.1:5000/api/ward-command"
-            payload = {"username": username}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-            req.add_header("Content-Type", "application/json")
-
-            try:
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    raw = resp.read().decode("utf-8", errors="replace")
-                    if not raw.strip():
-                        return SPAWN_RESULT_FILE, "Summon ward failed (empty response from server)"
-                    try:
-                        body = json.loads(raw)
-                    except json.JSONDecodeError:
-                        return SPAWN_RESULT_FILE, "Summon ward failed (server error). Is the overlay running?"
-                    if not body.get("ok"):
-                        return SPAWN_RESULT_FILE, body.get("error", "Summon ward failed")
-            except urllib.error.HTTPError as e:
-                return SPAWN_RESULT_FILE, _http_error_msg(
-                    e, "Summon ward timed out. Is the game running and in an active run?"
-                )
-            except urllib.error.URLError as e:
-                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
-            except Exception as e:
-                msg = str(e).strip() if e else ""
-                return SPAWN_RESULT_FILE, "Summon ward failed. " + (msg if msg else "Check overlay server and try again.")
-
-            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation, role)
-            write_points(data)
-            ward_name = body.get("ward_name", "Ward")
-            return SPAWN_RESULT_FILE, f"ok|{ward_name}|{new_pts}"
-    except TimeoutError:
-        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+    body, err = _post_game_command(
+        "/api/ward-command", {"username": username},
+        "Summon ward failed", "Summon ward timed out. Is the game running and in an active run?"
+    )
+    if err:
+        refund_points(res)
+        return SPAWN_RESULT_FILE, err
+    ward_name = body.get("ward_name", "Ward")
+    return SPAWN_RESULT_FILE, f"ok|{ward_name}|{res['new_pts']}"
 
 
 def cmd_buff(args):
@@ -1231,52 +1050,19 @@ def cmd_buff(args):
     username = args[0]
 
     base_cost = effective_cost("cost_per_buff", get_config()["cost_per_buff"])
-    key = username.lower()
-    try:
-        with points_lock():
-            data = read_points()
-            pts, last, donation_pts, role = _get_user_data(data, key)
-            ok, err = check_command_access("buff", role)
-            if not ok:
-                return SPAWN_RESULT_FILE, err
-            cost = apply_role_discount(base_cost, "buff", role)
-            total = effective_total(pts, donation_pts)
-            if total < cost:
-                return SPAWN_RESULT_FILE, not_enough_points_msg(username, cost, total, "for random buff")
+    res, err = reserve_points(username, "buff", base_cost, "for random buff")
+    if err:
+        return SPAWN_RESULT_FILE, err
 
-            url = "http://127.0.0.1:5000/api/buff-command"
-            payload = {"username": username}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-            req.add_header("Content-Type", "application/json")
-
-            try:
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    raw = resp.read().decode("utf-8", errors="replace")
-                    if not raw.strip():
-                        return SPAWN_RESULT_FILE, "Buff command failed (empty response from server)"
-                    try:
-                        body = json.loads(raw)
-                    except json.JSONDecodeError:
-                        return SPAWN_RESULT_FILE, "Buff command failed (server error). Is the overlay running?"
-                    if not body.get("ok"):
-                        return SPAWN_RESULT_FILE, body.get("error", "Buff command failed")
-            except urllib.error.HTTPError as e:
-                return SPAWN_RESULT_FILE, _http_error_msg(
-                    e, "Buff command timed out. Is the game running and in an active run?"
-                )
-            except urllib.error.URLError as e:
-                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
-            except Exception as e:
-                msg = str(e).strip() if e else ""
-                return SPAWN_RESULT_FILE, "Buff command failed. " + (msg if msg else "Check overlay server and try again.")
-
-            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation, role)
-            write_points(data)
-            buff_name = body.get("buff_name", "buff")
-            return SPAWN_RESULT_FILE, f"ok|{buff_name}|{new_pts}"
-    except TimeoutError:
-        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+    body, err = _post_game_command(
+        "/api/buff-command", {"username": username},
+        "Buff command failed", "Buff command timed out. Is the game running and in an active run?"
+    )
+    if err:
+        refund_points(res)
+        return SPAWN_RESULT_FILE, err
+    buff_name = body.get("buff_name", "buff")
+    return SPAWN_RESULT_FILE, f"ok|{buff_name}|{res['new_pts']}"
 
 
 def cmd_debuff(args):
@@ -1287,52 +1073,19 @@ def cmd_debuff(args):
     username = args[0]
 
     base_cost = effective_cost("cost_per_debuff", get_config()["cost_per_debuff"])
-    key = username.lower()
-    try:
-        with points_lock():
-            data = read_points()
-            pts, last, donation_pts, role = _get_user_data(data, key)
-            ok, err = check_command_access("debuff", role)
-            if not ok:
-                return SPAWN_RESULT_FILE, err
-            cost = apply_role_discount(base_cost, "debuff", role)
-            total = effective_total(pts, donation_pts)
-            if total < cost:
-                return SPAWN_RESULT_FILE, not_enough_points_msg(username, cost, total, "for random debuff")
+    res, err = reserve_points(username, "debuff", base_cost, "for random debuff")
+    if err:
+        return SPAWN_RESULT_FILE, err
 
-            url = "http://127.0.0.1:5000/api/debuff-command"
-            payload = {"username": username}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-            req.add_header("Content-Type", "application/json")
-
-            try:
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    raw = resp.read().decode("utf-8", errors="replace")
-                    if not raw.strip():
-                        return SPAWN_RESULT_FILE, "Debuff command failed (empty response from server)"
-                    try:
-                        body = json.loads(raw)
-                    except json.JSONDecodeError:
-                        return SPAWN_RESULT_FILE, "Debuff command failed (server error). Is the overlay running?"
-                    if not body.get("ok"):
-                        return SPAWN_RESULT_FILE, body.get("error", "Debuff command failed")
-            except urllib.error.HTTPError as e:
-                return SPAWN_RESULT_FILE, _http_error_msg(
-                    e, "Debuff command timed out. Is the game running and in an active run?"
-                )
-            except urllib.error.URLError as e:
-                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
-            except Exception as e:
-                msg = str(e).strip() if e else ""
-                return SPAWN_RESULT_FILE, "Debuff command failed. " + (msg if msg else "Check overlay server and try again.")
-
-            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation, role)
-            write_points(data)
-            debuff_name = body.get("debuff_name", "debuff")
-            return SPAWN_RESULT_FILE, f"ok|{debuff_name}|{new_pts}"
-    except TimeoutError:
-        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+    body, err = _post_game_command(
+        "/api/debuff-command", {"username": username},
+        "Debuff command failed", "Debuff command timed out. Is the game running and in an active run?"
+    )
+    if err:
+        refund_points(res)
+        return SPAWN_RESULT_FILE, err
+    debuff_name = body.get("debuff_name", "debuff")
+    return SPAWN_RESULT_FILE, f"ok|{debuff_name}|{res['new_pts']}"
 
 
 WAND_TIERS = frozenset(["common", "uncommon", "rare", "veryrare", "very_rare"])
@@ -1349,55 +1102,20 @@ def cmd_wand(args):
         username = args[0]
 
     cfg = get_config()
-    base_cost_check = effective_cost("cost_per_wand", cfg["cost_per_wand"])
-    key = username.lower()
-    try:
-        with points_lock():
-            data = read_points()
-            pts, last, donation_pts, role = _get_user_data(data, key)
-            ok, err = check_command_access("wand", role)
-            if not ok:
-                return SPAWN_RESULT_FILE, err
-            cost_check = apply_role_discount(base_cost_check, "wand", role)
-            total = effective_total(pts, donation_pts)
-            if total < cost_check:
-                return SPAWN_RESULT_FILE, not_enough_points_msg(username, cost_check, total)
+    base_cost = effective_cost("cost_per_wand", cfg["cost_per_wand"])
+    res, err = reserve_points(username, "wand", base_cost)
+    if err:
+        return SPAWN_RESULT_FILE, err
 
-            url = "http://127.0.0.1:5000/api/wand-command"
-            payload = {"username": username}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-            req.add_header("Content-Type", "application/json")
-
-            try:
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    raw = resp.read().decode("utf-8", errors="replace")
-                    if not raw.strip():
-                        return SPAWN_RESULT_FILE, "Wand command failed (empty response from server)"
-                    try:
-                        body = json.loads(raw)
-                    except json.JSONDecodeError:
-                        return SPAWN_RESULT_FILE, "Wand command failed (server error). Is the overlay running?"
-                    if not body.get("ok"):
-                        return SPAWN_RESULT_FILE, body.get("error", "Wand command failed")
-            except urllib.error.HTTPError as e:
-                return SPAWN_RESULT_FILE, _http_error_msg(
-                    e, "Wand command timed out. Is the game running and in an active run?"
-                )
-            except urllib.error.URLError as e:
-                return SPAWN_RESULT_FILE, "Overlay server not reachable. Is it running?"
-            except Exception as e:
-                msg = str(e).strip() if e else ""
-                return SPAWN_RESULT_FILE, "Wand command failed. " + (msg if msg else "Check overlay server and try again.")
-
-            base_cost = effective_cost("cost_per_wand", cfg["cost_per_wand"])
-            cost = apply_role_discount(base_cost, "wand", role)
-            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation, role)
-            write_points(data)
-            effect_name = body.get("effect_name", "effect")
-            return SPAWN_RESULT_FILE, f"ok|{effect_name}|{new_pts}"
-    except TimeoutError:
-        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+    body, err = _post_game_command(
+        "/api/wand-command", {"username": username},
+        "Wand command failed", "Wand command timed out. Is the game running and in an active run?"
+    )
+    if err:
+        refund_points(res)
+        return SPAWN_RESULT_FILE, err
+    effect_name = body.get("effect_name", "effect")
+    return SPAWN_RESULT_FILE, f"ok|{effect_name}|{res['new_pts']}"
 
 
 def fetch_usd_rate(currency_code: str) -> float:
@@ -1428,13 +1146,13 @@ def cmd_superchat(args):
     micro_amount = _parse_micro_amount(args[0])
     currency = (args[1] or "USD").upper()[:3]
     username = args[2]
-    is_sub, is_sponsor, top_farder = _donation_flags_from_args(args, 3)
+    is_sub, is_sponsor = _donation_flags_from_args(args, 3)
 
     amount_in_currency = micro_amount / 1_000_000
     rate = fetch_usd_rate(currency)
     amount_usd = amount_in_currency * rate
     to_add = max(0, int(round(amount_usd * 100)))
-    return award_donation_points(username, to_add, is_sub, is_sponsor, top_farder)
+    return award_donation_points(username, to_add, is_sub, is_sponsor)
 
 
 def cmd_cheer(args):
@@ -1442,14 +1160,14 @@ def cmd_cheer(args):
         return DONATION_RESULT_FILE, "invalid|0"
     bits = _parse_positive_int(args[0], 0)
     username = args[1]
-    is_sub, is_sponsor, top_farder = _donation_flags_from_args(args, 2)
-    return award_donation_points(username, bits, is_sub, is_sponsor, top_farder)
+    is_sub, is_sponsor = _donation_flags_from_args(args, 2)
+    return award_donation_points(username, bits, is_sub, is_sponsor)
 
 
 def cmd_giftmembership(args):
     """Award points for a gifted sub (Twitch) or gift membership (YouTube).
 
-    Args: <username> [tier] [isSubscribed] [userIsSponsor] [topFarder]
+    Args: <username> [tier] [isSubscribed] [userIsSponsor]
     Twitch: credit %recipientUserName%. YouTube gift membership: use %gifterUserName% (no recipient in API).
     """
     if len(args) < 1:
@@ -1460,9 +1178,9 @@ def cmd_giftmembership(args):
     if len(args) > 1 and _looks_like_tier(args[1]):
         tier = args[1]
         flag_idx = 2
-    is_sub, is_sponsor, top_farder = _donation_flags_from_args(args, flag_idx)
+    is_sub, is_sponsor = _donation_flags_from_args(args, flag_idx)
     to_add = gift_sub_points(tier, get_config())
-    return award_donation_points(username, to_add, is_sub, is_sponsor, top_farder)
+    return award_donation_points(username, to_add, is_sub, is_sponsor)
 
 
 def cmd_heal(args):
@@ -1471,37 +1189,19 @@ def cmd_heal(args):
     if len(args) < 1:
         return SPAWN_RESULT_FILE, "Usage: !heal (heals hero ~15% HP)"
     username = args[0]
-    key = username.lower()
-    try:
-        with points_lock():
-            data = read_points()
-            pts, last, donation_pts, role = _get_user_data(data, key)
-            ok, err = check_command_access("heal", role)
-            if not ok:
-                return SPAWN_RESULT_FILE, err
-            base_cost = effective_cost("cost_per_heal", get_config()["cost_per_heal"])
-            cost = apply_role_discount(base_cost, "heal", role)
-            total = effective_total(pts, donation_pts)
-            if total < cost:
-                return SPAWN_RESULT_FILE, not_enough_points_msg(username, cost, total, "to heal")
+    base_cost = effective_cost("cost_per_heal", get_config()["cost_per_heal"])
+    res, err = reserve_points(username, "heal", base_cost, "to heal")
+    if err:
+        return SPAWN_RESULT_FILE, err
 
-            url = "http://127.0.0.1:5000/api/heal-command"
-            payload = {"username": username}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-            req.add_header("Content-Type", "application/json")
-            try:
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    body = json.loads(resp.read().decode())
-                    if not body.get("ok"):
-                        return SPAWN_RESULT_FILE, body.get("error", "Heal failed")
-            except Exception as e:
-                return SPAWN_RESULT_FILE, _http_error_msg(e, "Heal timed out. Is the game running?")
-            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation, role)
-            write_points(data)
-            return SPAWN_RESULT_FILE, f"ok|Healing|{new_pts}"
-    except TimeoutError:
-        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+    body, err = _post_game_command(
+        "/api/heal-command", {"username": username},
+        "Heal failed", "Heal timed out. Is the game running?"
+    )
+    if err:
+        refund_points(res)
+        return SPAWN_RESULT_FILE, err
+    return SPAWN_RESULT_FILE, f"ok|Healing|{res['new_pts']}"
 
 
 def cmd_cleanse(args):
@@ -1510,38 +1210,20 @@ def cmd_cleanse(args):
     if len(args) < 1:
         return SPAWN_RESULT_FILE, "Usage: !cleanse (removes one random debuff)"
     username = args[0]
-    key = username.lower()
-    try:
-        with points_lock():
-            data = read_points()
-            pts, last, donation_pts, role = _get_user_data(data, key)
-            ok, err = check_command_access("cleanse", role)
-            if not ok:
-                return SPAWN_RESULT_FILE, err
-            base_cost = effective_cost("cost_per_cleanse", get_config()["cost_per_cleanse"])
-            cost = apply_role_discount(base_cost, "cleanse", role)
-            total = effective_total(pts, donation_pts)
-            if total < cost:
-                return SPAWN_RESULT_FILE, not_enough_points_msg(username, cost, total, "to cleanse")
+    base_cost = effective_cost("cost_per_cleanse", get_config()["cost_per_cleanse"])
+    res, err = reserve_points(username, "cleanse", base_cost, "to cleanse")
+    if err:
+        return SPAWN_RESULT_FILE, err
 
-            url = "http://127.0.0.1:5000/api/cleanse-command"
-            payload = {"username": username}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-            req.add_header("Content-Type", "application/json")
-            try:
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    body = json.loads(resp.read().decode())
-                    if not body.get("ok"):
-                        return SPAWN_RESULT_FILE, body.get("error", "Cleanse failed")
-                    buff_name = body.get("buff_name", "debuff")
-            except Exception as e:
-                return SPAWN_RESULT_FILE, _http_error_msg(e, "Cleanse timed out. Is the game running?")
-            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation, role)
-            write_points(data)
-            return SPAWN_RESULT_FILE, f"ok|{buff_name}|{new_pts}"
-    except TimeoutError:
-        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+    body, err = _post_game_command(
+        "/api/cleanse-command", {"username": username},
+        "Cleanse failed", "Cleanse timed out. Is the game running?"
+    )
+    if err:
+        refund_points(res)
+        return SPAWN_RESULT_FILE, err
+    buff_name = body.get("buff_name", "debuff")
+    return SPAWN_RESULT_FILE, f"ok|{buff_name}|{res['new_pts']}"
 
 
 def cmd_dew(args):
@@ -1550,37 +1232,19 @@ def cmd_dew(args):
     if len(args) < 1:
         return SPAWN_RESULT_FILE, "Usage: !dew (drops a dewdrop near hero)"
     username = args[0]
-    key = username.lower()
-    try:
-        with points_lock():
-            data = read_points()
-            pts, last, donation_pts, role = _get_user_data(data, key)
-            ok, err = check_command_access("dew", role)
-            if not ok:
-                return SPAWN_RESULT_FILE, err
-            base_cost = effective_cost("cost_per_dew", get_config()["cost_per_dew"])
-            cost = apply_role_discount(base_cost, "dew", role)
-            total = effective_total(pts, donation_pts)
-            if total < cost:
-                return SPAWN_RESULT_FILE, not_enough_points_msg(username, cost, total, "for dewdrop")
+    base_cost = effective_cost("cost_per_dew", get_config()["cost_per_dew"])
+    res, err = reserve_points(username, "dew", base_cost, "for dewdrop")
+    if err:
+        return SPAWN_RESULT_FILE, err
 
-            url = "http://127.0.0.1:5000/api/dew-command"
-            payload = {"username": username}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-            req.add_header("Content-Type", "application/json")
-            try:
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    body = json.loads(resp.read().decode())
-                    if not body.get("ok"):
-                        return SPAWN_RESULT_FILE, body.get("error", "Dew failed")
-            except Exception as e:
-                return SPAWN_RESULT_FILE, _http_error_msg(e, "Dew timed out. Is the game running?")
-            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation, role)
-            write_points(data)
-            return SPAWN_RESULT_FILE, f"ok|Dewdrop|{new_pts}"
-    except TimeoutError:
-        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+    body, err = _post_game_command(
+        "/api/dew-command", {"username": username},
+        "Dew failed", "Dew timed out. Is the game running?"
+    )
+    if err:
+        refund_points(res)
+        return SPAWN_RESULT_FILE, err
+    return SPAWN_RESULT_FILE, f"ok|Dewdrop|{res['new_pts']}"
 
 
 def cmd_plant(args):
@@ -1589,38 +1253,20 @@ def cmd_plant(args):
     if len(args) < 1:
         return SPAWN_RESULT_FILE, "Usage: !plant (plants a random plant near hero; fails if Barren Land enabled)"
     username = args[0]
-    key = username.lower()
-    try:
-        with points_lock():
-            data = read_points()
-            pts, last, donation_pts, role = _get_user_data(data, key)
-            ok, err = check_command_access("plant", role)
-            if not ok:
-                return SPAWN_RESULT_FILE, err
-            base_cost = effective_cost("cost_per_plant", get_config()["cost_per_plant"])
-            cost = apply_role_discount(base_cost, "plant", role)
-            total = effective_total(pts, donation_pts)
-            if total < cost:
-                return SPAWN_RESULT_FILE, not_enough_points_msg(username, cost, total, "to plant")
+    base_cost = effective_cost("cost_per_plant", get_config()["cost_per_plant"])
+    res, err = reserve_points(username, "plant", base_cost, "to plant")
+    if err:
+        return SPAWN_RESULT_FILE, err
 
-            url = "http://127.0.0.1:5000/api/plant-command"
-            payload = {"username": username}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-            req.add_header("Content-Type", "application/json")
-            try:
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    body = json.loads(resp.read().decode())
-                    if not body.get("ok"):
-                        return SPAWN_RESULT_FILE, body.get("error", "Plant failed")
-                    plant_name = body.get("plant_name", "plant")
-            except Exception as e:
-                return SPAWN_RESULT_FILE, _http_error_msg(e, "Plant timed out. Is the game running?")
-            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation, role)
-            write_points(data)
-            return SPAWN_RESULT_FILE, f"ok|{plant_name}|{new_pts}"
-    except TimeoutError:
-        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+    body, err = _post_game_command(
+        "/api/plant-command", {"username": username},
+        "Plant failed", "Plant timed out. Is the game running?"
+    )
+    if err:
+        refund_points(res)
+        return SPAWN_RESULT_FILE, err
+    plant_name = body.get("plant_name", "plant")
+    return SPAWN_RESULT_FILE, f"ok|{plant_name}|{res['new_pts']}"
 
 
 def cmd_corrupt_ally(args):
@@ -1629,38 +1275,20 @@ def cmd_corrupt_ally(args):
     if len(args) < 1:
         return SPAWN_RESULT_FILE, "Usage: !corruptally (summons a corrupted ally from the current biome)"
     username = args[0]
-    key = username.lower()
-    try:
-        with points_lock():
-            data = read_points()
-            pts, last, donation_pts, role = _get_user_data(data, key)
-            ok, err = check_command_access("corrupt_ally", role)
-            if not ok:
-                return SPAWN_RESULT_FILE, err
-            base_cost = effective_cost("cost_per_corrupt_ally", get_config()["cost_per_corrupt_ally"])
-            cost = apply_role_discount(base_cost, "corrupt_ally", role)
-            total = effective_total(pts, donation_pts)
-            if total < cost:
-                return SPAWN_RESULT_FILE, not_enough_points_msg(username, cost, total, "to summon corrupted ally")
+    base_cost = effective_cost("cost_per_corrupt_ally", get_config()["cost_per_corrupt_ally"])
+    res, err = reserve_points(username, "corrupt_ally", base_cost, "to summon corrupted ally")
+    if err:
+        return SPAWN_RESULT_FILE, err
 
-            url = "http://127.0.0.1:5000/api/corrupt-ally-command"
-            payload = {"username": username}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-            req.add_header("Content-Type", "application/json")
-            try:
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    body = json.loads(resp.read().decode())
-                    if not body.get("ok"):
-                        return SPAWN_RESULT_FILE, body.get("error", "Corrupt ally failed")
-                    mob_name = body.get("mob_name", "ally")
-            except Exception as e:
-                return SPAWN_RESULT_FILE, _http_error_msg(e, "Corrupt ally timed out. Is the game running?")
-            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation, role)
-            write_points(data)
-            return SPAWN_RESULT_FILE, f"ok|{mob_name}|{new_pts}"
-    except TimeoutError:
-        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+    body, err = _post_game_command(
+        "/api/corrupt-ally-command", {"username": username},
+        "Corrupt ally failed", "Corrupt ally timed out. Is the game running?"
+    )
+    if err:
+        refund_points(res)
+        return SPAWN_RESULT_FILE, err
+    mob_name = body.get("mob_name", "ally")
+    return SPAWN_RESULT_FILE, f"ok|{mob_name}|{res['new_pts']}"
 
 
 def cmd_hex(args):
@@ -1669,37 +1297,19 @@ def cmd_hex(args):
     if len(args) < 1:
         return SPAWN_RESULT_FILE, "Usage: !hex (applies Hex debuff)"
     username = args[0]
-    key = username.lower()
-    try:
-        with points_lock():
-            data = read_points()
-            pts, last, donation_pts, role = _get_user_data(data, key)
-            ok, err = check_command_access("hex", role)
-            if not ok:
-                return SPAWN_RESULT_FILE, err
-            base_cost = effective_cost("cost_per_hex", get_config()["cost_per_hex"])
-            cost = apply_role_discount(base_cost, "hex", role)
-            total = effective_total(pts, donation_pts)
-            if total < cost:
-                return SPAWN_RESULT_FILE, not_enough_points_msg(username, cost, total, "to hex")
+    base_cost = effective_cost("cost_per_hex", get_config()["cost_per_hex"])
+    res, err = reserve_points(username, "hex", base_cost, "to hex")
+    if err:
+        return SPAWN_RESULT_FILE, err
 
-            url = "http://127.0.0.1:5000/api/hex-command"
-            payload = {"username": username}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-            req.add_header("Content-Type", "application/json")
-            try:
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    body = json.loads(resp.read().decode())
-                    if not body.get("ok"):
-                        return SPAWN_RESULT_FILE, body.get("error", "Hex failed")
-            except Exception as e:
-                return SPAWN_RESULT_FILE, _http_error_msg(e, "Hex timed out. Is the game running?")
-            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation, role)
-            write_points(data)
-            return SPAWN_RESULT_FILE, f"ok|Hex|{new_pts}"
-    except TimeoutError:
-        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+    body, err = _post_game_command(
+        "/api/hex-command", {"username": username},
+        "Hex failed", "Hex timed out. Is the game running?"
+    )
+    if err:
+        refund_points(res)
+        return SPAWN_RESULT_FILE, err
+    return SPAWN_RESULT_FILE, f"ok|Hex|{res['new_pts']}"
 
 
 def cmd_degrade(args):
@@ -1708,37 +1318,19 @@ def cmd_degrade(args):
     if len(args) < 1:
         return SPAWN_RESULT_FILE, "Usage: !degrade (applies Degrade debuff)"
     username = args[0]
-    key = username.lower()
-    try:
-        with points_lock():
-            data = read_points()
-            pts, last, donation_pts, role = _get_user_data(data, key)
-            ok, err = check_command_access("degrade", role)
-            if not ok:
-                return SPAWN_RESULT_FILE, err
-            base_cost = effective_cost("cost_per_degrade", get_config()["cost_per_degrade"])
-            cost = apply_role_discount(base_cost, "degrade", role)
-            total = effective_total(pts, donation_pts)
-            if total < cost:
-                return SPAWN_RESULT_FILE, not_enough_points_msg(username, cost, total, "to degrade")
+    base_cost = effective_cost("cost_per_degrade", get_config()["cost_per_degrade"])
+    res, err = reserve_points(username, "degrade", base_cost, "to degrade")
+    if err:
+        return SPAWN_RESULT_FILE, err
 
-            url = "http://127.0.0.1:5000/api/degrade-command"
-            payload = {"username": username}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-            req.add_header("Content-Type", "application/json")
-            try:
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    body = json.loads(resp.read().decode())
-                    if not body.get("ok"):
-                        return SPAWN_RESULT_FILE, body.get("error", "Degrade failed")
-            except Exception as e:
-                return SPAWN_RESULT_FILE, _http_error_msg(e, "Degrade timed out. Is the game running?")
-            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation, role)
-            write_points(data)
-            return SPAWN_RESULT_FILE, f"ok|Degrade|{new_pts}"
-    except TimeoutError:
-        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+    body, err = _post_game_command(
+        "/api/degrade-command", {"username": username},
+        "Degrade failed", "Degrade timed out. Is the game running?"
+    )
+    if err:
+        refund_points(res)
+        return SPAWN_RESULT_FILE, err
+    return SPAWN_RESULT_FILE, f"ok|Degrade|{res['new_pts']}"
 
 
 def cmd_sabotage(args):
@@ -1747,38 +1339,20 @@ def cmd_sabotage(args):
     if len(args) < 1:
         return SPAWN_RESULT_FILE, "Usage: !sabotage (removes one random buff)"
     username = args[0]
-    key = username.lower()
-    try:
-        with points_lock():
-            data = read_points()
-            pts, last, donation_pts, role = _get_user_data(data, key)
-            ok, err = check_command_access("sabotage", role)
-            if not ok:
-                return SPAWN_RESULT_FILE, err
-            base_cost = effective_cost("cost_per_sabotage", get_config()["cost_per_sabotage"])
-            cost = apply_role_discount(base_cost, "sabotage", role)
-            total = effective_total(pts, donation_pts)
-            if total < cost:
-                return SPAWN_RESULT_FILE, not_enough_points_msg(username, cost, total, "to sabotage")
+    base_cost = effective_cost("cost_per_sabotage", get_config()["cost_per_sabotage"])
+    res, err = reserve_points(username, "sabotage", base_cost, "to sabotage")
+    if err:
+        return SPAWN_RESULT_FILE, err
 
-            url = "http://127.0.0.1:5000/api/sabotage-command"
-            payload = {"username": username}
-            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), method="POST")
-            req.add_header("Content-Type", "application/json")
-            try:
-                with urllib.request.urlopen(req, timeout=15) as resp:
-                    body = json.loads(resp.read().decode())
-                    if not body.get("ok"):
-                        return SPAWN_RESULT_FILE, body.get("error", "Sabotage failed")
-                    buff_name = body.get("buff_name", "buff")
-            except Exception as e:
-                return SPAWN_RESULT_FILE, _http_error_msg(e, "Sabotage timed out. Is the game running?")
-            new_pts, new_donation = deduct_points(pts, donation_pts, cost)
-            data[key] = (new_pts, last, new_donation, role)
-            write_points(data)
-            return SPAWN_RESULT_FILE, f"ok|{buff_name}|{new_pts}"
-    except TimeoutError:
-        return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
+    body, err = _post_game_command(
+        "/api/sabotage-command", {"username": username},
+        "Sabotage failed", "Sabotage timed out. Is the game running?"
+    )
+    if err:
+        refund_points(res)
+        return SPAWN_RESULT_FILE, err
+    buff_name = body.get("buff_name", "buff")
+    return SPAWN_RESULT_FILE, f"ok|{buff_name}|{res['new_pts']}"
 
 
 def cmd_transfer(args):
@@ -1787,7 +1361,7 @@ def cmd_transfer(args):
     Deduction order: chat-earned points first, then donation-backed points if needed.
     Recipient donation points do not increase.
     """
-    if len(args) < 3:
+    if len(args) != 3:
         return SPAWN_RESULT_FILE, "Usage: !givepoints <amount> <target> (example: !givepoints 50 @bob)"
     try:
         amount = int(args[0])
@@ -1799,7 +1373,7 @@ def cmd_transfer(args):
         return SPAWN_RESULT_FILE, "Amount too large."
 
     to_username = (args[1] or "").strip()
-    from_username = (args[2] or "").strip()
+    from_username = _caller_username(args)
     if not to_username or not from_username:
         return SPAWN_RESULT_FILE, "Usage: !givepoints <amount> <target> (example: !givepoints 50 @bob)"
 
@@ -1881,26 +1455,50 @@ COMMANDS = {
     "giftmembership": cmd_giftmembership,
     "gift_membership": cmd_giftmembership,
     "giftsub": cmd_giftmembership,
+    "balance": cmd_balance,
 }
+
+# Commands that write spawn_result.txt (serialized so Streamer.bot C# reads the right result).
+SPEND_PIPELINE_COMMANDS = frozenset(k for k in COMMANDS if k not in (
+    "superchat", "cheer", "giftmembership", "gift_membership", "giftsub", "balance",
+))
 
 
 def main():
     args = [a.strip() for a in sys.argv[1:] if a.strip()]
     if len(args) < 1:
-        with open(SPAWN_RESULT_FILE, "w", encoding="utf-8") as f:
-            f.write("Usage: points_command.py <spawn|champion|gold|transfer|givepoints|curse|gas|scroll|row|trap|plant|bomb|transmute|bee|ward|corruptally|buff|debuff|wand|heal|cleanse|dew|hex|degrade|sabotage|superchat|cheer|giftmembership> [args...]")
+        _write_result("", SPAWN_RESULT_FILE, "Usage: points_command.py <spawn|champion|gold|...>")
         sys.exit(0)
 
     cmd = args[0].lower()
     cmd_args = args[1:]
+    _trace(f"start {cmd} args={cmd_args!r}")
     if cmd not in COMMANDS:
-        with open(SPAWN_RESULT_FILE, "w", encoding="utf-8") as f:
-            f.write(f"Unknown command: {cmd}")
+        _write_result(cmd, SPAWN_RESULT_FILE, f"Unknown command: {cmd}")
         sys.exit(0)
 
-    result_file, msg = COMMANDS[cmd](cmd_args)
-    with open(result_file, "w", encoding="utf-8") as f:
-        f.write(msg)
+    try:
+        if cmd in SPEND_PIPELINE_COMMANDS:
+            _trace(f"{cmd} waiting for spend pipeline lock")
+            with spend_command_lock():
+                _trace(f"{cmd} pipeline lock acquired")
+                try:
+                    os.remove(SPAWN_RESULT_FILE)
+                except OSError:
+                    pass
+                t0 = time.monotonic()
+                result_file, msg = COMMANDS[cmd](cmd_args)
+                _trace(f"{cmd} handler done in {time.monotonic() - t0:.2f}s -> {msg[:80]!r}")
+                _write_result(cmd, result_file, msg)
+        else:
+            result_file, msg = COMMANDS[cmd](cmd_args)
+            _write_result(cmd, result_file, msg)
+    except TimeoutError:
+        _trace(f"{cmd} pipeline lock timeout")
+        result_file = SPAWN_RESULT_FILE if cmd in SPEND_PIPELINE_COMMANDS else DONATION_RESULT_FILE
+        msg = "Another command is in progress. Please try again in a moment."
+        _write_result(cmd, result_file, msg)
+    _trace(f"{cmd} exit")
     sys.exit(0)
 
 

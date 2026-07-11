@@ -1517,10 +1517,7 @@ public final class StreamingCommandHandler {
 
 		Item.updateQuickslot();
 		String detail = lastTitle != null ? lastTitle : clazz.getSimpleName();
-		if (quantity > 1 || level > 0) {
-			if (level > 0) detail += " +" + level;
-			if (quantity > 1) detail += " x" + quantity;
-		}
+		if (quantity > 1) detail += " x" + quantity;
 		GLog.p(Messages.get(StreamingCommandHandler.class, "streamer_give_item", detail));
 		return detail;
 	}

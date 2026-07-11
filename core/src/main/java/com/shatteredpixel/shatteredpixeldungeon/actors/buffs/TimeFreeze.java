@@ -23,6 +23,7 @@ package com.shatteredpixel.shatteredpixeldungeon.actors.buffs;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
+import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.Trap;
@@ -50,6 +51,17 @@ public class TimeFreeze extends Buff {
 	protected float maxLeft = -1;
 
 	protected ArrayList<Integer> presses = new ArrayList<>();
+
+	/** Returns any active time-freeze buff, including hourglass's inner subclass. */
+	public static TimeFreeze on( Char ch ){
+		if (ch == null) return null;
+		for (Buff b : ch.buffs()) {
+			if (b instanceof TimeFreeze) {
+				return (TimeFreeze) b;
+			}
+		}
+		return null;
+	}
 
 	public void setDuration( int turns ){
 		left = turns + 1; //add 1 as we're spending it on our action

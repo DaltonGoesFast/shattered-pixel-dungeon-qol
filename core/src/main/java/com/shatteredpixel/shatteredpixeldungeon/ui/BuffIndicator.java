@@ -42,6 +42,7 @@ import com.watabou.utils.GameMath;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 
 public class BuffIndicator extends Component {
 	
@@ -417,5 +418,20 @@ public class BuffIndicator extends Component {
 
 	public static void setBossInstance(BuffIndicator boss){
 		bossInstance = boss;
+	}
+
+	/** Buffs currently drawn on the hero status bar (respects width, row, and max limits). */
+	public static List<Buff> visibleHeroBuffs() {
+		if (heroInstance == null) {
+			return Collections.emptyList();
+		}
+		heroInstance.layout();
+		ArrayList<Buff> result = new ArrayList<>();
+		for (BuffButton button : heroInstance.buffButtons.values()) {
+			if (button.visible) {
+				result.add(button.buff);
+			}
+		}
+		return result;
 	}
 }

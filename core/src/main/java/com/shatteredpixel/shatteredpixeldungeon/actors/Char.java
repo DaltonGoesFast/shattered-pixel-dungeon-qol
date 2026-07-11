@@ -1114,7 +1114,7 @@ public abstract class Char extends Actor {
 
 	@Override
 	protected void spendConstant(float time) {
-		TimeFreeze freeze = buff(TimeFreeze.class);
+		TimeFreeze freeze = TimeFreeze.on(this);
 		if (freeze != null) {
 			freeze.processTime(time);
 			return;

@@ -249,6 +249,7 @@ class SPDSaveParser:
                 'hp': hero.get('HP', 0),
                 'ht': hero.get('HT', 0),
                 'exp': hero.get('exp', 0),
+                'maxExp': 5 + hero.get('lvl', 1) * 5,
                 'lvl': hero.get('lvl', 1),
                 'str': hero.get('STR', 10)
             },
@@ -410,7 +411,13 @@ class SPDSaveParser:
         # Buffs
         buffs = game_info.get('buffs', [])
         if buffs:
-            summary.append(f"Buffs:   {', '.join(buffs)}")
+            names = []
+            for b in buffs:
+                if isinstance(b, dict):
+                    names.append(b.get('name', '?'))
+                else:
+                    names.append(str(b))
+            summary.append(f"Buffs:   {', '.join(names)}")
             
         summary.append("-" * 44)
         
