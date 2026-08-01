@@ -1,0 +1,38 @@
+{
+  "heat_window_sec": 900,
+  "sprint_donor_reward": 100,
+  "per_user_bar_cap_fraction": 0.0,
+  "repeat_mob_diminishing": false,
+  "levels": [
+    {
+      "level": 1,
+      "zone": "Sewers",
+      "bar_threshold": 60,
+      "monsters": ["rat", "albino", "snake"]
+    },
+    {
+      "level": 2,
+      "zone": "Prison",
+      "bar_threshold": 100,
+      "monsters": ["gnoll", "crab", "slime", "swarm", "thief"]
+    },
+    {
+      "level": 3,
+      "zone": "Caves",
+      "bar_threshold": 140,
+      "monsters": ["skeleton", "dm100", "bat", "brute", "shaman", "spinner"]
+    },
+    {
+      "level": 4,
+      "zone": "City",
+      "bar_threshold": 180,
+      "monsters": ["guard", "necromancer", "ghoul", "elemental", "warlock", "monk", "golem"]
+    },
+    {
+      "level": 5,
+      "zone": "Halls",
+      "bar_threshold": 0,
+      "monsters": ["succubus", "eye", "scorpio"]
+    }
+  ]
+}

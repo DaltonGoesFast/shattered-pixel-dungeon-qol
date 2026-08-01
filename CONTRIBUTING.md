@@ -25,12 +25,23 @@ git checkout -b dalton/spawn-costs-update
 
 ## Testing the Streaming Setup
 
-To test or verify changes to the overlay, points system, or chat spawn features, you need to emulate the full setup. See **[docs/streaming-setup-guide.md](docs/streaming-setup-guide.md)** for step-by-step instructions.
+See **[docs/streaming-setup-guide.md](docs/streaming-setup-guide.md)** and the **Pre-stream checklist** in that file.
+
+Quick API smoke test:
+
+```powershell
+cd "Lastest UI"
+python server.py   # separate window
+.\test_chat_command_api.ps1
+```
 
 ## Key Paths to Customize
 
-If you're running this on a different machine, update these paths:
+| What | Where |
+|------|--------|
+| Save folder | `Lastest UI/config.json` ← copy from `config.example.json` |
+| Streamer.bot curl paths | [streamerbot-http-gateway-apply.md](docs/streamerbot-http-gateway-apply.md) (R1 `chat_command_body.json`, working directory) |
+| OBS source names | `Lastest UI/presentation_config.py` |
+| Points file | Next to scripts (`viewer_points.txt`); admin UI at `/points-config` |
 
-- **config.json:** `save_directory` (SPD save file location; copy from `config.example.json`)
-- **docs/streamerbot-points-from-scratch.md:** All `FILE`, `DOUBLE_FILE` paths in the C# code
-- **points_command.py:** Uses `SCRIPT_DIR` for points file; fetches depth from `http://127.0.0.1:5000/api/game-data`
+Legacy path list in [streamerbot-points-from-scratch.md](docs/streamerbot-points-from-scratch.md) applies only to the **archived** ~40-action bot — see [docs/archive/README.md](docs/archive/README.md).

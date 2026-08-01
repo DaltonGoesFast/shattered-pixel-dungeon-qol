@@ -1,0 +1,3746 @@
+{
+  "entries": [
+    {
+      "id": "badge_0000",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0000.png",
+      "region": {
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 0"
+    },
+    {
+      "id": "badge_0001",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0001.png",
+      "region": {
+        "x": 16,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 1"
+    },
+    {
+      "id": "badge_0002",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0002.png",
+      "region": {
+        "x": 32,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 2"
+    },
+    {
+      "id": "badge_0003",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0003.png",
+      "region": {
+        "x": 48,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 3"
+    },
+    {
+      "id": "badge_0004",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0004.png",
+      "region": {
+        "x": 64,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 4"
+    },
+    {
+      "id": "badge_0005",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0005.png",
+      "region": {
+        "x": 80,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 5"
+    },
+    {
+      "id": "badge_0006",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0006.png",
+      "region": {
+        "x": 96,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 6"
+    },
+    {
+      "id": "badge_0007",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0007.png",
+      "region": {
+        "x": 112,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 7"
+    },
+    {
+      "id": "badge_0008",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0008.png",
+      "region": {
+        "x": 0,
+        "y": 16,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 8"
+    },
+    {
+      "id": "badge_0009",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0009.png",
+      "region": {
+        "x": 16,
+        "y": 16,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 9"
+    },
+    {
+      "id": "badge_0010",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0010.png",
+      "region": {
+        "x": 32,
+        "y": 16,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 10"
+    },
+    {
+      "id": "badge_0011",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0011.png",
+      "region": {
+        "x": 48,
+        "y": 16,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 11"
+    },
+    {
+      "id": "badge_0012",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0012.png",
+      "region": {
+        "x": 64,
+        "y": 16,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 12"
+    },
+    {
+      "id": "badge_0013",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0013.png",
+      "region": {
+        "x": 80,
+        "y": 16,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 13"
+    },
+    {
+      "id": "badge_0014",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0014.png",
+      "region": {
+        "x": 96,
+        "y": 16,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 14"
+    },
+    {
+      "id": "badge_0015",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0015.png",
+      "region": {
+        "x": 112,
+        "y": 16,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 15"
+    },
+    {
+      "id": "badge_0016",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0016.png",
+      "region": {
+        "x": 0,
+        "y": 32,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 16"
+    },
+    {
+      "id": "badge_0017",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0017.png",
+      "region": {
+        "x": 16,
+        "y": 32,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 17"
+    },
+    {
+      "id": "badge_0018",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0018.png",
+      "region": {
+        "x": 32,
+        "y": 32,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 18"
+    },
+    {
+      "id": "badge_0019",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0019.png",
+      "region": {
+        "x": 48,
+        "y": 32,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 19"
+    },
+    {
+      "id": "badge_0020",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0020.png",
+      "region": {
+        "x": 64,
+        "y": 32,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 20"
+    },
+    {
+      "id": "badge_0021",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0021.png",
+      "region": {
+        "x": 80,
+        "y": 32,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 21"
+    },
+    {
+      "id": "badge_0022",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0022.png",
+      "region": {
+        "x": 96,
+        "y": 32,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 22"
+    },
+    {
+      "id": "badge_0023",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0023.png",
+      "region": {
+        "x": 112,
+        "y": 32,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 23"
+    },
+    {
+      "id": "badge_0024",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0024.png",
+      "region": {
+        "x": 0,
+        "y": 48,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 24"
+    },
+    {
+      "id": "badge_0025",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0025.png",
+      "region": {
+        "x": 16,
+        "y": 48,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 25"
+    },
+    {
+      "id": "badge_0026",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0026.png",
+      "region": {
+        "x": 32,
+        "y": 48,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 26"
+    },
+    {
+      "id": "badge_0027",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0027.png",
+      "region": {
+        "x": 48,
+        "y": 48,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 27"
+    },
+    {
+      "id": "badge_0028",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0028.png",
+      "region": {
+        "x": 64,
+        "y": 48,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 28"
+    },
+    {
+      "id": "badge_0029",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0029.png",
+      "region": {
+        "x": 80,
+        "y": 48,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 29"
+    },
+    {
+      "id": "badge_0030",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0030.png",
+      "region": {
+        "x": 96,
+        "y": 48,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 30"
+    },
+    {
+      "id": "badge_0031",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0031.png",
+      "region": {
+        "x": 112,
+        "y": 48,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 31"
+    },
+    {
+      "id": "badge_0032",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0032.png",
+      "region": {
+        "x": 0,
+        "y": 64,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 32"
+    },
+    {
+      "id": "badge_0033",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0033.png",
+      "region": {
+        "x": 16,
+        "y": 64,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 33"
+    },
+    {
+      "id": "badge_0034",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0034.png",
+      "region": {
+        "x": 32,
+        "y": 64,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 34"
+    },
+    {
+      "id": "badge_0035",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0035.png",
+      "region": {
+        "x": 48,
+        "y": 64,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 35"
+    },
+    {
+      "id": "badge_0036",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0036.png",
+      "region": {
+        "x": 64,
+        "y": 64,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 36"
+    },
+    {
+      "id": "badge_0037",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0037.png",
+      "region": {
+        "x": 80,
+        "y": 64,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 37"
+    },
+    {
+      "id": "badge_0038",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0038.png",
+      "region": {
+        "x": 96,
+        "y": 64,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 38"
+    },
+    {
+      "id": "badge_0039",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0039.png",
+      "region": {
+        "x": 112,
+        "y": 64,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 39"
+    },
+    {
+      "id": "badge_0040",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0040.png",
+      "region": {
+        "x": 0,
+        "y": 80,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 40"
+    },
+    {
+      "id": "badge_0041",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0041.png",
+      "region": {
+        "x": 16,
+        "y": 80,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 41"
+    },
+    {
+      "id": "badge_0042",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0042.png",
+      "region": {
+        "x": 32,
+        "y": 80,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 42"
+    },
+    {
+      "id": "badge_0043",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0043.png",
+      "region": {
+        "x": 48,
+        "y": 80,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 43"
+    },
+    {
+      "id": "badge_0044",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0044.png",
+      "region": {
+        "x": 64,
+        "y": 80,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 44"
+    },
+    {
+      "id": "badge_0045",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0045.png",
+      "region": {
+        "x": 80,
+        "y": 80,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 45"
+    },
+    {
+      "id": "badge_0046",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0046.png",
+      "region": {
+        "x": 96,
+        "y": 80,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 46"
+    },
+    {
+      "id": "badge_0047",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0047.png",
+      "region": {
+        "x": 112,
+        "y": 80,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 47"
+    },
+    {
+      "id": "badge_0048",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0048.png",
+      "region": {
+        "x": 0,
+        "y": 96,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 48"
+    },
+    {
+      "id": "badge_0049",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0049.png",
+      "region": {
+        "x": 16,
+        "y": 96,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 49"
+    },
+    {
+      "id": "badge_0050",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0050.png",
+      "region": {
+        "x": 32,
+        "y": 96,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 50"
+    },
+    {
+      "id": "badge_0051",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0051.png",
+      "region": {
+        "x": 48,
+        "y": 96,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 51"
+    },
+    {
+      "id": "badge_0052",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0052.png",
+      "region": {
+        "x": 64,
+        "y": 96,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 52"
+    },
+    {
+      "id": "badge_0053",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0053.png",
+      "region": {
+        "x": 80,
+        "y": 96,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 53"
+    },
+    {
+      "id": "badge_0054",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0054.png",
+      "region": {
+        "x": 96,
+        "y": 96,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 54"
+    },
+    {
+      "id": "badge_0055",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0055.png",
+      "region": {
+        "x": 112,
+        "y": 96,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 55"
+    },
+    {
+      "id": "badge_0056",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0056.png",
+      "region": {
+        "x": 0,
+        "y": 112,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 56"
+    },
+    {
+      "id": "badge_0057",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0057.png",
+      "region": {
+        "x": 16,
+        "y": 112,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 57"
+    },
+    {
+      "id": "badge_0058",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0058.png",
+      "region": {
+        "x": 32,
+        "y": 112,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 58"
+    },
+    {
+      "id": "badge_0059",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0059.png",
+      "region": {
+        "x": 48,
+        "y": 112,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 59"
+    },
+    {
+      "id": "badge_0060",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0060.png",
+      "region": {
+        "x": 64,
+        "y": 112,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 60"
+    },
+    {
+      "id": "badge_0061",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0061.png",
+      "region": {
+        "x": 80,
+        "y": 112,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 61"
+    },
+    {
+      "id": "badge_0062",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0062.png",
+      "region": {
+        "x": 96,
+        "y": 112,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 62"
+    },
+    {
+      "id": "badge_0063",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0063.png",
+      "region": {
+        "x": 112,
+        "y": 112,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 63"
+    },
+    {
+      "id": "badge_0064",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0064.png",
+      "region": {
+        "x": 0,
+        "y": 128,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 64"
+    },
+    {
+      "id": "badge_0065",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0065.png",
+      "region": {
+        "x": 16,
+        "y": 128,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 65"
+    },
+    {
+      "id": "badge_0066",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0066.png",
+      "region": {
+        "x": 32,
+        "y": 128,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 66"
+    },
+    {
+      "id": "badge_0067",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0067.png",
+      "region": {
+        "x": 48,
+        "y": 128,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 67"
+    },
+    {
+      "id": "badge_0068",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0068.png",
+      "region": {
+        "x": 64,
+        "y": 128,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 68"
+    },
+    {
+      "id": "badge_0069",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0069.png",
+      "region": {
+        "x": 80,
+        "y": 128,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 69"
+    },
+    {
+      "id": "badge_0070",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0070.png",
+      "region": {
+        "x": 96,
+        "y": 128,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 70"
+    },
+    {
+      "id": "badge_0071",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0071.png",
+      "region": {
+        "x": 112,
+        "y": 128,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 71"
+    },
+    {
+      "id": "badge_0072",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0072.png",
+      "region": {
+        "x": 0,
+        "y": 144,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 72"
+    },
+    {
+      "id": "badge_0073",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0073.png",
+      "region": {
+        "x": 16,
+        "y": 144,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 73"
+    },
+    {
+      "id": "badge_0074",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0074.png",
+      "region": {
+        "x": 32,
+        "y": 144,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 74"
+    },
+    {
+      "id": "badge_0075",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0075.png",
+      "region": {
+        "x": 48,
+        "y": 144,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 75"
+    },
+    {
+      "id": "badge_0076",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0076.png",
+      "region": {
+        "x": 64,
+        "y": 144,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 76"
+    },
+    {
+      "id": "badge_0077",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0077.png",
+      "region": {
+        "x": 80,
+        "y": 144,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 77"
+    },
+    {
+      "id": "badge_0078",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0078.png",
+      "region": {
+        "x": 96,
+        "y": 144,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 78"
+    },
+    {
+      "id": "badge_0079",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0079.png",
+      "region": {
+        "x": 112,
+        "y": 144,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 79"
+    },
+    {
+      "id": "badge_0080",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0080.png",
+      "region": {
+        "x": 0,
+        "y": 160,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 80"
+    },
+    {
+      "id": "badge_0081",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0081.png",
+      "region": {
+        "x": 16,
+        "y": 160,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 81"
+    },
+    {
+      "id": "badge_0082",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0082.png",
+      "region": {
+        "x": 32,
+        "y": 160,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 82"
+    },
+    {
+      "id": "badge_0083",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0083.png",
+      "region": {
+        "x": 48,
+        "y": 160,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 83"
+    },
+    {
+      "id": "badge_0084",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0084.png",
+      "region": {
+        "x": 64,
+        "y": 160,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 84"
+    },
+    {
+      "id": "badge_0085",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0085.png",
+      "region": {
+        "x": 80,
+        "y": 160,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 85"
+    },
+    {
+      "id": "badge_0086",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0086.png",
+      "region": {
+        "x": 96,
+        "y": 160,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 86"
+    },
+    {
+      "id": "badge_0087",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0087.png",
+      "region": {
+        "x": 112,
+        "y": 160,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 87"
+    },
+    {
+      "id": "badge_0088",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0088.png",
+      "region": {
+        "x": 0,
+        "y": 176,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 88"
+    },
+    {
+      "id": "badge_0089",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0089.png",
+      "region": {
+        "x": 16,
+        "y": 176,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 89"
+    },
+    {
+      "id": "badge_0090",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0090.png",
+      "region": {
+        "x": 32,
+        "y": 176,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 90"
+    },
+    {
+      "id": "badge_0091",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0091.png",
+      "region": {
+        "x": 48,
+        "y": 176,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 91"
+    },
+    {
+      "id": "badge_0092",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0092.png",
+      "region": {
+        "x": 64,
+        "y": 176,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 92"
+    },
+    {
+      "id": "badge_0093",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0093.png",
+      "region": {
+        "x": 80,
+        "y": 176,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 93"
+    },
+    {
+      "id": "badge_0094",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0094.png",
+      "region": {
+        "x": 96,
+        "y": 176,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 94"
+    },
+    {
+      "id": "badge_0095",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0095.png",
+      "region": {
+        "x": 112,
+        "y": 176,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 95"
+    },
+    {
+      "id": "badge_0096",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0096.png",
+      "region": {
+        "x": 0,
+        "y": 192,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 96"
+    },
+    {
+      "id": "badge_0097",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0097.png",
+      "region": {
+        "x": 16,
+        "y": 192,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 97"
+    },
+    {
+      "id": "badge_0098",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0098.png",
+      "region": {
+        "x": 32,
+        "y": 192,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 98"
+    },
+    {
+      "id": "badge_0099",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0099.png",
+      "region": {
+        "x": 48,
+        "y": 192,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 99"
+    },
+    {
+      "id": "badge_0100",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0100.png",
+      "region": {
+        "x": 64,
+        "y": 192,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 100"
+    },
+    {
+      "id": "badge_0101",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0101.png",
+      "region": {
+        "x": 80,
+        "y": 192,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 101"
+    },
+    {
+      "id": "badge_0102",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0102.png",
+      "region": {
+        "x": 96,
+        "y": 192,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 102"
+    },
+    {
+      "id": "badge_0103",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0103.png",
+      "region": {
+        "x": 112,
+        "y": 192,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 103"
+    },
+    {
+      "id": "badge_0104",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0104.png",
+      "region": {
+        "x": 0,
+        "y": 208,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 104"
+    },
+    {
+      "id": "badge_0105",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0105.png",
+      "region": {
+        "x": 16,
+        "y": 208,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 105"
+    },
+    {
+      "id": "badge_0106",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0106.png",
+      "region": {
+        "x": 32,
+        "y": 208,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 106"
+    },
+    {
+      "id": "badge_0107",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0107.png",
+      "region": {
+        "x": 48,
+        "y": 208,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 107"
+    },
+    {
+      "id": "badge_0108",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0108.png",
+      "region": {
+        "x": 64,
+        "y": 208,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 108"
+    },
+    {
+      "id": "badge_0109",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0109.png",
+      "region": {
+        "x": 80,
+        "y": 208,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 109"
+    },
+    {
+      "id": "badge_0110",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0110.png",
+      "region": {
+        "x": 96,
+        "y": 208,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 110"
+    },
+    {
+      "id": "badge_0111",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0111.png",
+      "region": {
+        "x": 112,
+        "y": 208,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 111"
+    },
+    {
+      "id": "badge_0112",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0112.png",
+      "region": {
+        "x": 0,
+        "y": 224,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 112"
+    },
+    {
+      "id": "badge_0113",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0113.png",
+      "region": {
+        "x": 16,
+        "y": 224,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 113"
+    },
+    {
+      "id": "badge_0114",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0114.png",
+      "region": {
+        "x": 32,
+        "y": 224,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 114"
+    },
+    {
+      "id": "badge_0115",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0115.png",
+      "region": {
+        "x": 48,
+        "y": 224,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 115"
+    },
+    {
+      "id": "badge_0116",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0116.png",
+      "region": {
+        "x": 64,
+        "y": 224,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 116"
+    },
+    {
+      "id": "badge_0117",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0117.png",
+      "region": {
+        "x": 80,
+        "y": 224,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 117"
+    },
+    {
+      "id": "badge_0118",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0118.png",
+      "region": {
+        "x": 96,
+        "y": 224,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 118"
+    },
+    {
+      "id": "badge_0119",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0119.png",
+      "region": {
+        "x": 112,
+        "y": 224,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 119"
+    },
+    {
+      "id": "badge_0120",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0120.png",
+      "region": {
+        "x": 0,
+        "y": 240,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 120"
+    },
+    {
+      "id": "badge_0121",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0121.png",
+      "region": {
+        "x": 16,
+        "y": 240,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 121"
+    },
+    {
+      "id": "badge_0122",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0122.png",
+      "region": {
+        "x": 32,
+        "y": 240,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 122"
+    },
+    {
+      "id": "badge_0123",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0123.png",
+      "region": {
+        "x": 48,
+        "y": 240,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 123"
+    },
+    {
+      "id": "badge_0124",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0124.png",
+      "region": {
+        "x": 64,
+        "y": 240,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 124"
+    },
+    {
+      "id": "badge_0125",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0125.png",
+      "region": {
+        "x": 80,
+        "y": 240,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 125"
+    },
+    {
+      "id": "badge_0126",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0126.png",
+      "region": {
+        "x": 96,
+        "y": 240,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 126"
+    },
+    {
+      "id": "badge_0127",
+      "tag": "badges",
+      "atlas": "interfaces/badges.png",
+      "png": "badges/cells/badge_0127.png",
+      "region": {
+        "x": 112,
+        "y": 240,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "TextureFilm cell index 127"
+    },
+    {
+      "id": "boss_slain",
+      "tag": "banner",
+      "atlas": "interfaces/banners.png",
+      "png": "banners/boss_slain.png",
+      "region": {
+        "x": 0,
+        "y": 157,
+        "w": 127,
+        "h": 68
+      }
+    },
+    {
+      "id": "game_over",
+      "tag": "banner",
+      "atlas": "interfaces/banners.png",
+      "png": "banners/game_over.png",
+      "region": {
+        "x": 128,
+        "y": 157,
+        "w": 128,
+        "h": 35
+      }
+    },
+    {
+      "id": "title_glow_land",
+      "tag": "banner",
+      "atlas": "interfaces/banners.png",
+      "png": "banners/title_glow_land.png",
+      "region": {
+        "x": 240,
+        "y": 100,
+        "w": 240,
+        "h": 57
+      }
+    },
+    {
+      "id": "title_glow_port",
+      "tag": "banner",
+      "atlas": "interfaces/banners.png",
+      "png": "banners/title_glow_port.png",
+      "region": {
+        "x": 139,
+        "y": 0,
+        "w": 139,
+        "h": 100
+      }
+    },
+    {
+      "id": "title_land",
+      "tag": "banner",
+      "atlas": "interfaces/banners.png",
+      "png": "banners/title_land.png",
+      "region": {
+        "x": 0,
+        "y": 100,
+        "w": 240,
+        "h": 57
+      }
+    },
+    {
+      "id": "title_port",
+      "tag": "banner",
+      "atlas": "interfaces/banners.png",
+      "png": "banners/title_port.png",
+      "region": {
+        "x": 0,
+        "y": 0,
+        "w": 139,
+        "h": 100
+      },
+      "notes": "uvRect \u2192 xywh"
+    },
+    {
+      "id": "bar_compact",
+      "tag": "boss_hp",
+      "atlas": "interfaces/boss_hp.png",
+      "png": "boss_hp/bar_compact.png",
+      "region": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 16
+      }
+    },
+    {
+      "id": "bar_large",
+      "tag": "boss_hp",
+      "atlas": "interfaces/boss_hp.png",
+      "png": "boss_hp/bar_large.png",
+      "region": {
+        "x": 0,
+        "y": 16,
+        "w": 128,
+        "h": 30
+      }
+    },
+    {
+      "id": "hp_compact",
+      "tag": "boss_hp",
+      "atlas": "interfaces/boss_hp.png",
+      "png": "boss_hp/hp_compact.png",
+      "region": {
+        "x": 71,
+        "y": 0,
+        "w": 47,
+        "h": 4
+      }
+    },
+    {
+      "id": "hp_large",
+      "tag": "boss_hp",
+      "atlas": "interfaces/boss_hp.png",
+      "png": "boss_hp/hp_large.png",
+      "region": {
+        "x": 0,
+        "y": 46,
+        "w": 96,
+        "h": 9
+      }
+    },
+    {
+      "id": "shield_hp_compact",
+      "tag": "boss_hp",
+      "atlas": "interfaces/boss_hp.png",
+      "png": "boss_hp/shield_hp_compact.png",
+      "region": {
+        "x": 71,
+        "y": 5,
+        "w": 47,
+        "h": 4
+      }
+    },
+    {
+      "id": "shield_hp_large",
+      "tag": "boss_hp",
+      "atlas": "interfaces/boss_hp.png",
+      "png": "boss_hp/shield_hp_large.png",
+      "region": {
+        "x": 0,
+        "y": 55,
+        "w": 96,
+        "h": 9
+      }
+    },
+    {
+      "id": "skull",
+      "tag": "boss_hp",
+      "atlas": "interfaces/boss_hp.png",
+      "png": "boss_hp/skull.png",
+      "region": {
+        "x": 64,
+        "y": 0,
+        "w": 6,
+        "h": 6
+      }
+    },
+    {
+      "id": "blank",
+      "tag": "chrome",
+      "atlas": "interfaces/chrome.png",
+      "png": "chrome/blank.png",
+      "region": {
+        "x": 45,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      "nine_patch_margin": {
+        "left": 0,
+        "top": 0,
+        "right": 0,
+        "bottom": 0
+      },
+      "notes": "BLANK"
+    },
+    {
+      "id": "gem",
+      "tag": "chrome",
+      "atlas": "interfaces/chrome.png",
+      "png": "chrome/gem.png",
+      "region": {
+        "x": 0,
+        "y": 32,
+        "w": 32,
+        "h": 32
+      },
+      "nine_patch_margin": {
+        "left": 13,
+        "top": 13,
+        "right": 13,
+        "bottom": 13
+      },
+      "notes": "GEM"
+    },
+    {
+      "id": "grey_button",
+      "tag": "chrome",
+      "atlas": "interfaces/chrome.png",
+      "png": "chrome/grey_button.png",
+      "region": {
+        "x": 38,
+        "y": 6,
+        "w": 6,
+        "h": 6
+      },
+      "nine_patch_margin": {
+        "left": 2,
+        "top": 2,
+        "right": 2,
+        "bottom": 2
+      },
+      "notes": "GREY_BUTTON"
+    },
+    {
+      "id": "red_button",
+      "tag": "chrome",
+      "atlas": "interfaces/chrome.png",
+      "png": "chrome/red_button.png",
+      "region": {
+        "x": 38,
+        "y": 0,
+        "w": 6,
+        "h": 6
+      },
+      "nine_patch_margin": {
+        "left": 2,
+        "top": 2,
+        "right": 2,
+        "bottom": 2
+      },
+      "notes": "RED_BUTTON"
+    },
+    {
+      "id": "scroll",
+      "tag": "chrome",
+      "atlas": "interfaces/chrome.png",
+      "png": "chrome/scroll.png",
+      "region": {
+        "x": 32,
+        "y": 32,
+        "w": 32,
+        "h": 32
+      },
+      "nine_patch_margin": {
+        "left": 5,
+        "top": 11,
+        "right": 5,
+        "bottom": 11
+      },
+      "notes": "SCROLL"
+    },
+    {
+      "id": "tab_selected",
+      "tag": "chrome",
+      "atlas": "interfaces/chrome.png",
+      "png": "chrome/tab_selected.png",
+      "region": {
+        "x": 65,
+        "y": 22,
+        "w": 8,
+        "h": 13
+      },
+      "nine_patch_margin": {
+        "left": 3,
+        "top": 7,
+        "right": 3,
+        "bottom": 5
+      },
+      "notes": "TAB_SELECTED"
+    },
+    {
+      "id": "tab_set",
+      "tag": "chrome",
+      "atlas": "interfaces/chrome.png",
+      "png": "chrome/tab_set.png",
+      "region": {
+        "x": 64,
+        "y": 0,
+        "w": 20,
+        "h": 20
+      },
+      "nine_patch_margin": {
+        "left": 6,
+        "top": 6,
+        "right": 6,
+        "bottom": 6
+      },
+      "notes": "TAB_SET"
+    },
+    {
+      "id": "tab_unselected",
+      "tag": "chrome",
+      "atlas": "interfaces/chrome.png",
+      "png": "chrome/tab_unselected.png",
+      "region": {
+        "x": 75,
+        "y": 22,
+        "w": 8,
+        "h": 13
+      },
+      "nine_patch_margin": {
+        "left": 3,
+        "top": 7,
+        "right": 3,
+        "bottom": 5
+      },
+      "notes": "TAB_UNSELECTED"
+    },
+    {
+      "id": "tag",
+      "tag": "chrome",
+      "atlas": "interfaces/chrome.png",
+      "png": "chrome/tag.png",
+      "region": {
+        "x": 22,
+        "y": 18,
+        "w": 16,
+        "h": 14
+      },
+      "nine_patch_margin": {
+        "left": 3,
+        "top": 3,
+        "right": 3,
+        "bottom": 3
+      },
+      "notes": "TAG"
+    },
+    {
+      "id": "toast",
+      "tag": "chrome",
+      "atlas": "interfaces/chrome.png",
+      "png": "chrome/toast.png",
+      "region": {
+        "x": 20,
+        "y": 0,
+        "w": 9,
+        "h": 9
+      },
+      "nine_patch_margin": {
+        "left": 4,
+        "top": 4,
+        "right": 4,
+        "bottom": 4
+      },
+      "notes": "TOAST"
+    },
+    {
+      "id": "toast_tr",
+      "tag": "chrome",
+      "atlas": "interfaces/chrome.png",
+      "png": "chrome/toast_tr.png",
+      "region": {
+        "x": 20,
+        "y": 9,
+        "w": 9,
+        "h": 9
+      },
+      "nine_patch_margin": {
+        "left": 4,
+        "top": 4,
+        "right": 4,
+        "bottom": 4
+      },
+      "notes": "TOAST_TR / GREY_BUTTON_TR"
+    },
+    {
+      "id": "toast_tr_heavy",
+      "tag": "chrome",
+      "atlas": "interfaces/chrome.png",
+      "png": "chrome/toast_tr_heavy.png",
+      "region": {
+        "x": 29,
+        "y": 9,
+        "w": 9,
+        "h": 9
+      },
+      "nine_patch_margin": {
+        "left": 4,
+        "top": 4,
+        "right": 4,
+        "bottom": 4
+      },
+      "notes": "TOAST_TR_HEAVY"
+    },
+    {
+      "id": "toast_white",
+      "tag": "chrome",
+      "atlas": "interfaces/chrome.png",
+      "png": "chrome/toast_white.png",
+      "region": {
+        "x": 29,
+        "y": 0,
+        "w": 9,
+        "h": 9
+      },
+      "nine_patch_margin": {
+        "left": 4,
+        "top": 4,
+        "right": 4,
+        "bottom": 4
+      },
+      "notes": "TOAST_WHITE"
+    },
+    {
+      "id": "window",
+      "tag": "chrome",
+      "atlas": "interfaces/chrome.png",
+      "png": "chrome/window.png",
+      "region": {
+        "x": 0,
+        "y": 0,
+        "w": 20,
+        "h": 20
+      },
+      "nine_patch_margin": {
+        "left": 6,
+        "top": 6,
+        "right": 6,
+        "bottom": 6
+      },
+      "notes": "Chrome.Type.WINDOW"
+    },
+    {
+      "id": "window_silver",
+      "tag": "chrome",
+      "atlas": "interfaces/chrome.png",
+      "png": "chrome/window_silver.png",
+      "region": {
+        "x": 86,
+        "y": 0,
+        "w": 22,
+        "h": 22
+      },
+      "nine_patch_margin": {
+        "left": 7,
+        "top": 7,
+        "right": 7,
+        "bottom": 7
+      },
+      "notes": "WINDOW_SILVER"
+    },
+    {
+      "id": "icons_alchemy",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_alchemy.png",
+      "region": {
+        "x": 96,
+        "y": 48,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "Icons.ALCHEMY"
+    },
+    {
+      "id": "icons_aleks",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_aleks.png",
+      "region": {
+        "x": 16,
+        "y": 96,
+        "w": 16,
+        "h": 13
+      },
+      "notes": "Icons.ALEKS"
+    },
+    {
+      "id": "icons_alert",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_alert.png",
+      "region": {
+        "x": 16,
+        "y": 80,
+        "w": 8,
+        "h": 8
+      },
+      "notes": "Icons.ALERT"
+    },
+    {
+      "id": "icons_arcnor",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_arcnor.png",
+      "region": {
+        "x": 96,
+        "y": 96,
+        "w": 32,
+        "h": 32
+      },
+      "notes": "Icons.ARCNOR",
+      "scale_hint": 0.49
+    },
+    {
+      "id": "icons_arrow",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_arrow.png",
+      "region": {
+        "x": 128,
+        "y": 32,
+        "w": 11,
+        "h": 11
+      },
+      "notes": "Icons.ARROW"
+    },
+    {
+      "id": "icons_audio",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_audio.png",
+      "region": {
+        "x": 64,
+        "y": 16,
+        "w": 14,
+        "h": 14
+      },
+      "notes": "Icons.AUDIO"
+    },
+    {
+      "id": "icons_backpack",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_backpack.png",
+      "region": {
+        "x": 176,
+        "y": 80,
+        "w": 10,
+        "h": 10
+      },
+      "notes": "Icons.BACKPACK"
+    },
+    {
+      "id": "icons_backpack_lrg",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_backpack_lrg.png",
+      "region": {
+        "x": 0,
+        "y": 48,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "Icons.BACKPACK_LRG"
+    },
+    {
+      "id": "icons_badges",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_badges.png",
+      "region": {
+        "x": 51,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "Icons.BADGES"
+    },
+    {
+      "id": "icons_buffs",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_buffs.png",
+      "region": {
+        "x": 64,
+        "y": 48,
+        "w": 16,
+        "h": 15
+      },
+      "notes": "Icons.BUFFS"
+    },
+    {
+      "id": "icons_busy",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_busy.png",
+      "region": {
+        "x": 8,
+        "y": 80,
+        "w": 8,
+        "h": 8
+      },
+      "notes": "Icons.BUSY"
+    },
+    {
+      "id": "icons_calendar",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_calendar.png",
+      "region": {
+        "x": 224,
+        "y": 16,
+        "w": 15,
+        "h": 12
+      },
+      "notes": "Icons.CALENDAR"
+    },
+    {
+      "id": "icons_catalog",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_catalog.png",
+      "region": {
+        "x": 80,
+        "y": 48,
+        "w": 13,
+        "h": 16
+      },
+      "notes": "Icons.CATALOG"
+    },
+    {
+      "id": "icons_celesti",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_celesti.png",
+      "region": {
+        "x": 32,
+        "y": 96,
+        "w": 32,
+        "h": 32
+      },
+      "notes": "Icons.CELESTI",
+      "scale_hint": 0.49
+    },
+    {
+      "id": "icons_chal_count",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_chal_count.png",
+      "region": {
+        "x": 160,
+        "y": 80,
+        "w": 7,
+        "h": 7
+      },
+      "notes": "Icons.CHAL_COUNT"
+    },
+    {
+      "id": "icons_challenge_color",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_challenge_color.png",
+      "region": {
+        "x": 144,
+        "y": 32,
+        "w": 15,
+        "h": 12
+      },
+      "notes": "Icons.CHALLENGE_COLOR"
+    },
+    {
+      "id": "icons_challenge_grey",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_challenge_grey.png",
+      "region": {
+        "x": 144,
+        "y": 16,
+        "w": 15,
+        "h": 12
+      },
+      "notes": "Icons.CHALLENGE_GREY"
+    },
+    {
+      "id": "icons_changes",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_changes.png",
+      "region": {
+        "x": 85,
+        "y": 0,
+        "w": 15,
+        "h": 15
+      },
+      "notes": "Icons.CHANGES"
+    },
+    {
+      "id": "icons_checked",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_checked.png",
+      "region": {
+        "x": 64,
+        "y": 32,
+        "w": 12,
+        "h": 12
+      },
+      "notes": "Icons.CHECKED"
+    },
+    {
+      "id": "icons_chevron",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_chevron.png",
+      "region": {
+        "x": 240,
+        "y": 16,
+        "w": 13,
+        "h": 10
+      },
+      "notes": "Icons.CHEVRON"
+    },
+    {
+      "id": "icons_close",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_close.png",
+      "region": {
+        "x": 80,
+        "y": 32,
+        "w": 11,
+        "h": 11
+      },
+      "notes": "Icons.CLOSE"
+    },
+    {
+      "id": "icons_coin_sml",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_coin_sml.png",
+      "region": {
+        "x": 168,
+        "y": 80,
+        "w": 7,
+        "h": 7
+      },
+      "notes": "Icons.COIN_SML"
+    },
+    {
+      "id": "icons_compass",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_compass.png",
+      "region": {
+        "x": 0,
+        "y": 88,
+        "w": 7,
+        "h": 5
+      },
+      "notes": "Icons.COMPASS"
+    },
+    {
+      "id": "icons_controller",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_controller.png",
+      "region": {
+        "x": 96,
+        "y": 16,
+        "w": 16,
+        "h": 12
+      },
+      "notes": "Icons.CONTROLLER"
+    },
+    {
+      "id": "icons_copy",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_copy.png",
+      "region": {
+        "x": 176,
+        "y": 32,
+        "w": 13,
+        "h": 13
+      },
+      "notes": "Icons.COPY"
+    },
+    {
+      "id": "icons_cube_code",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_cube_code.png",
+      "region": {
+        "x": 160,
+        "y": 96,
+        "w": 27,
+        "h": 30
+      },
+      "notes": "Icons.CUBE_CODE",
+      "scale_hint": 0.49
+    },
+    {
+      "id": "icons_data",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_data.png",
+      "region": {
+        "x": 48,
+        "y": 16,
+        "w": 14,
+        "h": 15
+      },
+      "notes": "Icons.DATA"
+    },
+    {
+      "id": "icons_display_land",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_display_land.png",
+      "region": {
+        "x": 32,
+        "y": 16,
+        "w": 16,
+        "h": 12
+      },
+      "notes": "Icons.DISPLAY_LAND"
+    },
+    {
+      "id": "icons_display_port",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_display_port.png",
+      "region": {
+        "x": 16,
+        "y": 16,
+        "w": 12,
+        "h": 16
+      },
+      "notes": "Icons.DISPLAY_PORT"
+    },
+    {
+      "id": "icons_distant_well",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_distant_well.png",
+      "region": {
+        "x": 176,
+        "y": 64,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "Icons.DISTANT_WELL"
+    },
+    {
+      "id": "icons_energy_sml",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_energy_sml.png",
+      "region": {
+        "x": 168,
+        "y": 88,
+        "w": 8,
+        "h": 7
+      },
+      "notes": "Icons.ENERGY_SML"
+    },
+    {
+      "id": "icons_enter",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_enter.png",
+      "region": {
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "Icons.ENTER"
+    },
+    {
+      "id": "icons_exit",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_exit.png",
+      "region": {
+        "x": 0,
+        "y": 16,
+        "w": 15,
+        "h": 11
+      },
+      "notes": "Icons.EXIT"
+    },
+    {
+      "id": "icons_gold",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_gold.png",
+      "region": {
+        "x": 17,
+        "y": 0,
+        "w": 17,
+        "h": 16
+      },
+      "notes": "Icons.GOLD"
+    },
+    {
+      "id": "icons_grass",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_grass.png",
+      "region": {
+        "x": 112,
+        "y": 48,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "Icons.GRASS"
+    },
+    {
+      "id": "icons_info",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_info.png",
+      "region": {
+        "x": 16,
+        "y": 32,
+        "w": 14,
+        "h": 14
+      },
+      "notes": "Icons.INFO"
+    },
+    {
+      "id": "icons_investigate",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_investigate.png",
+      "region": {
+        "x": 16,
+        "y": 88,
+        "w": 8,
+        "h": 8
+      },
+      "notes": "Icons.INVESTIGATE"
+    },
+    {
+      "id": "icons_journal",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_journal.png",
+      "region": {
+        "x": 136,
+        "y": 0,
+        "w": 17,
+        "h": 15
+      },
+      "notes": "Icons.JOURNAL"
+    },
+    {
+      "id": "icons_keyboard",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_keyboard.png",
+      "region": {
+        "x": 112,
+        "y": 16,
+        "w": 15,
+        "h": 12
+      },
+      "notes": "Icons.KEYBOARD"
+    },
+    {
+      "id": "icons_langs",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_langs.png",
+      "region": {
+        "x": 80,
+        "y": 16,
+        "w": 14,
+        "h": 11
+      },
+      "notes": "Icons.LANGS"
+    },
+    {
+      "id": "icons_leftarrow",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_leftarrow.png",
+      "region": {
+        "x": 192,
+        "y": 16,
+        "w": 14,
+        "h": 9
+      },
+      "notes": "Icons.LEFTARROW"
+    },
+    {
+      "id": "icons_libgdx",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_libgdx.png",
+      "region": {
+        "x": 0,
+        "y": 96,
+        "w": 16,
+        "h": 13
+      },
+      "notes": "Icons.LIBGDX"
+    },
+    {
+      "id": "icons_lost",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_lost.png",
+      "region": {
+        "x": 24,
+        "y": 80,
+        "w": 8,
+        "h": 8
+      },
+      "notes": "Icons.LOST"
+    },
+    {
+      "id": "icons_lumine",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_lumine.png",
+      "region": {
+        "x": 64,
+        "y": 96,
+        "w": 32,
+        "h": 32
+      },
+      "notes": "Icons.LUMINE",
+      "scale_hint": 0.49
+    },
+    {
+      "id": "icons_magnify",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_magnify.png",
+      "region": {
+        "x": 32,
+        "y": 48,
+        "w": 14,
+        "h": 14
+      },
+      "notes": "Icons.MAGNIFY"
+    },
+    {
+      "id": "icons_news",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_news.png",
+      "region": {
+        "x": 68,
+        "y": 0,
+        "w": 16,
+        "h": 15
+      },
+      "notes": "Icons.NEWS"
+    },
+    {
+      "id": "icons_paste",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_paste.png",
+      "region": {
+        "x": 192,
+        "y": 32,
+        "w": 13,
+        "h": 13
+      },
+      "notes": "Icons.PASTE"
+    },
+    {
+      "id": "icons_plus",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_plus.png",
+      "region": {
+        "x": 96,
+        "y": 32,
+        "w": 11,
+        "h": 11
+      },
+      "notes": "Icons.PLUS"
+    },
+    {
+      "id": "icons_potion_bandolier",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_potion_bandolier.png",
+      "region": {
+        "x": 216,
+        "y": 80,
+        "w": 10,
+        "h": 10
+      },
+      "notes": "Icons.POTION_BANDOLIER"
+    },
+    {
+      "id": "icons_prefs",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_prefs.png",
+      "region": {
+        "x": 102,
+        "y": 0,
+        "w": 14,
+        "h": 14
+      },
+      "notes": "Icons.PREFS"
+    },
+    {
+      "id": "icons_purigro",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_purigro.png",
+      "region": {
+        "x": 128,
+        "y": 96,
+        "w": 32,
+        "h": 32
+      },
+      "notes": "Icons.PURIGRO",
+      "scale_hint": 0.49
+    },
+    {
+      "id": "icons_rankings",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_rankings.png",
+      "region": {
+        "x": 34,
+        "y": 0,
+        "w": 17,
+        "h": 16
+      },
+      "notes": "Icons.RANKINGS"
+    },
+    {
+      "id": "icons_repeat",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_repeat.png",
+      "region": {
+        "x": 112,
+        "y": 32,
+        "w": 11,
+        "h": 11
+      },
+      "notes": "Icons.REPEAT"
+    },
+    {
+      "id": "icons_rightarrow",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_rightarrow.png",
+      "region": {
+        "x": 208,
+        "y": 16,
+        "w": 14,
+        "h": 9
+      },
+      "notes": "Icons.RIGHTARROW"
+    },
+    {
+      "id": "icons_sacrifice_altar",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_sacrifice_altar.png",
+      "region": {
+        "x": 160,
+        "y": 64,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "Icons.SACRIFICE_ALTAR"
+    },
+    {
+      "id": "icons_scroll_color",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_scroll_color.png",
+      "region": {
+        "x": 160,
+        "y": 32,
+        "w": 15,
+        "h": 14
+      },
+      "notes": "Icons.SCROLL_COLOR"
+    },
+    {
+      "id": "icons_scroll_grey",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_scroll_grey.png",
+      "region": {
+        "x": 160,
+        "y": 16,
+        "w": 15,
+        "h": 14
+      },
+      "notes": "Icons.SCROLL_GREY"
+    },
+    {
+      "id": "icons_scroll_holder",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_scroll_holder.png",
+      "region": {
+        "x": 186,
+        "y": 80,
+        "w": 10,
+        "h": 10
+      },
+      "notes": "Icons.SCROLL_HOLDER"
+    },
+    {
+      "id": "icons_seed",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_seed.png",
+      "region": {
+        "x": 176,
+        "y": 16,
+        "w": 15,
+        "h": 10
+      },
+      "notes": "Icons.SEED"
+    },
+    {
+      "id": "icons_seed_pouch",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_seed_pouch.png",
+      "region": {
+        "x": 196,
+        "y": 80,
+        "w": 10,
+        "h": 10
+      },
+      "notes": "Icons.SEED_POUCH"
+    },
+    {
+      "id": "icons_shpx",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_shpx.png",
+      "region": {
+        "x": 119,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "Icons.SHPX"
+    },
+    {
+      "id": "icons_shuffle",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_shuffle.png",
+      "region": {
+        "x": 240,
+        "y": 32,
+        "w": 15,
+        "h": 12
+      },
+      "notes": "Icons.SHUFFLE"
+    },
+    {
+      "id": "icons_skull",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_skull.png",
+      "region": {
+        "x": 0,
+        "y": 80,
+        "w": 8,
+        "h": 8
+      },
+      "notes": "Icons.SKULL"
+    },
+    {
+      "id": "icons_sleep",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_sleep.png",
+      "region": {
+        "x": 7,
+        "y": 88,
+        "w": 9,
+        "h": 8
+      },
+      "notes": "Icons.SLEEP"
+    },
+    {
+      "id": "icons_snake",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_snake.png",
+      "region": {
+        "x": 48,
+        "y": 48,
+        "w": 9,
+        "h": 13
+      },
+      "notes": "Icons.SNAKE"
+    },
+    {
+      "id": "icons_stairs",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_stairs.png",
+      "region": {
+        "x": 0,
+        "y": 64,
+        "w": 15,
+        "h": 16
+      },
+      "notes": "Icons.STAIRS"
+    },
+    {
+      "id": "icons_stairs_chasm",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_stairs_chasm.png",
+      "region": {
+        "x": 16,
+        "y": 64,
+        "w": 15,
+        "h": 16
+      },
+      "notes": "Icons.STAIRS_CHASM"
+    },
+    {
+      "id": "icons_stairs_dark",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_stairs_dark.png",
+      "region": {
+        "x": 64,
+        "y": 64,
+        "w": 15,
+        "h": 16
+      },
+      "notes": "Icons.STAIRS_DARK"
+    },
+    {
+      "id": "icons_stairs_grass",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_stairs_grass.png",
+      "region": {
+        "x": 48,
+        "y": 64,
+        "w": 15,
+        "h": 16
+      },
+      "notes": "Icons.STAIRS_GRASS"
+    },
+    {
+      "id": "icons_stairs_large",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_stairs_large.png",
+      "region": {
+        "x": 80,
+        "y": 64,
+        "w": 15,
+        "h": 16
+      },
+      "notes": "Icons.STAIRS_LARGE"
+    },
+    {
+      "id": "icons_stairs_secrets",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_stairs_secrets.png",
+      "region": {
+        "x": 112,
+        "y": 64,
+        "w": 15,
+        "h": 16
+      },
+      "notes": "Icons.STAIRS_SECRETS"
+    },
+    {
+      "id": "icons_stairs_traps",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_stairs_traps.png",
+      "region": {
+        "x": 96,
+        "y": 64,
+        "w": 15,
+        "h": 16
+      },
+      "notes": "Icons.STAIRS_TRAPS"
+    },
+    {
+      "id": "icons_stairs_water",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_stairs_water.png",
+      "region": {
+        "x": 32,
+        "y": 64,
+        "w": 15,
+        "h": 16
+      },
+      "notes": "Icons.STAIRS_WATER"
+    },
+    {
+      "id": "icons_stats",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_stats.png",
+      "region": {
+        "x": 128,
+        "y": 16,
+        "w": 16,
+        "h": 13
+      },
+      "notes": "Icons.STATS"
+    },
+    {
+      "id": "icons_talent",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_talent.png",
+      "region": {
+        "x": 16,
+        "y": 48,
+        "w": 13,
+        "h": 13
+      },
+      "notes": "Icons.TALENT"
+    },
+    {
+      "id": "icons_target",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_target.png",
+      "region": {
+        "x": 0,
+        "y": 32,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "Icons.TARGET"
+    },
+    {
+      "id": "icons_unchecked",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_unchecked.png",
+      "region": {
+        "x": 48,
+        "y": 32,
+        "w": 12,
+        "h": 12
+      },
+      "notes": "Icons.UNCHECKED"
+    },
+    {
+      "id": "icons_wand_holster",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_wand_holster.png",
+      "region": {
+        "x": 206,
+        "y": 80,
+        "w": 10,
+        "h": 10
+      },
+      "notes": "Icons.WAND_HOLSTER"
+    },
+    {
+      "id": "icons_warning",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_warning.png",
+      "region": {
+        "x": 32,
+        "y": 32,
+        "w": 14,
+        "h": 14
+      },
+      "notes": "Icons.WARNING"
+    },
+    {
+      "id": "icons_wata",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_wata.png",
+      "region": {
+        "x": 0,
+        "y": 112,
+        "w": 17,
+        "h": 12
+      },
+      "notes": "Icons.WATA"
+    },
+    {
+      "id": "icons_well_awareness",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_well_awareness.png",
+      "region": {
+        "x": 144,
+        "y": 64,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "Icons.WELL_AWARENESS"
+    },
+    {
+      "id": "icons_well_health",
+      "tag": "icons",
+      "atlas": "interfaces/icons.png",
+      "png": "icons/icons_well_health.png",
+      "region": {
+        "x": 128,
+        "y": 64,
+        "w": 16,
+        "h": 16
+      },
+      "notes": "Icons.WELL_HEALTH"
+    },
+    {
+      "id": "menu_btn_default",
+      "tag": "menu",
+      "atlas": "interfaces/menu_button.png",
+      "png": "menu_button/menu_btn_default.png",
+      "region": {
+        "x": 2,
+        "y": 2,
+        "w": 13,
+        "h": 11
+      }
+    },
+    {
+      "id": "menu_btn_icon_strip",
+      "tag": "menu",
+      "atlas": "interfaces/menu_button.png",
+      "png": "menu_button/menu_btn_icon_strip.png",
+      "region": {
+        "x": 17,
+        "y": 2,
+        "w": 12,
+        "h": 11
+      }
+    },
+    {
+      "id": "menu_btn_journal_icon",
+      "tag": "menu",
+      "atlas": "interfaces/menu_button.png",
+      "png": "menu_button/menu_btn_journal_icon.png",
+      "region": {
+        "x": 31,
+        "y": 0,
+        "w": 11,
+        "h": 6
+      }
+    },
+    {
+      "id": "menu_pane_bg",
+      "tag": "menu",
+      "atlas": "interfaces/menu_pane.png",
+      "png": "menu_pane/menu_pane_bg.png",
+      "region": {
+        "x": 1,
+        "y": 0,
+        "w": 31,
+        "h": 21
+      }
+    },
+    {
+      "id": "inner_disc_lg",
+      "tag": "radial",
+      "atlas": "interfaces/radial_menu.png",
+      "png": "radial_menu/inner_disc_lg.png",
+      "region": {
+        "x": 340,
+        "y": 0,
+        "w": 120,
+        "h": 120
+      }
+    },
+    {
+      "id": "inner_disc_sm",
+      "tag": "radial",
+      "atlas": "interfaces/radial_menu.png",
+      "png": "radial_menu/inner_disc_sm.png",
+      "region": {
+        "x": 340,
+        "y": 120,
+        "w": 90,
+        "h": 90
+      }
+    },
+    {
+      "id": "outer_ring_lg",
+      "tag": "radial",
+      "atlas": "interfaces/radial_menu.png",
+      "png": "radial_menu/outer_ring_lg.png",
+      "region": {
+        "x": 0,
+        "y": 0,
+        "w": 200,
+        "h": 200
+      }
+    },
+    {
+      "id": "outer_ring_sm",
+      "tag": "radial",
+      "atlas": "interfaces/radial_menu.png",
+      "png": "radial_menu/outer_ring_sm.png",
+      "region": {
+        "x": 200,
+        "y": 0,
+        "w": 140,
+        "h": 140
+      }
+    },
+    {
+      "id": "shadow_full",
+      "tag": "shadow",
+      "atlas": "interfaces/shadow.png",
+      "png": "shadow/shadow_full.png",
+      "region": {
+        "x": 0,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "nine_patch_margin": {
+        "left": 1,
+        "top": 1,
+        "right": 1,
+        "bottom": 1
+      },
+      "notes": "Full atlas; margin 1px all sides (ShadowBox). Region filled from image size at export."
+    },
+    {
+      "id": "bg_compact",
+      "tag": "status",
+      "atlas": "interfaces/status_pane.png",
+      "png": "status_pane/bg_compact.png",
+      "region": {
+        "x": 0,
+        "y": 0,
+        "w": 82,
+        "h": 38
+      },
+      "nine_patch_margin": {
+        "left": 32,
+        "top": 0,
+        "right": 5,
+        "bottom": 0
+      },
+      "notes": "StatusPane small; NinePatch margins L,T,R,B"
+    },
+    {
+      "id": "bg_large",
+      "tag": "status",
+      "atlas": "interfaces/status_pane.png",
+      "png": "status_pane/bg_large.png",
+      "region": {
+        "x": 0,
+        "y": 64,
+        "w": 41,
+        "h": 39
+      },
+      "nine_patch_margin": {
+        "left": 33,
+        "top": 0,
+        "right": 4,
+        "bottom": 0
+      },
+      "notes": "StatusPane large"
+    },
+    {
+      "id": "exp_compact",
+      "tag": "status",
+      "atlas": "interfaces/status_pane.png",
+      "png": "status_pane/exp_compact.png",
+      "region": {
+        "x": 0,
+        "y": 48,
+        "w": 17,
+        "h": 4
+      }
+    },
+    {
+      "id": "exp_large",
+      "tag": "status",
+      "atlas": "interfaces/status_pane.png",
+      "png": "status_pane/exp_large.png",
+      "region": {
+        "x": 0,
+        "y": 121,
+        "w": 128,
+        "h": 7
+      }
+    },
+    {
+      "id": "hero_pane_cutout",
+      "tag": "status",
+      "atlas": "interfaces/status_pane.png",
+      "png": "status_pane/hero_pane_cutout.png",
+      "region": {
+        "x": 0,
+        "y": 0,
+        "w": 5,
+        "h": 36
+      },
+      "nine_patch_margin": {
+        "left": 4,
+        "top": 0,
+        "right": 0,
+        "bottom": 0
+      },
+      "notes": "heroPaneCutout overlay"
+    },
+    {
+      "id": "hp_compact",
+      "tag": "status",
+      "atlas": "interfaces/status_pane.png",
+      "png": "status_pane/hp_compact.png",
+      "region": {
+        "x": 0,
+        "y": 40,
+        "w": 50,
+        "h": 4
+      }
+    },
+    {
+      "id": "hp_cutout",
+      "tag": "status",
+      "atlas": "interfaces/status_pane.png",
+      "png": "status_pane/hp_cutout.png",
+      "region": {
+        "x": 90,
+        "y": 0,
+        "w": 12,
+        "h": 9
+      },
+      "notes": "hp inset graphic"
+    },
+    {
+      "id": "hp_large",
+      "tag": "status",
+      "atlas": "interfaces/status_pane.png",
+      "png": "status_pane/hp_large.png",
+      "region": {
+        "x": 0,
+        "y": 103,
+        "w": 128,
+        "h": 9
+      }
+    },
+    {
+      "id": "shield_hp_compact",
+      "tag": "status",
+      "atlas": "interfaces/status_pane.png",
+      "png": "status_pane/shield_hp_compact.png",
+      "region": {
+        "x": 0,
+        "y": 44,
+        "w": 50,
+        "h": 4
+      }
+    },
+    {
+      "id": "shield_hp_large",
+      "tag": "status",
+      "atlas": "interfaces/status_pane.png",
+      "png": "status_pane/shield_hp_large.png",
+      "region": {
+        "x": 0,
+        "y": 112,
+        "w": 128,
+        "h": 9
+      }
+    },
+    {
+      "id": "cloud_a",
+      "tag": "surface",
+      "atlas": "interfaces/surface.png",
+      "png": "surface/cloud_a.png",
+      "region": {
+        "x": 88,
+        "y": 0,
+        "w": 49,
+        "h": 20
+      }
+    },
+    {
+      "id": "cloud_b",
+      "tag": "surface",
+      "atlas": "interfaces/surface.png",
+      "png": "surface/cloud_b.png",
+      "region": {
+        "x": 88,
+        "y": 20,
+        "w": 49,
+        "h": 22
+      }
+    },
+    {
+      "id": "cloud_c",
+      "tag": "surface",
+      "atlas": "interfaces/surface.png",
+      "png": "surface/cloud_c.png",
+      "region": {
+        "x": 88,
+        "y": 42,
+        "w": 50,
+        "h": 18
+      }
+    },
+    {
+      "id": "grass_patch",
+      "tag": "surface",
+      "atlas": "interfaces/surface.png",
+      "png": "surface/grass_patch.png",
+      "region": {
+        "x": 88,
+        "y": 60,
+        "w": 16,
+        "h": 14
+      },
+      "notes": "GrassPatch random X 88..88+3*16"
+    },
+    {
+      "id": "grass_patch_x100",
+      "tag": "surface",
+      "atlas": "interfaces/surface.png",
+      "png": "surface/grass_patch_x100.png",
+      "region": {
+        "x": 100,
+        "y": 60,
+        "w": 16,
+        "h": 14
+      }
+    },
+    {
+      "id": "grass_patch_x92",
+      "tag": "surface",
+      "atlas": "interfaces/surface.png",
+      "png": "surface/grass_patch_x92.png",
+      "region": {
+        "x": 92,
+        "y": 60,
+        "w": 16,
+        "h": 14
+      }
+    },
+    {
+      "id": "grass_patch_x96",
+      "tag": "surface",
+      "atlas": "interfaces/surface.png",
+      "png": "surface/grass_patch_x96.png",
+      "region": {
+        "x": 96,
+        "y": 60,
+        "w": 16,
+        "h": 14
+      }
+    },
+    {
+      "id": "grave",
+      "tag": "surface",
+      "atlas": "interfaces/surface.png",
+      "png": "surface/grave.png",
+      "region": {
+        "x": 88,
+        "y": 74,
+        "w": 16,
+        "h": 22
+      }
+    },
+    {
+      "id": "talent_btn_maxpts_1",
+      "tag": "talent_button",
+      "atlas": "interfaces/talent_button.png",
+      "png": "talent_button/talent_btn_maxpts_1.png",
+      "region": {
+        "x": 0,
+        "y": 0,
+        "w": 20,
+        "h": 26
+      },
+      "notes": "TalentButton bg.frame(20*(maxPoints-1),0,20,26)"
+    },
+    {
+      "id": "talent_btn_maxpts_2",
+      "tag": "talent_button",
+      "atlas": "interfaces/talent_button.png",
+      "png": "talent_button/talent_btn_maxpts_2.png",
+      "region": {
+        "x": 20,
+        "y": 0,
+        "w": 20,
+        "h": 26
+      },
+      "notes": "TalentButton bg.frame(20*(maxPoints-1),0,20,26)"
+    },
+    {
+      "id": "talent_btn_maxpts_3",
+      "tag": "talent_button",
+      "atlas": "interfaces/talent_button.png",
+      "png": "talent_button/talent_btn_maxpts_3.png",
+      "region": {
+        "x": 40,
+        "y": 0,
+        "w": 20,
+        "h": 26
+      },
+      "notes": "TalentButton bg.frame(20*(maxPoints-1),0,20,26)"
+    },
+    {
+      "id": "talent_btn_maxpts_4",
+      "tag": "talent_button",
+      "atlas": "interfaces/talent_button.png",
+      "png": "talent_button/talent_btn_maxpts_4.png",
+      "region": {
+        "x": 60,
+        "y": 0,
+        "w": 20,
+        "h": 26
+      },
+      "notes": "TalentButton bg.frame(20*(maxPoints-1),0,20,26)"
+    },
+    {
+      "id": "talent_btn_maxpts_5",
+      "tag": "talent_button",
+      "atlas": "interfaces/talent_button.png",
+      "png": "talent_button/talent_btn_maxpts_5.png",
+      "region": {
+        "x": 80,
+        "y": 0,
+        "w": 20,
+        "h": 26
+      },
+      "notes": "TalentButton bg.frame(20*(maxPoints-1),0,20,26)"
+    },
+    {
+      "id": "talent_btn_maxpts_6",
+      "tag": "talent_button",
+      "atlas": "interfaces/talent_button.png",
+      "png": "talent_button/talent_btn_maxpts_6.png",
+      "region": {
+        "x": 100,
+        "y": 0,
+        "w": 20,
+        "h": 26
+      },
+      "notes": "TalentButton bg.frame(20*(maxPoints-1),0,20,26)"
+    },
+    {
+      "id": "btn_inventory_base",
+      "tag": "toolbar",
+      "atlas": "interfaces/toolbar.png",
+      "png": "toolbar/btn_inventory_base.png",
+      "region": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 26
+      }
+    },
+    {
+      "id": "btn_search_base",
+      "tag": "toolbar",
+      "atlas": "interfaces/toolbar.png",
+      "png": "toolbar/btn_search_base.png",
+      "region": {
+        "x": 44,
+        "y": 0,
+        "w": 20,
+        "h": 26
+      }
+    },
+    {
+      "id": "btn_wait_base",
+      "tag": "toolbar",
+      "atlas": "interfaces/toolbar.png",
+      "png": "toolbar/btn_wait_base.png",
+      "region": {
+        "x": 24,
+        "y": 0,
+        "w": 20,
+        "h": 26
+      },
+      "notes": "Tool wait"
+    },
+    {
+      "id": "icon_inventory",
+      "tag": "toolbar",
+      "atlas": "interfaces/toolbar.png",
+      "png": "toolbar/icon_inventory.png",
+      "region": {
+        "x": 160,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      }
+    },
+    {
+      "id": "icon_search",
+      "tag": "toolbar",
+      "atlas": "interfaces/toolbar.png",
+      "png": "toolbar/icon_search.png",
+      "region": {
+        "x": 192,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      }
+    },
+    {
+      "id": "icon_wait",
+      "tag": "toolbar",
+      "atlas": "interfaces/toolbar.png",
+      "png": "toolbar/icon_wait.png",
+      "region": {
+        "x": 176,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      }
+    },
+    {
+      "id": "quickslot_default",
+      "tag": "toolbar",
+      "atlas": "interfaces/toolbar.png",
+      "png": "toolbar/quickslot_default.png",
+      "region": {
+        "x": 64,
+        "y": 0,
+        "w": 22,
+        "h": 24
+      }
+    },
+    {
+      "id": "quickslot_left_cap",
+      "tag": "toolbar",
+      "atlas": "interfaces/toolbar.png",
+      "png": "toolbar/quickslot_left_cap.png",
+      "region": {
+        "x": 86,
+        "y": 0,
+        "w": 20,
+        "h": 24
+      }
+    },
+    {
+      "id": "quickslot_mid",
+      "tag": "toolbar",
+      "atlas": "interfaces/toolbar.png",
+      "png": "toolbar/quickslot_mid.png",
+      "region": {
+        "x": 88,
+        "y": 0,
+        "w": 18,
+        "h": 24
+      }
+    },
+    {
+      "id": "quickslot_right_cap",
+      "tag": "toolbar",
+      "atlas": "interfaces/toolbar.png",
+      "png": "toolbar/quickslot_right_cap.png",
+      "region": {
+        "x": 106,
+        "y": 0,
+        "w": 19,
+        "h": 24
+      }
+    },
+    {
+      "id": "slot_swap_base",
+      "tag": "toolbar",
+      "atlas": "interfaces/toolbar.png",
+      "png": "toolbar/slot_swap_base.png",
+      "region": {
+        "x": 128,
+        "y": 0,
+        "w": 21,
+        "h": 23
+      }
+    }
+  ]
+}

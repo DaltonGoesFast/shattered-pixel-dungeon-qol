@@ -1,5 +1,7 @@
 # Fard Rework — Streamer.bot Apply Guide
 
+> **Superseded (Phase 5):** Fard is **R1 + R9** in the HTTP gateway. See [streamerbot-http-gateway-apply.md](streamerbot-http-gateway-apply.md) and [archive/README.md](archive/README.md).
+
 Step-by-step instructions to paste into Streamer.bot. Repo code (`server.py`, `points_command.py`) is updated separately.
 
 **Reference:** [fard-system.md](fard-system.md) (planned rework), [fard_system_rework plan](../.cursor/plans/fard_system_rework_0adf992a.plan.md).

@@ -44,6 +44,7 @@ import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSpriteSheet;
 import com.shatteredpixel.shatteredpixeldungeon.ui.CurrencyIndicator;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RedButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RenderedTextBlock;
+import com.shatteredpixel.shatteredpixeldungeon.utils.TrainingExport;
 
 public class WndTradeItem extends WndInfoItem {
 
@@ -89,6 +90,7 @@ public class WndTradeItem extends WndInfoItem {
 			RedButton btnSell = new RedButton( Messages.get(this, "sell", item.value()) ) {
 				@Override
 				protected void onClick() {
+					TrainingExport.logShop("shop_sell", item.getClass().getSimpleName());
 					sell( item, finalShop);
 					hide();
 				}
@@ -105,6 +107,7 @@ public class WndTradeItem extends WndInfoItem {
 			RedButton btnSell1 = new RedButton( Messages.get(this, "sell_1", priceAll / item.quantity()) ) {
 				@Override
 				protected void onClick() {
+					TrainingExport.logShop("shop_sell", item.getClass().getSimpleName());
 					sellOne( item, finalShop );
 					hide();
 				}
@@ -115,6 +118,7 @@ public class WndTradeItem extends WndInfoItem {
 			RedButton btnSellAll = new RedButton( Messages.get(this, "sell_all", priceAll ) ) {
 				@Override
 				protected void onClick() {
+					TrainingExport.logShop("shop_sell_all", item.getClass().getSimpleName());
 					sell( item, finalShop );
 					hide();
 				}
@@ -147,6 +151,7 @@ public class WndTradeItem extends WndInfoItem {
 		RedButton btnBuy = new RedButton( Messages.get(this, "buy", price) ) {
 			@Override
 			protected void onClick() {
+				TrainingExport.logShop("shop_buy", item.getClass().getSimpleName());
 				hide();
 				buy( heap );
 			}

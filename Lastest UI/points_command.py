@@ -25,8 +25,8 @@ Usage:
   giftmembership: python points_command.py giftmembership <username> [tier] [isSubscribed 0|1] [userIsSponsor 0|1]
   balance:  python points_command.py balance <username>  (!points lookup; writes points_balance_result.txt)
 
-All spend commands write to spawn_result.txt (ok or ok|extra|pts). The last value is remaining points. Donation writes to donation_result.txt.
-Transmute uses four fields: ok|<original_item_name>|<result_item_name>|<points> (original may be empty if the game build omits it).
+CLI spend commands still write spawn_result.txt for manual terminal testing.
+The HTTP gateway (R1 /api/chat-command) uses structured ChatResult only — no result files.
 """
 import sys
 import urllib.request
@@ -36,6 +36,8 @@ import time
 import random
 import datetime
 from contextlib import contextmanager
+from dataclasses import dataclass, field
+from typing import Any, Optional
 
 if os.name == "nt":
     import msvcrt
@@ -61,6 +63,15 @@ SPEND_DISABLED_FILE = os.path.join(SCRIPT_DIR, "spend_disabled.txt")
 GAME_DATA_URL = "http://127.0.0.1:5000/api/game-data"
 DOUBLE_POINTS_END_FILE = os.path.join(SCRIPT_DIR, "double_points_end.txt")
 TOP_SUMMONER_FILE = os.path.join(SCRIPT_DIR, "top_summoner.txt")
+DEATH_COST_STATE_FILE = os.path.join(SCRIPT_DIR, "death_cost_state.json")
+DEATH_COST_DISPLAY_FILE = os.path.join(SCRIPT_DIR, "death_cost_display.txt")
+DEATH_COST_EXEMPT_COMMANDS = frozenset({
+    "heal", "bee", "ward", "ring_of_wealth", "row",
+    "corrupt_ally", "corruptally", "buff", "cleanse",
+})
+DEATH_COST_FACTOR = 1.5
+
+BOT_USER = "daltongoesslow"
 
 
 def is_spend_disabled():
@@ -96,30 +107,72 @@ def _arg_bool(s, default=False):
 
 
 def is_top_summoner(username):
-    """True if username matches top_summoner.txt leader (case-insensitive)."""
+    """True if username is the rolling heat leader (15m Bestiary XP), case-insensitive.
+
+    Prefers summon_bestiary.get_heat_leader(); falls back to heat_leader.txt /
+    top_summoner.txt for legacy readers.
+    """
     if not username:
         return False
+    want = str(username).strip().lower()
     try:
-        if not os.path.exists(TOP_SUMMONER_FILE):
+        from summon_bestiary import get_heat_leader
+        leader, _score = get_heat_leader()
+        if leader and leader.strip().lower() == want:
+            return True
+        if leader:
             return False
-        with open(TOP_SUMMONER_FILE, encoding="utf-8") as f:
-            line = f.readline().strip()
-        prefix = "Top Summoner: "
-        if not line.startswith(prefix):
-            return False
-        rest = line[len(prefix):]
-        dash = rest.rfind(" - ")
-        if dash < 0:
-            leader = rest.strip()
-        else:
-            leader = rest[:dash].strip()
-        return leader.lower() == str(username).strip().lower()
-    except OSError:
+    except Exception:
+        pass
+    # Fallback: heat_leader.txt then top_summoner.txt (same "Top Summoner: name - N" format)
+    for path in (
+        os.path.join(SCRIPT_DIR, "heat_leader.txt"),
+        TOP_SUMMONER_FILE,
+    ):
+        try:
+            if not os.path.exists(path):
+                continue
+            with open(path, encoding="utf-8") as f:
+                line = f.readline().strip()
+            prefix = "Top Summoner: "
+            if not line.startswith(prefix):
+                continue
+            rest = line[len(prefix):]
+            dash = rest.rfind(" - ")
+            leader = rest[:dash].strip() if dash >= 0 else rest.strip()
+            if leader.lower() == want:
+                return True
+        except OSError:
+            continue
+    return False
+
+
+def grant_sprint_donor_reward(username, amount=100):
+    """Flat donor-wallet grant for Bestiary sprint winners (no earn multipliers).
+
+    Increments both pts and donation_pts by amount so the grant is spendable and
+    counted as donor balance.
+    """
+    if not username or str(username).strip().lower() in ("", "anonymous"):
+        return False
+    to_add = max(0, int(amount))
+    if to_add <= 0:
+        return False
+    key = str(username).strip().lower()
+    try:
+        with points_lock():
+            data = read_points()
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            pts += to_add
+            data[key] = (pts, last, donation_pts + to_add, role)
+            write_points(data)
+        return True
+    except TimeoutError:
         return False
 
 
 def donation_earn_multiplier(is_subscribed=False, is_sponsor=False, username=None):
-    """Stack global 2×, top summoner 2×, and subscriber/member 2× (matches chat earning)."""
+    """Stack global 2×, top summoner 2×, and subscriber/member 2×; capped at donation_multiplier_cap."""
     m = 1
     if is_double_points_active():
         m *= 2
@@ -127,7 +180,13 @@ def donation_earn_multiplier(is_subscribed=False, is_sponsor=False, username=Non
         m *= 2
     if is_subscribed or is_sponsor:
         m *= 2
-    return m
+    cap = int(get_config().get("donation_multiplier_cap", 4))
+    return min(max(1, cap), m)
+
+
+def chat_pts(pts: int, donation_pts: int) -> int:
+    """Chat-only balance (not donor wallet)."""
+    return max(0, pts - donation_pts)
 
 
 def _parse_positive_int(s, default=0):
@@ -233,6 +292,7 @@ def load_config():
         "command_allowed_roles": {},
         "cost_per_gold": 5,
         "cost_per_curse": 200,
+        "curse_class_kit_duration_turns": 100,
         "cost_per_gas": 75,
         "cost_per_scroll": 100,
         "cost_per_ring_of_wealth": 100,
@@ -252,6 +312,16 @@ def load_config():
             "necromancer": 25, "ghoul": 40, "elemental": 40, "warlock": 45,
             "monk": 50, "golem": 50, "succubus": 60, "eye": 70, "scorpio": 80,
         },
+        "points_per_message": 2,
+        "chat_cooldown_sec": 20,
+        "passive_cooldown_sec": 60,
+        "first_words_bonus": 5,
+        "chat_point_cap": 500,
+        "bank_ratio_manual": 0.10,
+        "bank_ratio_auto": 0.05,
+        "bank_ratio_auto_member": 0.10,
+        "donation_multiplier_cap": 4,
+        "reset_debounce_hours": 4,
     }
     if not os.path.exists(CONFIG_FILE):
         return defaults
@@ -267,6 +337,7 @@ def load_config():
         return {
             "cost_per_gold": int(cfg.get("cost_per_gold", defaults["cost_per_gold"])),
             "cost_per_curse": int(cfg.get("cost_per_curse", defaults["cost_per_curse"])),
+            "curse_class_kit_duration_turns": max(1, int(cfg.get("curse_class_kit_duration_turns", defaults["curse_class_kit_duration_turns"]))),
             "cost_per_gas": int(cfg.get("cost_per_gas", defaults["cost_per_gas"])),
             "cost_per_scroll": int(cfg.get("cost_per_scroll", defaults["cost_per_scroll"])),
             "cost_per_ring_of_wealth": max(1, int(cfg.get("cost_per_ring_of_wealth", defaults["cost_per_ring_of_wealth"]))),
@@ -289,6 +360,16 @@ def load_config():
             "cost_per_degrade": max(1, int(cfg.get("cost_per_degrade", defaults["cost_per_degrade"]))),
             "cost_per_sabotage": max(1, int(cfg.get("cost_per_sabotage", defaults["cost_per_sabotage"]))),
             "command_allowed_roles": cfg.get("command_allowed_roles") or {},
+            "points_per_message": max(1, int(cfg.get("points_per_message", defaults["points_per_message"]))),
+            "chat_cooldown_sec": max(0, int(cfg.get("chat_cooldown_sec", defaults["chat_cooldown_sec"]))),
+            "passive_cooldown_sec": max(0, int(cfg.get("passive_cooldown_sec", defaults["passive_cooldown_sec"]))),
+            "first_words_bonus": max(0, int(cfg.get("first_words_bonus", defaults["first_words_bonus"]))),
+            "chat_point_cap": max(1, int(cfg.get("chat_point_cap", defaults["chat_point_cap"]))),
+            "bank_ratio_manual": float(cfg.get("bank_ratio_manual", defaults["bank_ratio_manual"])),
+            "bank_ratio_auto": float(cfg.get("bank_ratio_auto", defaults["bank_ratio_auto"])),
+            "bank_ratio_auto_member": float(cfg.get("bank_ratio_auto_member", defaults["bank_ratio_auto_member"])),
+            "donation_multiplier_cap": max(1, int(cfg.get("donation_multiplier_cap", defaults["donation_multiplier_cap"]))),
+            "reset_debounce_hours": max(0, float(cfg.get("reset_debounce_hours", defaults["reset_debounce_hours"]))),
         }
     except Exception:
         return defaults
@@ -317,6 +398,85 @@ def is_cost_free(cost_key):
 def effective_cost(cost_key, base_cost):
     """Return 0 if cost is free, else base_cost."""
     return 0 if is_cost_free(cost_key) else base_cost
+
+
+def _load_death_cost_state() -> dict:
+    if not os.path.exists(DEATH_COST_STATE_FILE):
+        return {"deaths": 0}
+    try:
+        with open(DEATH_COST_STATE_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        return {"deaths": max(0, int(data.get("deaths", 0)))}
+    except (json.JSONDecodeError, OSError, TypeError, ValueError):
+        return {"deaths": 0}
+
+
+def _save_death_cost_state(state: dict) -> None:
+    with open(DEATH_COST_STATE_FILE, "w", encoding="utf-8") as f:
+        json.dump({"deaths": max(0, int(state.get("deaths", 0)))}, f)
+
+
+def get_death_cost_deaths() -> int:
+    return _load_death_cost_state()["deaths"]
+
+
+def get_death_cost_multiplier() -> float:
+    deaths = get_death_cost_deaths()
+    if deaths <= 0:
+        return 1.0
+    return DEATH_COST_FACTOR ** deaths
+
+
+def format_death_cost_display() -> str:
+    """OBS-friendly one-liner; empty when costs are normal."""
+    deaths = get_death_cost_deaths()
+    if deaths <= 0:
+        return ""
+    mult = get_death_cost_multiplier()
+    pct = int(round((mult - 1.0) * 100))
+    death_word = "death" if deaths == 1 else "deaths"
+    return f"Harmful costs: {mult:.2f}x (+{pct}%, {deaths} {death_word})"
+
+
+def refresh_death_cost_display_file() -> str:
+    """Write death_cost_display.txt for OBS Read from file."""
+    text = format_death_cost_display()
+    try:
+        with open(DEATH_COST_DISPLAY_FILE, "w", encoding="utf-8") as f:
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+    except OSError:
+        pass
+    return text
+
+
+def on_hero_death_cost_inflation() -> int:
+    """Increment death counter (+50% harmful costs per death, compounded)."""
+    state = _load_death_cost_state()
+    state["deaths"] = state.get("deaths", 0) + 1
+    _save_death_cost_state(state)
+    refresh_death_cost_display_file()
+    return state["deaths"]
+
+
+def on_boss_slain_cost_inflation_reset() -> None:
+    """Reset death-based cost inflation after a boss kill."""
+    _save_death_cost_state({"deaths": 0})
+    refresh_death_cost_display_file()
+
+
+def apply_death_cost_inflation(command_id: str, cost: int) -> int:
+    """Apply compound +50% per death to harmful commands; helpful commands exempt."""
+    if cost <= 0:
+        return cost
+    cmd = (command_id or "").lower()
+    if cmd in DEATH_COST_EXEMPT_COMMANDS:
+        return cost
+    mult = get_death_cost_multiplier()
+    if mult <= 1.0:
+        return cost
+    return max(1, int(round(cost * mult)))
 
 
 def check_command_access(command_id, role):
@@ -679,6 +839,7 @@ def reserve_points(username, command_id, base_cost, detail=""):
             if not ok:
                 return None, err
             cost = apply_role_discount(base_cost, command_id, role)
+            cost = apply_death_cost_inflation(command_id, cost)
             total = effective_total(pts, donation_pts)
             if total < cost:
                 return None, not_enough_points_msg(username, cost, total, detail)
@@ -700,14 +861,54 @@ def cmd_balance(args):
         return BALANCE_RESULT_FILE, "Usage: balance <username>"
     username = args[0].strip()
     if not username:
-        return BALANCE_RESULT_FILE, "ok|0"
+        return BALANCE_RESULT_FILE, "ok|0|0|500"
     try:
         with points_lock():
             data = read_points()
             pts, _, donation_pts, _ = _get_user_data(data, username.lower())
-            p, d = pts, donation_pts
-            display = (p + d) if (d > 0 and p < d) else p
-            return BALANCE_RESULT_FILE, f"ok|{display}"
+            cap = int(get_config().get("chat_point_cap", 500))
+            c = chat_pts(pts, donation_pts)
+            return BALANCE_RESULT_FILE, f"ok|{c}|{donation_pts}|{cap}"
+    except TimeoutError:
+        return BALANCE_RESULT_FILE, "Points file busy. Please try again in a moment."
+
+
+def cmd_bank(args):
+    """CLI: bank <username> [all|<amount>] — preview if amount omitted."""
+    if len(args) < 1:
+        return BALANCE_RESULT_FILE, "Usage: bank <username> [all|<amount>]"
+    username = args[0].strip()
+    if not username:
+        return BALANCE_RESULT_FILE, "Usage: bank <username> [all|<amount>]"
+    amount_arg = args[1].strip().lower() if len(args) > 1 else None
+    try:
+        with points_lock():
+            data = read_points()
+            key = username.lower()
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            cfg = get_config()
+            ratio = float(cfg.get("bank_ratio_manual", 0.10))
+            c = chat_pts(pts, donation_pts)
+            if amount_arg is None:
+                gain = int(c * ratio)
+                return BALANCE_RESULT_FILE, f"preview|{c}|{gain}|{int(ratio * 100)}"
+            if amount_arg == "all":
+                amount = c
+            else:
+                try:
+                    amount = int(amount_arg)
+                except ValueError:
+                    return BALANCE_RESULT_FILE, f"invalid|{c}"
+            if amount < 1:
+                return BALANCE_RESULT_FILE, "invalid|0"
+            if amount > c:
+                return BALANCE_RESULT_FILE, f"excess|{c}"
+            donor_gain = int(amount * ratio)
+            new_donation = donation_pts + donor_gain
+            new_pts = pts - amount + donor_gain
+            data[key] = (new_pts, last, new_donation, role)
+            write_points(data)
+            return BALANCE_RESULT_FILE, f"ok|{amount}|{donor_gain}|{new_donation}"
     except TimeoutError:
         return BALANCE_RESULT_FILE, "Points file busy. Please try again in a moment."
 
@@ -846,13 +1047,20 @@ def cmd_curse(args):
         return SPAWN_RESULT_FILE, err
 
     body, err = _post_game_command(
-        "/api/curse-command", {"username": username},
+        "/api/curse-command",
+        {
+            "username": username,
+            "class_kit_curse_duration_turns": get_config()["curse_class_kit_duration_turns"],
+        },
         "Curse failed", "Curse timed out. Is the game running and in an active run?"
     )
     if err:
         refund_points(res)
         return SPAWN_RESULT_FILE, err
     item_name = body.get("item_name", "item")
+    if body.get("temporary"):
+        duration = body.get("duration_turns", get_config()["curse_class_kit_duration_turns"])
+        return SPAWN_RESULT_FILE, f"ok|{item_name}|{res['new_pts']}|temporary|{duration}"
     return SPAWN_RESULT_FILE, f"ok|{item_name}|{res['new_pts']}"
 
 
@@ -1456,12 +1664,165 @@ COMMANDS = {
     "gift_membership": cmd_giftmembership,
     "giftsub": cmd_giftmembership,
     "balance": cmd_balance,
+    "bank": cmd_bank,
 }
 
-# Commands that write spawn_result.txt (serialized so Streamer.bot C# reads the right result).
+# Commands that run through the spend pipeline lock (CLI still writes spawn_result.txt).
 SPEND_PIPELINE_COMMANDS = frozenset(k for k in COMMANDS if k not in (
-    "superchat", "cheer", "giftmembership", "gift_membership", "giftsub", "balance",
+    "superchat", "cheer", "giftmembership", "gift_membership", "giftsub", "balance", "bank",
 ))
+
+
+@dataclass
+class ChatResult:
+    """Structured result for /api/chat-command (replaces spawn_result.txt in HTTP path)."""
+    ok: bool
+    message: Optional[str] = None
+    pts: Optional[int] = None
+    earned: int = 0
+    extra: Optional[dict[str, Any]] = None
+    presentation: Optional[dict[str, Any]] = None
+
+    def to_api_dict(self) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "ok": self.ok,
+            "message": self.message,
+            "pts": self.pts,
+            "earned": self.earned,
+        }
+        if self.extra is not None:
+            out["extra"] = self.extra
+        if self.presentation is not None:
+            out["presentation"] = self.presentation
+        return out
+
+
+def chat_earn_multiplier(username: str, is_subscribed: bool = False, is_member: bool = False) -> int:
+    """Stack global 2x, top summoner 2x, sub/member 2x for chat/passive/first-words earn."""
+    m = 1
+    if is_double_points_active():
+        m *= 2
+    if username and is_top_summoner(username):
+        m *= 2
+    if is_subscribed or is_member:
+        m *= 2
+    return m
+
+
+def _legacy_ok_parts(msg: str) -> Optional[list[str]]:
+    if not msg or not msg.startswith("ok|"):
+        return None
+    return msg.split("|")
+
+
+def legacy_to_chat_result(cmd: str, msg: str, username: str, cmd_args: list) -> ChatResult:
+    """Convert spawn_result.txt / balance line into a ChatResult with viewer-facing message."""
+    import chat_messages
+
+    if msg.startswith("excess|"):
+        chat_avail = int(msg.split("|", 1)[1])
+        return ChatResult(ok=False, message=chat_messages.bank_excess(username, chat_avail), extra={"command": "bank"})
+    if msg.startswith("invalid|"):
+        return ChatResult(ok=False, message=chat_messages.bank_invalid_amount(username), extra={"command": "bank"})
+    if msg.startswith("preview|"):
+        c, gain, pct = [int(x) for x in msg.split("|")[1:4]]
+        return ChatResult(
+            ok=True,
+            message=chat_messages.bank_preview(username, c, gain, pct),
+            extra={"command": "bank", "preview": True},
+        )
+
+    parts = _legacy_ok_parts(msg)
+    if parts:
+        if cmd == "balance":
+            c = int(parts[1])
+            donor = int(parts[2]) if len(parts) > 2 else 0
+            cap = int(parts[3]) if len(parts) > 3 else int(get_config().get("chat_point_cap", 500))
+            total = c + donor
+            return ChatResult(
+                ok=True,
+                message=chat_messages.points_balance_v11(username, c, cap, donor),
+                pts=total,
+                extra={"command": "points", "chat_pts": c, "donor_pts": donor, "chat_cap": cap},
+            )
+        if cmd == "bank" and len(parts) >= 4:
+            amount, gain, donor_total = int(parts[1]), int(parts[2]), int(parts[3])
+            return ChatResult(
+                ok=True,
+                message=chat_messages.bank_success(username, amount, gain, donor_total),
+                extra={"command": "bank", "chat_amount": amount, "donor_gain": gain, "donor_pts": donor_total},
+            )
+        if cmd == "transmute" and len(parts) >= 4:
+            extra_name = parts[2].strip() or parts[1].strip()
+            pts = int(parts[-1])
+            return ChatResult(
+                ok=True,
+                message=chat_messages.spend_success("transmute", username, pts, extra_name),
+                pts=pts,
+                extra={"command": cmd, "item": extra_name},
+            )
+        if cmd == "curse" and len(parts) >= 5 and parts[3] == "temporary":
+            extra = parts[1].strip()
+            pts = int(parts[2])
+            duration = parts[4].strip()
+            return ChatResult(
+                ok=True,
+                message=chat_messages.spend_success("curse_temporary", username, pts, extra, duration),
+                pts=pts,
+                extra={"command": cmd, "detail": extra, "temporary": True, "duration_turns": int(duration)},
+            )
+        if len(parts) >= 3:
+            extra = parts[1].strip()
+            pts = int(parts[-1])
+            display_cmd = "corruptally" if cmd in ("corrupt_ally", "corruptally") else cmd
+            return ChatResult(
+                ok=True,
+                message=chat_messages.spend_success(display_cmd, username, pts, extra),
+                pts=pts,
+                extra={"command": cmd, "detail": extra},
+            )
+        if len(parts) == 2:
+            pts = int(parts[1])
+            if cmd in ("spawn", "champion"):
+                monster = cmd_args[0] if cmd_args else "monster"
+                return ChatResult(
+                    ok=True,
+                    message=chat_messages.spend_success(cmd, username, pts, monster),
+                    pts=pts,
+                    extra={"command": cmd, "monster": monster},
+                )
+            return ChatResult(
+                ok=True,
+                message=chat_messages.spend_success(cmd, username, pts, ""),
+                pts=pts,
+                extra={"command": cmd},
+            )
+
+    if cmd == "transfer" and " gave " in msg:
+        return ChatResult(ok=True, message=msg, extra={"command": "givepoints"})
+
+    return ChatResult(ok=False, message=msg, extra={"command": cmd})
+
+
+def run_points_command(cmd: str, cmd_args: list, username: str = "") -> ChatResult:
+    """Run a points_command handler and return structured ChatResult."""
+    cmd = cmd.lower()
+    if cmd not in COMMANDS:
+        import chat_messages
+        return ChatResult(ok=False, message=chat_messages.unknown_command(cmd))
+
+    user = username or (_caller_username(cmd_args) if cmd_args else "")
+    try:
+        if cmd in SPEND_PIPELINE_COMMANDS:
+            with spend_command_lock():
+                result_file, msg = COMMANDS[cmd](cmd_args)
+        else:
+            result_file, msg = COMMANDS[cmd](cmd_args)
+    except TimeoutError:
+        import chat_messages
+        return ChatResult(ok=False, message=chat_messages.COMMAND_IN_PROGRESS)
+
+    return legacy_to_chat_result(cmd, msg, user, cmd_args)
 
 
 def main():

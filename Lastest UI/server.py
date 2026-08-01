@@ -509,8 +509,21 @@ def _handle_score_event(data):
     score_data = _load_score_data()
     if data.get('type') == 'hero_died':
         score_data['chat'] = score_data.get('chat', 0) + 1
+        try:
+            from points_command import on_hero_death_cost_inflation, get_death_cost_multiplier
+            deaths = on_hero_death_cost_inflation()
+            mult = get_death_cost_multiplier()
+            print(f"Death cost inflation: {deaths} death(s) -> {mult:.2f}x harmful command costs")
+        except Exception as e:
+            print(f"Death cost inflation update failed: {e}")
     elif data.get('type') == 'boss_slain':
         score_data['streamer'] = score_data.get('streamer', 0) + 1
+        try:
+            from points_command import on_boss_slain_cost_inflation_reset
+            on_boss_slain_cost_inflation_reset()
+            print("Death cost inflation reset (boss slain)")
+        except Exception as e:
+            print(f"Death cost inflation reset failed: {e}")
     _save_score_data(score_data)
     print(f"Score event {data.get('type')}: streamer={score_data['streamer']} chat={score_data['chat']}")
 
@@ -538,6 +551,9 @@ def _game_ws_on_message(ws, message):
                             pending_spawns[rid]['monster'] = data.get('monster')
                         if data.get('type') == 'curse_result' and data.get('item_name'):
                             pending_spawns[rid]['item_name'] = data.get('item_name')
+                        if data.get('type') == 'curse_result' and data.get('temporary'):
+                            pending_spawns[rid]['temporary'] = True
+                            pending_spawns[rid]['duration_turns'] = data.get('duration_turns')
                         if data.get('type') == 'curse_result' and data.get('error'):
                             pending_spawns[rid]['error'] = data.get('error')
                         if data.get('type') == 'gas_result' and data.get('gas_name'):
@@ -896,6 +912,17 @@ def points_config_api():
                 data.setdefault("command_allowed_roles", {})
                 data.setdefault("cost_per_wand", 75)
                 data.setdefault("cost_per_bomb", 75)
+                data.setdefault("points_per_message", 2)
+                data.setdefault("chat_cooldown_sec", 20)
+                data.setdefault("passive_cooldown_sec", 60)
+                data.setdefault("first_words_bonus", 5)
+                data.setdefault("chat_point_cap", 500)
+                data.setdefault("bank_ratio_manual", 0.10)
+                data.setdefault("bank_ratio_auto", 0.05)
+                data.setdefault("bank_ratio_auto_member", 0.10)
+                data.setdefault("donation_multiplier_cap", 4)
+                data.setdefault("reset_debounce_hours", 4)
+                data.setdefault("curse_class_kit_duration_turns", 100)
             else:
                 data = {
                     "cost_per_gold": 5,
@@ -969,6 +996,17 @@ def points_config_api():
             "cost_per_corrupt_ally": max(1, int(data.get("cost_per_corrupt_ally", 100))),
             "cost_per_ring_of_wealth": max(1, int(data.get("cost_per_ring_of_wealth", 100))),
             "command_allowed_roles": data.get("command_allowed_roles") or {},
+            "points_per_message": max(1, int(data.get("points_per_message", 2))),
+            "chat_cooldown_sec": max(0, int(data.get("chat_cooldown_sec", 20))),
+            "passive_cooldown_sec": max(0, int(data.get("passive_cooldown_sec", 60))),
+            "first_words_bonus": max(0, int(data.get("first_words_bonus", 5))),
+            "chat_point_cap": max(1, int(data.get("chat_point_cap", 500))),
+            "bank_ratio_manual": max(0, min(1, float(data.get("bank_ratio_manual", 0.10)))),
+            "bank_ratio_auto": max(0, min(1, float(data.get("bank_ratio_auto", 0.05)))),
+            "bank_ratio_auto_member": max(0, min(1, float(data.get("bank_ratio_auto_member", 0.10)))),
+            "donation_multiplier_cap": max(1, int(data.get("donation_multiplier_cap", 4))),
+            "reset_debounce_hours": max(0, float(data.get("reset_debounce_hours", 4))),
+            "curse_class_kit_duration_turns": max(1, int(data.get("curse_class_kit_duration_turns", 100))),
         }
         for k, v in (data.get("cost_per_monster") or {}).items():
             try:
@@ -1808,6 +1846,16 @@ def curse_command():
             data = request.form.to_dict()
         slot = (data.get('slot') or '').strip().lower()
         username = (data.get('username') or '').strip() or None
+        class_kit_duration = 100
+        try:
+            if data.get('class_kit_curse_duration_turns') is not None:
+                class_kit_duration = max(1, int(data.get('class_kit_curse_duration_turns')))
+            elif os.path.exists(POINTS_CONFIG_FILE):
+                with open(POINTS_CONFIG_FILE, encoding='utf-8') as f:
+                    cfg = json.load(f)
+                class_kit_duration = max(1, int(cfg.get('curse_class_kit_duration_turns', 100)))
+        except (TypeError, ValueError, json.JSONDecodeError, OSError):
+            class_kit_duration = 100
         valid_slots = {'weapon', 'armor', 'ring', 'artifact', 'misc'}
         if slot and slot not in valid_slots:
             return jsonify({'ok': False, 'error': f'Invalid slot. Options: weapon, armor, ring, artifact, misc (middle slot)'}), 400
@@ -1818,7 +1866,7 @@ def curse_command():
         with spawn_lock:
             pending_spawns[request_id] = {'event': ev, 'success': False}
         try:
-            payload = {'command': 'curse', 'request_id': request_id}
+            payload = {'command': 'curse', 'request_id': request_id, 'class_kit_curse_duration_turns': class_kit_duration}
             if slot:
                 payload['slot'] = slot
             if username:
@@ -1835,6 +1883,8 @@ def curse_command():
                 success = pending.get('success', False)
                 item_name = pending.get('item_name', '')
                 curse_error = pending.get('error')
+                curse_temporary = pending.get('temporary', False)
+                curse_duration = pending.get('duration_turns')
         else:
             with spawn_lock:
                 pending_spawns.pop(request_id, None)
@@ -1842,7 +1892,11 @@ def curse_command():
         if success:
             print(f"Curse OK: {slot or 'random'} ({item_name}) for {username}")
             _record_command_event(username, 'curse', slot or 'random', True)
-            return jsonify({'ok': True, 'slot': slot or None, 'item_name': item_name})
+            resp = {'ok': True, 'slot': slot or None, 'item_name': item_name}
+            if curse_temporary:
+                resp['temporary'] = True
+                resp['duration_turns'] = curse_duration
+            return jsonify(resp)
         err = curse_error or 'No curseable equipped item (all slots empty or already cursed)'
         _record_command_event(username, 'curse', slot or 'random', False)
         return jsonify({'ok': False, 'error': err}), 200
@@ -2727,6 +2781,19 @@ def summon_march():
                 layout = 'horizontal'
             if not monster or monster not in SPAWN_WHITELIST:
                 return jsonify({'ok': False, 'error': 'Invalid or missing monster'}), 400
+            # Bestiary unlocked-pool gate (chat_command already gates; reject stale direct POSTs)
+            try:
+                from summon_bestiary import is_monster_unlocked, monster_xp, get_state_payload
+                if not is_monster_unlocked(monster):
+                    return jsonify({
+                        'ok': False,
+                        'error': f'Monster not unlocked in current Bestiary level: {monster}',
+                    }), 400
+                xp = int(data.get('xp') or monster_xp(monster) or 0)
+                bestiary_level = int(data.get('bestiary_level') or get_state_payload().get('level') or 1)
+            except Exception:
+                xp = int(data.get('xp') or 0)
+                bestiary_level = int(data.get('bestiary_level') or 1)
             event_id = str(uuid.uuid4())
             ts = int(time.time())
             event = {
@@ -2735,6 +2802,8 @@ def summon_march():
                 'username': username,
                 'monster': monster,
                 'layout': layout,
+                'xp': xp,
+                'bestiary_level': bestiary_level,
             }
             _append_summon_march_event(event)
             _record_command_event(username, 'summon_march', monster, True)
@@ -2766,20 +2835,54 @@ def summon_march():
         return jsonify({'error': str(e), 'events': []}), 500
 
 
-@app.route('/api/top-summoner')
-def top_summoner_api():
-    """Return parsed top summoner for OBS browser sources."""
+@app.route('/api/bestiary')
+def bestiary_api():
+    """Bestiary HUD payload: bar, sprint, heat, hall of fame, unlocked monsters."""
     resp_headers = {'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0'}
     try:
-        username, count, display = _parse_top_summoner_file()
+        from summon_bestiary import get_state_payload
+        return jsonify(get_state_payload()), 200, resp_headers
+    except Exception as e:
+        return jsonify({'error': str(e), 'level': 1, 'bar_xp': 0, 'bar_threshold': 60}), 500, resp_headers
+
+
+@app.route('/api/top-summoner')
+def top_summoner_api():
+    """Sprint leader for OBS / legacy sources (Bestiary level sprint, not session count)."""
+    resp_headers = {'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0'}
+    try:
+        from summon_bestiary import get_sprint_leader
+        username, count, gap = get_sprint_leader()
+        display = f'Top Summoner: {username} - {count}' if username else ''
         return jsonify({
             'username': username or '',
             'count': count,
-            'display': display or (f'Top Summoner: {username} - {count}' if username else ''),
+            'gap': gap,
+            'display': display,
             'has_leader': bool(username),
+            'kind': 'sprint',
         }), 200, resp_headers
     except Exception as e:
         return jsonify({'error': str(e), 'username': '', 'count': 0, 'display': '', 'has_leader': False}), 500, resp_headers
+
+
+@app.route('/api/heat-leader')
+def heat_leader_api():
+    """Rolling heat leader (personal 2×)."""
+    resp_headers = {'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0'}
+    try:
+        from summon_bestiary import get_heat_leader, load_config
+        username, xp = get_heat_leader()
+        window = int(load_config().get('heat_window_sec', 900))
+        return jsonify({
+            'username': username or '',
+            'xp': xp,
+            'window_sec': window,
+            'has_leader': bool(username),
+            'display': f'Heat: {username} - {xp}' if username else '',
+        }), 200, resp_headers
+    except Exception as e:
+        return jsonify({'error': str(e), 'username': '', 'xp': 0, 'has_leader': False}), 500, resp_headers
 
 
 @app.route('/api/activity-commands')
@@ -2792,6 +2895,66 @@ def activity_commands():
         return jsonify({'events': out})
     except Exception as e:
         return jsonify({'error': str(e), 'events': []}), 500
+
+
+@app.route('/api/chat-command', methods=['POST', 'OPTIONS'])
+def chat_command_api():
+    """Unified chat router: earn, spend, query, meta. See docs/streaming-system-rework-plan.md."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        from chat_command import dispatch_chat_command
+        body = request.get_json(force=True, silent=True) or {}
+        result = dispatch_chat_command(body)
+        return jsonify(result.to_api_dict())
+    except Exception as e:
+        print(f"chat-command error: {e}")
+        return jsonify({"ok": False, "message": str(e), "pts": None, "earned": 0}), 500
+
+
+@app.route('/api/session/reset', methods=['POST', 'OPTIONS'])
+def session_reset_api():
+    """Reset per-stream session state (Stream Started). Does not wipe viewer points."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        from chat_command import reset_session_state
+        reset_session_state()
+        return jsonify({"ok": True, "message": "Session reset."})
+    except Exception as e:
+        print(f"session reset error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route('/api/session/end', methods=['POST', 'OPTIONS'])
+def session_end_api():
+    """Stream Offline: schedule or execute chat wipe + auto-bank (4h debounce unless force)."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        from chat_command import try_execute_stream_end
+        body = request.get_json(force=True, silent=True) or {}
+        force = bool(body.get("force") or request.args.get("force") in ("1", "true", "yes"))
+        result = try_execute_stream_end(force=force)
+        ok = result.get("ok", True) if not result.get("executed") else result.get("ok", True)
+        status = 200 if ok else 500
+        return jsonify({"ok": ok, **result}), status
+    except Exception as e:
+        print(f"session end error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+def stream_end_debounce_thread():
+    """Background: run pending stream-end reset after debounce elapses."""
+    while True:
+        time.sleep(60)
+        try:
+            from chat_command import try_execute_pending_stream_end
+            result = try_execute_pending_stream_end()
+            if result.get("executed"):
+                print(f"stream-end auto reset: {result}")
+        except Exception as e:
+            print(f"stream-end debounce error: {e}")
 
 
 @app.route('/api/status')
@@ -2820,6 +2983,7 @@ if __name__ == '__main__':
         threading.Thread(target=obs_relay_thread, daemon=True).start()
     # Double points countdown for OBS (writes to double_points_countdown.txt every second)
     threading.Thread(target=double_points_countdown_thread, daemon=True).start()
+    threading.Thread(target=stream_end_debounce_thread, daemon=True).start()
     
     # Load initial data
     game_info = parser.get_current_game_info()
@@ -2829,6 +2993,11 @@ if __name__ == '__main__':
 
     # Ensure streamer_chat_score.txt exists for OBS Read from file
     _save_score_data(_load_score_data())
+    try:
+        from points_command import refresh_death_cost_display_file
+        refresh_death_cost_display_file()
+    except Exception as e:
+        print(f"Death cost display init failed: {e}")
 
     # Load summon march queue from disk for Godot catch-up
     summon_march_events[:] = _load_summon_march_queue_from_disk()

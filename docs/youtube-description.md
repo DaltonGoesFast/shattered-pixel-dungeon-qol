@@ -5,18 +5,26 @@ Copy the block below for your YouTube channel description or video descriptions.
 ---
 
 ```
-Channel Assets by Channel Member Grunt Frostwolf and myself!
+DaltonGoesFast Channel Assets by Channel Member Grunt Frostwolf and myself!
+
+SHATTER THE STREAMER — Chat plays along with a live Shattered Pixel Dungeon run. Earn points by chatting and spending them on spawns, curses, scrolls, and more that hit the hero in real time. Free commands light up the stream overlay; paid commands change the dungeon.
+
+BESTIARY — Free !summon marches monsters across the companion overlay and fills a shared XP bar. Unlock zones together (Sewers -> Prison -> Caves -> City -> Halls). Race the Sprint for each level (Hall of Fame + 100 donor pts on win). Hold Heat (last 15 min of summon XP) for personal 2x point gains. Check !bestiary, !heat, !topsummoner, !summonhall.
 
 Stream Commands:
-!fard — once per stream per viewer; OBS + sound; extends global 2× for everyone (+1 min, +5 min for subs/members)
-!summon — free monster march on the companion overlay (60s cooldown); !summon rat or random monster
-!topsummoner — session summon leader (earns personal 2× points)
-!mysummons — your summon count this stream
-!kesha
-!challenges
-!seed
+!fard — once per stream per viewer; OBS + sound; extends global 2× for everyone (+3 min, +6 min for subs/members)
+!summon — free Bestiary march (60s cooldown); starts with Sewers mobs; fill the XP bar to unlock zones
+!bestiary / !summonlevel — co-op bar + unlocked mobs + your sprint/heat XP
+!topsummoner — current Bestiary sprint leader (resets each level-up; Hall of Fame + 100 donor pts on win)
+!heat / !hot — rolling 15m heat leader (personal 2× points)
+!summonhall — sprint winners this stream
+!mysummons — your summon count + sprint/heat XP
+!kesha — free meme alert: OBS kesha flash + sound (~2s); 60s global / 10 min per user
+!mimic / !tooth — free: plays mimic sound if you have Mimic Tooth trinket this run
+!challenge / !challenges — free: lists active run challenges
+!seed — free: shows current dungeon seed
 
-Streaming VERTICAL and HORIZONTAL on YouTube!
+DaltonGoesFast Streaming VERTICAL and HORIZONTAL on YouTube!
 
 Join our Discord! https://discord.gg/Xrv52j4mEf
 
@@ -24,18 +32,20 @@ Join our Discord! https://discord.gg/Xrv52j4mEf
 
 CHAT COMMANDS — Spend points to mess with the run!
 
-Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also give points!
+Earn up to 500 chat points per stream (2 pts per message, 20s cooldown). !bank saves 10% into donor points permanently. Super Chats & bits go to donor points (up to 4× during bonuses). Chat resets when the stream ends; donor points never expire.
 
-2× BONUSES (stack — up to 8× on your earns):
+2× BONUSES on chat earn (stack — up to 8×):
 - Global 2×: !doublepoints (streamer) + !fard extensions
-- Personal 2×: top summoner (!summon leader this stream)
+- Personal 2×: Bestiary heat leader (!heat — last 15 minutes of summon XP)
+- Sprint titles: each Bestiary level-up crowns a sprint winner (!topsummoner / !summonhall)
 - Sub/member 2×
 
-FREE (no points): !fard, !summon, !topsummoner, !mysummons — see Stream Commands above.
+FREE (no points): !fard, !summon, !bestiary, !summonlevel, !topsummoner, !heat, !hot, !summonhall, !mysummons, !kesha, !mimic, !challenge, !seed — see Stream Commands above.
 
 COMMANDS:
-- !points — Check your balance (free)
-- !toppoints / !leaderboard — Top 3 point holders (free)
+- !points — Chat, donor, and Bestiary sprint/heat XP (free)
+- !bank / !bank all / !bank (amount) — Convert chat pts to donor pts at 10% (free)
+- !toppoints / !leaderboard — Top 3 by donor points (free)
 - !givepoints (amount) (target) — Give points to another viewer (free). YouTube: no @ needed. Example: !givepoints 50 bob. Spends chat points first, then donor points if needed.
 - !spawn (monster) — Table price for that mob vs current depth and where it normally first appears: half off if you're deeper than that (min 1 pt). If you're still above that depth, extra cost depends on chapter gap—the dungeon is five chapters of five floors each (sewers → prison → caves → city → halls). You pay the listed price, or +20% on it, or +40% on it (rounded). Examples: !spawn rat, !spawn bat, !spawn scorpio
 - !champion (monster) — 2× that adjusted !spawn cost (not 2× raw table). Random type: Blazing, Projecting, Antimagic, Giant, Blessed, Growing. Examples: !champion rat, !champion eye

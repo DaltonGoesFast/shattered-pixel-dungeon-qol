@@ -39,6 +39,26 @@ tasks.register('debug', JavaExec) {
     }
 }
 
+// Offline Item Showcase export: item JSON + sprite rects for vertical shorts.
+// Usage:
+//   gradlew :desktop:runShowcaseExport -PshowcaseArgs="longsword|--out|C:/path/work/longsword"
+// Args are '|' separated so Windows paths with spaces stay intact.
+tasks.register('runShowcaseExport', JavaExec) {
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.shatteredpixel.shatteredpixeldungeon.desktop.ItemShowcaseExporter'
+    systemProperty 'Specification-Title', appName
+    systemProperty 'Implementation-Title', appPackageName
+    systemProperty 'Specification-Version', appVersionName + "-INDEV"
+    systemProperty 'Implementation-Version', appVersionCode
+    def raw = project.findProperty('showcaseArgs')
+    if (raw != null && raw.toString().trim()) {
+        args raw.toString().split('\\|') as List
+    }
+    if (osName.contains('mac')) {
+        jvmArgs '-XstartOnFirstThread'
+    }
+}
+
 tasks.register('release', Jar) {
     //FIXME this is now needed as of gradle 7.0, due to our weird sourceSets setup. Should see if there's a better way to do this
     setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE)

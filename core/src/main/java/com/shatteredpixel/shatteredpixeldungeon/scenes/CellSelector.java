@@ -29,6 +29,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.tiles.DungeonTilemap;
+import com.shatteredpixel.shatteredpixeldungeon.utils.TrainingExport;
 import com.watabou.input.ControllerHandler;
 import com.watabou.input.GameAction;
 import com.watabou.input.KeyBindings;
@@ -156,6 +157,9 @@ public class CellSelector extends ScrollArea {
 
 			switch (button){
 				default:
+					if (TrainingExport.hasPendingItem()) {
+						TrainingExport.onItemTargetSelected(cell);
+					}
 					listener.onSelect( cell );
 					break;
 				case PointerEvent.RIGHT:
@@ -532,6 +536,7 @@ public class CellSelector extends ScrollArea {
 		if (listener != null) {
 			listener.onSelect( null );
 		}
+		TrainingExport.clearPendingItem();
 		
 		GameScene.ready();
 	}

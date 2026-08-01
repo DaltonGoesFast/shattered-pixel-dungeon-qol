@@ -12,13 +12,13 @@ This guide helps you emulate the full streaming setup so you can test and verify
 | **Shattered Pixel Dungeon QoL** | The game (this mod) with streaming enabled |
 | **Streamer.bot** | Connects chat to actions (optional for basic testing) |
 | **OBS Studio** | Displays the overlay; optional for API testing |
-| **Godot companion** (optional) | **SPD Companion 3** at `Documents/spd-companion-3` — polls `/api/summon-march` |
+| **Godot companion** (optional) | **`spd-comp3/`** in this repo — polls `/api/summon-march` + `/api/bestiary` |
 
 ---
 
 ## 1. Overlay Server
 
-The Flask server exposes **`/api/game-data`**, **`/api/points-config`** (GET/POST), viewer-points APIs (including bulk ops), **`/api/streamer-chat-score`**, double-points endpoints, **`/api/activity-commands`**, **`/api/summon-march`** (Godot companion queue), **`/api/top-summoner`**, and many forwarded chat routes such as **`/api/spawn-command`**, **`/api/champion-command`**, **`/api/gold-command`**, **`/api/trap-command`**, **`/api/transmute-command`**, **`/api/summon-bee-command`**, **`/api/ward-command`**, **`/api/corrupt-ally-command`**, **`/api/heal-command`**, **`/api/hex-command`**, and related spend routes, **`/api/wand-command`**, etc. See `Lastest UI/server.py` for the full list, or open **`http://localhost:5000/ws-inspect`** for a combined inspector.
+The Flask server exposes **`/api/chat-command`** (unified chat router), **`/api/session/reset`** and **`/api/session/end`**, donation routes under **`/api/donation/*`**, **`/api/game-data`**, **`/api/points-config`** (GET/POST), viewer-points APIs, double-points endpoints, **`/api/activity-commands`**, **`/api/summon-march`** (Godot companion queue), **`/api/top-summoner`**, and legacy per-command HTTP routes kept for tools/tests. See `Lastest UI/server.py` or open **`http://localhost:5000/ws-inspect`** for a combined inspector.
 
 ```bash
 cd "Lastest UI"
@@ -45,7 +45,9 @@ Game WebSocket: ws://127.0.0.1:5001
 | `/points-config` | Costs (including heal/cleanse/dew/corrupt ally/hex/degrade/sabotage), viewer points table, streamer vs chat score |
 | `/double-points-countdown` | Optional OBS text source for 2× countdown |
 | `/api/summon-march` | Godot companion: poll queued monster marches (`GET ?since=id`) |
-| `/api/top-summoner` | Current session top summoner for OBS |
+| `/api/top-summoner` | Bestiary **sprint** leader for OBS |
+| `/api/heat-leader` | Rolling heat leader (personal 2×) |
+| `/api/bestiary` | Bestiary HUD payload (bar / sprint / heat / hall) |
 | `/ws-inspect` | Live game JSON + config snapshot |
 
 ---
@@ -64,7 +66,26 @@ Game WebSocket: ws://127.0.0.1:5001
 
 ## 3. Testing Without Streamer.bot
 
-You can test most functionality without Streamer.bot:
+You can test most functionality without Streamer.bot.
+
+### API smoke test (recommended)
+
+```powershell
+cd "Lastest UI"
+python server.py   # separate terminal
+.\test_chat_command_api.ps1
+```
+
+Expect **9 passed** (`/api/chat-command`, session reset, donations, earn, spend errors).
+
+### Rapid scenarios (optional)
+
+```powershell
+.\phase3_rapid_test.ps1 -Scenario All          # both direct API + Streamer.bot HTTP
+.\phase3_rapid_test.ps1 -Scenario SpawnStorm   # parallel !spawn rat stress
+```
+
+Requires Streamer.bot **HTTP server** on `127.0.0.1:7474` for `-Mode StreamerBot` steps. See [streamerbot-http-gateway-apply.md](streamerbot-http-gateway-apply.md).
 
 ### Overlay / game data
 ```bash
@@ -72,20 +93,17 @@ curl http://localhost:5000/api/game-data
 curl http://localhost:5000/game_summary.json
 ```
 
-### Spawn / Scroll (via Python)
+### Spawn / spend (CLI fallback)
+
 ```bash
 cd "Lastest UI"
 python points_command.py spawn rat YourUsername
-python points_command.py scroll YourUsername
 ```
-- Requires: overlay server running, game running with streaming, `viewer_points.txt` with enough points.
-- Creates `viewer_points.txt` if missing. Each line is: `username|totalPoints|lastActivityUnix|donationPts|role` (optional fifth column may be legacy `helper`/`hurter` or empty; it is no longer used for discounts or command gating). Example chat-only user: `yourusername|100|0|0|`
 
-### Spawn (via HTTP)
-```bash
-curl -X POST http://localhost:5000/api/spawn-command -H "Content-Type: application/json" -d "{\"monster\": \"rat\", \"username\": \"test\"}"
-```
-- This bypasses the points check (points are enforced in `points_command.py`, not the server). Use for testing spawn delivery only.
+- Requires overlay server, game running with streaming, and balance in `viewer_points.txt` (or points-config UI).
+- **Live stream path:** Streamer.bot **R1** → `POST /api/chat-command` (no `spawn_result.txt`).
+
+Each line in `viewer_points.txt`: `username|chatPts|lastActivityUnix|donorPts|role` (fifth column legacy; unused). Example: `yourusername|100|0|0|`
 
 ### Summon march (Godot companion — no game required)
 ```bash
@@ -94,31 +112,45 @@ curl "http://localhost:5000/api/summon-march"
 curl http://localhost:5000/api/top-summoner
 ```
 - Requires overlay server only (game can be offline). Events append to `Lastest UI/summon_march_queue.jsonl`.
-- Streamer.bot setup: [streamerbot-summon-march-apply.md](streamerbot-summon-march-apply.md). System spec: [summon-march-system.md](summon-march-system.md).
+- Streamer.bot setup: [summon-march-system.md](summon-march-system.md) (`!summon` via R1). Bestiary rules: [bestiary-summon-system.md](bestiary-summon-system.md). Legacy separate action: [streamerbot-summon-march-apply.md](streamerbot-summon-march-apply.md) (archived).
 - Viewer-facing copy: [user-facing-summary.md](user-facing-summary.md), [youtube-description.md](youtube-description.md), [twitch-panel.md](twitch-panel.md), [COMMANDS.md](../COMMANDS.md).
 
 ---
 
 ## 4. Full Setup (Streamer.bot + OBS)
 
-For full chat integration you need Streamer.bot talking to the overlay server and the game, plus OBS if you stream the overlay.
+**Status:** Live setup is the **HTTP gateway (R1–R10)** with **Economy v1.1** on the server. Roadmap and phase history: [streaming-system-rework-plan.md](streaming-system-rework-plan.md).
 
-### 4.1 Streamer.bot: import export (optional shortcut)
+| Action | Role |
+|--------|------|
+| **R1** | All points chat → `POST /api/chat-command` |
+| **R2** | First Words OBS only (points on server) |
+| **R3** | Passive earn batch → HTTP |
+| **R4–R6** | Donations |
+| **R7** | Twitch Stream Started → `/api/session/reset` |
+| **R8** | Spend on/off (`spend_disabled.txt`) — two actions for Stream Deck |
+| **R9** | Presentation queue (`!fard` OBS; optional summon sound in R1) |
+| **R10** | Stream Offline → `/api/session/end` (debounced chat wipe + auto-bank) |
 
-A bundled Streamer.bot export is included for parity with the maintainer’s setup:
+**Separate Command actions (not R1):** `!kesha`, `!seed`, `!mimic`, `!challenge` — [stream-info-commands.md](stream-info-commands.md).
 
-- **File:** `Lastest UI/streamerbot/shatter-the-streamer-export-0.1.0.txt` (single-line base64 export string; paste into Streamer.bot import or select when it asks for the export).
-- Import it through Streamer.bot’s normal **Import** flow for actions/triggers.
+### 4.1 Option A — Import export (fastest)
 
-**After importing, do not assume it will work unchanged on your machine.**
+- **Current:** `Lastest UI/streamerbot/shatter-the-streamer-export-0.2.0`
+- **Legacy (~40 actions):** `shatter-the-streamer-export-0.1.0.txt` — do not use for new setups
 
-1. **Reconcile with the canonical walkthrough** — Step through [streamerbot-points-from-scratch.md](streamerbot-points-from-scratch.md) and compare: commands, **Execute Python** / **Execute C#** steps, URLs like `http://127.0.0.1:5000/...`, and especially **absolute paths** to `points_command.py`, `Lastest UI`, and any files the actions read/write. Update every path to your clone location.
-2. **WebSocket connections** — Imports do not reliably carry working connections to **your** game. In Streamer.bot, open the **WebSocket Client** (or related) plugins and ensure you have a connection to the **game** stream, typically **`ws://127.0.0.1:5001`** (or whatever port **Settings → Streaming** shows). Recreate or fix these entries after import.
-3. **Overlay server** — `python server.py` must be running on port **5000** (or change Streamer.bot HTTP calls to match).
+After import:
 
-### 4.2 Streamer.bot: build from scratch
+1. Fix **absolute paths** in curl steps (see [streamerbot-http-gateway-apply.md](streamerbot-http-gateway-apply.md) § R1 `chat_command_body.json`).
+2. **OBS** must be connected in Streamer.bot (presentation and GDI steps fail silently otherwise).
+3. **Game WebSocket** `ws://127.0.0.1:5001` if any action still talks to the game directly (most spend goes through the overlay server).
+4. Run `test_chat_command_api.ps1` and one live `!spawn` / `!fard` smoke test.
 
-If you prefer not to use the export, follow [streamerbot-points-from-scratch.md](streamerbot-points-from-scratch.md) end-to-end to create actions, dedupe, and donation hooks.
+### 4.2 Option B — Build from scratch
+
+Follow [streamerbot-http-gateway-apply.md](streamerbot-http-gateway-apply.md) and paste C# from `Lastest UI/streamerbot/phase2/`.
+
+Do **not** build new setups from the archived walkthrough in [streamerbot-points-from-scratch.md](streamerbot-points-from-scratch.md) (kept for reference only).
 
 ### 4.3 OBS
 
@@ -138,9 +170,11 @@ The game sends immediate `ui_layout` events with popup bounds; the server expand
 
 **Tuning:** Crop/Pad `top` on `V - INV HUD GROUP`: `crop_top_closed` (**683**), `crop_top_min` (**390** for kinetic staff). Popups with `height` ≤ `no_expand_max_height` (**100**, Cursed Metal Shard size) keep closed crop and mask on. Larger popups use the linear `top` map and disable the mask. Log: `OBS inv crop: open top=... (game top=... height=...)`. Copy `obs_inv_layout.example.json` to `obs_inv_layout.json` for your own values. Set `"enabled": false` to turn the relay off.
 
-**Paths to update** (any machine-specific Streamer.bot step):
-- All `FILE`, `DOUBLE_FILE`, and Python invocations pointing at `Lastest UI`
-- `points_command.py` resolves `viewer_points.txt` and config next to the script (`SCRIPT_DIR`)
+**Paths to update** on a new machine:
+
+- R1 **curl** path to `chat_command_body.json` and **Working directory** (`Lastest UI`) — [streamerbot-http-gateway-apply.md](streamerbot-http-gateway-apply.md)
+- `Lastest UI/presentation_config.py` if OBS scene names differ
+- `Lastest UI/config.json` → `save_directory`
 
 ---
 
@@ -151,16 +185,39 @@ The game sends immediate `ui_layout` events with popup bounds; the server expand
 | Server starts | `python server.py` | No errors, "Server URL" printed |
 | Points config UI | Open `http://localhost:5000/points-config` | Page loads; Save writes `points_config.json` |
 | Game data | `curl http://localhost:5000/api/game-data` | JSON with `stats` (includes `depth`), `hero`, etc. when game is in a run and WS connected |
-| Spawn script | Ensure `viewer_points.txt` has `testuser|50|0|0|` (or use UI), run `python points_command.py spawn rat testuser` | `ok` in `spawn_result.txt` if game is running and has space |
+| Spawn script | `python points_command.py spawn rat testuser` (CLI) or `POST /api/chat-command` with `!spawn rat` | Game spawns when WS connected; JSON `ok` from API |
 | Spawn zone pricing | Deeper than native depth: half price; shallower: chapter-gap surcharge (+20% per step on base, max +40%; see `compute_spawn_cost` / `_early_spawn_multiplier` in `points_command.py`) | Costs match script when `/api/game-data` reports depth |
-| Streamer.bot import | After import, trigger one command + check game | No path errors; WebSocket shows connected if your actions require it |
+| Streamer.bot import | After import, trigger one command + check game | No path errors; OBS connected for presentation |
 
 ---
 
-## Troubleshooting
+## 6. Pre-stream checklist (go live)
+
+| Check | How |
+|-------|-----|
+| Overlay server | `python server.py` in `Lastest UI` — port **5000** |
+| API smoke | `.\test_chat_command_api.ps1` → 9 passed |
+| Game | Desktop build, **Streaming** on, WebSocket **5001** (default) |
+| Streamer.bot → OBS | **Connected** (fard/kesha OBS fail silently otherwise) |
+| R1–R10 | Enabled; legacy ~40-action commands **disabled** |
+| R7 | Twitch **Stream Started** → `/api/session/reset` |
+| R10 | **Stream Offline** → curl `/api/session/end` — [economy-v11-apply.md](economy-v11-apply.md) |
+| R8 | Stream Deck spend on/off wired |
+| Stream info | `!kesha`, `!seed`, `!mimic`, `!challenge` — [stream-info-commands.md](stream-info-commands.md) |
+| Godot companion | Polls `/api/summon-march` if used |
+| Points backup | CSV export from `/points-config` before wipes |
+| After stream | Keep server up for debounced R10 **or** force session end before next stream |
+
+Optional: `.\phase3_rapid_test.ps1 -Scenario Default` (Streamer.bot HTTP on `7474`).
+
+---
+
+## 7. Troubleshooting
 
 - **"No game data available"** — Game not running, or save directory wrong. Check `save_directory` in `config.json`.
 - **"Game not connected"** on spawn — Game must be running with streaming enabled; port in game Settings must match `GAME_WS_URL` in `server.py` (default 5001).
 - **"Not enough points"** — Raise balance in **points-config** or add a line to `viewer_points.txt` (`username|total|0|0|`).
-- **Paths in Streamer.bot** — Python and C# actions often use absolute paths from the export author. Update to your `Lastest UI` folder.
-- **Imported Streamer.bot profile: commands fire but game ignores** — Recreate **WebSocket Client** connection to `ws://127.0.0.1:<game port>`; confirm the game’s streaming toggle is on.
+- **Paths in Streamer.bot** — Update R1 curl path to your clone’s `Lastest UI` folder (see apply guide).
+- **Fard / kesha: sound works, no OBS flash** — Streamer.bot was not connected to OBS; connect and retry.
+- **Session end did nothing** — `POST /api/session/end` returns `debounce` until the timer fires; keep `server.py` running or use `force: true` (see [economy-v11-apply.md](economy-v11-apply.md)).
+- **Chat commands fire but spawns do not appear** — Game **Streaming** must be on; overlay relays to `ws://127.0.0.1:5001`. R1 does not require a separate Streamer.bot game WebSocket.

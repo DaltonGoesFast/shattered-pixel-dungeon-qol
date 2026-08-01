@@ -954,6 +954,7 @@ public class WndSettings extends WndTabbed {
 		CheckBox chkObsChromaMasks;
 		CheckBox chkTransparentVoid;
 		CheckBox chkStreamerBossStasisScroll;
+		CheckBox chkTrainingExport;
 
 		@Override
 		protected void createChildren() {
@@ -1060,6 +1061,15 @@ public class WndSettings extends WndTabbed {
 				};
 				chkStreamerBossStasisScroll.checked(SPDSettings.streamerBossStasisScroll());
 				add(chkStreamerBossStasisScroll);
+				chkTrainingExport = new CheckBox(Messages.get(this, "training_export_enable")) {
+					@Override
+					protected void onClick() {
+						super.onClick();
+						SPDSettings.trainingExportEnabled(checked());
+					}
+				};
+				chkTrainingExport.checked(SPDSettings.trainingExportEnabled());
+				add(chkTrainingExport);
 			}
 		}
 
@@ -1107,6 +1117,10 @@ public class WndSettings extends WndTabbed {
 				pos = chkTransparentVoid.bottom();
 				chkStreamerBossStasisScroll.setRect(0, pos + GAP, width, BTN_HEIGHT);
 				pos = chkStreamerBossStasisScroll.bottom();
+				if (chkTrainingExport != null) {
+					chkTrainingExport.setRect(0, pos + GAP, width, BTN_HEIGHT);
+					pos = chkTrainingExport.bottom();
+				}
 			}
 
 			height = pos;

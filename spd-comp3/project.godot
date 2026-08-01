@@ -1,0 +1,45 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="SPD Companion 3"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.6", "Forward Plus")
+run/max_fps=60
+config/icon="res://icon.svg"
+
+[autoload]
+
+CompanionConfig="*res://scripts/companion_config.gd"
+FreePromosState="*res://scripts/free_promos_state.gd"
+GameWebSocketClient="*res://scripts/game_websocket_client.gd"
+StreamerBotUdp="*res://scripts/streamerbot_udp_listener.gd"
+SpawnResultFileBridge="*res://scripts/spawn_result_file_bridge.gd"
+ObsWebSocketClient="*res://scripts/obs_websocket_client.gd"
+SummonPollService="*res://scripts/summon_poll_service.gd"
+BestiaryPollService="*res://scripts/bestiary_poll_service.gd"
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/per_pixel_transparency/allowed=true
+
+[physics]
+
+3d/physics_engine="GodotPhysics3D"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"

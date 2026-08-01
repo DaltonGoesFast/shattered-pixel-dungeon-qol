@@ -2,7 +2,7 @@
 
 This repo is a fork of **Shattered Pixel Dungeon** focused on **quality-of-life UI**, **optional visibility into fights**, and **game-facing rules** for chat-driven actions when you run the **desktop** build with the streaming integration. The Android/iOS builds still benefit from the in-game UI changes; external commands require the desktop WebSocket path.
 
-**Collaborating?** See [CONTRIBUTING.md](CONTRIBUTING.md) for git branching and the [streaming setup guide](docs/streaming-setup-guide.md) to emulate the live stream environment.
+**Collaborating?** See [CONTRIBUTING.md](CONTRIBUTING.md), [docs/README.md](docs/README.md), and [streaming-setup-guide.md](docs/streaming-setup-guide.md).
 
 ---
 
@@ -57,9 +57,12 @@ Point costs in the tables are the **defaults**; the overlay can override them.
 
 ## Where to read more
 
-- **[COMMANDS.md](COMMANDS.md)** — authoritative command list, monster costs, helper/hurter rules, and Streamer.bot notes.
+- **[COMMANDS.md](COMMANDS.md)** — authoritative command list, monster costs, and Streamer.bot notes.
 - **[docs/user-facing-summary.md](docs/user-facing-summary.md)** — short copy you can paste for panels / descriptions.
-- **[docs/streaming-setup-guide.md](docs/streaming-setup-guide.md)** — full desktop + overlay wiring.
+- **[docs/streaming-setup-guide.md](docs/streaming-setup-guide.md)** — full desktop + overlay + HTTP gateway wiring.
+- **[`spd-comp3/`](spd-comp3/)** — Godot companion (summon marches, Bestiary HUD); see [`spd-comp3/AGENTS.md`](spd-comp3/AGENTS.md).
+- **[docs/RELEASE.md](docs/RELEASE.md)** — build JAR / Windows `.exe` zip / APK for GitHub Releases.
+- **[docs/README.md](docs/README.md)** — documentation index (gateway, economy, tests, archive).
 
 ---
 

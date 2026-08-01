@@ -653,4 +653,15 @@ public class SPDSettings extends GameSettings {
 	public static boolean autoTalentPlan() {
 		return getBoolean( KEY_AUTO_TALENT_PLAN, false );
 	}
+
+	/** Desktop-only: write gameplay training datasets for offline ML (requires restart). */
+	public static final String KEY_TRAINING_EXPORT_ENABLED = "training_export_enabled";
+
+	public static void trainingExportEnabled( boolean value ) {
+		put( KEY_TRAINING_EXPORT_ENABLED, value );
+	}
+
+	public static boolean trainingExportEnabled() {
+		return getBoolean( KEY_TRAINING_EXPORT_ENABLED, false );
+	}
 }

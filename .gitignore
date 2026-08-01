@@ -73,13 +73,56 @@ Lastest UI/assigned_role.txt.bak
 Lastest UI/helper_hurter_counter.txt
 Lastest UI/switch_side_last.txt
 Lastest UI/switch_success_cooldown.json
+Lastest UI/session_state.json
+Lastest UI/free_until.json
+Lastest UI/chat_command_audit.jsonl
+Lastest UI/chat_command_body.json
+Lastest UI/chat_command_body_*.json
+Lastest UI/summon_march_queue.jsonl
+Lastest UI/summon_session_counts.json
+Lastest UI/top_summoner.txt
+Lastest UI/heat_leader.txt
+Lastest UI/bestiary_state.json
+Lastest UI/death_cost_state.json
+Lastest UI/death_cost_display.txt
+Lastest UI/totalsummons.txt
+Lastest UI/totalfard.txt
+Lastest UI/spend_command.lock
+Lastest UI/spawn_result_last.txt
+Lastest UI/points_balance_result.txt
+Lastest UI/passive_earn_batch.json
+Lastest UI/*_body.json
+Lastest UI/viewer_points.txt.bak*
+Lastest UI/*.bak
+Lastest UI/*.bak-*
+Lastest UI/viewerpoints/
+Lastest UI/junk/
+Lastest UI/streamerbot/README-backup.md
+
+# Paint.NET / editor working copies (keep .png assets)
+*.pdn
+
+# Godot companion (spd-comp3/) — commit project + assets; ignore editor cache & exports
+spd-comp3/.godot/
+spd-comp3/build/
+spd-comp3/**/*.exe
+spd-comp3/**/*.pck
+spd-comp3/**/*.tmp
+spd-comp3/.mono/
 
 # Lastest UI backups
 Lastest UI/backup/
 Lastest UI/backup_20251201/
+
+# Gameplay training export dumps (Documents path is outside repo; ignore local copies too)
+training_exports/
 
 # Copied game save data (if present)
 Lastest UI/Shattered Pixel Dungeon/
 
 # Local-only docs notes
 docs/points-command-ideas.md
+
+# Machine-local tooling (not project source)
+Streamerbot POST REWORK/
+OBS Exports/

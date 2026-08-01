@@ -1,0 +1,466 @@
+[gd_scene load_steps=15 format=3 uid="uid://spdcompanionmain"]
+
+[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
+[ext_resource type="Script" path="res://scripts/hud_status.gd" id="2_hud"]
+[ext_resource type="Script" path="res://scripts/alert_presenter.gd" id="3_alert"]
+[ext_resource type="Script" path="res://scripts/identification_overlay.gd" id="4_id"]
+[ext_resource type="PackedScene" path="res://scenes/settings_window.tscn" id="5_settings"]
+[ext_resource type="Texture2D" path="res://assets/ui_spd/chrome/toast.png" id="6_toast_chrome"]
+[ext_resource type="FontFile" path="res://assets/fonts/pixel_font.ttf" id="7_font"]
+[ext_resource type="Script" path="res://scripts/title_backdrop.gd" id="8_title_bg"]
+[ext_resource type="Script" path="res://scripts/spend_indicator.gd" id="9_spend"]
+[ext_resource type="Texture2D" path="res://assets/ui_spd/icons/icons_unchecked.png" id="10_icons_unchecked"]
+[ext_resource type="Script" path="res://scripts/free_promos_panel.gd" id="11_free_promos"]
+[ext_resource type="Script" path="res://scripts/live_water_background.gd" id="12_live_water"]
+[ext_resource type="Script" path="res://scripts/summon_march_controller.gd" id="13_summon_march"]
+[ext_resource type="Script" path="res://scripts/bestiary_hud.gd" id="14_bestiary"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel_bg"]
+bg_color = Color(0.06, 0.07, 0.12, 0.88)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_alert_toast"]
+texture = ExtResource("6_toast_chrome")
+texture_margin_left = 4.0
+texture_margin_top = 4.0
+texture_margin_right = 4.0
+texture_margin_bottom = 4.0
+
+[node name="Main" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_main")
+
+[node name="LiveBackground" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="LiveWater" type="ColorRect" parent="LiveBackground"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("12_live_water")
+
+[node name="ChromaOverlay" type="ColorRect" parent="LiveBackground"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(1, 1, 1, 1)
+
+[node name="TitleBackdrop" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("8_title_bg")
+
+[node name="CanvasLayerHUD" type="CanvasLayer" parent="."]
+layer = 1
+
+[node name="HUDStatus" type="PanelContainer" parent="CanvasLayerHUD"]
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 520.0
+offset_bottom = 168.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel_bg")
+script = ExtResource("2_hud")
+
+[node name="MarginContainer" type="MarginContainer" parent="CanvasLayerHUD/HUDStatus"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 10
+
+[node name="VBox" type="VBoxContainer" parent="CanvasLayerHUD/HUDStatus/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="WSRow" type="HBoxContainer" parent="CanvasLayerHUD/HUDStatus/MarginContainer/VBox"]
+layout_mode = 2
+
+[node name="Key" type="Label" parent="CanvasLayerHUD/HUDStatus/MarginContainer/VBox/WSRow"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "WebSocket"
+
+[node name="Value" type="Label" parent="CanvasLayerHUD/HUDStatus/MarginContainer/VBox/WSRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 18
+text = "…"
+
+[node name="UDPRow" type="HBoxContainer" parent="CanvasLayerHUD/HUDStatus/MarginContainer/VBox"]
+layout_mode = 2
+
+[node name="Key" type="Label" parent="CanvasLayerHUD/HUDStatus/MarginContainer/VBox/UDPRow"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Streamer.bot UDP"
+
+[node name="Value" type="Label" parent="CanvasLayerHUD/HUDStatus/MarginContainer/VBox/UDPRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 18
+text = "…"
+
+[node name="SnapshotRow" type="HBoxContainer" parent="CanvasLayerHUD/HUDStatus/MarginContainer/VBox"]
+layout_mode = 2
+
+[node name="Key" type="Label" parent="CanvasLayerHUD/HUDStatus/MarginContainer/VBox/SnapshotRow"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Snapshot"
+
+[node name="Value" type="Label" parent="CanvasLayerHUD/HUDStatus/MarginContainer/VBox/SnapshotRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 18
+text = "—"
+
+[node name="SummonMarchRow" type="HBoxContainer" parent="CanvasLayerHUD/HUDStatus/MarginContainer/VBox"]
+layout_mode = 2
+
+[node name="Key" type="Label" parent="CanvasLayerHUD/HUDStatus/MarginContainer/VBox/SummonMarchRow"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Summon march"
+
+[node name="Value" type="Label" parent="CanvasLayerHUD/HUDStatus/MarginContainer/VBox/SummonMarchRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 18
+text = "…"
+
+[node name="HintRow" type="HBoxContainer" parent="CanvasLayerHUD/HUDStatus/MarginContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Hint" type="Label" parent="CanvasLayerHUD/HUDStatus/MarginContainer/VBox/HintRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.65, 0.7, 0.8, 1)
+text = "F5: reload cfg · F3: hide/show this panel · F9: chroma debug fill"
+
+[node name="SettingsBtn" type="Button" parent="CanvasLayerHUD/HUDStatus/MarginContainer/VBox/HintRow"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Settings (F2)"
+
+[node name="CanvasLayerSpendIndicator" type="CanvasLayer" parent="."]
+layer = 9
+
+[node name="SpendIndicator" type="HBoxContainer" parent="CanvasLayerSpendIndicator"]
+visible = false
+layout_mode = 1
+anchors_preset = 2
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 0.0
+offset_bottom = 0.0
+theme_override_constants/separation = 2
+mouse_filter = 2
+script = ExtResource("9_spend")
+
+[node name="RedStrip" type="PanelContainer" parent="CanvasLayerSpendIndicator/SpendIndicator"]
+layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(200, 28)
+mouse_filter = 2
+
+[node name="RowMargin" type="MarginContainer" parent="CanvasLayerSpendIndicator/SpendIndicator/RedStrip"]
+layout_mode = 2
+theme_override_constants/margin_left = 2
+theme_override_constants/margin_top = 2
+theme_override_constants/margin_right = 2
+theme_override_constants/margin_bottom = 2
+mouse_filter = 2
+
+[node name="HBox" type="HBoxContainer" parent="CanvasLayerSpendIndicator/SpendIndicator/RedStrip/RowMargin"]
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_constants/separation = 6
+mouse_filter = 2
+
+[node name="StatusLabel" type="Label" parent="CanvasLayerSpendIndicator/SpendIndicator/RedStrip/RowMargin/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_fonts/font = ExtResource("7_font")
+theme_override_font_sizes/font_size = 15
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.75)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+text = "Chat Spending"
+
+[node name="ToggleTex" type="TextureRect" parent="CanvasLayerSpendIndicator/SpendIndicator/RedStrip/RowMargin/HBox"]
+custom_minimum_size = Vector2(14, 14)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+texture_filter = 0
+expand_mode = 1
+stretch_mode = 5
+texture = ExtResource("10_icons_unchecked")
+
+[node name="CanvasLayerFreePromos" type="CanvasLayer" parent="."]
+layer = 5
+
+[node name="FreePromosPanel" type="PanelContainer" parent="CanvasLayerFreePromos"]
+visible = false
+layout_mode = 1
+anchors_preset = 2
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 0.0
+offset_bottom = 0.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxTexture_alert_toast")
+script = ExtResource("11_free_promos")
+
+[node name="MarginContainer" type="MarginContainer" parent="CanvasLayerFreePromos/FreePromosPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 8
+mouse_filter = 2
+
+[node name="VBox" type="VBoxContainer" parent="CanvasLayerFreePromos/FreePromosPanel/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 4
+mouse_filter = 2
+
+[node name="Title" type="Label" parent="CanvasLayerFreePromos/FreePromosPanel/MarginContainer/VBox"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_fonts/font = ExtResource("7_font")
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.65)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(1, 1, 0.266667, 1)
+text = "Free for chat"
+autowrap_mode = 0
+
+[node name="List" type="VBoxContainer" parent="CanvasLayerFreePromos/FreePromosPanel/MarginContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 4
+mouse_filter = 2
+
+[node name="CanvasLayerID" type="CanvasLayer" parent="."]
+layer = 3
+canvas_item_default_texture_filter = 0
+
+[node name="IdentificationOverlay" type="Control" parent="CanvasLayerID"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_id")
+
+[node name="VBox" type="VBoxContainer" parent="CanvasLayerID/IdentificationOverlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="PotionsFlow" type="FlowContainer" parent="CanvasLayerID/IdentificationOverlay/VBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="ScrollsFlow" type="FlowContainer" parent="CanvasLayerID/IdentificationOverlay/VBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="CanvasLayerSummonMarch" type="CanvasLayer" parent="."]
+layer = 4
+
+[node name="SummonMarchController" type="Node2D" parent="CanvasLayerSummonMarch"]
+script = ExtResource("13_summon_march")
+
+[node name="CanvasLayerBestiary" type="CanvasLayer" parent="."]
+layer = 7
+
+[node name="BestiaryHud" type="Control" parent="CanvasLayerBestiary"]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 420.0
+offset_bottom = 160.0
+mouse_filter = 2
+script = ExtResource("14_bestiary")
+
+[node name="CanvasLayerAlerts" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="AlertPresenter" type="Control" parent="CanvasLayerAlerts"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("3_alert")
+
+[node name="FxAnchor" type="Node2D" parent="CanvasLayerAlerts/AlertPresenter"]
+
+[node name="CPUParticles2D" type="CPUParticles2D" parent="CanvasLayerAlerts/AlertPresenter/FxAnchor"]
+position = Vector2(0, 0)
+emitting = false
+
+[node name="AlertSlot" type="Control" parent="CanvasLayerAlerts/AlertPresenter"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="AlertRow" type="HBoxContainer" parent="CanvasLayerAlerts/AlertPresenter/AlertSlot"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 0.0
+offset_bottom = 140.0
+grow_horizontal = 2
+theme_override_constants/separation = 0
+
+[node name="PanelContainer" type="PanelContainer" parent="CanvasLayerAlerts/AlertPresenter/AlertSlot/AlertRow"]
+custom_minimum_size = Vector2(320, 100)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StyleBoxTexture_alert_toast")
+
+[node name="MarginContainer" type="MarginContainer" parent="CanvasLayerAlerts/AlertPresenter/AlertSlot/AlertRow/PanelContainer"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 8
+
+[node name="AlertInner" type="HBoxContainer" parent="CanvasLayerAlerts/AlertPresenter/AlertSlot/AlertRow/PanelContainer/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="CommandIcons" type="HBoxContainer" parent="CanvasLayerAlerts/AlertPresenter/AlertSlot/AlertRow/PanelContainer/MarginContainer/AlertInner"]
+layout_mode = 2
+theme_override_constants/separation = 6
+size_flags_vertical = 8
+
+[node name="CommandIconCell" type="Control" parent="CanvasLayerAlerts/AlertPresenter/AlertSlot/AlertRow/PanelContainer/MarginContainer/AlertInner/CommandIcons"]
+custom_minimum_size = Vector2(72, 72)
+layout_mode = 2
+size_flags_vertical = 8
+mouse_filter = 2
+
+[node name="CellBg" type="ColorRect" parent="CanvasLayerAlerts/AlertPresenter/AlertSlot/AlertRow/PanelContainer/MarginContainer/AlertInner/CommandIcons/CommandIconCell"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.05, 0.06, 0.08, 0.92)
+
+[node name="Margin" type="MarginContainer" parent="CanvasLayerAlerts/AlertPresenter/AlertSlot/AlertRow/PanelContainer/MarginContainer/AlertInner/CommandIcons/CommandIconCell"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="RuneIcon" type="TextureRect" parent="CanvasLayerAlerts/AlertPresenter/AlertSlot/AlertRow/PanelContainer/MarginContainer/AlertInner/CommandIcons/CommandIconCell/Margin"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+texture_filter = 0
+
+[node name="ItemIcon" type="TextureRect" parent="CanvasLayerAlerts/AlertPresenter/AlertSlot/AlertRow/PanelContainer/MarginContainer/AlertInner/CommandIcons/CommandIconCell"]
+layout_mode = 0
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+texture_filter = 0
+
+[node name="VBox" type="VBoxContainer" parent="CanvasLayerAlerts/AlertPresenter/AlertSlot/AlertRow/PanelContainer/MarginContainer/AlertInner"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="Title" type="Label" parent="CanvasLayerAlerts/AlertPresenter/AlertSlot/AlertRow/PanelContainer/MarginContainer/AlertInner/VBox"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("7_font")
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.65)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(1, 1, 0.266667, 1)
+text = "Title"
+autowrap_mode = 3
+
+[node name="Subtitle" type="Label" parent="CanvasLayerAlerts/AlertPresenter/AlertSlot/AlertRow/PanelContainer/MarginContainer/AlertInner/VBox"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("7_font")
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.55)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.95, 0.92, 0.85, 1)
+text = "Subtitle"
+autowrap_mode = 3
+
+[node name="SettingsWindow" parent="." instance=ExtResource("5_settings")]
+layout_mode = 0

@@ -57,6 +57,7 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.StatusPane;
 import com.shatteredpixel.shatteredpixeldungeon.ui.StyledButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Toolbar;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
+import com.shatteredpixel.shatteredpixeldungeon.utils.TrainingExport;
 import com.shatteredpixel.shatteredpixeldungeon.windows.IconTitle;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndBag;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndEnergizeItem;
@@ -721,6 +722,7 @@ public class AlchemyScene extends PixelScene {
 		if (result != null){
 
 			craftItem(ingredients, result);
+			TrainingExport.logAlchemy(recipe.getClass().getSimpleName());
 
 		}
 

@@ -1,11 +1,8 @@
 # Chat Command Economy v1
 
-**Status:** Proposed — **v1.1 tuning approved** (not implemented)  
-**Last updated:** July 2026  
+**Status:** **Implemented** (server-side — July 2026). Streamer.bot Stream Offline wiring is manual; see [economy-v11-apply.md](economy-v11-apply.md).
 
-Single source of truth for the points economy rebalance. **v1.1** supersedes the initial v1 earn rates (1 pt/msg, 30s CD) and donation 2× cap. When implemented, keep this doc in sync with `points_config.json`, `points_command.py`, Streamer.bot actions, and viewer-facing docs.
-
-**Related:** [COMMANDS.md](../COMMANDS.md), [streamerbot-points-from-scratch.md](streamerbot-points-from-scratch.md), [fard-system.md](fard-system.md), [summon-march-system.md](summon-march-system.md), [streaming-setup-guide.md](streaming-setup-guide.md)
+**Related:** [streaming-system-rework-plan.md](streaming-system-rework-plan.md), [COMMANDS.md](../COMMANDS.md), [streamerbot-points-from-scratch.md](streamerbot-points-from-scratch.md), [fard-system.md](fard-system.md), [summon-march-system.md](summon-march-system.md), [streaming-setup-guide.md](streaming-setup-guide.md)
 
 ---
 
@@ -54,7 +51,7 @@ Locked decisions for implementation:
 - **Lurkers** stay ~1 pt/min passive — do not drive balance.
 - **Donors OP:** uncapped donor balance; donations beat max grind+bank; **4× donation cap** allows member + fard SC without full 8× chat stack.
 
-**Streamer.bot C# constants (Action 01):** `POINTS_PER_MESSAGE = 2`, `COOLDOWN_SEC = 20`.
+**Config keys (Phase 6):** `points_per_message = 2`, `chat_cooldown_sec = 20` in `points_config.json` (server earn module after Phase 4 gateway).
 
 ---
 
@@ -83,13 +80,15 @@ Stored in `viewer_points.txt` per user:
 
 ## Earning
 
-### Chat earn (Streamer.bot Actions 01–03)
+### Chat earn (server earn module — post Phase 4 gateway)
+
+v1.1 constants are **live** (Phase 6 complete). Plumbing used 1 pt/msg, 30s CD until July 2026 cutover.
 
 | Source | Rate (v1.1) | Notes |
 |--------|-------------|-------|
 | Chat message | **+2** | **20 s** cooldown per user |
 | Passive tick | +1 | Every 60 s; shares `lastEarn` with chat |
-| First Words | +5 | Once per user per stream (Action 03) |
+| First Words | +5 | Once per user per stream; server `session_state.json` |
 
 Earn writes apply **only to the chat portion** of the ledger. Donor pts are not reduced when chat is awarded.
 
@@ -98,14 +97,16 @@ Earn writes apply **only to the chat portion** of the ledger. Donor pts are not 
 Applied at earn time for **chat, passive, and first-word** only:
 
 ```
-effective = base × (global2x ? 2 : 1) × (topSummoner ? 2 : 1) × (subOrMember ? 2 : 1)
+effective = base × (global2x ? 2 : 1) × (heatLeader ? 2 : 1) × (subOrMember ? 2 : 1)
 ```
 
 | Multiplier | Source | Scope |
 |------------|--------|-------|
 | Global 2× | `!fard` extensions, or streamer `!doublepoints` | Everyone |
-| Top summoner 2× | Session `!summon` leader (`top_summoner.txt`) | Personal |
+| Heat leader 2× | Bestiary rolling **15 min** summon-XP leader (`!heat`; `is_top_summoner()`) | Personal |
 | Sub / member 2× | Twitch sub, YouTube member | Personal |
+
+**Deprecated:** Session-long `!summon` **count** as the personal 2× source. See [bestiary-summon-system.md](bestiary-summon-system.md).
 
 **Maximum on chat earn:** 8× (all three active).
 
@@ -114,7 +115,7 @@ effective = base × (global2x ? 2 : 1) × (topSummoner ? 2 : 1) × (subOrMember 
 Applied to **Super Chat, cheer, and gift sub/membership** awards. Donations use the same bonus sources but **never stack above 4× total** (v1.1 — raised from 2× so donors can be OP during hype, without full 8× chat stack):
 
 ```
-donation_multiplier = min(4, (global2x ? 2 : 1) × (topSummoner ? 2 : 1) × (subOrMember ? 2 : 1))
+donation_multiplier = min(4, (global2x ? 2 : 1) × (heatLeader ? 2 : 1) × (subOrMember ? 2 : 1))
 ```
 
 | Scenario | Chat earn | Donation earn |
@@ -122,7 +123,7 @@ donation_multiplier = min(4, (global2x ? 2 : 1) × (topSummoner ? 2 : 1) × (sub
 | Member, no fard | 2× | 2× |
 | Regular, fard active | 2× | 2× |
 | Member + fard | 4× on chat | **4×** (at cap) |
-| Member + fard + top summoner | 8× on chat | **4×** (capped) |
+| Member + fard + heat leader | 8× on chat | **4×** (capped) |
 
 **Example:** $1 Super Chat (100 pts base) during `!fard` as a member → **400 donor pts**, not 800.
 
@@ -138,7 +139,7 @@ Donations credit **donor pts directly** (and increase total `pts`). Not subject 
 
 ### Global 2× policy (v1)
 
-- **`!fard`** is the intended global 2× for viewers: once per user per stream → +1 min global 2× (+5 min for subs/members). See [fard-system.md](fard-system.md).
+- **`!fard`** is the intended global 2× for viewers: once per user per stream → **+3 min** global 2× (**+6 min** for subs/members). See [fard-system.md](fard-system.md).
 - **`!doublepoints`** remains streamer-only for emergencies or special events. **Do not leave it on for whole streams** — that defeats the fard design and inflates earn toward the cap.
 - Chat cap absorbs multiplier stacking on chat earn; retiring the always-on `!doublepoints` habit is an **operational** change, not a code requirement.
 
@@ -147,7 +148,7 @@ Donations credit **donor pts directly** (and increase total `pts`). Not subject 
 | Perk | Regular | Sub / member |
 |------|---------|--------------|
 | Chat earn multipliers | Up to 8× | Up to 8× |
-| `!fard` extension | +1 min global 2× | +5 min global 2× |
+| `!fard` extension | +3 min global 2× | +6 min global 2× |
 | Donation multiplier | Up to **4× cap** | Up to **4× cap** (member + fard reaches cap) |
 | Manual `!bank` | 10% | 10% |
 | Auto-bank on stream reset | **5%** | **10%** (same as manual) |
@@ -310,7 +311,7 @@ Full mob table: [COMMANDS.md](../COMMANDS.md).
 
 | Command | Cost | Description |
 |---------|------|-------------|
-| `!points` | Free | **Chat pts** and **donor pts** shown separately (see below) |
+| `!points` | Free | **Chat pts**, **donor pts**, and **Bestiary** sprint/heat XP (see below) |
 | `!bank` | Free | Preview bank conversion |
 | `!bank all` | Free | Convert all chat pts at 10% |
 | `!bank <n>` | Free | Convert n chat pts at 10% |
@@ -318,20 +319,22 @@ Full mob table: [COMMANDS.md](../COMMANDS.md).
 | `!givepoints` | Free | Transfer to another viewer (chat first, then donor) |
 | *(all spend commands)* | Per JSON | Unchanged |
 
-### `!points` display (v1.1)
+### `!points` display (v1.1 + Bestiary)
 
-Always show **two buckets separately** — never a single combined number without breakdown:
+Always show **chat and donor separately** — never a single combined number without breakdown. Also append Bestiary XP:
 
 ```
-@viewer — Chat points: 120/500 | Donor points: 340
+@viewer - Chat points: 120/500 | Donor points: 340 | Bestiary: sprint 8 XP, heat 14 XP
 ```
 
 | Field | Meaning |
 |-------|---------|
 | **Chat points** | `pts − donation_pts`, capped at 500 this stream; resets on stream end |
 | **Donor points** | `donation_pts`; permanent, uncapped |
+| **Sprint XP** | Bestiary XP this level (resets on level-up) |
+| **Heat XP** | Bestiary XP in the last 15 minutes |
 
-Optional third line if helpful for spends: `Total spendable now: 460` (chat + donor). The **chat** and **donor** lines are required; total alone is not sufficient.
+Optional: `Total spendable now: 460` (chat + donor). The **chat** and **donor** lines are required; total alone is not sufficient.
 
 ### Viewer-facing one-liner (panel / !commands)
 
@@ -345,7 +348,8 @@ Optional third line if helpful for spends: `Total spendable now: 460` (chat + do
 |---------|---------|
 | `!doublepoints <min>` | **Rare** manual global 2× (max 120 min). Not a default. |
 | `!fard` | Viewer-driven global 2× extension — primary hype lever |
-| Spend OFF/ON (Stream Deck) | Disable/enable spend commands mid-run |
+| Spend toggle (Stream Deck Action Switch) | Disable/enable spend commands mid-run (`R8 - Spend Toggle`) |
+| Kesha / Seed (Set Command State) | Disable/enable `!kesha` and/or `!seed` Command entries in Streamer.bot |
 | Manual chat reset | End-of-stream “bank now!” before auto reset |
 | Points config UI (`/points-config`) | Tune costs; v1 adds cap/bank ratio fields |
 
@@ -405,17 +409,19 @@ For each user in `viewer_points.txt`:
 
 ## Implementation surface (when approved)
 
+**Prerequisite:** Complete Phases 0–5 of [streaming-system-rework-plan.md](streaming-system-rework-plan.md) (HTTP gateway). After Phase 4, earn/cap/bank/reset logic lives entirely in the server — not Streamer.bot C#.
+
 | Area | Changes |
 |------|---------|
-| `points_command.py` | `cmd_bank`; cap on chat earn awards + **cap nudge on every blocked earn**; reset helper; `donation_earn_multiplier()` **4×** cap; member-aware auto-bank ratio; `!points` shows chat/donor separately |
+| `chat_command.py` | Cap on chat earn + **cap nudge on every blocked earn**; reset/auto-bank helper; flip earn rates to v1.1 |
+| `points_command.py` | `cmd_bank`; `donation_earn_multiplier()` **4×** cap; member-aware auto-bank ratio; `!points` shows chat/donor separately |
 | `points_config.json` | New cap/ratio/donation-cap keys |
 | `points-config.html` | UI for cap/ratios; reset trigger |
-| `server.py` | Optional HTTP endpoints for bank + reset (if thinning Streamer.bot) |
-| Streamer.bot Action 01–03 | Enforce cap on C# earn writes; **reply with `!bank` nudge on every capped earn** |
-| Streamer.bot (new) | `!bank` action; Stream Offline reset (+ debounce) with member check for auto-bank rate |
+| `server.py` | `POST /api/session/end` (debounced stream reset) |
+| Streamer.bot (thin) | Stream Offline trigger → `POST /api/session/end` — **only new SB wiring in v1.1** |
 | Docs | This file + `COMMANDS.md`, `user-facing-summary.md`, `twitch-panel.md`, `youtube-description.md`, `streamerbot-points-from-scratch.md` |
 
-**Streamer.bot note:** earn-cap and reset logic likely require C# paste into Actions 01–03 and a new reset action. Reset must pass sub/member status (or read from ledger) to pick 5% vs 10% auto-bank. Produce paste-ready blocks when implementing; the agent cannot edit Streamer.bot directly.
+**Phase 6 checklist:** See [streaming-system-rework-plan.md § Phase 6](streaming-system-rework-plan.md#phase-6--economy-v11-server-only-after-plumbing-stable).
 
 ---
 
@@ -428,7 +434,7 @@ On implementation, update together:
 - [ ] `docs/user-facing-summary.md`
 - [ ] `docs/twitch-panel.md`
 - [ ] `docs/youtube-description.md`
-- [ ] `docs/streamerbot-points-from-scratch.md` — Actions 01–03 cap, **2 pt/msg + 20s CD**, donation **4×** cap, new bank action, reset action
+- [ ] `docs/streamerbot-points-from-scratch.md` — 9-action model, server earn module, cap, 2 pt/20s, 4× donations, `!bank`, reset
 - [ ] `points_config.json` + Python defaults + HTML `value=` — keep identical
 
 ---
@@ -450,7 +456,7 @@ Passive and chat **share `lastEarn`** — active chatters earn primarily from me
 | **Chatter** | **6** | **2 pt / 20s** |
 | Chatter + member | 12 | × member 2× |
 | Chatter + member + fard | 24 | × global 2× |
-| Chatter + max stack (8×) | 48 | fard + top summoner + member |
+| Chatter + max stack (8×) | 48 | fard + heat leader + member |
 
 ### Time to earn (minutes, native depth, v1.1)
 

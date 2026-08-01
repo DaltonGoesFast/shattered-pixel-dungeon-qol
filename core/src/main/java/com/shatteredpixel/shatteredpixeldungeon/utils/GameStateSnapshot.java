@@ -253,7 +253,8 @@ public class GameStateSnapshot {
 		}
 	}
 
-	private static Map<String, Object> itemIconSpriteRect(int icon) {
+	/** Public for Item Showcase export / offline tooling. */
+	public static Map<String, Object> itemIconSpriteRect(int icon) {
 		if (icon < 0) return null;
 		try {
 			RectF r = ItemSpriteSheet.Icons.film.get(icon);
@@ -481,7 +482,8 @@ public class GameStateSnapshot {
 		}
 	}
 
-	private static Map<String, Object> itemSpriteRect(int imageId) {
+	/** Public for Item Showcase export / offline tooling. */
+	public static Map<String, Object> itemSpriteRect(int imageId) {
 		RectF r = ItemSpriteSheet.film.get(imageId);
 		if (r == null) return null;
 		try {

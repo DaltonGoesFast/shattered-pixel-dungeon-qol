@@ -1,28 +1,56 @@
 # Chat Commands (Twitch Panel)
 
-Spend points to mess with the run! Earn points by chatting (1 per message, 30s cooldown). Super Chats & bits also give points.
+Spend points to mess with the run! Earn up to **500 chat points per stream** (2 pts per message, 20s cooldown). **`!bank`** saves **10%** into **donor points** (permanent). Super Chats & bits go to donor points (up to **4×** during bonuses). Chat resets when the stream ends; donor points never expire.
 
-**2× bonuses (stack — up to 8×):** global !doublepoints + !fard → personal top summoner (!summon leader) → sub/member.
+**2× bonuses on chat earn (stack — up to 8×):** global !doublepoints + !fard → **Bestiary heat** leader (`!heat`, last 15 min of summon XP) → sub/member.
+
+**Bestiary:** Free `!summon` fills a shared XP bar and unlocks zones (Sewers → Halls). **Sprint** = most XP this level (Hall of Fame + 100 donor pts on level-up). **Heat** = rolling 15m leader (personal 2×).
 
 ---
 
 ## Free commands (no points)
 
-**!fard** — Once per stream per viewer: OBS flash + sound; extends **global 2×** for everyone (+1 min, +5 min for subs/members). Already used? The command silently does nothing (no chat).
+**!fard** — Once per stream per viewer: OBS flash + sound; extends **global 2×** for everyone (+3 min, +6 min for subs/members). Already used? Bot tells you.
 
-**!summon** — Queue a monster march on the **companion overlay** (not an in-game spawn). **60s** cooldown per user. Optional monster: `!summon rat` (random from spawn pool if omitted)
+**!summon** — Monster march on the **companion overlay** (not an in-game spawn). **60s** cooldown. Starts with **Sewers** mobs; fill the co-op bar to unlock more. Optional: `!summon rat` (random from unlocked pool if omitted)
 
-**!topsummoner** — Session summon leader (most successful !summons). Leader earns **personal 2×** on point gains
+**!bestiary** / **!summonlevel** — Co-op bar (level / zone / XP), unlocked monsters, and **your** sprint + heat XP
 
-**!mysummons** — Your summon count this stream
+**!topsummoner** — **Sprint** leader this Bestiary level (resets on level-up)
+
+**!heat** / **!hot** — Rolling **15 min** heat leader (personal **2×** on point gains)
+
+**!summonhall** — Hall of Fame: sprint winners for completed zones this stream
+
+**!mysummons** — Your summon count this stream + sprint XP + heat XP
+
+**!kesha** — Meme alert: OBS `kesha` overlay + sound (~2s). 60s global / 10 min per-user cooldown. No chat reply.
+
+**!mimic** / **!tooth** — Plays mimic sound if your hero has **Mimic Tooth** (bag or equipped) this run.
+
+**!challenge** / **!challenges** — Lists active run challenges (from live game data).
+
+**!seed** — Shows the current dungeon seed.
+
+*Setup:* separate Streamer.bot command actions (not the points router). See [stream-info-commands.md](stream-info-commands.md).
+
+---
+
+## Banking & balance (free)
+
+**!points** — Chat points, donor points, and Bestiary sprint/heat XP
+
+**!bank** — Preview converting chat pts → donor pts at **10%**
+
+**!bank all** — Convert all current chat points to donor points
+
+**!bank** (amount) — Convert that many chat points to donor points
+
+**!toppoints** / **!leaderboard** — Top 3 by **donor points** (saved forever)
 
 ---
 
 ## Spend commands (points)
-
-**!points** — Check your balance (free)
-
-**!toppoints** / **!leaderboard** — Top 3 point holders (free)
 
 **!givepoints** (amount) (target) — Give points to another viewer (free). YouTube works without `@`: `!givepoints 50 bob` (Twitch also accepts `@bob`). Spends chat points first, then donor points if needed.
 

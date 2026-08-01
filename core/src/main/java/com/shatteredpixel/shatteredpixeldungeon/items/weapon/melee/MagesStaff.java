@@ -299,6 +299,13 @@ public class MagesStaff extends MeleeWeapon {
 		return wand != null ? wand.getClass() : null;
 	}
 
+	/** Keeps imbued wand curse flag in sync with staff curse (chat temporary curse). */
+	public void syncImbuedWandCursed() {
+		if (wand != null) {
+			wand.cursed = cursed || hasCurseEnchant();
+		}
+	}
+
 	@Override
 	public Item upgrade(boolean enchant) {
 		super.upgrade( enchant );

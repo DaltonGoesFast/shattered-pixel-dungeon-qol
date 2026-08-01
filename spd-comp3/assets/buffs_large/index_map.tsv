@@ -1,0 +1,129 @@
+index	primary_java_constant	buff_subclasses	talent_enum_constants	hero_java_refs	notes
+0	MIND_VISION	MagicalSight;MindVision;MonkEnergy;RevealedArea			
+1	LEVITATION	Levitation			
+2	FIRE	Burning			
+3	POISON	Corrosion;Poison			
+4	PARALYSIS	Paralysis			
+5	HUNGER				
+6	STARVATION				
+7	TIME	Slow			
+8	OOZE	Ooze			
+9	AMOK	Amok			
+10	TERROR	Dread;Terror			
+11	ROOTS	Roots			
+12	INVISIBLE	Invisibility			
+13	SHADOWS				
+14	WEAKNESS	Weakness			
+15	FROST	Chill;Frost			
+16	BLINDNESS	Blindness			
+17	COMBO	Combo;MagicImmune			
+18	FURY	Fury			
+19	HERB_HEALING	LifeLink			
+20	ARMOR	ArcaneArmor;Barrier;HoldFast;PrismaticGuard			
+21	HEART	Charm			
+22	LIGHT	Light			
+23	CRIPPLE	Cripple			
+24	BARKSKIN	Barkskin			
+25	IMMUNITY	BlobImmunity			
+26	BLEEDING	Bleeding			
+27	MARK	SnipersMark			
+28	DEFERRED				
+29	DROWSY	Drowsy			
+30	MAGIC_SLEEP	MagicalSleep			
+31	THORNS				
+32	FORESIGHT	Foresight			
+33	VERTIGO	GravityChaosTracker;Vertigo			
+34	RECHARGING	ArtifactRecharge;Recharging			
+35	LOCKED_FLOOR	LockedFloor			
+36	CORRUPT	Corruption;Doom			
+37	BLESS	Bless			
+38	RAGE				
+39	SACRIFICE				
+40	BERSERK	Berserk			
+41	HASTE	GreaterHaste;Haste;Stamina			
+42	PREPARATION	Preparation			
+43	WELL_FED	WellFed			
+44	HEALING	Healing			
+45	WEAPON				
+46	VULNERABLE	Vulnerable			
+47	HEX	Hex			
+48	DEGRADE	Degrade			
+49	PINCUSHION	PinCushion			
+50	UPGRADE	Adrenaline;AdrenalineSurge;EnhancedRings;PhysicalEmpower			
+51	MOMENTUM	Momentum			
+52	ANKH	Invulnerability			
+53	NOINV	LostInventory			
+54	TARGETED				
+55	IMBUE	FireImbue;FrostImbue			
+56	ENDURE				
+57	INVERT_MARK	SoulMark			
+58	NATURE_POWER				
+59	AMULET	AscensionChallenge			
+60	DUEL_CLEAVE				
+61	DUEL_GUARD				
+62	DUEL_SPIN				
+63	DUEL_EVASIVE				
+64	DUEL_DANCE				
+65	DUEL_BRAWL				
+66	DUEL_XBOW				
+67	CHALLENGE				
+68	MONK_ENERGY				
+69	DUEL_COMBO				
+70	DAZE	Daze			
+71	DISGUISE	HeroDisguise			
+72	WAND	ScrollEmpower;WandEmpower			
+73	HOLY_WEAPON				
+74	HOLY_ARMOR				
+75	SPELL_FOOD				
+76	LIGHT_SHIELD				
+77	HOLY_SIGHT				
+78	GLYPH_RECALL				
+79	ASCEND				
+80	PROT_AURA				
+81	ILLUMINATED				
+82	TRINITY_FORM				
+83	MANY_POWER				
+84	SEAL_SHIELD				
+85	THROWN_WEP				
+86					no_java_reference_found
+87					no_java_reference_found
+88					no_java_reference_found
+89					no_java_reference_found
+90					no_java_reference_found
+91					no_java_reference_found
+92					no_java_reference_found
+93					no_java_reference_found
+94					no_java_reference_found
+95					no_java_reference_found
+96					no_java_reference_found
+97					no_java_reference_found
+98					no_java_reference_found
+99					no_java_reference_found
+100					no_java_reference_found
+101					no_java_reference_found
+102					no_java_reference_found
+103					no_java_reference_found
+104					no_java_reference_found
+105					no_java_reference_found
+106					no_java_reference_found
+107					no_java_reference_found
+108					no_java_reference_found
+109					no_java_reference_found
+110					no_java_reference_found
+111					no_java_reference_found
+112					no_java_reference_found
+113					no_java_reference_found
+114					no_java_reference_found
+115					no_java_reference_found
+116					no_java_reference_found
+117					no_java_reference_found
+118					no_java_reference_found
+119					no_java_reference_found
+120					no_java_reference_found
+121					no_java_reference_found
+122					no_java_reference_found
+123					no_java_reference_found
+124					no_java_reference_found
+125					no_java_reference_found
+126					no_java_reference_found
+127					no_java_reference_found

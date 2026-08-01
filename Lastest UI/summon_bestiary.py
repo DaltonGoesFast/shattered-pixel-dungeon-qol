@@ -1,0 +1,632 @@
+#!/usr/bin/env python3
+"""Bestiary progression for !summon: co-op XP bar, level sprint, rolling heat.
+
+Authoritative session state for Godot HUD via GET /api/bestiary.
+"""
+from __future__ import annotations
+
+import json
+import os
+import random
+import threading
+import time
+from typing import Any, Optional
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+CONFIG_FILE = os.path.join(SCRIPT_DIR, "bestiary_config.json")
+STATE_FILE = os.path.join(SCRIPT_DIR, "bestiary_state.json")
+HEAT_LEADER_FILE = os.path.join(SCRIPT_DIR, "heat_leader.txt")
+TOP_SUMMONER_FILE = os.path.join(SCRIPT_DIR, "top_summoner.txt")
+TOTAL_SUMMONS_FILE = os.path.join(SCRIPT_DIR, "totalsummons.txt")
+SUMMON_COUNTS_FILE = os.path.join(SCRIPT_DIR, "summon_session_counts.json")
+
+_lock = threading.Lock()
+_config_cache: Optional[dict] = None
+
+
+def _default_config() -> dict:
+    return {
+        "heat_window_sec": 900,
+        "sprint_donor_reward": 100,
+        "per_user_bar_cap_fraction": 0.0,
+        "repeat_mob_diminishing": False,
+        "levels": [
+            {"level": 1, "zone": "Sewers", "bar_threshold": 60,
+             "monsters": ["rat", "albino", "snake"]},
+            {"level": 2, "zone": "Prison", "bar_threshold": 100,
+             "monsters": ["gnoll", "crab", "slime", "swarm", "thief"]},
+            {"level": 3, "zone": "Caves", "bar_threshold": 140,
+             "monsters": ["skeleton", "dm100", "bat", "brute", "shaman", "spinner"]},
+            {"level": 4, "zone": "City", "bar_threshold": 180,
+             "monsters": ["guard", "necromancer", "ghoul", "elemental", "warlock", "monk", "golem"]},
+            {"level": 5, "zone": "Halls", "bar_threshold": 0,
+             "monsters": ["succubus", "eye", "scorpio"]},
+        ],
+    }
+
+
+def load_config(force: bool = False) -> dict:
+    global _config_cache
+    if _config_cache is not None and not force:
+        return _config_cache
+    cfg = _default_config()
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, encoding="utf-8") as f:
+                raw = json.load(f)
+            if isinstance(raw, dict):
+                cfg.update({k: v for k, v in raw.items() if k != "levels"})
+                if isinstance(raw.get("levels"), list) and raw["levels"]:
+                    cfg["levels"] = raw["levels"]
+        except (json.JSONDecodeError, OSError):
+            pass
+    _config_cache = cfg
+    return cfg
+
+
+def _monster_level_map(cfg: Optional[dict] = None) -> dict[str, int]:
+    cfg = cfg or load_config()
+    out: dict[str, int] = {}
+    for entry in cfg.get("levels") or []:
+        lvl = int(entry.get("level", 1))
+        for m in entry.get("monsters") or []:
+            out[str(m).strip().lower()] = lvl
+    return out
+
+
+def _zone_for_level(level: int, cfg: Optional[dict] = None) -> str:
+    cfg = cfg or load_config()
+    for entry in cfg.get("levels") or []:
+        if int(entry.get("level", 0)) == level:
+            return str(entry.get("zone") or f"Level {level}")
+    return f"Level {level}"
+
+
+def _threshold_for_level(level: int, cfg: Optional[dict] = None) -> int:
+    """XP needed to advance FROM this level to the next. 0 = max level (no bar)."""
+    cfg = cfg or load_config()
+    for entry in cfg.get("levels") or []:
+        if int(entry.get("level", 0)) == level:
+            return max(0, int(entry.get("bar_threshold", 0) or 0))
+    return 0
+
+
+def _max_level(cfg: Optional[dict] = None) -> int:
+    cfg = cfg or load_config()
+    levels = [int(e.get("level", 1)) for e in (cfg.get("levels") or [])]
+    return max(levels) if levels else 1
+
+
+def monster_xp(monster: str) -> int:
+    """XP from cost_per_monster: max(2, cost // 5)."""
+    monster = (monster or "").strip().lower()
+    try:
+        from points_command import get_config
+        cfg = get_config()
+        cost = int(cfg.get("cost_per_monster", {}).get(monster, cfg.get("default_monster_cost", 100)))
+    except Exception:
+        cost = 100
+    return max(2, cost // 5)
+
+
+def _empty_state() -> dict:
+    return {
+        "level": 1,
+        "bar_xp": 0,
+        "sprint_xp": {},
+        "heat_events": [],
+        "hall_of_fame": [],
+        "last_level_up_ts": 0,
+        "session_summon_counts": {},
+        "last_monster_by_user": {},
+    }
+
+
+def _load_state() -> dict:
+    if not os.path.exists(STATE_FILE):
+        return _empty_state()
+    try:
+        with open(STATE_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            return _empty_state()
+        base = _empty_state()
+        base.update(data)
+        if not isinstance(base.get("sprint_xp"), dict):
+            base["sprint_xp"] = {}
+        if not isinstance(base.get("heat_events"), list):
+            base["heat_events"] = []
+        if not isinstance(base.get("hall_of_fame"), list):
+            base["hall_of_fame"] = []
+        if not isinstance(base.get("session_summon_counts"), dict):
+            base["session_summon_counts"] = {}
+        if not isinstance(base.get("last_monster_by_user"), dict):
+            base["last_monster_by_user"] = {}
+        base["level"] = max(1, int(base.get("level", 1) or 1))
+        base["bar_xp"] = max(0, int(base.get("bar_xp", 0) or 0))
+        return base
+    except (json.JSONDecodeError, OSError):
+        return _empty_state()
+
+
+def _save_state(state: dict) -> None:
+    tmp = STATE_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(state, f, indent=2)
+    os.replace(tmp, STATE_FILE)
+
+
+def unlocked_monsters(level: Optional[int] = None, cfg: Optional[dict] = None) -> list[str]:
+    cfg = cfg or load_config()
+    if level is None:
+        with _lock:
+            level = int(_load_state().get("level", 1))
+    out: list[str] = []
+    for entry in cfg.get("levels") or []:
+        if int(entry.get("level", 99)) <= level:
+            for m in entry.get("monsters") or []:
+                mid = str(m).strip().lower()
+                if mid and mid not in out:
+                    out.append(mid)
+    return out
+
+
+def is_monster_unlocked(monster: str, level: Optional[int] = None) -> bool:
+    return (monster or "").strip().lower() in unlocked_monsters(level)
+
+
+def required_level_for_monster(monster: str) -> Optional[int]:
+    return _monster_level_map().get((monster or "").strip().lower())
+
+
+def resolve_monster(raw: str) -> tuple[Optional[str], Optional[str]]:
+    """Resolve arg or random from unlocked pool. Returns (monster, error_message)."""
+    cfg = load_config()
+    with _lock:
+        state = _load_state()
+        level = int(state.get("level", 1))
+        bar_xp = int(state.get("bar_xp", 0))
+    pool = unlocked_monsters(level, cfg)
+    if not pool:
+        return None, "No monsters unlocked yet."
+
+    raw = (raw or "").strip().lower()
+    if not raw:
+        return random.choice(pool), None
+
+    mmap = _monster_level_map(cfg)
+    if raw not in mmap:
+        return None, "Unknown monster. Try: rat, gnoll, bat, brute, …"
+
+    need = mmap[raw]
+    if need > level:
+        thresh = _threshold_for_level(level, cfg)
+        remaining = max(0, thresh - bar_xp) if thresh > 0 else 0
+        zone = _zone_for_level(need, cfg)
+        return None, (
+            f"Need Bestiary Lv {need} ({zone}) - {remaining} XP left on current level."
+        )
+    return raw, None
+
+
+def _prune_heat(events: list, now: int, window_sec: int) -> list:
+    cutoff = now - window_sec
+    return [e for e in events if int(e.get("ts", 0)) > cutoff]
+
+
+def _heat_scores(events: list) -> dict[str, int]:
+    scores: dict[str, int] = {}
+    for e in events:
+        u = str(e.get("user") or "").strip().lower()
+        if not u:
+            continue
+        scores[u] = scores.get(u, 0) + int(e.get("xp", 0) or 0)
+    return scores
+
+
+def _leader_from_scores(scores: dict[str, int], display_map: Optional[dict] = None) -> tuple[str, int]:
+    if not scores:
+        return "", 0
+    best_user = max(scores, key=lambda k: (scores[k], k))
+    # Prefer highest XP; on tie keep lexicographically first lower key for stability
+    top_xp = scores[best_user]
+    candidates = [u for u, xp in scores.items() if xp == top_xp]
+    # Prefer incumbent display name if provided via display_map keys matching
+    key = sorted(candidates)[0]
+    display = (display_map or {}).get(key, key)
+    return display, top_xp
+
+
+def get_heat_leader() -> tuple[str, int]:
+    """Return (display_username, heat_xp). Empty username if none."""
+    cfg = load_config()
+    window = int(cfg.get("heat_window_sec", 900))
+    with _lock:
+        state = _load_state()
+        now = int(time.time())
+        events = _prune_heat(list(state.get("heat_events") or []), now, window)
+        scores = _heat_scores(events)
+        # Map lower keys to last-seen display casing from events
+        display_map: dict[str, str] = {}
+        for e in events:
+            u = str(e.get("user") or "").strip()
+            if u:
+                display_map[u.lower()] = u
+        return _leader_from_scores(scores, display_map)
+
+
+def get_sprint_leader() -> tuple[str, int, int]:
+    """Return (display_username, sprint_xp, gap_to_second)."""
+    with _lock:
+        state = _load_state()
+        sprint = dict(state.get("sprint_xp") or {})
+    if not sprint:
+        return "", 0, 0
+    # sprint_xp keys are lowercase; values are {"xp": int, "display": str}
+    scores: dict[str, int] = {}
+    display_map: dict[str, str] = {}
+    for k, v in sprint.items():
+        if isinstance(v, dict):
+            scores[k] = int(v.get("xp", 0) or 0)
+            display_map[k] = str(v.get("display") or k)
+        else:
+            scores[k] = int(v or 0)
+            display_map[k] = k
+    if not scores or max(scores.values()) <= 0:
+        return "", 0, 0
+    ranked = sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))
+    top_key, top_xp = ranked[0]
+    second = ranked[1][1] if len(ranked) > 1 else 0
+    return display_map.get(top_key, top_key), top_xp, max(0, top_xp - second)
+
+
+def _write_heat_leader_file(username: str, score: int) -> None:
+    try:
+        with open(HEAT_LEADER_FILE, "w", encoding="utf-8") as f:
+            if username:
+                f.write(f"Top Summoner: {username} - {score}\n")
+            else:
+                f.write("")
+        # Keep top_summoner.txt as heat-compatible display for legacy OBS / is_top_summoner readers
+        # until points_command reads heat_leader; still write heat format there for sprint→heat migration.
+        with open(TOP_SUMMONER_FILE, "w", encoding="utf-8") as f:
+            if username:
+                f.write(f"Top Summoner: {username} - {score}\n")
+            else:
+                f.write("")
+    except OSError:
+        pass
+
+
+def _write_totals(state: dict) -> None:
+    counts = state.get("session_summon_counts") or {}
+    total = sum(int(v) for v in counts.values())
+    try:
+        with open(TOTAL_SUMMONS_FILE, "w", encoding="utf-8") as f:
+            f.write(f"Total Summons: {total}\n")
+        with open(SUMMON_COUNTS_FILE, "w", encoding="utf-8") as f:
+            json.dump(counts, f, indent=2)
+    except OSError:
+        pass
+
+
+def _grant_sprint_donor(username: str, amount: int) -> bool:
+    if not username or amount <= 0:
+        return False
+    try:
+        from points_command import grant_sprint_donor_reward
+        grant_sprint_donor_reward(username, amount)
+        return True
+    except Exception as e:
+        print(f"[bestiary] grant_sprint_donor_reward failed: {e}")
+        return False
+
+
+def apply_summon(username: str, monster: str) -> dict[str, Any]:
+    """Apply XP to bar/sprint/heat. May level up. Returns result dict for chat/API."""
+    cfg = load_config()
+    monster = (monster or "").strip().lower()
+    display = (username or "").strip() or "Anonymous"
+    key = display.lower()
+    xp = monster_xp(monster)
+    window = int(cfg.get("heat_window_sec", 900))
+    donor_reward = int(cfg.get("sprint_donor_reward", 100))
+    max_lvl = _max_level(cfg)
+    cap_frac = float(cfg.get("per_user_bar_cap_fraction", 0) or 0)
+    diminish = bool(cfg.get("repeat_mob_diminishing", False))
+
+    with _lock:
+        state = _load_state()
+        level = int(state.get("level", 1))
+        if not is_monster_unlocked(monster, level):
+            need = required_level_for_monster(monster) or level + 1
+            thresh = _threshold_for_level(level, cfg)
+            remaining = max(0, thresh - int(state.get("bar_xp", 0))) if thresh else 0
+            return {
+                "ok": False,
+                "error": (
+                    f"Need Bestiary Lv {need} ({_zone_for_level(need, cfg)}) "
+                    f"- {remaining} XP left on current level."
+                ),
+            }
+
+        now = int(time.time())
+        bar_xp_add = xp
+        sprint_heat_xp = xp
+
+        if diminish:
+            last = (state.get("last_monster_by_user") or {}).get(key)
+            if last == monster:
+                sprint_heat_xp = max(1, xp // 2)
+
+        # Per-user bar contribution cap for this level
+        if cap_frac > 0:
+            thresh = _threshold_for_level(level, cfg)
+            if thresh > 0:
+                contrib = dict(state.get("bar_contrib") or {})
+                already = int(contrib.get(key, 0) or 0)
+                cap = int(thresh * cap_frac)
+                room = max(0, cap - already)
+                bar_xp_add = min(bar_xp_add, room)
+                contrib[key] = already + bar_xp_add
+                state["bar_contrib"] = contrib
+
+        # Sprint
+        sprint = dict(state.get("sprint_xp") or {})
+        entry = sprint.get(key)
+        if isinstance(entry, dict):
+            entry = {"xp": int(entry.get("xp", 0)) + sprint_heat_xp, "display": display}
+        else:
+            entry = {"xp": int(entry or 0) + sprint_heat_xp, "display": display}
+        sprint[key] = entry
+        state["sprint_xp"] = sprint
+
+        # Heat
+        events = list(state.get("heat_events") or [])
+        events.append({"user": display, "xp": sprint_heat_xp, "ts": now})
+        events = _prune_heat(events, now, window)
+        state["heat_events"] = events
+
+        # Session counts
+        counts = dict(state.get("session_summon_counts") or {})
+        counts[display] = int(counts.get(display, 0) or 0) + 1
+        # also track lowercase for lookups
+        counts_lower_key = key
+        # Prefer display casing as key; mysummons does case-insensitive lookup
+        state["session_summon_counts"] = counts
+
+        last_mobs = dict(state.get("last_monster_by_user") or {})
+        last_mobs[key] = monster
+        state["last_monster_by_user"] = last_mobs
+
+        # Co-op bar + level-ups
+        leveled_up = False
+        level_up_info: Optional[dict] = None
+        newly_unlocked: list[str] = []
+        state["bar_xp"] = int(state.get("bar_xp", 0)) + bar_xp_add
+
+        while True:
+            cur = int(state.get("level", 1))
+            if cur >= max_lvl:
+                # Cap bar at 0 progress on max level (cosmetic complete)
+                state["bar_xp"] = 0
+                break
+            thresh = _threshold_for_level(cur, cfg)
+            if thresh <= 0:
+                break
+            if int(state.get("bar_xp", 0)) < thresh:
+                break
+
+            # Level up
+            overflow = int(state.get("bar_xp", 0)) - thresh
+            sprint_before = dict(state.get("sprint_xp") or {})
+            winner_key = ""
+            winner_display = ""
+            winner_xp = 0
+            if sprint_before:
+                scores = {
+                    k: (int(v.get("xp", 0)) if isinstance(v, dict) else int(v or 0))
+                    for k, v in sprint_before.items()
+                }
+                if scores and max(scores.values()) > 0:
+                    ranked = sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))
+                    winner_key, winner_xp = ranked[0]
+                    w = sprint_before.get(winner_key)
+                    winner_display = (
+                        str(w.get("display") or winner_key) if isinstance(w, dict) else winner_key
+                    )
+
+            old_level = cur
+            old_zone = _zone_for_level(old_level, cfg)
+            new_level = cur + 1
+            new_zone = _zone_for_level(new_level, cfg)
+            old_pool = set(unlocked_monsters(old_level, cfg))
+            new_pool = set(unlocked_monsters(new_level, cfg))
+            newly_unlocked = sorted(new_pool - old_pool)
+
+            hall = list(state.get("hall_of_fame") or [])
+            hall.append({
+                "level": old_level,
+                "zone": old_zone,
+                "user": winner_display,
+                "xp": winner_xp,
+                "ts": now,
+            })
+            state["hall_of_fame"] = hall
+            state["level"] = new_level
+            state["bar_xp"] = max(0, overflow)
+            state["sprint_xp"] = {}
+            state["bar_contrib"] = {}
+            state["last_level_up_ts"] = now
+            leveled_up = True
+            level_up_info = {
+                "from_level": old_level,
+                "to_level": new_level,
+                "from_zone": old_zone,
+                "to_zone": new_zone,
+                "winner": winner_display,
+                "winner_xp": winner_xp,
+                "newly_unlocked": newly_unlocked,
+                "donor_reward": donor_reward if winner_display else 0,
+            }
+            # Only one level-up per summon typically; loop allows multi if overflow huge
+            if winner_display and donor_reward > 0:
+                # Grant outside lock would be nicer, but keep call here after unlock
+                pass
+
+        heat_user, heat_xp = _leader_from_scores(
+            _heat_scores(events),
+            {str(e.get("user", "")).lower(): str(e.get("user", "")) for e in events if e.get("user")},
+        )
+        _write_heat_leader_file(heat_user, heat_xp)
+        _write_totals(state)
+        _save_state(state)
+
+        result = {
+            "ok": True,
+            "monster": monster,
+            "xp": xp,
+            "bar_xp_added": bar_xp_add,
+            "sprint_heat_xp": sprint_heat_xp,
+            "level": int(state.get("level", 1)),
+            "zone": _zone_for_level(int(state.get("level", 1)), cfg),
+            "bar_xp": int(state.get("bar_xp", 0)),
+            "bar_threshold": _threshold_for_level(int(state.get("level", 1)), cfg),
+            "leveled_up": leveled_up,
+            "level_up": level_up_info,
+            "heat_leader": heat_user,
+            "heat_xp": heat_xp,
+        }
+
+    # Donor grant outside main mutation lock (uses points lock)
+    if leveled_up and level_up_info and level_up_info.get("winner"):
+        _grant_sprint_donor(level_up_info["winner"], donor_reward)
+
+    return result
+
+
+def get_state_payload() -> dict[str, Any]:
+    """Full HUD / API payload."""
+    cfg = load_config()
+    window = int(cfg.get("heat_window_sec", 900))
+    max_lvl = _max_level(cfg)
+
+    with _lock:
+        state = _load_state()
+        now = int(time.time())
+        events = _prune_heat(list(state.get("heat_events") or []), now, window)
+        if len(events) != len(state.get("heat_events") or []):
+            state["heat_events"] = events
+            _save_state(state)
+
+        level = int(state.get("level", 1))
+        bar_xp = int(state.get("bar_xp", 0))
+        thresh = _threshold_for_level(level, cfg)
+        zone = _zone_for_level(level, cfg)
+        unlocked = unlocked_monsters(level, cfg)
+
+        sprint = dict(state.get("sprint_xp") or {})
+        sprint_scores: dict[str, int] = {}
+        sprint_display: dict[str, str] = {}
+        for k, v in sprint.items():
+            if isinstance(v, dict):
+                sprint_scores[k] = int(v.get("xp", 0) or 0)
+                sprint_display[k] = str(v.get("display") or k)
+            else:
+                sprint_scores[k] = int(v or 0)
+                sprint_display[k] = k
+        sprint_user, sprint_xp, sprint_gap = "", 0, 0
+        if sprint_scores and max(sprint_scores.values()) > 0:
+            ranked = sorted(sprint_scores.items(), key=lambda kv: (-kv[1], kv[0]))
+            top_key, sprint_xp = ranked[0]
+            sprint_user = sprint_display.get(top_key, top_key)
+            second = ranked[1][1] if len(ranked) > 1 else 0
+            sprint_gap = max(0, sprint_xp - second)
+
+        heat_scores = _heat_scores(events)
+        heat_display = {
+            str(e.get("user", "")).lower(): str(e.get("user", ""))
+            for e in events if e.get("user")
+        }
+        heat_user, heat_xp = _leader_from_scores(heat_scores, heat_display)
+
+        # Next locked monsters (first locked level's list)
+        next_locked: list[str] = []
+        if level < max_lvl:
+            for entry in cfg.get("levels") or []:
+                if int(entry.get("level", 0)) == level + 1:
+                    next_locked = [str(m).lower() for m in (entry.get("monsters") or [])]
+                    break
+
+        return {
+            "level": level,
+            "max_level": max_lvl,
+            "zone": zone,
+            "bar_xp": bar_xp,
+            "bar_threshold": thresh,
+            "bar_fraction": (float(bar_xp) / float(thresh)) if thresh > 0 else 1.0,
+            "unlocked_monsters": unlocked,
+            "next_locked_monsters": next_locked,
+            "sprint": {
+                "username": sprint_user,
+                "xp": sprint_xp,
+                "gap": sprint_gap,
+                "has_leader": bool(sprint_user),
+            },
+            "heat": {
+                "username": heat_user,
+                "xp": heat_xp,
+                "window_sec": window,
+                "has_leader": bool(heat_user),
+            },
+            "hall_of_fame": list(state.get("hall_of_fame") or []),
+            "last_level_up_ts": int(state.get("last_level_up_ts", 0) or 0),
+            "session_summon_counts": dict(state.get("session_summon_counts") or {}),
+            "heat_window_sec": window,
+            "sprint_donor_reward": int(cfg.get("sprint_donor_reward", 100)),
+        }
+
+
+def user_sprint_xp(username: str) -> int:
+    key = (username or "").strip().lower()
+    with _lock:
+        state = _load_state()
+        v = (state.get("sprint_xp") or {}).get(key)
+        if isinstance(v, dict):
+            return int(v.get("xp", 0) or 0)
+        return int(v or 0)
+
+
+def user_heat_xp(username: str) -> int:
+    key = (username or "").strip().lower()
+    cfg = load_config()
+    window = int(cfg.get("heat_window_sec", 900))
+    with _lock:
+        state = _load_state()
+        now = int(time.time())
+        events = _prune_heat(list(state.get("heat_events") or []), now, window)
+        scores = _heat_scores(events)
+        return int(scores.get(key, 0))
+
+
+def user_session_count(username: str) -> int:
+    key = (username or "").strip().lower()
+    with _lock:
+        state = _load_state()
+        counts = state.get("session_summon_counts") or {}
+        for name, n in counts.items():
+            if str(name).lower() == key:
+                return int(n)
+        return 0
+
+
+def reset_bestiary_state() -> None:
+    """Clear bestiary session (stream started)."""
+    with _lock:
+        _save_state(_empty_state())
+        for path in (HEAT_LEADER_FILE, TOP_SUMMONER_FILE, TOTAL_SUMMONS_FILE, SUMMON_COUNTS_FILE):
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+            except OSError:
+                pass

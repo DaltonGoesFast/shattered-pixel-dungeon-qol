@@ -8,8 +8,8 @@
   "cost_per_transmute": 150,
   "cost_per_ally_bee": 40,
   "cost_per_ward": 9,
-  "cost_per_buff": 75,
-  "cost_per_debuff": 50,
+  "cost_per_buff": 40,
+  "cost_per_debuff": 40,
   "cost_per_wand": 75,
   "default_monster_cost": 100,
   "cost_per_monster": {
@@ -47,5 +47,16 @@
   "cost_per_sabotage": 75,
   "cost_per_corrupt_ally": 40,
   "cost_per_ring_of_wealth": 100,
-  "command_allowed_roles": {}
+  "command_allowed_roles": {},
+  "points_per_message": 2,
+  "chat_cooldown_sec": 20,
+  "passive_cooldown_sec": 60,
+  "first_words_bonus": 5,
+  "chat_point_cap": 500,
+  "bank_ratio_manual": 0.1,
+  "bank_ratio_auto": 0.05,
+  "bank_ratio_auto_member": 0.1,
+  "donation_multiplier_cap": 4,
+  "reset_debounce_hours": 4.0,
+  "curse_class_kit_duration_turns": 100
 }

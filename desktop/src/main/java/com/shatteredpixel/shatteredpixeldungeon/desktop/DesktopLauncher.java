@@ -201,6 +201,9 @@ public class DesktopLauncher {
 		if (SPDSettings.streamingEnabled()) {
 			StreamingBootstrapper.start(SPDSettings.streamingPort());
 		}
+		if (SPDSettings.trainingExportEnabled()) {
+			TrainingExportBootstrapper.start();
+		}
 		if (SPDSettings.transparentVoidEnabled()) {
 			config.setTransparentFramebuffer(true);
 		}

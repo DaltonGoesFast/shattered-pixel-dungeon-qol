@@ -1,7 +1,7 @@
 # Godot Companion — Summon March Implementation Brief
 
 **Audience:** Godot agent / developer implementing the SPD stream companion overlay.  
-**Production project:** `C:/Users/dalto/Documents/spd-companion-3` (**SPD Companion 3**). Godot code lives in that workspace, not in this repo.  
+**Production project:** [`spd-comp3/`](../spd-comp3/) in this repo (**SPD Companion 3**). See [`spd-comp3/AGENTS.md`](../spd-comp3/AGENTS.md).  
 **Backend:** `shattered-pixel-dungeon-qol` → `Lastest UI/server.py` (already implemented).
 
 ---
@@ -251,7 +251,7 @@ func _poll():
 ## Related docs (main repo)
 
 - [summon-march-system.md](summon-march-system.md) — full system overview
-- [streamerbot-summon-march-apply.md](streamerbot-summon-march-apply.md) — Streamer.bot setup (not needed for Godot)
+- [streamerbot-summon-march-apply.md](streamerbot-summon-march-apply.md) — legacy standalone `!summon` (archived); live path is R1 — [summon-march-system.md](summon-march-system.md)
 - [streaming-setup-guide.md](streaming-setup-guide.md) — server startup
 
 ---

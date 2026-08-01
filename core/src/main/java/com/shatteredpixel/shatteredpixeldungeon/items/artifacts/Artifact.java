@@ -245,6 +245,14 @@ public class Artifact extends KindofMisc {
 	}
 
 	protected ArtifactBuff activeBuff() {return null; }
+
+	/** Ends an active artifact effect (e.g. cloak stealth) without unequipping. */
+	public void clearActiveEffect() {
+		if (activeBuff != null) {
+			if (activeBuff.target != null) activeBuff.detach();
+			activeBuff = null;
+		}
+	}
 	
 	public void charge(Hero target, float amount){
 		//do nothing by default;

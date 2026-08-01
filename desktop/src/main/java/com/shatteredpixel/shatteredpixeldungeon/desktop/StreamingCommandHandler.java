@@ -64,6 +64,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Corruption;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ChampionEnemy;
 import com.shatteredpixel.shatteredpixeldungeon.ui.ActionIndicator;
 import com.shatteredpixel.shatteredpixeldungeon.ui.BuffIndicator;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ChatClassKitCurse;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ChatSpawned;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Cripple;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Daze;
@@ -800,18 +801,37 @@ public final class StreamingCommandHandler {
 		return "Ward";
 	}
 
-	/** Curse an equipped item in the given slot. Returns item name on success, error message on failure. */
-	public static String handleCurse(String slot, String username) {
-		if (Dungeon.hero == null || Dungeon.level == null)
-			return "ERR:Not in an active run (title/menu)";
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
-			return "ERR:Not in an active run (title/menu)";
-		if (!Dungeon.hero.isAlive())
-			return "ERR:Hero is dead";
+	public static final class CurseStreamResult {
+		public String errorMessage;
+		public String itemName;
+		public boolean temporary;
+		public int durationTurns;
+	}
+
+	private static final int DEFAULT_CLASS_KIT_CURSE_TURNS = 100;
+
+	/** Curse an equipped item in the given slot. Returns result with item name on success. */
+	public static CurseStreamResult curseEquipped(String slot, String username, int classKitDurationTurns) {
+		CurseStreamResult out = new CurseStreamResult();
+		if (Dungeon.hero == null || Dungeon.level == null) {
+			out.errorMessage = "Not in an active run (title/menu)";
+			return out;
+		}
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene)) {
+			out.errorMessage = "Not in an active run (title/menu)";
+			return out;
+		}
+		if (!Dungeon.hero.isAlive()) {
+			out.errorMessage = "Hero is dead";
+			return out;
+		}
 
 		Item item = null;
 		String slotName = null;
-		if (slot == null) return "ERR:Missing slot";
+		if (slot == null) {
+			out.errorMessage = "Missing slot";
+			return out;
+		}
 		switch (slot.toLowerCase()) {
 			case "weapon":
 				KindOfWeapon wep = Dungeon.hero.belongings.weapon();
@@ -836,39 +856,59 @@ public final class StreamingCommandHandler {
 				slotName = "misc";
 				break;
 			default:
-				return "ERR:Invalid slot";
+				out.errorMessage = "Invalid slot";
+				return out;
 		}
 
-		if (item == null)
-			return "ERR:No item in " + slotName + " slot";
-		if (item.cursed && item.cursedKnown)
-			return "ERR:Item in " + slotName + " is already cursed";
+		if (item == null) {
+			out.errorMessage = "No item in " + slotName + " slot";
+			return out;
+		}
+		if (item.cursed && item.cursedKnown) {
+			out.errorMessage = "Item in " + slotName + " is already cursed";
+			return out;
+		}
 
-		if (item instanceof Weapon) {
-			((Weapon) item).saveEnchantmentBeforeChatCurse();
-		}
-		if (item instanceof Armor) {
-			((Armor) item).saveGlyphBeforeChatCurse();
-		}
-		item.cursed = item.cursedKnown = true;
-		if (item instanceof Weapon) {
-			Weapon w = (Weapon) item;
-			w.enchant(Weapon.Enchantment.randomCurse());
-		}
-		if (item instanceof Armor) {
-			Armor a = (Armor) item;
-			a.inscribe(Armor.Glyph.randomCurse());
+		int duration = Math.max(1, classKitDurationTurns > 0 ? classKitDurationTurns : DEFAULT_CLASS_KIT_CURSE_TURNS);
+		boolean temporary = ChatClassKitCurse.isClassKitItem(item);
+
+		if (temporary) {
+			ChatClassKitCurse.apply(Dungeon.hero, item, slotName, duration);
+		} else {
+			if (item instanceof Weapon) {
+				((Weapon) item).saveEnchantmentBeforeChatCurse();
+			}
+			if (item instanceof Armor) {
+				((Armor) item).saveGlyphBeforeChatCurse();
+			}
+			item.cursed = item.cursedKnown = true;
+			if (item instanceof Weapon) {
+				Weapon w = (Weapon) item;
+				w.enchant(Weapon.Enchantment.randomCurse());
+			}
+			if (item instanceof Armor) {
+				Armor a = (Armor) item;
+				a.inscribe(Armor.Glyph.randomCurse());
+			}
 		}
 
 		EquipableItem.equipCursed(Dungeon.hero);
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		String itemName = item.name();
-		GLog.n(Messages.get(StreamingCommandHandler.class, "chat_curse"), chatter, slotName);
-		return itemName;
+		if (temporary) {
+			GLog.n(Messages.get(StreamingCommandHandler.class, "chat_curse_temporary"), chatter, itemName, duration);
+		} else {
+			GLog.n(Messages.get(StreamingCommandHandler.class, "chat_curse"), chatter, slotName);
+		}
+
+		out.itemName = itemName;
+		out.temporary = temporary;
+		out.durationTurns = temporary ? duration : 0;
+		return out;
 	}
 
 	/** Curse a random eligible equipped item (tries each slot once, shuffled). */
-	public static String handleCurseRandom(String username) {
+	public static CurseStreamResult curseEquippedRandom(String username, int classKitDurationTurns) {
 		ArrayList<String> slots = new ArrayList<>();
 		slots.add("weapon");
 		slots.add("armor");
@@ -877,11 +917,13 @@ public final class StreamingCommandHandler {
 		slots.add("misc");
 		Collections.shuffle(slots);
 		for (String slot : slots) {
-			String result = handleCurse(slot, username);
-			if (result != null && !result.startsWith("ERR:"))
+			CurseStreamResult result = curseEquipped(slot, username, classKitDurationTurns);
+			if (result.errorMessage == null)
 				return result;
 		}
-		return "ERR:No curseable equipped item (all slots empty or already cursed)";
+		CurseStreamResult fail = new CurseStreamResult();
+		fail.errorMessage = "No curseable equipped item (all slots empty or already cursed)";
+		return fail;
 	}
 
 	/** Spawn random gas (Chaotic Censer at level +3). Returns gas name on success, error message on failure. */

@@ -220,19 +220,30 @@ public class StreamingServer extends WebSocketServer {
 			} else if ("curse".equals(cmd)) {
 				String slot = obj.has("slot") ? obj.get("slot").getAsString() : null;
 				String slotFinal = (slot != null) ? slot.trim().toLowerCase() : "";
+				int classKitDuration = 100;
+				if (obj.has("class_kit_curse_duration_turns")) {
+					try {
+						classKitDuration = obj.get("class_kit_curse_duration_turns").getAsInt();
+					} catch (Exception ignored) {}
+				}
+				final int classKitDurationFinal = classKitDuration;
 				Gdx.app.postRunnable(() -> {
-					String result = slotFinal.isEmpty()
-							? StreamingCommandHandler.handleCurseRandom(usernameFinal)
-							: StreamingCommandHandler.handleCurse(slotFinal, usernameFinal);
-					boolean ok = (result != null && !result.startsWith("ERR:"));
-					String itemName = ok ? result : null;
-					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					StreamingCommandHandler.CurseStreamResult result = slotFinal.isEmpty()
+							? StreamingCommandHandler.curseEquippedRandom(usernameFinal, classKitDurationFinal)
+							: StreamingCommandHandler.curseEquipped(slotFinal, usernameFinal, classKitDurationFinal);
+					boolean ok = (result.errorMessage == null);
+					String itemName = ok ? result.itemName : null;
+					String err = result.errorMessage;
 					if (requestId != null && !requestId.isEmpty()) {
 						JsonObject resp = new JsonObject();
 						resp.addProperty("type", "curse_result");
 						resp.addProperty("request_id", requestId);
 						resp.addProperty("success", ok);
 						if (itemName != null) resp.addProperty("item_name", itemName);
+						if (ok && result.temporary) {
+							resp.addProperty("temporary", true);
+							resp.addProperty("duration_turns", result.durationTurns);
+						}
 						if (err != null) resp.addProperty("error", err);
 						addChatter(resp, usernameFinal);
 						broadcast(resp.toString());

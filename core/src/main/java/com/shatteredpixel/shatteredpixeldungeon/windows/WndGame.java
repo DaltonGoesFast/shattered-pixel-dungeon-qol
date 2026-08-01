@@ -34,6 +34,7 @@ import com.shatteredpixel.shatteredpixeldungeon.scenes.TitleScene;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Icons;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RedButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
+import com.shatteredpixel.shatteredpixeldungeon.utils.TrainingExport;
 import com.watabou.noosa.Game;
 
 import java.io.IOException;
@@ -106,6 +107,8 @@ public class WndGame extends Window {
 				} catch (IOException e) {
 					ShatteredPixelDungeon.reportException(e);
 				}
+				// End training run + close steps.jsonl while process stays at title.
+				TrainingExport.onSessionEnd();
 				Game.switchScene(TitleScene.class);
 			}
 		});

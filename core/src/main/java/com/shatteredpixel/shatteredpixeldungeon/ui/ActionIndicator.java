@@ -25,6 +25,7 @@ import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.SPDAction;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
+import com.shatteredpixel.shatteredpixeldungeon.utils.TrainingExport;
 import com.watabou.input.GameAction;
 import com.watabou.noosa.BitmapText;
 import com.watabou.noosa.Visual;
@@ -137,6 +138,7 @@ public class ActionIndicator extends Tag {
 	protected void onClick() {
 		super.onClick();
 		if (action != null && Dungeon.hero.ready) {
+			TrainingExport.logCombo(action.getClass().getSimpleName());
 			action.doAction();
 		}
 	}

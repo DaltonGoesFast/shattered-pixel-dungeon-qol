@@ -387,6 +387,15 @@
       <label for="freeMins">Free for (mins):</label>
       <input type="number" id="freeMins" min="1" max="1440" value="5" style="width:64px;">
     </div>
+    <h3 style="margin:0.5rem 0;font-size:1rem;color:var(--spd-muted-on-surface);">Economy v1.1</h3>
+    <div class="row"><label for="points_per_message">Pts per message:</label><input type="number" id="points_per_message" min="1" value="2"></div>
+    <div class="row"><label for="chat_cooldown_sec">Chat cooldown (sec):</label><input type="number" id="chat_cooldown_sec" min="0" value="20"></div>
+    <div class="row"><label for="chat_point_cap">Chat cap:</label><input type="number" id="chat_point_cap" min="1" value="500"></div>
+    <div class="row"><label for="bank_ratio_manual">Bank ratio (manual):</label><input type="number" id="bank_ratio_manual" min="0" max="1" step="0.01" value="0.10"></div>
+    <div class="row"><label for="bank_ratio_auto">Bank ratio (auto):</label><input type="number" id="bank_ratio_auto" min="0" max="1" step="0.01" value="0.05"></div>
+    <div class="row"><label for="bank_ratio_auto_member">Bank ratio (auto member):</label><input type="number" id="bank_ratio_auto_member" min="0" max="1" step="0.01" value="0.10"></div>
+    <div class="row"><label for="donation_multiplier_cap">Donation mult cap:</label><input type="number" id="donation_multiplier_cap" min="1" value="4"></div>
+    <div class="row" style="margin-bottom:0.75rem;padding-bottom:0.75rem;border-bottom:1px solid var(--spd-border);"><label for="reset_debounce_hours">Reset debounce (hrs):</label><input type="number" id="reset_debounce_hours" min="0" step="0.5" value="4"></div>
     <div class="costs-scroll">
     <div class="row" data-cost-key="cost_per_gold" data-cmd="gold">
       <label for="cost_per_gold">Gold (per 1):</label>
@@ -401,6 +410,10 @@
       <button type="button" class="free-btn">Free</button>
       <span class="free-countdown" style="display:none;"></span>
       <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
+    </div>
+    <div class="row">
+      <label for="curse_class_kit_duration_turns" title="Rogue cloak, Cleric tome, Mage staff">Class kit curse (turns):</label>
+      <input type="number" id="curse_class_kit_duration_turns" min="1" value="100">
     </div>
     <div class="row" data-cost-key="cost_per_gas" data-cmd="gas">
       <label for="cost_per_gas">Gas:</label>
@@ -856,6 +869,15 @@
           setIf('cost_per_hex', data.cost_per_hex, 75);
           setIf('cost_per_degrade', data.cost_per_degrade, 100);
           setIf('cost_per_sabotage', data.cost_per_sabotage, 75);
+          setIf('points_per_message', data.points_per_message, 2);
+          setIf('chat_cooldown_sec', data.chat_cooldown_sec, 20);
+          setIf('chat_point_cap', data.chat_point_cap, 500);
+          setIf('bank_ratio_manual', data.bank_ratio_manual, 0.10);
+          setIf('bank_ratio_auto', data.bank_ratio_auto, 0.05);
+          setIf('bank_ratio_auto_member', data.bank_ratio_auto_member, 0.10);
+          setIf('donation_multiplier_cap', data.donation_multiplier_cap, 4);
+          setIf('reset_debounce_hours', data.reset_debounce_hours, 4);
+          setIf('curse_class_kit_duration_turns', data.curse_class_kit_duration_turns, 100);
           const monsters = data.cost_per_monster || {};
           const container = document.getElementById('monsters');
           container.innerHTML = '';
@@ -910,6 +932,7 @@
       const payload = {
         cost_per_gold: parseInt(document.getElementById('cost_per_gold').value, 10) || 5,
         cost_per_curse: parseInt(document.getElementById('cost_per_curse').value, 10) || 200,
+        curse_class_kit_duration_turns: parseInt(document.getElementById('curse_class_kit_duration_turns')?.value, 10) || 100,
         cost_per_gas: parseInt(document.getElementById('cost_per_gas').value, 10) || 75,
         cost_per_scroll: parseInt(document.getElementById('cost_per_scroll').value, 10) || 100,
         cost_per_ring_of_wealth: parseInt(document.getElementById('cost_per_ring_of_wealth').value, 10) || 100,
@@ -931,6 +954,14 @@
         cost_per_hex: parseInt(document.getElementById('cost_per_hex')?.value, 10) || 75,
         cost_per_degrade: parseInt(document.getElementById('cost_per_degrade')?.value, 10) || 100,
         cost_per_sabotage: parseInt(document.getElementById('cost_per_sabotage')?.value, 10) || 75,
+        points_per_message: parseInt(document.getElementById('points_per_message')?.value, 10) || 2,
+        chat_cooldown_sec: parseInt(document.getElementById('chat_cooldown_sec')?.value, 10) || 20,
+        chat_point_cap: parseInt(document.getElementById('chat_point_cap')?.value, 10) || 500,
+        bank_ratio_manual: parseFloat(document.getElementById('bank_ratio_manual')?.value) || 0.10,
+        bank_ratio_auto: parseFloat(document.getElementById('bank_ratio_auto')?.value) || 0.05,
+        bank_ratio_auto_member: parseFloat(document.getElementById('bank_ratio_auto_member')?.value) || 0.10,
+        donation_multiplier_cap: parseInt(document.getElementById('donation_multiplier_cap')?.value, 10) || 4,
+        reset_debounce_hours: parseFloat(document.getElementById('reset_debounce_hours')?.value) || 4,
       };
       fetch('/api/points-config', {
         method: 'POST',
@@ -1076,13 +1107,19 @@
             users.push({ username, points: Math.max(0, pts || 0), donationPts: Math.max(0, donor || 0), last: isNaN(last) ? 0 : last, role });
           }
           if (users.length === 0) { showMsg('No valid rows to import', false); return; }
-          fetch('/api/viewer-points/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ users, merge: true }) })
+          // OK = replace all live points with CSV; Cancel = merge (update/add only, keep others).
+          const merge = !confirm(
+            'Import ' + users.length + ' users from CSV.\n\n' +
+            'OK = REPLACE all viewer points with this CSV\n' +
+            'Cancel = MERGE (update matching names, keep everyone else)'
+          );
+          fetch('/api/viewer-points/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ users, merge: merge }) })
             .then(r => r.json())
             .then(d => {
               if (d.error) throw new Error(d.error);
-              showMsg(`Imported ${d.count || users.length} users`, true);
+              showMsg((merge ? 'Merged ' : 'Replaced with ') + (d.count || users.length) + ' users', true);
               loadViewerPoints(true);
-              logActivity('VP: imported ' + (d.count || users.length) + ' CSV');
+              logActivity('VP: ' + (merge ? 'merged ' : 'replaced ') + (d.count || users.length) + ' CSV');
             })
             .catch(err => showMsg('Import failed: ' + err.message, false));
         } catch (err) { showMsg('Import failed: ' + err.message, false); }

@@ -1,12 +1,27 @@
 # Summon March — Streamer.bot Apply Guide
 
-Step-by-step instructions to paste into Streamer.bot. Repo code (`server.py`, `points_command.py`) is updated separately.
+> **Superseded (Phase 5):** `!summon` routes through **R1** only (no separate summon action). See [streaming-system-rework-plan.md](streaming-system-rework-plan.md) § Streamer.bot meta commands and [summon-march-system.md](summon-march-system.md).
 
-**Reference:** [summon-march-system.md](summon-march-system.md), [streamerbot-points-from-scratch.md](streamerbot-points-from-scratch.md) (Earn Points `IsTopSummoner`).
+## Current setup (HTTP gateway)
+
+| Piece | Where |
+|-------|--------|
+| Chat | **R1** → `POST /api/chat-command` → `handle_summon()` in `chat_command.py` |
+| Cooldown | 60 s per user (enforced on server; optional duplicate on Streamer.bot command if you still have one — remove legacy Command) |
+| Queue / Godot | Server `POST /api/summon-march`; companion polls `GET /api/summon-march` |
+| Leaderboard | Server writes `top_summoner.txt`; personal 2× in `points_command.py` |
+| Sound | API `presentation` with `kind: "summon"` — `ParseChatResponse.cs` plays `SUMMON_SOUND` in `presentation_config.py` |
+| Session reset | **R7** `/api/session/reset` clears summon counts (same as fard session state) |
+
+**No** Run Program to `summon_march_post.py` in the live path. **No** separate Streamer.bot action on `!summon`.
+
+Re-paste `ParseChatResponse.cs` after pulling summon-sound changes from the repo.
 
 ---
 
-Same layout as `**!spawn**` / `**!scroll**` in [streamerbot-points-from-scratch.md](streamerbot-points-from-scratch.md): **Run a Program → C# reads result file → If ok → chat**. Python does monster pick, POST, and leaderboard files — no extra If blocks in the action.
+## Archived: separate `!summon` action (pre-gateway)
+
+The steps below document the **old** Run Program + `summon_result.txt` layout. Keep for rollback reference only.
 
 ---
 

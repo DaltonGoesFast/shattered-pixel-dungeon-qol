@@ -1,4 +1,44 @@
-# Points System (From Scratch)
+# Points System — Streamer.bot setup
+
+> **Superseded (Phase 5):** The live setup is the **9-action HTTP gateway**, not the ~40-action model below.  
+> **Use these instead:**
+> - **Build / maintain:** [streamerbot-http-gateway-apply.md](streamerbot-http-gateway-apply.md)
+> - **Roadmap:** [streaming-system-rework-plan.md](streaming-system-rework-plan.md)
+> - **Quick setup:** [streaming-setup-guide.md](streaming-setup-guide.md)
+> - **Off-stream tests:** `Lastest UI/phase3_rapid_test.ps1`
+> - **Import bot:** `Lastest UI/streamerbot/shatter-the-streamer-export-0.2.0.txt` (export from your live R1–R9 bot)
+
+## Current model (9 actions)
+
+| Action | Role |
+|--------|------|
+| R1 Chat Router | All chat commands → `POST /api/chat-command` |
+| R2 First Words | OBS presentation only (+5 on server) |
+| R3 Passive earn | Present viewers → HTTP passive earn |
+| R4–R6 Donations | Cheer / Super Chat / gifts → `/api/donation/*` |
+| R7 Session reset | Twitch Stream Started → `/api/session/reset` |
+| R8 Spend Toggle | `spend_disabled.txt` toggle (Stream Deck Action Switch) |
+| R9 Presentation | `!fard` OBS + sound (queued from R1) |
+| R10 Stream end | Stream Offline → `POST /api/session/end` (debounced chat wipe + auto-bank) |
+
+**Economy v1.1 (server):** 2 pt/msg, 20s CD, 500 chat cap, `!bank` (10%), donor wallet, donation **4×** cap, stream-end auto-bank (5% / 10% members). Spec: [Chat Command Economy v1.md](Chat%20Command%20Economy%20v1.md). Apply: [economy-v11-apply.md](economy-v11-apply.md).
+
+**No** per-command Streamer.bot actions. **No** `spawn_result.txt` / `donation_result.txt` in the live path.  
+C# snippets: `Lastest UI/streamerbot/phase2/`.
+
+**Fard:** Server returns `message` + `presentation` → R1 chat reply + R9 OBS/sound. See [fard-system.md](fard-system.md).  
+**Summon march:** `!summon` handled in R1; Godot overlay polls `/api/summon-march`. See [summon-march-system.md](summon-march-system.md).
+
+---
+
+## Archived: ~40-action walkthrough (pre–HTTP gateway)
+
+The content below (~3800 lines) documents the **old** Run Program + `spawn_result.txt` + per-command C# parsers.  
+**Do not build new setups from it.** Index: [archive/README.md](archive/README.md).
+
+---
+
+# Points System (From Scratch) — legacy
 
 A simple file-based points system for Streamer.bot—no extensions. Viewers earn points by chatting and spend them to spawn monsters. Works with **Twitch and YouTube**.
 
@@ -26,7 +66,7 @@ Use this list when updating an **existing** setup. Game code fixes (corrupt `!al
 |------|-----|----------------|
 | **`!wand` Run a Program** | Unified wand: **one** cost (`cost_per_wand`), weighted random effect in the game. | [Action 18](#action-18-cursed-wand-effect-wand-with-points) |
 | **Cheer + Super Chat optional args** | So bits / Super Chat get the same **stacking 2×** as chat (!doublepoints, **top summoner**, sub/member). Without the extra args, only global double points + top summoner apply on donations. | [Action 20](#action-20-earn-points-cheer), [Action 21](#action-21-earn-points-super-chat), [argument reference](#cheer--super-chat--argument-reference). |
-| **Top summoner 2× (chat earn)** | Session leader from `!summon` earns **2×** on chat, passive, and First Words. Add `IsTopSummoner` to Earn Points C# (Actions 01–03) if your export predates summon march. | [Top summoner 2×](#top-summoner-2-personal-points), [streamerbot-summon-march-apply.md](streamerbot-summon-march-apply.md). |
+| **Top summoner 2× (chat earn)** | Session leader from `!summon` — handled on server via R1; see [summon-march-system.md](summon-march-system.md). | Legacy C# in archived Actions 01–03 below. |
 | **Gift sub / gift membership** | Not automatic — add [Action 40](#action-40-earn-points-gift-sub--gift-membership). | [Action 40](#action-40-earn-points-gift-sub--gift-membership) (after `!plant`). |
 | **Super Chat / Cheer** | Donation points require Actions 20–21 on the points queue; see HTTP fallback if Run Program fails. | [Action 20](#action-20-earn-points-cheer), [Action 21](#action-21-earn-points-super-chat). |
 | **Chat → donor by %** | Transfer part of chat-only points into donor points from the overlay. | Open **points-config** in the browser (`/points-config`): set **Chat→Donor %** next to the button, then **Chat → Donor**. Not a Streamer.bot change. |
@@ -244,7 +284,7 @@ bool IsTopSummoner(string userKey)
 - **Passive cooldown:** `60` seconds (change `COOLDOWN_SEC` in Earn Points passive; shares `lastEarn` with chat)
 - **Points costs:** Edit `points_config.json` or open **http://localhost:5000** in your browser (main control page; overlay server must be running). The overlay also has **Delete all points** (clears non-donor only; donors keep donation) and **Delete all donor points** (full wipe).
 - **Donation rate:** 1 point per $0.01 (Super Chat uses Frankfurter API for conversion; not in points config)
-- **Fard extends 2×:** Viewers use `!fard` once per stream to add +1 min (+5 min for subs/members) to global 2×. See [fard-system.md](fard-system.md) and [streamerbot-fard-rework-apply.md](streamerbot-fard-rework-apply.md).
+- **Fard extends 2×:** Viewers use `!fard` once per stream to add **+3 min** (**+6 min** for subs/members) to global 2×. See [fard-system.md](fard-system.md) and R1/R9 in [streamerbot-http-gateway-apply.md](streamerbot-http-gateway-apply.md).
 - **Top summoner 2×:** Session `!summon` leader earns 2× on personal points (chat, passive, First Words, donations). See [Top summoner 2×](#top-summoner-2-personal-points).
 - **Subscriber / member 2×:** Twitch subscribers and YouTube channel members earn 2× points. Uses Streamer.bot variables `isSubscribed` (Twitch) and `userIsSponsor` (YouTube). Stacks with double points and top summoner (e.g. **8×** when all three apply).
 
@@ -2420,58 +2460,36 @@ public class CPHInline
 
 ---
 
-## Action 23: Spend OFF / Action 24: Spend ON (Stream Deck switch)
+## Action 23: Spend OFF / Action 24: Spend ON (Stream Deck switch) — legacy
 
-**Purpose:** Two separate actions for Stream Deck "action switches" — when the switch is ON, trigger Spend ON (enable spending); when OFF, trigger Spend OFF (disable spending). Users can still earn points; they just can't use spend commands that check `spend_disabled.txt` while it exists. **All** such spends (including heal, hex, etc.) respect Spend OFF.
+> **Live setup (R8):** Use **one** action — `R8 - Spend Toggle` with `SpendToggle.cs`. See [streamerbot-http-gateway-apply.md](streamerbot-http-gateway-apply.md) Step 6. Assign the same action to **both** Toggle On and Toggle Off on the Streamer.bot Action Switch key; branch on `%state%` (`0` = spend off, `1` = spend on).
+
+**Purpose (old two-action model):** Separate actions for Stream Deck switches — Spend ON (enable spending) vs Spend OFF (disable spending). Users can still earn points; they just can't use spend commands that check `spend_disabled.txt` while it exists. **All** such spends (including heal, hex, etc.) respect Spend OFF.
+
+**Coverage:** Spend commands in `points_command.py` check for `spend_disabled.txt` and return "Spending is currently disabled by the streamer." when the file exists. If you add new spend commands to the script, add the same `is_spend_disabled()` check at the start of the handler.
+
+<details>
+<summary>Legacy SpendOff / SpendOn C# (pre–Spend Toggle)</summary>
 
 ### Spend OFF action
 
 **Trigger:** Hotkey (Stream Deck switch → OFF state)
 
-**Sub-Action:** Execute C# Code (Inline) — creates the disable flag file. Keep spend actions enabled so they still run and return the "Spending is currently disabled" message to chat.
-
 ```csharp
-using System;
-using System.IO;
-
-public class CPHInline
-{
-    const string FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spend_disabled.txt";
-
-    public bool Execute()
-    {
-        File.WriteAllText(FILE, "1");
-        return true;
-    }
-}
+File.WriteAllText(FILE, "1");
 ```
 
 ### Spend ON action
 
 **Trigger:** Hotkey (Stream Deck switch → ON state)
 
-**Sub-Action:** Execute C# Code (Inline) — removes the disable flag.
-
 ```csharp
-using System;
-using System.IO;
-
-public class CPHInline
-{
-    const string FILE = @"C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI\spend_disabled.txt";
-
-    public bool Execute()
-    {
-        if (File.Exists(FILE))
-            File.Delete(FILE);
-        return true;
-    }
-}
+if (File.Exists(FILE)) File.Delete(FILE);
 ```
 
-**Stream Deck setup:** Create an "Action Switch" or similar. Assign Spend ON to the ON state and Spend OFF to the OFF state. When the switch is ON, spending is enabled; when OFF, spending is disabled.
+**Stream Deck setup (legacy):** Assign Spend ON to the ON state and Spend OFF to the OFF state.
 
-**Coverage:** Spend commands in `points_command.py` (spawn, champion, gold, curse, gas, scroll, row, trap, transmute, bee, ward, buff, debuff, wand, heal, cleanse, dew, corrupt ally, hex, degrade, sabotage) check for `spend_disabled.txt` and return "Spending is currently disabled by the streamer." when the file exists. If you add new spend commands to the script, add the same `is_spend_disabled()` check at the start of the handler.
+</details>
 
 ---
 

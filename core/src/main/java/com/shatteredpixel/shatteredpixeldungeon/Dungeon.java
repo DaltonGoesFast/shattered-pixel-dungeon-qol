@@ -77,6 +77,7 @@ import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.ui.QuickSlotButton;
 import com.shatteredpixel.shatteredpixeldungeon.utils.DungeonSeed;
+import com.shatteredpixel.shatteredpixeldungeon.utils.TrainingExport;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndResurrect;
 import com.watabou.noosa.Game;
 import com.watabou.utils.BArray;
@@ -513,6 +514,7 @@ public class Dungeon {
 			/*This only catches IO errors. Yes, this means things can go wrong, and they can go wrong catastrophically.
 			But when they do the user will get a nice 'report this issue' dialogue, and I can fix the bug.*/
 		}
+		TrainingExport.onLevelEnter();
 	}
 
 	public static void dropToChasm( Item item ) {
@@ -882,6 +884,7 @@ public class Dungeon {
 		hero.belongings.identify();
 
 		Rankings.INSTANCE.submit( true, cause );
+		TrainingExport.onRunWon();
 	}
 
 	public static void updateLevelExplored(){

@@ -1,0 +1,1741 @@
+{
+  "description": "TitleScene / TitleBackground / BannerSprites / Fireball torches",
+  "java_reference": [
+    "com.shatteredpixel.shatteredpixeldungeon.scenes.TitleScene",
+    "com.shatteredpixel.shatteredpixeldungeon.ui.TitleBackground",
+    "com.shatteredpixel.shatteredpixeldungeon.effects.BannerSprites",
+    "com.shatteredpixel.shatteredpixeldungeon.effects.Fireball"
+  ],
+  "title_background_expected_counts": {
+    "arch": 6,
+    "back_cluster": 2,
+    "mid_mixed": 24,
+    "front_small": 19
+  },
+  "notes": "TextureFilm uses integer tile counts; hi-res atlases may export extra edge cells. TitleBackground picks mid_mixed indices 0-23 and front_small 0-18 only (extra exported cells are unused by stock Java).",
+  "title_scene_icon_ids_in_ui_spd": [
+    "icons_enter",
+    "icons_gold",
+    "icons_rankings",
+    "icons_journal",
+    "icons_news",
+    "icons_changes",
+    "icons_prefs",
+    "icons_langs",
+    "icons_shpx",
+    "icons_exit",
+    "icons_chevron"
+  ],
+  "title_scene_chrome_id_in_ui_spd": "toast_tr",
+  "related_manifest": "assets/ui_spd/godot_ui_manifest.json (icons + chrome)",
+  "slices": [
+    {
+      "id": "arch_00",
+      "role": "arch",
+      "source": "splashes/title/archs.png",
+      "png": "archs/arch_00.png",
+      "cell_index": 0,
+      "region_in_atlas": {
+        "x": 0,
+        "y": 0,
+        "w": 333,
+        "h": 100
+      }
+    },
+    {
+      "id": "arch_01",
+      "role": "arch",
+      "source": "splashes/title/archs.png",
+      "png": "archs/arch_01.png",
+      "cell_index": 1,
+      "region_in_atlas": {
+        "x": 333,
+        "y": 0,
+        "w": 333,
+        "h": 100
+      }
+    },
+    {
+      "id": "arch_02",
+      "role": "arch",
+      "source": "splashes/title/archs.png",
+      "png": "archs/arch_02.png",
+      "cell_index": 2,
+      "region_in_atlas": {
+        "x": 666,
+        "y": 0,
+        "w": 333,
+        "h": 100
+      }
+    },
+    {
+      "id": "arch_03",
+      "role": "arch",
+      "source": "splashes/title/archs.png",
+      "png": "archs/arch_03.png",
+      "cell_index": 3,
+      "region_in_atlas": {
+        "x": 0,
+        "y": 100,
+        "w": 333,
+        "h": 100
+      }
+    },
+    {
+      "id": "arch_04",
+      "role": "arch",
+      "source": "splashes/title/archs.png",
+      "png": "archs/arch_04.png",
+      "cell_index": 4,
+      "region_in_atlas": {
+        "x": 333,
+        "y": 100,
+        "w": 333,
+        "h": 100
+      }
+    },
+    {
+      "id": "arch_05",
+      "role": "arch",
+      "source": "splashes/title/archs.png",
+      "png": "archs/arch_05.png",
+      "cell_index": 5,
+      "region_in_atlas": {
+        "x": 666,
+        "y": 100,
+        "w": 333,
+        "h": 100
+      }
+    },
+    {
+      "id": "back_cluster_00",
+      "role": "back_cluster",
+      "source": "splashes/title/back_clusters.png",
+      "png": "back_clusters/cluster_00.png",
+      "cell_index": 0,
+      "region_in_atlas": {
+        "x": 0,
+        "y": 0,
+        "w": 450,
+        "h": 250
+      }
+    },
+    {
+      "id": "back_cluster_01",
+      "role": "back_cluster",
+      "source": "splashes/title/back_clusters.png",
+      "png": "back_clusters/cluster_01.png",
+      "cell_index": 1,
+      "region_in_atlas": {
+        "x": 0,
+        "y": 250,
+        "w": 450,
+        "h": 250
+      }
+    },
+    {
+      "id": "mid_mixed_00",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_00.png",
+      "cell_index": 0,
+      "region_in_atlas": {
+        "x": 0,
+        "y": 0,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_01",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_01.png",
+      "cell_index": 1,
+      "region_in_atlas": {
+        "x": 273,
+        "y": 0,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_02",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_02.png",
+      "cell_index": 2,
+      "region_in_atlas": {
+        "x": 546,
+        "y": 0,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_03",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_03.png",
+      "cell_index": 3,
+      "region_in_atlas": {
+        "x": 819,
+        "y": 0,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_04",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_04.png",
+      "cell_index": 4,
+      "region_in_atlas": {
+        "x": 1092,
+        "y": 0,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_05",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_05.png",
+      "cell_index": 5,
+      "region_in_atlas": {
+        "x": 1365,
+        "y": 0,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_06",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_06.png",
+      "cell_index": 6,
+      "region_in_atlas": {
+        "x": 1638,
+        "y": 0,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_07",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_07.png",
+      "cell_index": 7,
+      "region_in_atlas": {
+        "x": 0,
+        "y": 242,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_08",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_08.png",
+      "cell_index": 8,
+      "region_in_atlas": {
+        "x": 273,
+        "y": 242,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_09",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_09.png",
+      "cell_index": 9,
+      "region_in_atlas": {
+        "x": 546,
+        "y": 242,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_10",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_10.png",
+      "cell_index": 10,
+      "region_in_atlas": {
+        "x": 819,
+        "y": 242,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_11",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_11.png",
+      "cell_index": 11,
+      "region_in_atlas": {
+        "x": 1092,
+        "y": 242,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_12",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_12.png",
+      "cell_index": 12,
+      "region_in_atlas": {
+        "x": 1365,
+        "y": 242,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_13",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_13.png",
+      "cell_index": 13,
+      "region_in_atlas": {
+        "x": 1638,
+        "y": 242,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_14",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_14.png",
+      "cell_index": 14,
+      "region_in_atlas": {
+        "x": 0,
+        "y": 484,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_15",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_15.png",
+      "cell_index": 15,
+      "region_in_atlas": {
+        "x": 273,
+        "y": 484,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_16",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_16.png",
+      "cell_index": 16,
+      "region_in_atlas": {
+        "x": 546,
+        "y": 484,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_17",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_17.png",
+      "cell_index": 17,
+      "region_in_atlas": {
+        "x": 819,
+        "y": 484,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_18",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_18.png",
+      "cell_index": 18,
+      "region_in_atlas": {
+        "x": 1092,
+        "y": 484,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_19",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_19.png",
+      "cell_index": 19,
+      "region_in_atlas": {
+        "x": 1365,
+        "y": 484,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_20",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_20.png",
+      "cell_index": 20,
+      "region_in_atlas": {
+        "x": 1638,
+        "y": 484,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_21",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_21.png",
+      "cell_index": 21,
+      "region_in_atlas": {
+        "x": 0,
+        "y": 726,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_22",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_22.png",
+      "cell_index": 22,
+      "region_in_atlas": {
+        "x": 273,
+        "y": 726,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_23",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_23.png",
+      "cell_index": 23,
+      "region_in_atlas": {
+        "x": 546,
+        "y": 726,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_24",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_24.png",
+      "cell_index": 24,
+      "region_in_atlas": {
+        "x": 819,
+        "y": 726,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_25",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_25.png",
+      "cell_index": 25,
+      "region_in_atlas": {
+        "x": 1092,
+        "y": 726,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_26",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_26.png",
+      "cell_index": 26,
+      "region_in_atlas": {
+        "x": 1365,
+        "y": 726,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "mid_mixed_27",
+      "role": "mid_mixed",
+      "source": "splashes/title/mid_mixed.png",
+      "png": "mid_mixed/mid_27.png",
+      "cell_index": 27,
+      "region_in_atlas": {
+        "x": 1638,
+        "y": 726,
+        "w": 273,
+        "h": 242
+      }
+    },
+    {
+      "id": "front_small_00",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_00.png",
+      "cell_index": 0,
+      "region_in_atlas": {
+        "x": 0,
+        "y": 0,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_01",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_01.png",
+      "cell_index": 1,
+      "region_in_atlas": {
+        "x": 112,
+        "y": 0,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_02",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_02.png",
+      "cell_index": 2,
+      "region_in_atlas": {
+        "x": 224,
+        "y": 0,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_03",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_03.png",
+      "cell_index": 3,
+      "region_in_atlas": {
+        "x": 336,
+        "y": 0,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_04",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_04.png",
+      "cell_index": 4,
+      "region_in_atlas": {
+        "x": 448,
+        "y": 0,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_05",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_05.png",
+      "cell_index": 5,
+      "region_in_atlas": {
+        "x": 560,
+        "y": 0,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_06",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_06.png",
+      "cell_index": 6,
+      "region_in_atlas": {
+        "x": 672,
+        "y": 0,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_07",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_07.png",
+      "cell_index": 7,
+      "region_in_atlas": {
+        "x": 784,
+        "y": 0,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_08",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_08.png",
+      "cell_index": 8,
+      "region_in_atlas": {
+        "x": 896,
+        "y": 0,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_09",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_09.png",
+      "cell_index": 9,
+      "region_in_atlas": {
+        "x": 0,
+        "y": 116,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_10",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_10.png",
+      "cell_index": 10,
+      "region_in_atlas": {
+        "x": 112,
+        "y": 116,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_11",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_11.png",
+      "cell_index": 11,
+      "region_in_atlas": {
+        "x": 224,
+        "y": 116,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_12",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_12.png",
+      "cell_index": 12,
+      "region_in_atlas": {
+        "x": 336,
+        "y": 116,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_13",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_13.png",
+      "cell_index": 13,
+      "region_in_atlas": {
+        "x": 448,
+        "y": 116,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_14",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_14.png",
+      "cell_index": 14,
+      "region_in_atlas": {
+        "x": 560,
+        "y": 116,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_15",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_15.png",
+      "cell_index": 15,
+      "region_in_atlas": {
+        "x": 672,
+        "y": 116,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_16",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_16.png",
+      "cell_index": 16,
+      "region_in_atlas": {
+        "x": 784,
+        "y": 116,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_17",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_17.png",
+      "cell_index": 17,
+      "region_in_atlas": {
+        "x": 896,
+        "y": 116,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_18",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_18.png",
+      "cell_index": 18,
+      "region_in_atlas": {
+        "x": 0,
+        "y": 232,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_19",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_19.png",
+      "cell_index": 19,
+      "region_in_atlas": {
+        "x": 112,
+        "y": 232,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_20",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_20.png",
+      "cell_index": 20,
+      "region_in_atlas": {
+        "x": 224,
+        "y": 232,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_21",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_21.png",
+      "cell_index": 21,
+      "region_in_atlas": {
+        "x": 336,
+        "y": 232,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_22",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_22.png",
+      "cell_index": 22,
+      "region_in_atlas": {
+        "x": 448,
+        "y": 232,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_23",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_23.png",
+      "cell_index": 23,
+      "region_in_atlas": {
+        "x": 560,
+        "y": 232,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_24",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_24.png",
+      "cell_index": 24,
+      "region_in_atlas": {
+        "x": 672,
+        "y": 232,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_25",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_25.png",
+      "cell_index": 25,
+      "region_in_atlas": {
+        "x": 784,
+        "y": 232,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_26",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_26.png",
+      "cell_index": 26,
+      "region_in_atlas": {
+        "x": 896,
+        "y": 232,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_27",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_27.png",
+      "cell_index": 27,
+      "region_in_atlas": {
+        "x": 0,
+        "y": 348,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_28",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_28.png",
+      "cell_index": 28,
+      "region_in_atlas": {
+        "x": 112,
+        "y": 348,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_29",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_29.png",
+      "cell_index": 29,
+      "region_in_atlas": {
+        "x": 224,
+        "y": 348,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_30",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_30.png",
+      "cell_index": 30,
+      "region_in_atlas": {
+        "x": 336,
+        "y": 348,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_31",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_31.png",
+      "cell_index": 31,
+      "region_in_atlas": {
+        "x": 448,
+        "y": 348,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_32",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_32.png",
+      "cell_index": 32,
+      "region_in_atlas": {
+        "x": 560,
+        "y": 348,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_33",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_33.png",
+      "cell_index": 33,
+      "region_in_atlas": {
+        "x": 672,
+        "y": 348,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_34",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_34.png",
+      "cell_index": 34,
+      "region_in_atlas": {
+        "x": 784,
+        "y": 348,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "front_small_35",
+      "role": "front_small",
+      "source": "splashes/title/front_small.png",
+      "png": "front_small/small_35.png",
+      "cell_index": 35,
+      "region_in_atlas": {
+        "x": 896,
+        "y": 348,
+        "w": 112,
+        "h": 116
+      }
+    },
+    {
+      "id": "title_port",
+      "role": "banner",
+      "source": "interfaces/banners.png",
+      "png": "banners/title_port.png",
+      "notes": "BannerSprites.Type",
+      "region_in_atlas": {
+        "x": 0,
+        "y": 0,
+        "w": 139,
+        "h": 100
+      }
+    },
+    {
+      "id": "title_glow_port",
+      "role": "banner",
+      "source": "interfaces/banners.png",
+      "png": "banners/title_glow_port.png",
+      "notes": "BannerSprites.Type",
+      "region_in_atlas": {
+        "x": 139,
+        "y": 0,
+        "w": 139,
+        "h": 100
+      }
+    },
+    {
+      "id": "title_land",
+      "role": "banner",
+      "source": "interfaces/banners.png",
+      "png": "banners/title_land.png",
+      "notes": "BannerSprites.Type",
+      "region_in_atlas": {
+        "x": 0,
+        "y": 100,
+        "w": 240,
+        "h": 57
+      }
+    },
+    {
+      "id": "title_glow_land",
+      "role": "banner",
+      "source": "interfaces/banners.png",
+      "png": "banners/title_glow_land.png",
+      "notes": "BannerSprites.Type",
+      "region_in_atlas": {
+        "x": 240,
+        "y": 100,
+        "w": 240,
+        "h": 57
+      }
+    },
+    {
+      "id": "fireball_tall_00",
+      "role": "fireball_tall",
+      "source": "effects/fireball-tall.png",
+      "png": "fireball_tall/frame_00.png",
+      "frame": 0,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 0,
+        "y": 0,
+        "w": 61,
+        "h": 61
+      }
+    },
+    {
+      "id": "fireball_tall_01",
+      "role": "fireball_tall",
+      "source": "effects/fireball-tall.png",
+      "png": "fireball_tall/frame_01.png",
+      "frame": 1,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 61,
+        "y": 0,
+        "w": 61,
+        "h": 61
+      }
+    },
+    {
+      "id": "fireball_tall_02",
+      "role": "fireball_tall",
+      "source": "effects/fireball-tall.png",
+      "png": "fireball_tall/frame_02.png",
+      "frame": 2,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 122,
+        "y": 0,
+        "w": 61,
+        "h": 61
+      }
+    },
+    {
+      "id": "fireball_tall_03",
+      "role": "fireball_tall",
+      "source": "effects/fireball-tall.png",
+      "png": "fireball_tall/frame_03.png",
+      "frame": 3,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 183,
+        "y": 0,
+        "w": 61,
+        "h": 61
+      }
+    },
+    {
+      "id": "fireball_tall_04",
+      "role": "fireball_tall",
+      "source": "effects/fireball-tall.png",
+      "png": "fireball_tall/frame_04.png",
+      "frame": 4,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 0,
+        "y": 61,
+        "w": 61,
+        "h": 61
+      }
+    },
+    {
+      "id": "fireball_tall_05",
+      "role": "fireball_tall",
+      "source": "effects/fireball-tall.png",
+      "png": "fireball_tall/frame_05.png",
+      "frame": 5,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 61,
+        "y": 61,
+        "w": 61,
+        "h": 61
+      }
+    },
+    {
+      "id": "fireball_tall_06",
+      "role": "fireball_tall",
+      "source": "effects/fireball-tall.png",
+      "png": "fireball_tall/frame_06.png",
+      "frame": 6,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 122,
+        "y": 61,
+        "w": 61,
+        "h": 61
+      }
+    },
+    {
+      "id": "fireball_tall_07",
+      "role": "fireball_tall",
+      "source": "effects/fireball-tall.png",
+      "png": "fireball_tall/frame_07.png",
+      "frame": 7,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 183,
+        "y": 61,
+        "w": 61,
+        "h": 61
+      }
+    },
+    {
+      "id": "fireball_tall_08",
+      "role": "fireball_tall",
+      "source": "effects/fireball-tall.png",
+      "png": "fireball_tall/frame_08.png",
+      "frame": 8,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 0,
+        "y": 122,
+        "w": 61,
+        "h": 61
+      }
+    },
+    {
+      "id": "fireball_tall_09",
+      "role": "fireball_tall",
+      "source": "effects/fireball-tall.png",
+      "png": "fireball_tall/frame_09.png",
+      "frame": 9,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 61,
+        "y": 122,
+        "w": 61,
+        "h": 61
+      }
+    },
+    {
+      "id": "fireball_tall_10",
+      "role": "fireball_tall",
+      "source": "effects/fireball-tall.png",
+      "png": "fireball_tall/frame_10.png",
+      "frame": 10,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 122,
+        "y": 122,
+        "w": 61,
+        "h": 61
+      }
+    },
+    {
+      "id": "fireball_tall_11",
+      "role": "fireball_tall",
+      "source": "effects/fireball-tall.png",
+      "png": "fireball_tall/frame_11.png",
+      "frame": 11,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 183,
+        "y": 122,
+        "w": 61,
+        "h": 61
+      }
+    },
+    {
+      "id": "fireball_tall_12",
+      "role": "fireball_tall",
+      "source": "effects/fireball-tall.png",
+      "png": "fireball_tall/frame_12.png",
+      "frame": 12,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 0,
+        "y": 183,
+        "w": 61,
+        "h": 61
+      }
+    },
+    {
+      "id": "fireball_tall_13",
+      "role": "fireball_tall",
+      "source": "effects/fireball-tall.png",
+      "png": "fireball_tall/frame_13.png",
+      "frame": 13,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 61,
+        "y": 183,
+        "w": 61,
+        "h": 61
+      }
+    },
+    {
+      "id": "fireball_tall_14",
+      "role": "fireball_tall",
+      "source": "effects/fireball-tall.png",
+      "png": "fireball_tall/frame_14.png",
+      "frame": 14,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 122,
+        "y": 183,
+        "w": 61,
+        "h": 61
+      }
+    },
+    {
+      "id": "fireball_tall_15",
+      "role": "fireball_tall",
+      "source": "effects/fireball-tall.png",
+      "png": "fireball_tall/frame_15.png",
+      "frame": 15,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 183,
+        "y": 183,
+        "w": 61,
+        "h": 61
+      }
+    },
+    {
+      "id": "fireball_tall_16",
+      "role": "fireball_tall",
+      "source": "effects/fireball-tall.png",
+      "png": "fireball_tall/frame_16.png",
+      "frame": 16,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 0,
+        "y": 244,
+        "w": 61,
+        "h": 61
+      }
+    },
+    {
+      "id": "fireball_tall_17",
+      "role": "fireball_tall",
+      "source": "effects/fireball-tall.png",
+      "png": "fireball_tall/frame_17.png",
+      "frame": 17,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 61,
+        "y": 244,
+        "w": 61,
+        "h": 61
+      }
+    },
+    {
+      "id": "fireball_tall_18",
+      "role": "fireball_tall",
+      "source": "effects/fireball-tall.png",
+      "png": "fireball_tall/frame_18.png",
+      "frame": 18,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 122,
+        "y": 244,
+        "w": 61,
+        "h": 61
+      }
+    },
+    {
+      "id": "fireball_tall_19",
+      "role": "fireball_tall",
+      "source": "effects/fireball-tall.png",
+      "png": "fireball_tall/frame_19.png",
+      "frame": 19,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 183,
+        "y": 244,
+        "w": 61,
+        "h": 61
+      }
+    },
+    {
+      "id": "fireball_tall_20",
+      "role": "fireball_tall",
+      "source": "effects/fireball-tall.png",
+      "png": "fireball_tall/frame_20.png",
+      "frame": 20,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 0,
+        "y": 305,
+        "w": 61,
+        "h": 61
+      }
+    },
+    {
+      "id": "fireball_tall_21",
+      "role": "fireball_tall",
+      "source": "effects/fireball-tall.png",
+      "png": "fireball_tall/frame_21.png",
+      "frame": 21,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 61,
+        "y": 305,
+        "w": 61,
+        "h": 61
+      }
+    },
+    {
+      "id": "fireball_tall_22",
+      "role": "fireball_tall",
+      "source": "effects/fireball-tall.png",
+      "png": "fireball_tall/frame_22.png",
+      "frame": 22,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 122,
+        "y": 305,
+        "w": 61,
+        "h": 61
+      }
+    },
+    {
+      "id": "fireball_tall_23",
+      "role": "fireball_tall",
+      "source": "effects/fireball-tall.png",
+      "png": "fireball_tall/frame_23.png",
+      "frame": 23,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 183,
+        "y": 305,
+        "w": 61,
+        "h": 61
+      }
+    },
+    {
+      "id": "fireball_short_00",
+      "role": "fireball_short",
+      "source": "effects/fireball-short.png",
+      "png": "fireball_short/frame_00.png",
+      "frame": 0,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 0,
+        "y": 0,
+        "w": 47,
+        "h": 47
+      }
+    },
+    {
+      "id": "fireball_short_01",
+      "role": "fireball_short",
+      "source": "effects/fireball-short.png",
+      "png": "fireball_short/frame_01.png",
+      "frame": 1,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 47,
+        "y": 0,
+        "w": 47,
+        "h": 47
+      }
+    },
+    {
+      "id": "fireball_short_02",
+      "role": "fireball_short",
+      "source": "effects/fireball-short.png",
+      "png": "fireball_short/frame_02.png",
+      "frame": 2,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 94,
+        "y": 0,
+        "w": 47,
+        "h": 47
+      }
+    },
+    {
+      "id": "fireball_short_03",
+      "role": "fireball_short",
+      "source": "effects/fireball-short.png",
+      "png": "fireball_short/frame_03.png",
+      "frame": 3,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 141,
+        "y": 0,
+        "w": 47,
+        "h": 47
+      }
+    },
+    {
+      "id": "fireball_short_04",
+      "role": "fireball_short",
+      "source": "effects/fireball-short.png",
+      "png": "fireball_short/frame_04.png",
+      "frame": 4,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 188,
+        "y": 0,
+        "w": 47,
+        "h": 47
+      }
+    },
+    {
+      "id": "fireball_short_05",
+      "role": "fireball_short",
+      "source": "effects/fireball-short.png",
+      "png": "fireball_short/frame_05.png",
+      "frame": 5,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 0,
+        "y": 47,
+        "w": 47,
+        "h": 47
+      }
+    },
+    {
+      "id": "fireball_short_06",
+      "role": "fireball_short",
+      "source": "effects/fireball-short.png",
+      "png": "fireball_short/frame_06.png",
+      "frame": 6,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 47,
+        "y": 47,
+        "w": 47,
+        "h": 47
+      }
+    },
+    {
+      "id": "fireball_short_07",
+      "role": "fireball_short",
+      "source": "effects/fireball-short.png",
+      "png": "fireball_short/frame_07.png",
+      "frame": 7,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 94,
+        "y": 47,
+        "w": 47,
+        "h": 47
+      }
+    },
+    {
+      "id": "fireball_short_08",
+      "role": "fireball_short",
+      "source": "effects/fireball-short.png",
+      "png": "fireball_short/frame_08.png",
+      "frame": 8,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 141,
+        "y": 47,
+        "w": 47,
+        "h": 47
+      }
+    },
+    {
+      "id": "fireball_short_09",
+      "role": "fireball_short",
+      "source": "effects/fireball-short.png",
+      "png": "fireball_short/frame_09.png",
+      "frame": 9,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 188,
+        "y": 47,
+        "w": 47,
+        "h": 47
+      }
+    },
+    {
+      "id": "fireball_short_10",
+      "role": "fireball_short",
+      "source": "effects/fireball-short.png",
+      "png": "fireball_short/frame_10.png",
+      "frame": 10,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 0,
+        "y": 94,
+        "w": 47,
+        "h": 47
+      }
+    },
+    {
+      "id": "fireball_short_11",
+      "role": "fireball_short",
+      "source": "effects/fireball-short.png",
+      "png": "fireball_short/frame_11.png",
+      "frame": 11,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 47,
+        "y": 94,
+        "w": 47,
+        "h": 47
+      }
+    },
+    {
+      "id": "fireball_short_12",
+      "role": "fireball_short",
+      "source": "effects/fireball-short.png",
+      "png": "fireball_short/frame_12.png",
+      "frame": 12,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 94,
+        "y": 94,
+        "w": 47,
+        "h": 47
+      }
+    },
+    {
+      "id": "fireball_short_13",
+      "role": "fireball_short",
+      "source": "effects/fireball-short.png",
+      "png": "fireball_short/frame_13.png",
+      "frame": 13,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 141,
+        "y": 94,
+        "w": 47,
+        "h": 47
+      }
+    },
+    {
+      "id": "fireball_short_14",
+      "role": "fireball_short",
+      "source": "effects/fireball-short.png",
+      "png": "fireball_short/frame_14.png",
+      "frame": 14,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 188,
+        "y": 94,
+        "w": 47,
+        "h": 47
+      }
+    },
+    {
+      "id": "fireball_short_15",
+      "role": "fireball_short",
+      "source": "effects/fireball-short.png",
+      "png": "fireball_short/frame_15.png",
+      "frame": 15,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 0,
+        "y": 141,
+        "w": 47,
+        "h": 47
+      }
+    },
+    {
+      "id": "fireball_short_16",
+      "role": "fireball_short",
+      "source": "effects/fireball-short.png",
+      "png": "fireball_short/frame_16.png",
+      "frame": 16,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 47,
+        "y": 141,
+        "w": 47,
+        "h": 47
+      }
+    },
+    {
+      "id": "fireball_short_17",
+      "role": "fireball_short",
+      "source": "effects/fireball-short.png",
+      "png": "fireball_short/frame_17.png",
+      "frame": 17,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 94,
+        "y": 141,
+        "w": 47,
+        "h": 47
+      }
+    },
+    {
+      "id": "fireball_short_18",
+      "role": "fireball_short",
+      "source": "effects/fireball-short.png",
+      "png": "fireball_short/frame_18.png",
+      "frame": 18,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 141,
+        "y": 141,
+        "w": 47,
+        "h": 47
+      }
+    },
+    {
+      "id": "fireball_short_19",
+      "role": "fireball_short",
+      "source": "effects/fireball-short.png",
+      "png": "fireball_short/frame_19.png",
+      "frame": 19,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 188,
+        "y": 141,
+        "w": 47,
+        "h": 47
+      }
+    },
+    {
+      "id": "fireball_short_20",
+      "role": "fireball_short",
+      "source": "effects/fireball-short.png",
+      "png": "fireball_short/frame_20.png",
+      "frame": 20,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 0,
+        "y": 188,
+        "w": 47,
+        "h": 47
+      }
+    },
+    {
+      "id": "fireball_short_21",
+      "role": "fireball_short",
+      "source": "effects/fireball-short.png",
+      "png": "fireball_short/frame_21.png",
+      "frame": 21,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 47,
+        "y": 188,
+        "w": 47,
+        "h": 47
+      }
+    },
+    {
+      "id": "fireball_short_22",
+      "role": "fireball_short",
+      "source": "effects/fireball-short.png",
+      "png": "fireball_short/frame_22.png",
+      "frame": 22,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 94,
+        "y": 188,
+        "w": 47,
+        "h": 47
+      }
+    },
+    {
+      "id": "fireball_short_23",
+      "role": "fireball_short",
+      "source": "effects/fireball-short.png",
+      "png": "fireball_short/frame_23.png",
+      "frame": 23,
+      "fps_hint": 24,
+      "loop": true,
+      "region_in_atlas": {
+        "x": 141,
+        "y": 188,
+        "w": 47,
+        "h": 47
+      }
+    }
+  ]
+}

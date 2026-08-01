@@ -52,16 +52,31 @@ public class DesktopWindowListener implements Lwjgl3WindowListener {
 		}
 	}
 	public boolean closeRequested () {
-		StreamingBootstrapper.stop();
-		// Exit after delay so gradle :desktop:run finishes. Use in-game Save & Quit to save before closing.
-		Thread exitThread = new Thread(() -> {
+		// Never block the LWJGL close callback — a hung writer/websocket stop used to
+		// prevent halt(), leaving :desktop:debug stuck at IDLE with SE binary alive.
+		// Watchdog guarantees process death even if cleanup hangs.
+		Thread watchdog = new Thread(() -> {
 			try {
-				Thread.sleep(2500);
+				Thread.sleep(3000);
 			} catch (InterruptedException ignored) {}
+			System.out.println("[Desktop] Force-exit (watchdog)");
+			Runtime.getRuntime().halt(0);
+		}, "DesktopRunExitWatchdog");
+		watchdog.setDaemon(true);
+		watchdog.start();
+
+		Thread cleanup = new Thread(() -> {
+			try {
+				TrainingExportBootstrapper.stop();
+				StreamingBootstrapper.stop();
+			} catch (Throwable t) {
+				t.printStackTrace();
+			}
+			System.out.println("[Desktop] Exit after cleanup");
 			Runtime.getRuntime().halt(0);
 		}, "DesktopRunExit");
-		exitThread.setDaemon(true);
-		exitThread.start();
+		cleanup.setDaemon(false);
+		cleanup.start();
 		return true;
 	}
 	public void filesDropped ( String[] strings ) { }

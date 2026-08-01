@@ -1,0 +1,129 @@
+index	primary_java_constant	buff_subclasses	talent_enum_constants	hero_java_refs	notes
+0	BERSERKER			HeroSubClass.BERSERKER	
+1	GLADIATOR			HeroSubClass.GLADIATOR	
+2	BATTLEMAGE			HeroSubClass.BATTLEMAGE	
+3	WARLOCK			HeroSubClass.WARLOCK	
+4	ASSASSIN			HeroSubClass.ASSASSIN	
+5	FREERUNNER			HeroSubClass.FREERUNNER	
+6	SNIPER			HeroSubClass.SNIPER	
+7	WARDEN			HeroSubClass.WARDEN	
+8	CHAMPION			HeroSubClass.CHAMPION	
+9	MONK			HeroSubClass.MONK	
+10	PRIEST			HeroSubClass.PRIEST	
+11	PALADIN			HeroSubClass.PALADIN	
+12					no_java_reference_found
+13					no_java_reference_found
+14					no_java_reference_found
+15					no_java_reference_found
+16	HEROIC_LEAP			HeroicLeap	
+17	SHOCKWAVE			Shockwave	
+18	ENDURE			Endure	
+19	ELEMENTAL_BLAST			ElementalBlast	
+20	WILD_MAGIC			WildMagic	
+21	WARP_BEACON			WarpBeacon	
+22	SMOKE_BOMB			SmokeBomb	
+23	DEATH_MARK			DeathMark	
+24	SHADOW_CLONE			ShadowClone	
+25	SPECTRAL_BLADES			SpectralBlades	
+26	NATURES_POWER			NaturesPower	
+27	SPIRIT_HAWK			SpiritHawk	
+28	CHALLENGE			Challenge	
+29	ELEMENTAL_STRIKE			ElementalStrike	
+30	FEINT			Feint	
+31	ASCENDED_FORM			AscendedForm	
+32	TRINITY			Trinity	
+33	POWER_OF_MANY			PowerOfMany	
+34	RATMOGRIFY			Ratmogrify	
+35					no_java_reference_found
+36					no_java_reference_found
+37					no_java_reference_found
+38					no_java_reference_found
+39					no_java_reference_found
+40	GUIDING_LIGHT			GuidingLight	
+41	HOLY_WEAPON			HolyWeapon	
+42	HOLY_WARD			HolyWard	
+43	HOLY_INTUITION			HolyIntuition	
+44	SHIELD_OF_LIGHT			ShieldOfLight	
+45	RECALL_GLYPH			RecallInscription	
+46	SUNRAY			Sunray	
+47	DIVINE_SENSE			DivineSense	
+48	BLESS			BlessSpell	
+49	CLEANSE			Cleanse	
+50	RADIANCE			Radiance	
+51	HOLY_LANCE			HolyLance	
+52	HALLOWED_GROUND			HallowedGround	
+53	MNEMONIC_PRAYER			MnemonicPrayer	
+54	SMITE			Smite	
+55	LAY_ON_HANDS			LayOnHands	
+56	AURA_OF_PROTECTION			AuraOfProtection	
+57	WALL_OF_LIGHT			WallOfLight	
+58	DIVINE_INTERVENTION			DivineIntervention	
+59	JUDGEMENT			Judgement	
+60	FLASH			Flash	
+61	BODY_FORM			BodyForm	
+62	MIND_FORM			MindForm	
+63	SPIRIT_FORM			SpiritForm	
+64	BEAMING_RAY			BeamingRay	
+65	LIFE_LINK			LifeLinkSpell	
+66	STASIS			Stasis	
+67					no_java_reference_found
+68					no_java_reference_found
+69					no_java_reference_found
+70					no_java_reference_found
+71					no_java_reference_found
+72					no_java_reference_found
+73					no_java_reference_found
+74					no_java_reference_found
+75					no_java_reference_found
+76					no_java_reference_found
+77					no_java_reference_found
+78					no_java_reference_found
+79					no_java_reference_found
+80					no_java_reference_found
+81					no_java_reference_found
+82					no_java_reference_found
+83					no_java_reference_found
+84					no_java_reference_found
+85					no_java_reference_found
+86					no_java_reference_found
+87					no_java_reference_found
+88					no_java_reference_found
+89					no_java_reference_found
+90					no_java_reference_found
+91					no_java_reference_found
+92					no_java_reference_found
+93					no_java_reference_found
+94					no_java_reference_found
+95					no_java_reference_found
+96					no_java_reference_found
+97					no_java_reference_found
+98					no_java_reference_found
+99					no_java_reference_found
+100					no_java_reference_found
+101					no_java_reference_found
+102					no_java_reference_found
+103					no_java_reference_found
+104	BERSERK				
+105	COMBO				
+106	PREPARATION				
+107	MOMENTUM				
+108	SNIPERS_MARK				
+109	WEAPON_SWAP				
+110	MONK_ABILITIES				
+111					no_java_reference_found
+112					no_java_reference_found
+113					no_java_reference_found
+114					no_java_reference_found
+115					no_java_reference_found
+116					no_java_reference_found
+117					no_java_reference_found
+118					no_java_reference_found
+119					no_java_reference_found
+120					no_java_reference_found
+121					no_java_reference_found
+122					no_java_reference_found
+123					no_java_reference_found
+124					no_java_reference_found
+125					no_java_reference_found
+126					no_java_reference_found
+127					no_java_reference_found
