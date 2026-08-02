@@ -25,6 +25,7 @@ from points_command import (
     chat_pts,
     effective_total,
     get_config,
+    ignores_command_cooldowns,
     is_double_points_active,
     points_lock,
     read_points,
@@ -369,7 +370,12 @@ def handle_earn_message(username: str, is_sub: bool, is_member: bool) -> ChatRes
             data = read_points()
             pts, last, donation_pts, role = _get_user_data(data, key)
 
-            if cooldown > 0 and last > 0 and (now - last) < cooldown:
+            if (
+                not ignores_command_cooldowns(username)
+                and cooldown > 0
+                and last > 0
+                and (now - last) < cooldown
+            ):
                 total = effective_total(pts, donation_pts)
                 return ChatResult(ok=True, message=None, pts=total, earned=0)
 
@@ -413,7 +419,12 @@ def handle_earn_passive(username: str, is_sub: bool, is_member: bool) -> ChatRes
             if key not in data:
                 return ChatResult(ok=True, message=None, earned=0)
             pts, last, donation_pts, role = _get_user_data(data, key)
-            if cooldown > 0 and last > 0 and (now - last) < cooldown:
+            if (
+                not ignores_command_cooldowns(username)
+                and cooldown > 0
+                and last > 0
+                and (now - last) < cooldown
+            ):
                 return ChatResult(ok=True, message=None, pts=effective_total(pts, donation_pts), earned=0)
 
             mult = chat_earn_multiplier(username, is_sub, is_member)
@@ -590,7 +601,11 @@ def handle_summon(username: str, args: list[str]) -> ChatResult:
     summon_last = state.setdefault("summon_last", {})
     now = int(time.time())
     last = int(summon_last.get(key, 0) or 0)
-    if last and (now - last) < SUMMON_COOLDOWN_SEC:
+    if (
+        not ignores_command_cooldowns(username)
+        and last
+        and (now - last) < SUMMON_COOLDOWN_SEC
+    ):
         return ChatResult(ok=True, message=None, extra={"command": "summon", "skipped": "cooldown"})
 
     monster_arg = args[0] if args else ""
@@ -605,6 +620,8 @@ def handle_summon(username: str, args: list[str]) -> ChatResult:
 
     xp = int(bestiary.get("xp", 0) or 0)
     level = int(bestiary.get("level", 1) or 1)
+    soft_floor = bool(bestiary.get("soft_floor"))
+    xp_mult = float(bestiary.get("xp_mult", 1.0) or 1.0)
     march_ok = True
     try:
         _summon_post(username, monster, xp=xp, bestiary_level=level)
@@ -618,7 +635,9 @@ def handle_summon(username: str, args: list[str]) -> ChatResult:
     _save_session_state(state)
 
     pres = dict(presentation_config.SUMMON_PRESENTATION) if march_ok else None
-    msg = chat_messages.summon_success(username, monster, xp)
+    msg = chat_messages.summon_success(
+        username, monster, xp, soft_floor=soft_floor, xp_mult=xp_mult
+    )
     if not march_ok:
         msg += " (overlay server offline - XP counted, march not queued)"
     if bestiary.get("leveled_up") and bestiary.get("level_up"):
@@ -642,6 +661,8 @@ def handle_summon(username: str, args: list[str]) -> ChatResult:
             "command": "summon",
             "monster": monster,
             "xp": xp,
+            "xp_mult": xp_mult,
+            "soft_floor": soft_floor,
             "bestiary_level": level,
             "leveled_up": bool(bestiary.get("leveled_up")),
             "march_queued": march_ok,

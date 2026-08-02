@@ -6,8 +6,9 @@ const _SpdUi := preload("res://scripts/spd_ui_art.gd")
 var _panel: PanelContainer
 var _zone_label: Label
 var _bar_holder: Control
-var _exp_track: TextureRect
+var _exp_track: ColorRect
 var _exp_fill: TextureRect
+var _exp_fill_atlas: AtlasTexture
 var _exp_text: Label
 var _sprint_label: Label
 var _heat_label: Label
@@ -65,7 +66,9 @@ func _build() -> void:
 	_panel = PanelContainer.new()
 	_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_panel.clip_contents = true
-	_panel.add_theme_stylebox_override("panel", _SpdUi.chrome_style_window())
+	_panel.add_theme_stylebox_override(
+		"panel", _SpdUi.chrome_style_window(CompanionConfig.bestiary_chrome_scale)
+	)
 	add_child(_panel)
 
 	var margin := MarginContainer.new()
@@ -91,16 +94,15 @@ func _build() -> void:
 	_sync_bar_holder_min_size()
 	vbox.add_child(_bar_holder)
 
-	_exp_track = TextureRect.new()
-	_exp_track.texture = _SpdUi.exp_track_texture()
-	_exp_track.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_exp_track.stretch_mode = TextureRect.STRETCH_SCALE
-	_SpdUi.apply_nearest(_exp_track)
-	_exp_track.modulate = Color(0.35, 0.35, 0.4, 0.85)
+	_exp_track = ColorRect.new()
+	# Flat track — stretched HP atlas end-caps looked spear-tipped at HUD widths.
+	_exp_track.color = Color(0.22, 0.07, 0.07, 0.95)
+	_exp_track.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_bar_holder.add_child(_exp_track)
 
 	_exp_fill = TextureRect.new()
-	_exp_fill.texture = _SpdUi.exp_fill_texture(false)
+	_exp_fill_atlas = _SpdUi.exp_fill_texture(false)
+	_exp_fill.texture = _exp_fill_atlas
 	_exp_fill.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_exp_fill.stretch_mode = TextureRect.STRETCH_SCALE
 	_SpdUi.apply_nearest(_exp_fill)
@@ -196,32 +198,65 @@ func _content_width() -> float:
 	return maxf(zone_w, bar_w + 24.0)
 
 
+func _exp_native_size() -> Vector2:
+	if CompanionConfig.bestiary_use_compact_exp_bar:
+		return Vector2(17.0, 4.0)
+	return Vector2(128.0, 7.0)
+
+
+func _bar_draw_size(holder_w: float) -> Vector2:
+	## Width/height follow settings; track is a ColorRect so wide bars stay rectangular.
+	## Height uses the large StatusPane strip (7px) so compact fill art doesn't shrink the bar.
+	var h_scale := clampf(CompanionConfig.bestiary_exp_bar_height_scale, 0.5, 4.0)
+	var bar_h := maxf(4.0, 7.0 * h_scale)
+	var bar_w := float(clampi(CompanionConfig.bestiary_exp_bar_width_px, 64, 1600))
+	if holder_w > 1.0:
+		bar_w = minf(bar_w, holder_w)
+	return Vector2(maxf(32.0, bar_w), bar_h)
+
+
 func _sync_bar_holder_min_size() -> void:
 	if _bar_holder == null:
 		return
-	## Native StatusPane exp is 7px (large) / 4px (compact); scale drives visible height.
-	var base_h: float = 4.0 if CompanionConfig.bestiary_use_compact_exp_bar else 7.0
-	var h_scale := clampf(CompanionConfig.bestiary_exp_bar_height_scale, 0.5, 4.0)
-	var h := maxf(4.0, base_h * h_scale)
-	var inner_w := maxf(64.0, _content_width() - 24.0)
-	_bar_holder.custom_minimum_size = Vector2(inner_w, h)
+	var draw := _bar_draw_size(0.0)
+	var inner_w := maxf(draw.x, _content_width() - 24.0)
+	_bar_holder.custom_minimum_size = Vector2(inner_w, draw.y)
 
 
 func _layout_exp_bar(_unused: Variant = null) -> void:
-	if _bar_holder == null:
+	if _bar_holder == null or _exp_track == null or _exp_fill == null:
 		return
-	var w := _bar_holder.size.x
-	var h := maxf(4.0, _bar_holder.size.y)
-	if w < 1.0:
-		w = maxf(64.0, _content_width() - 24.0)
-	_exp_track.position = Vector2.ZERO
-	_exp_track.size = Vector2(w, h)
+	var holder_w := _bar_holder.size.x
+	if holder_w < 1.0:
+		holder_w = maxf(64.0, _content_width() - 24.0)
+	var draw := _bar_draw_size(holder_w)
+	var bar_w := draw.x
+	var bar_h := draw.y
 	var frac := 0.0
 	if not _last_payload.is_empty():
 		frac = clampf(float(_last_payload.get("bar_fraction", 0.0)), 0.0, 1.0)
-	# StatusPane.java: exp.scale.x = (128 / exp.width) * exp/maxExp; height follows holder.
+
+	_exp_track.position = Vector2.ZERO
+	_exp_track.size = Vector2(bar_w, bar_h)
+
+	# Crop the left portion of the SPD exp strip (don't squash the rounded tip).
+	var native := _exp_native_size()
+	var src_w := maxf(1.0, native.x * frac) if frac > 0.0 else 0.0
+	if _exp_fill_atlas and frac > 0.0:
+		var base_region := (
+			_SpdUi.EXP_COMPACT if CompanionConfig.bestiary_use_compact_exp_bar else _SpdUi.EXP_LARGE
+		)
+		_exp_fill_atlas.region = Rect2(
+			float(base_region.position.x),
+			float(base_region.position.y),
+			src_w,
+			float(base_region.size.y)
+		)
+		_exp_fill.texture = _exp_fill_atlas
+	var fill_w := bar_w * frac
 	_exp_fill.position = Vector2.ZERO
-	_exp_fill.size = Vector2(w * frac, h)
+	_exp_fill.size = Vector2(fill_w, bar_h)
+	_exp_fill.visible = fill_w >= 0.5
 
 
 func _layout_banner(canvas: Vector2) -> void:
@@ -261,9 +296,13 @@ func _apply_layout() -> void:
 		_panel.custom_minimum_size = Vector2(content_w, 0)
 		_panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		_panel.scale = Vector2(hud_s, hud_s)
+		_panel.add_theme_stylebox_override(
+			"panel", _SpdUi.chrome_style_window(CompanionConfig.bestiary_chrome_scale)
+		)
 	_sync_bar_holder_min_size()
 	_refresh_fonts()
-	_exp_fill.texture = _SpdUi.exp_fill_texture(CompanionConfig.bestiary_use_compact_exp_bar)
+	_exp_fill_atlas = _SpdUi.exp_fill_texture(CompanionConfig.bestiary_use_compact_exp_bar)
+	_exp_fill.texture = _exp_fill_atlas
 	_layout_exp_bar()
 	_layout_banner(canvas)
 

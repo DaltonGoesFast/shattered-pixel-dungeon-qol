@@ -139,8 +139,13 @@ func _process_events(events: Array) -> void:
 		seen_ids[id] = true
 		last_seen_id = id
 		print(
-			"[SummonPoll] New summon: %s from %s (%s)"
-			% [event.get("monster", "?"), event.get("username", "?"), id]
+			"[SummonPoll] New summon: %s from %s crowned=%s (%s)"
+			% [
+				event.get("monster", "?"),
+				event.get("username", "?"),
+				event.get("crowned", false),
+				id,
+			]
 		)
 		summon_received.emit(event)
 

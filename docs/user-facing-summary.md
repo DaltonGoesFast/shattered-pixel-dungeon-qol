@@ -11,7 +11,7 @@ Copy the block below for your YouTube description, Twitch panels, or channel Abo
 ```
 SHATTER THE STREAMER - Chat plays along with a live Shattered Pixel Dungeon run. Earn points by chatting and spend them on spawns, curses, scrolls, and more that hit the hero in real time. Free commands light up the stream overlay; paid commands change the dungeon.
 
-BESTIARY - Free !summon marches monsters across the companion overlay and fills a shared XP bar. Unlock zones together (Sewers -> Prison -> Caves -> City -> Halls). Race the Sprint for each level (Hall of Fame + 100 donor pts on win). Hold Heat (last 15 min of summon XP) for personal 2x point gains. Check !bestiary, !heat, !topsummoner, !summonhall.
+BESTIARY - Free !summon marches monsters across the companion overlay and fills a shared XP bar. Unlock zones together (Sewers -> Prison -> Caves -> City -> Halls). Race the Sprint for each level (Hall of Fame + 100/200/300/400 donor pts by zone on win). Hold Heat (last 15 min of summon XP) for personal 2x point gains. Check !bestiary, !heat, !topsummoner, !summonhall.
 
 CHAT COMMANDS - Spend points to mess with the run!
 

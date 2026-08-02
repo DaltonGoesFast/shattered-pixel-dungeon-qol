@@ -1,3 +1,4 @@
 {
-    "java.configuration.updateBuildConfiguration": "automatic"
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "godotTools.editorPath.godot4": "c:\\Users\\dalto\\Documents\\My Games\\Godot\\Godot_v4.6.2-stable_win64.exe"
 }

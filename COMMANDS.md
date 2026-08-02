@@ -2,7 +2,7 @@
 
 **Shatter the Streamer** — Chat plays along with a live *Shattered Pixel Dungeon* run. Earn points by chatting and spend them on spawns, curses, scrolls, and more that hit the hero in real time. Free commands light up the stream overlay; paid commands change the dungeon.
 
-**Bestiary** — Free `!summon` marches monsters across the companion overlay and fills a **shared XP bar**. Unlock zones together (Sewers → Prison → Caves → City → Halls). Race the **Sprint** for each level (Hall of Fame + **100 donor pts** on win). Hold **Heat** (last 15 min of summon XP) for **personal 2×** point gains. Check `!bestiary`, `!heat`, `!topsummoner`, `!summonhall`. Details: [docs/bestiary-summon-system.md](docs/bestiary-summon-system.md).
+**Bestiary** — Free `!summon` marches monsters across the companion overlay and fills a **shared XP bar**. Unlock zones together (Sewers → Prison → Caves → City → Halls). Race the **Sprint** for each level (Hall of Fame + **100/200/300/400 donor pts** by zone; **one crown per viewer per stream**). Hold **Heat** (last 15 min of summon XP) for **personal 2×** point gains. Check `!bestiary`, `!heat`, `!topsummoner`, `!summonhall`. Details: [docs/bestiary-summon-system.md](docs/bestiary-summon-system.md).
 
 **Economy v1.1:** Earn **2 pts per message** (20s cooldown). Up to **500 chat points per stream**; use **`!bank`** to save **10%** into **donor points** (permanent). Chat resets when the stream ends; donor points never expire.
 
@@ -17,7 +17,7 @@
 | **!fard** | Once per stream per viewer: OBS flash + sound; extends **global 2×** for everyone (+3 min, +6 min for subs/members). Already used? Bot replies that you used your fard this stream. |
 | **!summon** | Monster march on the **companion overlay** (not in-game). **60s** cooldown. Starts with **Sewers** mobs; fill the co-op XP bar to unlock more. `!summon rat` or random from the unlocked pool |
 | **!bestiary** / **!summonlevel** | Co-op bar (level / zone / XP) + unlocked list + **your** sprint XP and heat XP |
-| **!topsummoner** | **Sprint** leader this Bestiary level (resets on level-up; not the 2× heat crown) |
+| **!topsummoner** | **Sprint** leader this Bestiary level among viewers who haven’t crowned yet this stream (resets on level-up; not the 2× heat crown) |
 | **!heat** / **!hot** | Rolling **15 min** heat leader — that viewer earns **personal 2×** on point gains |
 | **!summonhall** | Hall of Fame — sprint winners for completed zones this stream |
 | **!mysummons** | Your summon count this stream + sprint XP + heat XP |

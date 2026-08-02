@@ -83,7 +83,9 @@ When enabled in `user://companion_settings.cfg`, if the WebSocket is down the cl
 
 ## Streamer.bot JSON (UDP)
 
-Target: **`127.0.0.1:<streamerbot_udp_port>`** (default **5100**). Configure Streamer.bot **Send UDP** (or equivalent). Send **one JSON object per datagram**, **UTF-8**.
+Target port: **`<streamerbot_udp_port>`** (default **5100**). Companion binds **`*`** (all interfaces) so Streamer.bot **Core → Network → UDP Broadcast** works. Send **one JSON object per datagram**, **UTF-8**.
+
+### Game commands (alerts)
 
 | Field | Required | Description |
 |-------|----------|-------------|
@@ -99,6 +101,25 @@ Target: **`127.0.0.1:<streamerbot_udp_port>`** (default **5100**). Configure Str
 ```json
 {"source":"streamerbot","command":"spawn","args":["rat"],"username":"viewer42","request_id":"%uuid%"}
 ```
+
+### Paid / highlight notices (companion overlay only)
+
+If the JSON includes a non-empty **`ui`** field, it is **not** treated as a game command. Handled by `PaidNoticeOverlay` (Settings → **Paid notices**).
+
+**Apply guide (triggers, Send UDP, Speaker.bot, migration from OBS):** [`docs/streamerbot-paid-notices-companion-apply.md`](../docs/streamerbot-paid-notices-companion-apply.md).
+
+Streamer.bot group **Companion Commands**: `C01 - Superchat`, `C02 - New Sub/Member`, `C03 - Gifted`.
+
+| `ui` (or `kind`) | Platform | Streamer.bot action / trigger |
+|------------------|----------|-------------------------------|
+| `superchat` | YouTube | **C01** · Super Chat |
+| `membership` | YouTube | **C02** · New Sponsor (C# maps from `companionUi=sub`) |
+| `sub` | Twitch | **C02** · Subscription / Resubscription |
+| `gifted_membership` | YouTube | **C03** · Membership Gift |
+| `gifted_subs` | Twitch | **C03** · Gift Subscription (C# maps from `companionUi=gifted_membership`) |
+| `highlight` | Twitch | **None** (no SB action — leave disabled) |
+
+Optional fields: `username`, `message` / `text`, `amount`, `tier`, `months`, `count` / `gift_count`, `ttl_sec` (default from settings, often `6`).
 
 **Testing without Streamer.bot:** from PowerShell you can send a datagram (replace path/tools as needed):
 
@@ -120,6 +141,14 @@ If the overlay writes **`spawn_result.txt`** and your Streamer.bot C# reads it (
 - **Race:** If C# runs and deletes the file **before** the next poll, Godot may miss one event—use a short poll (e.g. **0.05–0.1**), or add a short **Delay** before the C# action so the companion usually sees the file first.
 - Alert **icons** from this file are **off** by default (`spawn_result_file_icons=false`). Turn **on** only if the middle segment reliably carries a scroll/rune or `ScrollOf*` name.
 
+## Placeable chrome boxes (empty SPD window frames)
+
+- **Settings → UI panels → Add chrome box** creates an empty SPD chrome panel on the canvas.
+- Each box gets its own settings tab: **Chrome style** (all `Chrome.Type` slices: window, silver window, toasts, red/grey buttons, tag, gem, scroll, tabs, blank), enable, pixel zone (`x/y/w/h`, height `0` = auto), chrome scale, **Show on Live** / **Show on Pause**.
+- Style ids + labels live in `SpdUiArt.CHROME_STYLE_*`; margins match `Chrome.java`. Assets under `assets/ui_spd/chrome/`.
+- Max **16** boxes. Persisted as `[ui] chrome_boxes` (array of dictionaries; `style` defaults to `window`) in `user://companion_settings.cfg`.
+- Runtime: `CanvasLayerChromeBoxes` / `scripts/placeable_chrome_boxes.gd` (layer 2). When OBS sync is off or disconnected, a box shows if either scene checkbox is on.
+
 ## Summon march + Bestiary (Lastest UI HTTP)
 
 - **March queue:** `GET http://127.0.0.1:5000/api/summon-march?since=<id>` — autoload `SummonPollService`.
@@ -132,6 +161,13 @@ If the overlay writes **`spawn_result.txt`** and your Streamer.bot C# reads it (
 ## Local settings file (`user://companion_settings.cfg`)
 
 Created on first run. You can edit in a text editor, or use the in-app **Settings** window (**F2** or the HUD button), then **Apply & save**. That writes this file and reconnects WebSocket / UDP where needed. **F5** still reloads from disk without opening the window (and reconnects WS/UDP via the game client autoload). **F3** toggles the top-left connection/snapshot status panel (hidden state is saved without reconnecting listeners).
+
+### Export defaults (overwrite user:// on revision bump)
+
+- Shipped file: [`res://defaults/companion_settings.cfg`](defaults/companion_settings.cfg) with `[meta] defaults_revision`.
+- On load: if `user://` is missing **or** its `defaults_revision` ≠ shipped revision → **overwrite** `user://` from the shipped file (then continue normally).
+- In the **editor** Settings footer: **Save as export defaults** applies current UI, bumps revision, writes `user://`, and copies into `res://defaults/`. Re-export after that so the new revision ships.
+- Runtime tweaks still save to `user://` until the next export with a higher revision overwrites them.
 
 **`[network]`**
 

@@ -6,6 +6,7 @@ Authoritative session state for Godot HUD via GET /api/bestiary.
 from __future__ import annotations
 
 import json
+import math
 import os
 import random
 import threading
@@ -28,26 +29,46 @@ def _default_config() -> dict:
     return {
         "heat_window_sec": 900,
         "sprint_donor_reward": 100,
+        "sprint_donor_reward_per_level": 100,
         "per_user_bar_cap_fraction": 0.0,
         "repeat_mob_diminishing": False,
+        "soft_floor": {
+            "enabled": True,
+            "board": "sprint_eligible",
+            "top_n": 3,
+            "bonus": 0.25,
+            "min_unique_summoners": 10,
+            "exclude_users": ["DaltonGoesFast", "DaltonGoesSlow"],
+            "apply_to_bar": True,
+            "apply_to_sprint": True,
+            "apply_to_heat": True,
+        },
+        # Zones match NATIVE_DEPTH chapter: (depth-1)//5 (see points_command / StreamingCommandHandler).
         "levels": [
-            {"level": 1, "zone": "Sewers", "bar_threshold": 60,
-             "monsters": ["rat", "albino", "snake"]},
-            {"level": 2, "zone": "Prison", "bar_threshold": 100,
-             "monsters": ["gnoll", "crab", "slime", "swarm", "thief"]},
-            {"level": 3, "zone": "Caves", "bar_threshold": 140,
-             "monsters": ["skeleton", "dm100", "bat", "brute", "shaman", "spinner"]},
-            {"level": 4, "zone": "City", "bar_threshold": 180,
-             "monsters": ["guard", "necromancer", "ghoul", "elemental", "warlock", "monk", "golem"]},
+            {"level": 1, "zone": "Sewers", "bar_threshold": 4000,
+             "monsters": ["rat", "albino", "snake", "gnoll", "crab", "slime", "swarm", "thief"]},
+            {"level": 2, "zone": "Prison", "bar_threshold": 7000,
+             "monsters": ["skeleton", "dm100", "guard", "necromancer"]},
+            {"level": 3, "zone": "Caves", "bar_threshold": 10000,
+             "monsters": ["bat", "brute", "shaman", "spinner", "ghoul"]},
+            {"level": 4, "zone": "City", "bar_threshold": 14000,
+             "monsters": ["elemental", "warlock", "monk", "golem", "succubus"]},
             {"level": 5, "zone": "Halls", "bar_threshold": 0,
-             "monsters": ["succubus", "eye", "scorpio"]},
+             "monsters": ["eye", "scorpio"]},
         ],
     }
 
 
+_config_mtime: float = 0.0
+
+
 def load_config(force: bool = False) -> dict:
-    global _config_cache
-    if _config_cache is not None and not force:
+    global _config_cache, _config_mtime
+    try:
+        mtime = os.path.getmtime(CONFIG_FILE) if os.path.exists(CONFIG_FILE) else 0.0
+    except OSError:
+        mtime = 0.0
+    if _config_cache is not None and not force and mtime == _config_mtime:
         return _config_cache
     cfg = _default_config()
     if os.path.exists(CONFIG_FILE):
@@ -61,6 +82,7 @@ def load_config(force: bool = False) -> dict:
         except (json.JSONDecodeError, OSError):
             pass
     _config_cache = cfg
+    _config_mtime = mtime
     return cfg
 
 
@@ -116,6 +138,7 @@ def _empty_state() -> dict:
         "sprint_xp": {},
         "heat_events": [],
         "hall_of_fame": [],
+        "sprint_winners": [],
         "last_level_up_ts": 0,
         "session_summon_counts": {},
         "last_monster_by_user": {},
@@ -138,6 +161,16 @@ def _load_state() -> dict:
             base["heat_events"] = []
         if not isinstance(base.get("hall_of_fame"), list):
             base["hall_of_fame"] = []
+        if not isinstance(base.get("sprint_winners"), list):
+            # Backfill from hall so mid-stream upgrades keep prior crowns ineligible
+            winners: list[str] = []
+            seen: set[str] = set()
+            for entry in base.get("hall_of_fame") or []:
+                u = str((entry or {}).get("user") or "").strip().lower()
+                if u and u not in seen:
+                    seen.add(u)
+                    winners.append(u)
+            base["sprint_winners"] = winners
         if not isinstance(base.get("session_summon_counts"), dict):
             base["session_summon_counts"] = {}
         if not isinstance(base.get("last_monster_by_user"), dict):
@@ -151,9 +184,20 @@ def _load_state() -> dict:
 
 def _save_state(state: dict) -> None:
     tmp = STATE_FILE + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(state, f, indent=2)
-    os.replace(tmp, STATE_FILE)
+    payload = json.dumps(state, indent=2)
+    last_err: Optional[BaseException] = None
+    for attempt in range(8):
+        try:
+            with open(tmp, "w", encoding="utf-8") as f:
+                f.write(payload)
+            os.replace(tmp, STATE_FILE)
+            return
+        except OSError as e:
+            # Windows: Flask + sim can race on replace while the other process reads.
+            last_err = e
+            time.sleep(0.01 * (attempt + 1))
+    if last_err:
+        raise last_err
 
 
 def unlocked_monsters(level: Optional[int] = None, cfg: Optional[dict] = None) -> list[str]:
@@ -255,29 +299,160 @@ def get_heat_leader() -> tuple[str, int]:
         return _leader_from_scores(scores, display_map)
 
 
-def get_sprint_leader() -> tuple[str, int, int]:
-    """Return (display_username, sprint_xp, gap_to_second)."""
-    with _lock:
-        state = _load_state()
-        sprint = dict(state.get("sprint_xp") or {})
-    if not sprint:
-        return "", 0, 0
-    # sprint_xp keys are lowercase; values are {"xp": int, "display": str}
+def _sprint_ineligible_keys(state: dict) -> set[str]:
+    """Users who already won a sprint crown this stream (until session reset)."""
+    out: set[str] = set()
+    for u in state.get("sprint_winners") or []:
+        k = str(u or "").strip().lower()
+        if k:
+            out.add(k)
+    for entry in state.get("hall_of_fame") or []:
+        k = str((entry or {}).get("user") or "").strip().lower()
+        if k:
+            out.add(k)
+    return out
+
+
+def _sprint_scores(sprint: dict) -> tuple[dict[str, int], dict[str, str]]:
     scores: dict[str, int] = {}
     display_map: dict[str, str] = {}
-    for k, v in sprint.items():
+    for k, v in (sprint or {}).items():
+        key = str(k).strip().lower()
+        if not key:
+            continue
         if isinstance(v, dict):
-            scores[k] = int(v.get("xp", 0) or 0)
-            display_map[k] = str(v.get("display") or k)
+            scores[key] = int(v.get("xp", 0) or 0)
+            display_map[key] = str(v.get("display") or key)
         else:
-            scores[k] = int(v or 0)
-            display_map[k] = k
-    if not scores or max(scores.values()) <= 0:
+            scores[key] = int(v or 0)
+            display_map[key] = key
+    return scores, display_map
+
+
+def _eligible_sprint_ranked(
+    sprint: dict, ineligible: set[str]
+) -> list[tuple[str, int]]:
+    """Eligible sprint scorers sorted by XP desc (prior crowns excluded)."""
+    scores, _display_map = _sprint_scores(sprint)
+    return sorted(
+        ((k, xp) for k, xp in scores.items() if xp > 0 and k not in ineligible),
+        key=lambda kv: (-kv[1], kv[0]),
+    )
+
+
+def _pick_eligible_sprint_leader(
+    sprint: dict, ineligible: set[str]
+) -> tuple[str, int, int]:
+    """Eligible sprint leader for crown / !topsummoner. Skips prior winners this stream."""
+    scores, display_map = _sprint_scores(sprint)
+    ranked = _eligible_sprint_ranked(sprint, ineligible)
+    if not ranked:
         return "", 0, 0
-    ranked = sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))
     top_key, top_xp = ranked[0]
     second = ranked[1][1] if len(ranked) > 1 else 0
     return display_map.get(top_key, top_key), top_xp, max(0, top_xp - second)
+
+
+def _unique_summoner_keys(counts: dict, include_key: str = "") -> set[str]:
+    keys: set[str] = set()
+    for k in (counts or {}).keys():
+        kk = str(k or "").strip().lower()
+        if kk:
+            keys.add(kk)
+    ik = (include_key or "").strip().lower()
+    if ik:
+        keys.add(ik)
+    return keys
+
+
+def _soft_floor_cfg(cfg: Optional[dict] = None) -> dict:
+    cfg = cfg or load_config()
+    raw = cfg.get("soft_floor")
+    if not isinstance(raw, dict):
+        return {}
+    return raw
+
+
+def _soft_floor_exclude_keys(sf: dict) -> set[str]:
+    out: set[str] = set()
+    for u in sf.get("exclude_users") or []:
+        k = str(u or "").strip().lower()
+        if k:
+            out.add(k)
+    return out
+
+
+def _top_band_keys(ranked: list[tuple[str, int]], top_n: int) -> set[str]:
+    """Keys in the protected top band. Ties at the cutoff share the seats."""
+    if top_n <= 0 or not ranked:
+        return set()
+    if len(ranked) <= top_n:
+        return {k for k, _xp in ranked}
+    cutoff = ranked[top_n - 1][1]
+    return {k for k, xp in ranked if xp >= cutoff}
+
+
+def soft_floor_multiplier(
+    username: str,
+    state: dict,
+    cfg: Optional[dict] = None,
+) -> tuple[float, bool]:
+    """Return (mult, applied). Mid-pack catch-up on eligible sprint board.
+
+    Gate: enabled, enough unique summoners this stream, user not excluded,
+    and user not in top_n eligible sprint (XP before this summon).
+    """
+    sf = _soft_floor_cfg(cfg)
+    if not sf or not bool(sf.get("enabled", False)):
+        return 1.0, False
+    key = (username or "").strip().lower()
+    if not key:
+        return 1.0, False
+    if key in _soft_floor_exclude_keys(sf):
+        return 1.0, False
+
+    min_unique = max(1, int(sf.get("min_unique_summoners", 10) or 10))
+    counts = state.get("session_summon_counts") or {}
+    if len(_unique_summoner_keys(counts, key)) < min_unique:
+        return 1.0, False
+
+    top_n = max(1, int(sf.get("top_n", 3) or 3))
+    ineligible = _sprint_ineligible_keys(state)
+    ranked = _eligible_sprint_ranked(dict(state.get("sprint_xp") or {}), ineligible)
+    if key in _top_band_keys(ranked, top_n):
+        return 1.0, False
+
+    bonus = float(sf.get("bonus", 0.25) or 0.0)
+    if bonus <= 0:
+        return 1.0, False
+    return 1.0 + bonus, True
+
+
+def _apply_xp_mult(xp: int, mult: float) -> int:
+    """Apply catch-up mult; always at least +1 over base when mult > 1."""
+    base = max(0, int(xp))
+    if mult <= 1.0 + 1e-9:
+        return base
+    boosted = int(math.ceil(float(base) * mult - 1e-12))
+    return max(base + 1, boosted)
+
+
+def is_sprint_crowned(username: str) -> bool:
+    """True if this viewer already holds a sprint crown this stream (Hall / sprint_winners)."""
+    key = (username or "").strip().lower()
+    if not key:
+        return False
+    with _lock:
+        return key in _sprint_ineligible_keys(_load_state())
+
+
+def get_sprint_leader() -> tuple[str, int, int]:
+    """Return (display_username, sprint_xp, gap_to_second) among users eligible to crown."""
+    with _lock:
+        state = _load_state()
+        sprint = dict(state.get("sprint_xp") or {})
+        ineligible = _sprint_ineligible_keys(state)
+    return _pick_eligible_sprint_leader(sprint, ineligible)
 
 
 def _write_heat_leader_file(username: str, score: int) -> None:
@@ -310,6 +485,18 @@ def _write_totals(state: dict) -> None:
         pass
 
 
+def _sprint_donor_for_level(completed_level: int, cfg: Optional[dict] = None) -> int:
+    """Donor pts for crowning the sprint when leaving this level: base + (level-1)*step.
+
+    Defaults: 100, 200, 300, 400 for Sewers→Prison→Caves→City crowns.
+    """
+    cfg = cfg or load_config()
+    base = int(cfg.get("sprint_donor_reward", 100))
+    step = int(cfg.get("sprint_donor_reward_per_level", base))
+    lvl = max(1, int(completed_level or 1))
+    return max(0, base + (lvl - 1) * step)
+
+
 def _grant_sprint_donor(username: str, amount: int) -> bool:
     if not username or amount <= 0:
         return False
@@ -330,7 +517,6 @@ def apply_summon(username: str, monster: str) -> dict[str, Any]:
     key = display.lower()
     xp = monster_xp(monster)
     window = int(cfg.get("heat_window_sec", 900))
-    donor_reward = int(cfg.get("sprint_donor_reward", 100))
     max_lvl = _max_level(cfg)
     cap_frac = float(cfg.get("per_user_bar_cap_fraction", 0) or 0)
     diminish = bool(cfg.get("repeat_mob_diminishing", False))
@@ -351,6 +537,7 @@ def apply_summon(username: str, monster: str) -> dict[str, Any]:
             }
 
         now = int(time.time())
+        xp_base = xp
         bar_xp_add = xp
         sprint_heat_xp = xp
 
@@ -358,6 +545,17 @@ def apply_summon(username: str, monster: str) -> dict[str, Any]:
             last = (state.get("last_monster_by_user") or {}).get(key)
             if last == monster:
                 sprint_heat_xp = max(1, xp // 2)
+
+        xp_mult, soft_floor_applied = soft_floor_multiplier(display, state, cfg)
+        sf = _soft_floor_cfg(cfg)
+        if soft_floor_applied and xp_mult > 1.0:
+            if bool(sf.get("apply_to_sprint", True)) or bool(sf.get("apply_to_heat", True)):
+                sprint_heat_xp = _apply_xp_mult(sprint_heat_xp, xp_mult)
+            if bool(sf.get("apply_to_bar", True)):
+                bar_xp_add = _apply_xp_mult(bar_xp_add, xp_mult)
+        else:
+            soft_floor_applied = False
+            xp_mult = 1.0
 
         # Per-user bar contribution cap for this level
         if cap_frac > 0:
@@ -417,24 +615,14 @@ def apply_summon(username: str, monster: str) -> dict[str, Any]:
             if int(state.get("bar_xp", 0)) < thresh:
                 break
 
-            # Level up
+            # Level up — crown highest eligible sprint XP (prior winners blocked until next stream)
             overflow = int(state.get("bar_xp", 0)) - thresh
             sprint_before = dict(state.get("sprint_xp") or {})
-            winner_key = ""
-            winner_display = ""
-            winner_xp = 0
-            if sprint_before:
-                scores = {
-                    k: (int(v.get("xp", 0)) if isinstance(v, dict) else int(v or 0))
-                    for k, v in sprint_before.items()
-                }
-                if scores and max(scores.values()) > 0:
-                    ranked = sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))
-                    winner_key, winner_xp = ranked[0]
-                    w = sprint_before.get(winner_key)
-                    winner_display = (
-                        str(w.get("display") or winner_key) if isinstance(w, dict) else winner_key
-                    )
+            ineligible = _sprint_ineligible_keys(state)
+            winner_display, winner_xp, _gap = _pick_eligible_sprint_leader(
+                sprint_before, ineligible
+            )
+            winner_key = (winner_display or "").strip().lower()
 
             old_level = cur
             old_zone = _zone_for_level(old_level, cfg)
@@ -453,12 +641,18 @@ def apply_summon(username: str, monster: str) -> dict[str, Any]:
                 "ts": now,
             })
             state["hall_of_fame"] = hall
+            if winner_key:
+                winners = list(state.get("sprint_winners") or [])
+                if winner_key not in {str(w).lower() for w in winners}:
+                    winners.append(winner_key)
+                state["sprint_winners"] = winners
             state["level"] = new_level
             state["bar_xp"] = max(0, overflow)
             state["sprint_xp"] = {}
             state["bar_contrib"] = {}
             state["last_level_up_ts"] = now
             leveled_up = True
+            donor_reward = _sprint_donor_for_level(old_level, cfg) if winner_display else 0
             level_up_info = {
                 "from_level": old_level,
                 "to_level": new_level,
@@ -467,7 +661,7 @@ def apply_summon(username: str, monster: str) -> dict[str, Any]:
                 "winner": winner_display,
                 "winner_xp": winner_xp,
                 "newly_unlocked": newly_unlocked,
-                "donor_reward": donor_reward if winner_display else 0,
+                "donor_reward": donor_reward,
             }
             # Only one level-up per summon typically; loop allows multi if overflow huge
             if winner_display and donor_reward > 0:
@@ -485,7 +679,10 @@ def apply_summon(username: str, monster: str) -> dict[str, Any]:
         result = {
             "ok": True,
             "monster": monster,
-            "xp": xp,
+            "xp": sprint_heat_xp,
+            "xp_base": xp_base,
+            "xp_mult": xp_mult,
+            "soft_floor": soft_floor_applied,
             "bar_xp_added": bar_xp_add,
             "sprint_heat_xp": sprint_heat_xp,
             "level": int(state.get("level", 1)),
@@ -500,7 +697,9 @@ def apply_summon(username: str, monster: str) -> dict[str, Any]:
 
     # Donor grant outside main mutation lock (uses points lock)
     if leveled_up and level_up_info and level_up_info.get("winner"):
-        _grant_sprint_donor(level_up_info["winner"], donor_reward)
+        _grant_sprint_donor(
+            level_up_info["winner"], int(level_up_info.get("donor_reward") or 0)
+        )
 
     return result
 
@@ -526,22 +725,9 @@ def get_state_payload() -> dict[str, Any]:
         unlocked = unlocked_monsters(level, cfg)
 
         sprint = dict(state.get("sprint_xp") or {})
-        sprint_scores: dict[str, int] = {}
-        sprint_display: dict[str, str] = {}
-        for k, v in sprint.items():
-            if isinstance(v, dict):
-                sprint_scores[k] = int(v.get("xp", 0) or 0)
-                sprint_display[k] = str(v.get("display") or k)
-            else:
-                sprint_scores[k] = int(v or 0)
-                sprint_display[k] = k
-        sprint_user, sprint_xp, sprint_gap = "", 0, 0
-        if sprint_scores and max(sprint_scores.values()) > 0:
-            ranked = sorted(sprint_scores.items(), key=lambda kv: (-kv[1], kv[0]))
-            top_key, sprint_xp = ranked[0]
-            sprint_user = sprint_display.get(top_key, top_key)
-            second = ranked[1][1] if len(ranked) > 1 else 0
-            sprint_gap = max(0, sprint_xp - second)
+        ineligible = _sprint_ineligible_keys(state)
+        sprint_user, sprint_xp, sprint_gap = _pick_eligible_sprint_leader(sprint, ineligible)
+        sprint_winners = sorted(ineligible)
 
         heat_scores = _heat_scores(events)
         heat_display = {
@@ -572,6 +758,7 @@ def get_state_payload() -> dict[str, Any]:
                 "xp": sprint_xp,
                 "gap": sprint_gap,
                 "has_leader": bool(sprint_user),
+                "winners_this_stream": sprint_winners,
             },
             "heat": {
                 "username": heat_user,
@@ -580,10 +767,15 @@ def get_state_payload() -> dict[str, Any]:
                 "has_leader": bool(heat_user),
             },
             "hall_of_fame": list(state.get("hall_of_fame") or []),
+            "sprint_winners": sprint_winners,
             "last_level_up_ts": int(state.get("last_level_up_ts", 0) or 0),
             "session_summon_counts": dict(state.get("session_summon_counts") or {}),
             "heat_window_sec": window,
             "sprint_donor_reward": int(cfg.get("sprint_donor_reward", 100)),
+            "sprint_donor_reward_per_level": int(
+                cfg.get("sprint_donor_reward_per_level", cfg.get("sprint_donor_reward", 100))
+            ),
+            "next_sprint_donor_reward": _sprint_donor_for_level(level, cfg),
         }
 
 

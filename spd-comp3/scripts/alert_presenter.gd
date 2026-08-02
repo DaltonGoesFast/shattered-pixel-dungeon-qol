@@ -2,6 +2,7 @@ extends Control
 
 const _ScrollArt := preload("res://scripts/scroll_command_art.gd")
 const _MobArt := preload("res://scripts/mob_command_art.gd")
+const _SpdUi := preload("res://scripts/spd_ui_art.gd")
 
 @onready var _slot: Control = $AlertSlot
 @onready var _row: HBoxContainer = $AlertSlot/AlertRow
@@ -49,6 +50,7 @@ func _ready() -> void:
 	_icon_item.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_apply_command_icon_sizes()
 	_configure_particles()
+	_apply_alert_chrome()
 	_apply_alert_layout()
 	_apply_text_alignment()
 	_apply_alert_font_sizes()
@@ -61,6 +63,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_F5:
 			CompanionConfig.load_settings()
+			_apply_alert_chrome()
 			_apply_alert_layout()
 			_apply_text_alignment()
 			_apply_alert_font_sizes()
@@ -73,6 +76,7 @@ func _on_viewport_size_changed() -> void:
 
 
 func _on_settings_saved() -> void:
+	_apply_alert_chrome()
 	_apply_alert_layout()
 	_apply_text_alignment()
 	_apply_alert_font_sizes()
@@ -113,14 +117,35 @@ func _apply_alert_font_sizes() -> void:
 	_subtitle.add_theme_font_size_override("font_size", ss)
 
 
+func _apply_alert_chrome() -> void:
+	if _panel == null:
+		return
+	var style_id := str(CompanionConfig.alert_chrome_style)
+	var scale := clampf(CompanionConfig.alert_chrome_scale, 0.5, 4.0)
+	var sb: StyleBoxTexture = _SpdUi.chrome_style(style_id, scale)
+	if sb == null or sb.texture == null:
+		sb = _SpdUi.chrome_style_toast(scale)
+	_panel.add_theme_stylebox_override("panel", sb)
+
+
 func _apply_alert_layout() -> void:
 	if _slot == null:
 		return
 	var canvas: Vector2 = CompanionConfig.layout_canvas_size(self)
 	CompanionConfig.apply_alert_zone_layout(_slot, canvas)
+	# Keep toast row inside the zone (scene had a fixed 140px height that could clip large fonts).
+	if _row:
+		_slot.clip_contents = false
+		_row.set_anchors_preset(Control.PRESET_TOP_WIDE)
+		_row.offset_left = 0.0
+		_row.offset_top = 0.0
+		_row.offset_right = 0.0
+		_row.offset_bottom = maxf(140.0, _slot.size.y)
 	_apply_command_icon_sizes()
-	_panel.pivot_offset = _panel.size * 0.5
-	_row.pivot_offset = _row.size * 0.5
+	if _panel:
+		_panel.pivot_offset = _panel.size * 0.5
+	if _row:
+		_row.pivot_offset = _row.size * 0.5
 
 
 func _apply_command_icon_sizes() -> void:
@@ -485,7 +510,7 @@ func _with_article(phrase: String) -> String:
 	if p.is_empty():
 		return "something"
 	var lower := p.to_lower()
-	var c := lower[0]
+	var c: String = lower.substr(0, 1)
 	var article := "a"
 	if c == "a" or c == "e" or c == "i" or c == "o" or c == "u":
 		article = "an"

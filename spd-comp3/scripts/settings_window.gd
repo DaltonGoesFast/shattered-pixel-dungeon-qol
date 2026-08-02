@@ -2,6 +2,8 @@ extends Window
 
 ## In-app editor for companion settings. Open with F2 or the HUD button.
 
+const _SpdUiArt := preload("res://scripts/spd_ui_art.gd")
+
 var _net_host: LineEdit
 var _net_port: SpinBox
 var _udp_port: SpinBox
@@ -19,6 +21,8 @@ var _spend_corner: OptionButton
 var _spend_mx: SpinBox
 var _spend_my: SpinBox
 var _spend_label_fs: SpinBox
+var _spend_chrome_style: OptionButton
+var _spend_chrome_scale: SpinBox
 var _free_url: LineEdit
 var _free_poll: SpinBox
 var _free_vis: CheckBox
@@ -27,6 +31,8 @@ var _free_mx: SpinBox
 var _free_my: SpinBox
 var _free_fs: SpinBox
 var _free_mw: SpinBox
+var _free_chrome_style: OptionButton
+var _free_chrome_scale: SpinBox
 var _sm_on: CheckBox
 var _sm_url: LineEdit
 var _sm_poll: SpinBox
@@ -50,6 +56,20 @@ var _sm_monster_fs: SpinBox
 var _sm_monster_color: ColorPickerButton
 var _sm_monster_ox: SpinBox
 var _sm_monster_oy: SpinBox
+var _sm_crown_scale: SpinBox
+var _sm_crown_mob_mod: ColorPickerButton
+var _sm_crown_glow_on: CheckBox
+var _sm_crown_glow_color: ColorPickerButton
+var _sm_crown_glow_rays: SpinBox
+var _sm_crown_glow_spin: SpinBox
+var _sm_crown_glow_rad: SpinBox
+var _sm_crown_show: CheckBox
+var _sm_crown_sz: SpinBox
+var _sm_crown_oy: SpinBox
+var _sm_crown_mod: ColorPickerButton
+var _sm_crown_user_color: ColorPickerButton
+var _sm_crown_user_fs: SpinBox
+var _sm_crown_star: CheckBox
 var _best_on: CheckBox
 var _best_url: LineEdit
 var _best_poll: SpinBox
@@ -64,6 +84,7 @@ var _best_zbm: SpinBox
 var _best_bar_w: SpinBox
 var _best_bar_hs: SpinBox
 var _best_hud_scale: SpinBox
+var _best_chrome_scale: SpinBox
 var _best_compact: CheckBox
 var _best_zone_fs: SpinBox
 var _best_header_fmt: LineEdit
@@ -116,7 +137,39 @@ var _ata: OptionButton
 var _alert_title_fs: SpinBox
 var _alert_subtitle_fs: SpinBox
 var _alert_icon_sz: SpinBox
+var _alert_chrome_style: OptionButton
+var _alert_chrome_scale: SpinBox
 var _mob_idle_fps: SpinBox
+var _paid_on: CheckBox
+var _paid_qmax: SpinBox
+var _paid_ttl: SpinBox
+var _paid_fade_in: SpinBox
+var _paid_fade_out: SpinBox
+var _paid_zx: SpinBox
+var _paid_zy: SpinBox
+var _paid_zw: SpinBox
+var _paid_zh: SpinBox
+var _paid_zbm: SpinBox
+var _paid_chrome_style: OptionButton
+var _paid_chrome_scale: SpinBox
+var _paid_kind_fs: SpinBox
+var _paid_title_fs: SpinBox
+var _paid_body_fs: SpinBox
+var _paid_kind_color: ColorPickerButton
+var _paid_title_color: ColorPickerButton
+var _paid_body_color: ColorPickerButton
+var _paid_shadow: CheckBox
+var _paid_pad_h: SpinBox
+var _paid_pad_v: SpinBox
+var _paid_sep: SpinBox
+var _paid_align: OptionButton
+var _paid_pop_scale: CheckBox
+var _paid_live: CheckBox
+var _paid_pause: CheckBox
+var _paid_superchat: CheckBox
+var _paid_gifted: CheckBox
+var _paid_sub: CheckBox
+var _paid_highlight: CheckBox
 
 var _id_on: CheckBox
 var _iz_x: SpinBox
@@ -132,20 +185,55 @@ var _id_flow: SpinBox
 var _id_block: SpinBox
 var _icon_cell_bg: ColorPickerButton
 
+var _tabs: TabContainer
+## Draft list edited in Settings before Apply (Array of Dictionary).
+var _chrome_draft: Array = []
+## Parallel editor widgets for each draft entry.
+var _chrome_editors: Array = []
+var _chrome_mgmt_sc: ScrollContainer
+var _chrome_count_label: Label
+
 
 func _ready() -> void:
 	title = "SPD Companion — settings"
-	size = Vector2i(780, 700)
 	min_size = Vector2i(600, 480)
 	initial_position = Window.WINDOW_INITIAL_POSITION_CENTER_MAIN_WINDOW_SCREEN
-	close_requested.connect(hide)
+	close_requested.connect(_on_close_requested)
 	visibility_changed.connect(_on_visibility_changed)
+	_apply_saved_window_size()
 	_build_ui()
+
+
+func _on_close_requested() -> void:
+	_remember_window_size()
+	hide()
 
 
 func _on_visibility_changed() -> void:
 	if visible:
+		_apply_saved_window_size()
 		_sync_from_config()
+	else:
+		_remember_window_size()
+
+
+func _apply_saved_window_size() -> void:
+	var w := clampi(CompanionConfig.settings_window_width_px, min_size.x, 3840)
+	var h := clampi(CompanionConfig.settings_window_height_px, min_size.y, 2160)
+	size = Vector2i(w, h)
+
+
+func _remember_window_size() -> void:
+	if size.x < min_size.x or size.y < min_size.y:
+		return
+	if (
+		CompanionConfig.settings_window_width_px == size.x
+		and CompanionConfig.settings_window_height_px == size.y
+	):
+		return
+	CompanionConfig.settings_window_width_px = size.x
+	CompanionConfig.settings_window_height_px = size.y
+	CompanionConfig.save_settings_quiet()
 
 
 func _build_ui() -> void:
@@ -163,10 +251,11 @@ func _build_ui() -> void:
 	outer.add_theme_constant_override("separation", 8)
 	margin.add_child(outer)
 
-	var tabs := TabContainer.new()
-	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	tabs.custom_minimum_size = Vector2(0, 520)
-	outer.add_child(tabs)
+	_tabs = TabContainer.new()
+	_tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_tabs.custom_minimum_size = Vector2(0, 520)
+	outer.add_child(_tabs)
+	var tabs := _tabs
 
 	# --- Connection: live links to game + companion transport ---
 	var conn_sc := _make_scroll_vbox()
@@ -228,6 +317,8 @@ func _build_ui() -> void:
 	_spend_mx = _spin_i(0, 4000)
 	_spend_my = _spin_i(0, 4000)
 	_spend_label_fs = _spin_i(8, 64)
+	_spend_chrome_style = _opt(PackedStringArray(_SpdUiArt.CHROME_STYLE_LABELS))
+	_spend_chrome_scale = _spin_f(0.5, 4.0, 0.05)
 	_add_rows(
 		spend_sc,
 		[
@@ -236,6 +327,8 @@ func _build_ui() -> void:
 			["Margin X (px from edge)", _spend_mx],
 			["Margin Y (px from edge)", _spend_my],
 			["Label font size (px)", _spend_label_fs],
+			["Chrome style", _spend_chrome_style],
+			["Chrome scale (border)", _spend_chrome_scale],
 		]
 	)
 
@@ -252,6 +345,8 @@ func _build_ui() -> void:
 	_free_my = _spin_i(0, 4000)
 	_free_fs = _spin_i(8, 36)
 	_free_mw = _spin_i(160, 1600)
+	_free_chrome_style = _opt(PackedStringArray(_SpdUiArt.CHROME_STYLE_LABELS))
+	_free_chrome_scale = _spin_f(0.5, 4.0, 0.05)
 	_add_rows(
 		free_sc,
 		[
@@ -263,6 +358,8 @@ func _build_ui() -> void:
 			["Margin Y (px)", _free_my],
 			["Font size (px)", _free_fs],
 			["Max panel width (px)", _free_mw],
+			["Chrome style", _free_chrome_style],
+			["Chrome scale (border)", _free_chrome_scale],
 		]
 	)
 
@@ -294,6 +391,20 @@ func _build_ui() -> void:
 	_sm_monster_color = _color_picker()
 	_sm_monster_ox = _spin_i(-400, 400)
 	_sm_monster_oy = _spin_i(-400, 400)
+	_sm_crown_scale = _spin_f(1.0, 3.0, 0.05)
+	_sm_crown_mob_mod = _color_picker()
+	_sm_crown_glow_on = CheckBox.new()
+	_sm_crown_glow_color = _color_picker()
+	_sm_crown_glow_rays = _spin_i(3, 16)
+	_sm_crown_glow_spin = _spin_f(0.0, 720.0, 5.0)
+	_sm_crown_glow_rad = _spin_f(0.25, 3.0, 0.05)
+	_sm_crown_show = CheckBox.new()
+	_sm_crown_sz = _spin_f(0.1, 3.0, 0.05)
+	_sm_crown_oy = _spin_f(-1.5, 1.5, 0.02)
+	_sm_crown_mod = _color_picker()
+	_sm_crown_user_color = _color_picker()
+	_sm_crown_user_fs = _spin_i(0, 72)
+	_sm_crown_star = CheckBox.new()
 	_add_rows(
 		sm_sc,
 		[
@@ -320,6 +431,21 @@ func _build_ui() -> void:
 			["Monster name color", _sm_monster_color],
 			["Monster name offset X (px)", _sm_monster_ox],
 			["Monster name offset Y (px)", _sm_monster_oy],
+			["— Sprint crown (Blessed flare) —", _section_note()],
+			["Crowned sprite scale", _sm_crown_scale],
+			["Crowned mob tint", _sm_crown_mob_mod],
+			["Show Blessed glow", _sm_crown_glow_on],
+			["Glow color", _sm_crown_glow_color],
+			["Glow ray count", _sm_crown_glow_rays],
+			["Glow spin (deg/sec)", _sm_crown_glow_spin],
+			["Glow radius scale", _sm_crown_glow_rad],
+			["Show Dwarf King crown", _sm_crown_show],
+			["Crown size (vs sprite)", _sm_crown_sz],
+			["Crown Y offset (fraction)", _sm_crown_oy],
+			["Crown tint", _sm_crown_mod],
+			["Crowned username color", _sm_crown_user_color],
+			["Crowned username font (0=same)", _sm_crown_user_fs],
+			["★ prefix on crowned username", _sm_crown_star],
 		]
 	)
 
@@ -342,6 +468,7 @@ func _build_ui() -> void:
 	_best_bar_w = _spin_i(64, 1600)
 	_best_bar_hs = _spin_f(0.5, 4.0, 0.1)
 	_best_hud_scale = _spin_f(0.5, 4.0, 0.05)
+	_best_chrome_scale = _spin_f(0.5, 4.0, 0.05)
 	_best_compact = CheckBox.new()
 	_best_zone_fs = _spin_i(8, 96)
 	_best_header_fmt = _line()
@@ -374,6 +501,7 @@ func _build_ui() -> void:
 			["HUD zone height (px, 0=auto)", _best_zh],
 			["HUD zone bottom margin (px)", _best_zbm],
 			["HUD overall scale", _best_hud_scale],
+			["Grey box chrome scale (border)", _best_chrome_scale],
 			["Exp bar width (px; panel uses zone width)", _best_bar_w],
 			["Exp bar height scale", _best_bar_hs],
 			["Use compact StatusPane exp art", _best_compact],
@@ -434,6 +562,83 @@ func _build_ui() -> void:
 		]
 	)
 
+	var paid_sc := _make_scroll_vbox()
+	tabs.add_child(paid_sc)
+	tabs.set_tab_title(paid_sc.get_index(), "Paid notices")
+	_paid_on = CheckBox.new()
+	_paid_qmax = _spin_i(1, 32)
+	_paid_ttl = _spin_f(0.5, 60.0, 0.25)
+	_paid_fade_in = _spin_f(0.05, 5.0, 0.05)
+	_paid_fade_out = _spin_f(0.05, 5.0, 0.05)
+	_paid_zx = _spin_i(0, 4000)
+	_paid_zy = _spin_i(0, 4000)
+	_paid_zw = _spin_i(64, 1920)
+	_paid_zh = _spin_i(0, 1080)
+	_paid_zbm = _spin_i(0, 400)
+	_paid_chrome_style = _opt(PackedStringArray(_SpdUiArt.CHROME_STYLE_LABELS))
+	_paid_chrome_scale = _spin_f(0.5, 4.0, 0.05)
+	_paid_kind_fs = _spin_i(8, 96)
+	_paid_title_fs = _spin_i(8, 96)
+	_paid_body_fs = _spin_i(8, 96)
+	_paid_kind_color = _color_picker()
+	_paid_title_color = _color_picker()
+	_paid_body_color = _color_picker()
+	_paid_shadow = CheckBox.new()
+	_paid_pad_h = _spin_i(0, 64)
+	_paid_pad_v = _spin_i(0, 64)
+	_paid_sep = _spin_i(0, 48)
+	_paid_align = _opt(PackedStringArray(["Left", "Center"]))
+	_paid_pop_scale = CheckBox.new()
+	_paid_live = CheckBox.new()
+	_paid_pause = CheckBox.new()
+	_paid_superchat = CheckBox.new()
+	_paid_gifted = CheckBox.new()
+	_paid_sub = CheckBox.new()
+	_paid_highlight = CheckBox.new()
+	var paid_note := _section_note()
+	paid_note.text = (
+		"Streamer.bot UDP JSON with a ui field (superchat, gifted_membership, sub, highlight). "
+		+ "Does not go to the game — companion overlay only. Keep Speaker.bot as a separate sub-action. "
+		+ "Even font sizes (16/24/32) look sharpest with the pixel font; leave pop-scale off for crisp text."
+	)
+	paid_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	(paid_sc.get_node("InnerVBox") as VBoxContainer).add_child(paid_note)
+	_add_rows(
+		paid_sc,
+		[
+			["Enable paid / highlight notices", _paid_on],
+			["Queue max", _paid_qmax],
+			["Default hold (sec)", _paid_ttl],
+			["Fade in (sec)", _paid_fade_in],
+			["Fade out (sec)", _paid_fade_out],
+			["Zone X (px)", _paid_zx],
+			["Zone Y (px)", _paid_zy],
+			["Zone width (px)", _paid_zw],
+			["Zone height (0=auto)", _paid_zh],
+			["Bottom margin if height is auto", _paid_zbm],
+			["Chrome style", _paid_chrome_style],
+			["Chrome scale (border)", _paid_chrome_scale],
+			["Padding horizontal (px)", _paid_pad_h],
+			["Padding vertical (px)", _paid_pad_v],
+			["Line separation (px)", _paid_sep],
+			["Text align", _paid_align],
+			["Banner font size (px)", _paid_kind_fs],
+			["Title font size (px)", _paid_title_fs],
+			["Body font size (px)", _paid_body_fs],
+			["Banner color", _paid_kind_color],
+			["Title color", _paid_title_color],
+			["Body color", _paid_body_color],
+			["Text shadow", _paid_shadow],
+			["Pop-in scale animation", _paid_pop_scale],
+			["Show on Live scene", _paid_live],
+			["Show on Pause scene", _paid_pause],
+			["YouTube Super Chat", _paid_superchat],
+			["YouTube gifted membership / Twitch gift subs", _paid_gifted],
+			["Twitch sub / YouTube new member", _paid_sub],
+			["Twitch Highlight My Message", _paid_highlight],
+		]
+	)
+
 	var al_sc := _make_scroll_vbox()
 	tabs.add_child(al_sc)
 	tabs.set_tab_title(al_sc.get_index(), "Alerts")
@@ -474,6 +679,8 @@ func _build_ui() -> void:
 	_az_h = _spin_i(0, 4000)
 	_az_bm = _spin_i(0, 400)
 	_ata = _opt(["left", "center"])
+	_alert_chrome_style = _opt(PackedStringArray(_SpdUiArt.CHROME_STYLE_LABELS))
+	_alert_chrome_scale = _spin_f(0.5, 4.0, 0.05)
 	_alert_title_fs = _spin_i(6, 72)
 	_alert_subtitle_fs = _spin_i(6, 72)
 	_alert_icon_sz = _spin_i(24, 256)
@@ -486,6 +693,8 @@ func _build_ui() -> void:
 			["Toast zone width (px)", _az_w],
 			["Toast zone height (0=auto)", _az_h],
 			["Bottom margin if height is auto", _az_bm],
+			["Chrome style", _alert_chrome_style],
+			["Chrome scale (border)", _alert_chrome_scale],
 			["Title/subtitle align", _ata],
 			["Title font size (px)", _alert_title_fs],
 			["Subtitle font size (px)", _alert_subtitle_fs],
@@ -542,6 +751,26 @@ func _build_ui() -> void:
 		]
 	)
 
+	# --- Placeable UI panels (chrome boxes, etc.) ---
+	_chrome_mgmt_sc = _make_scroll_vbox() as ScrollContainer
+	tabs.add_child(_chrome_mgmt_sc)
+	tabs.set_tab_title(_chrome_mgmt_sc.get_index(), "UI panels")
+	var mgmt_note := _section_note()
+	mgmt_note.text = (
+		"Add empty SPD chrome panels to the canvas. Each gets its own tab "
+		+ "(style, enable, zone, chrome scale, Live/Pause). Styles match in-game Chrome "
+		+ "(window, toast, buttons, gem, scroll, tabs, …). Max %d."
+		% CompanionConfig.CHROME_BOXES_MAX
+	)
+	mgmt_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	(_chrome_mgmt_sc.get_node("InnerVBox") as VBoxContainer).add_child(mgmt_note)
+	_chrome_count_label = Label.new()
+	(_chrome_mgmt_sc.get_node("InnerVBox") as VBoxContainer).add_child(_chrome_count_label)
+	var add_chrome := Button.new()
+	add_chrome.text = "Add chrome box"
+	add_chrome.pressed.connect(_on_add_chrome_box)
+	(_chrome_mgmt_sc.get_node("InnerVBox") as VBoxContainer).add_child(add_chrome)
+
 	var path_l := Label.new()
 	path_l.name = "PathHint"
 	path_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -560,6 +789,16 @@ func _build_ui() -> void:
 	reload.text = "Reload from disk"
 	reload.pressed.connect(_on_reload_pressed)
 	row.add_child(reload)
+
+	if OS.has_feature("editor"):
+		var ship := Button.new()
+		ship.text = "Save as export defaults"
+		ship.tooltip_text = (
+			"Copy current settings into res://defaults/ and bump defaults_revision. "
+			+ "Exported builds overwrite user:// when that revision changes."
+		)
+		ship.pressed.connect(_on_save_as_export_defaults)
+		row.add_child(ship)
 
 	var close_b := Button.new()
 	close_b.text = "Close"
@@ -605,6 +844,13 @@ func _line() -> LineEdit:
 	var le := LineEdit.new()
 	le.clear_button_enabled = true
 	return le
+
+
+func _section_note() -> Label:
+	var lab := Label.new()
+	lab.text = ""
+	lab.modulate = Color(0.75, 0.75, 0.8, 1.0)
+	return lab
 
 
 func _spin_i(mn: int, mx: int) -> SpinBox:
@@ -673,6 +919,10 @@ func _sync_from_config() -> void:
 	_spend_mx.value = CompanionConfig.spend_indicator_margin_x
 	_spend_my.value = CompanionConfig.spend_indicator_margin_y
 	_spend_label_fs.value = CompanionConfig.spend_indicator_font_size_px
+	_spend_chrome_style.select(
+		_SpdUiArt.chrome_style_id_index(CompanionConfig.spend_indicator_chrome_style)
+	)
+	_spend_chrome_scale.value = CompanionConfig.spend_indicator_chrome_scale
 	_free_url.text = CompanionConfig.free_promos_http_url
 	_free_poll.value = CompanionConfig.free_promos_poll_sec
 	_free_vis.button_pressed = CompanionConfig.free_promos_panel_visible
@@ -681,6 +931,10 @@ func _sync_from_config() -> void:
 	_free_my.value = CompanionConfig.free_promos_margin_y
 	_free_fs.value = CompanionConfig.free_promos_font_size_px
 	_free_mw.value = CompanionConfig.free_promos_max_width_px
+	_free_chrome_style.select(
+		_SpdUiArt.chrome_style_id_index(CompanionConfig.free_promos_chrome_style)
+	)
+	_free_chrome_scale.value = CompanionConfig.free_promos_chrome_scale
 	_sm_on.button_pressed = CompanionConfig.summon_march_enabled
 	_sm_url.text = CompanionConfig.summon_march_base_url
 	_sm_poll.value = CompanionConfig.summon_march_poll_sec
@@ -704,6 +958,20 @@ func _sync_from_config() -> void:
 	_sm_monster_color.color = CompanionConfig.summon_march_monster_color
 	_sm_monster_ox.value = CompanionConfig.summon_march_monster_offset_x
 	_sm_monster_oy.value = CompanionConfig.summon_march_monster_offset_y
+	_sm_crown_scale.value = CompanionConfig.summon_crowned_sprite_scale
+	_sm_crown_mob_mod.color = CompanionConfig.summon_crowned_mob_modulate
+	_sm_crown_glow_on.button_pressed = CompanionConfig.summon_crowned_show_glow
+	_sm_crown_glow_color.color = CompanionConfig.summon_crowned_glow_color
+	_sm_crown_glow_rays.value = CompanionConfig.summon_crowned_glow_rays
+	_sm_crown_glow_spin.value = CompanionConfig.summon_crowned_glow_spin_deg
+	_sm_crown_glow_rad.value = CompanionConfig.summon_crowned_glow_radius_scale
+	_sm_crown_show.button_pressed = CompanionConfig.summon_crowned_show_crown
+	_sm_crown_sz.value = CompanionConfig.summon_crowned_crown_scale
+	_sm_crown_oy.value = CompanionConfig.summon_crowned_crown_offset_y
+	_sm_crown_mod.color = CompanionConfig.summon_crowned_crown_modulate
+	_sm_crown_user_color.color = CompanionConfig.summon_crowned_username_color
+	_sm_crown_user_fs.value = CompanionConfig.summon_crowned_username_font_size_px
+	_sm_crown_star.button_pressed = CompanionConfig.summon_crowned_show_star_prefix
 	_best_on.button_pressed = CompanionConfig.bestiary_hud_enabled
 	_best_url.text = CompanionConfig.bestiary_base_url
 	_best_poll.value = CompanionConfig.bestiary_poll_sec
@@ -716,6 +984,7 @@ func _sync_from_config() -> void:
 	_best_zh.value = CompanionConfig.bestiary_zone_height_px
 	_best_zbm.value = CompanionConfig.bestiary_zone_bottom_margin_px
 	_best_hud_scale.value = CompanionConfig.bestiary_hud_scale
+	_best_chrome_scale.value = CompanionConfig.bestiary_chrome_scale
 	_best_bar_w.value = CompanionConfig.bestiary_exp_bar_width_px
 	_best_bar_hs.value = CompanionConfig.bestiary_exp_bar_height_scale
 	_best_compact.button_pressed = CompanionConfig.bestiary_use_compact_exp_bar
@@ -766,10 +1035,47 @@ func _sync_from_config() -> void:
 	_az_h.value = CompanionConfig.alert_zone_height_px
 	_az_bm.value = CompanionConfig.alert_zone_bottom_margin_px
 	_select_option(_ata, CompanionConfig.alert_text_align.to_lower())
+	_alert_chrome_style.select(
+		_SpdUiArt.chrome_style_id_index(CompanionConfig.alert_chrome_style)
+	)
+	_alert_chrome_scale.value = CompanionConfig.alert_chrome_scale
 	_alert_title_fs.value = CompanionConfig.alert_title_font_size_px
 	_alert_subtitle_fs.value = CompanionConfig.alert_subtitle_font_size_px
 	_alert_icon_sz.value = CompanionConfig.alert_command_icon_size_px
 	_mob_idle_fps.value = CompanionConfig.alert_mob_idle_anim_fps
+
+	_paid_on.button_pressed = CompanionConfig.paid_notice_enabled
+	_paid_qmax.value = CompanionConfig.paid_notice_queue_max
+	_paid_ttl.value = CompanionConfig.paid_notice_default_ttl_sec
+	_paid_fade_in.value = CompanionConfig.paid_notice_fade_in_sec
+	_paid_fade_out.value = CompanionConfig.paid_notice_fade_out_sec
+	_paid_zx.value = CompanionConfig.paid_notice_zone_x_px
+	_paid_zy.value = CompanionConfig.paid_notice_zone_y_px
+	_paid_zw.value = CompanionConfig.paid_notice_zone_width_px
+	_paid_zh.value = CompanionConfig.paid_notice_zone_height_px
+	_paid_zbm.value = CompanionConfig.paid_notice_zone_bottom_margin_px
+	_paid_chrome_style.select(
+		_SpdUiArt.chrome_style_id_index(CompanionConfig.paid_notice_chrome_style)
+	)
+	_paid_chrome_scale.value = CompanionConfig.paid_notice_chrome_scale
+	_paid_kind_fs.value = CompanionConfig.paid_notice_kind_font_size_px
+	_paid_title_fs.value = CompanionConfig.paid_notice_title_font_size_px
+	_paid_body_fs.value = CompanionConfig.paid_notice_body_font_size_px
+	_paid_kind_color.color = CompanionConfig.paid_notice_kind_font_color
+	_paid_title_color.color = CompanionConfig.paid_notice_title_font_color
+	_paid_body_color.color = CompanionConfig.paid_notice_body_font_color
+	_paid_shadow.button_pressed = CompanionConfig.paid_notice_text_shadow
+	_paid_pad_h.value = CompanionConfig.paid_notice_padding_h_px
+	_paid_pad_v.value = CompanionConfig.paid_notice_padding_v_px
+	_paid_sep.value = CompanionConfig.paid_notice_line_separation_px
+	_paid_align.select(1 if CompanionConfig.paid_notice_text_align == "center" else 0)
+	_paid_pop_scale.button_pressed = CompanionConfig.paid_notice_pop_scale
+	_paid_live.button_pressed = CompanionConfig.paid_notice_show_on_live
+	_paid_pause.button_pressed = CompanionConfig.paid_notice_show_on_pause
+	_paid_superchat.button_pressed = CompanionConfig.paid_notice_enable_superchat
+	_paid_gifted.button_pressed = CompanionConfig.paid_notice_enable_gifted_membership
+	_paid_sub.button_pressed = CompanionConfig.paid_notice_enable_sub
+	_paid_highlight.button_pressed = CompanionConfig.paid_notice_enable_highlight
 
 	_id_on.button_pressed = CompanionConfig.id_overlay_enabled
 	_iz_x.value = CompanionConfig.id_zone_x_px
@@ -785,9 +1091,19 @@ func _sync_from_config() -> void:
 	_id_block.value = CompanionConfig.id_block_separation_px
 	_icon_cell_bg.color = CompanionConfig.icon_cell_background_color
 
+	_chrome_draft = CompanionConfig.duplicate_chrome_boxes()
+	_rebuild_chrome_tabs()
+
 	var path_l := _find_path_label()
 	if path_l:
-		path_l.text = "Saved to: %s — F2 closes/opens this window after apply" % CompanionConfig.SETTINGS_PATH
+		path_l.text = (
+			"Saved to: %s — shipped defaults rev %d (%s) — F2 toggles this window"
+			% [
+				CompanionConfig.SETTINGS_PATH,
+				CompanionConfig.defaults_revision,
+				CompanionConfig.SHIPPED_DEFAULTS_PATH,
+			]
+		)
 
 
 func _select_option(ob: OptionButton, value: String) -> void:
@@ -817,6 +1133,16 @@ func _on_apply_pressed() -> void:
 	CompanionConfig.spend_indicator_margin_x = int(_spend_mx.value)
 	CompanionConfig.spend_indicator_margin_y = int(_spend_my.value)
 	CompanionConfig.spend_indicator_font_size_px = clampi(int(_spend_label_fs.value), 8, 64)
+	if (
+		_spend_chrome_style.selected >= 0
+		and _spend_chrome_style.selected < _SpdUiArt.CHROME_STYLE_IDS.size()
+	):
+		CompanionConfig.spend_indicator_chrome_style = (
+			_SpdUiArt.CHROME_STYLE_IDS[_spend_chrome_style.selected]
+		)
+	CompanionConfig.spend_indicator_chrome_scale = clampf(
+		float(_spend_chrome_scale.value), 0.5, 4.0
+	)
 	CompanionConfig.free_promos_http_url = _free_url.text.strip_edges()
 	CompanionConfig.free_promos_poll_sec = maxf(0.5, float(_free_poll.value))
 	CompanionConfig.free_promos_panel_visible = _free_vis.button_pressed
@@ -825,6 +1151,14 @@ func _on_apply_pressed() -> void:
 	CompanionConfig.free_promos_margin_y = int(_free_my.value)
 	CompanionConfig.free_promos_font_size_px = clampi(int(_free_fs.value), 8, 36)
 	CompanionConfig.free_promos_max_width_px = clampi(int(_free_mw.value), 160, 1600)
+	if (
+		_free_chrome_style.selected >= 0
+		and _free_chrome_style.selected < _SpdUiArt.CHROME_STYLE_IDS.size()
+	):
+		CompanionConfig.free_promos_chrome_style = (
+			_SpdUiArt.CHROME_STYLE_IDS[_free_chrome_style.selected]
+		)
+	CompanionConfig.free_promos_chrome_scale = clampf(float(_free_chrome_scale.value), 0.5, 4.0)
 	CompanionConfig.summon_march_enabled = _sm_on.button_pressed
 	CompanionConfig.summon_march_base_url = _sm_url.text.strip_edges()
 	CompanionConfig.summon_march_poll_sec = maxf(0.15, float(_sm_poll.value))
@@ -853,6 +1187,20 @@ func _on_apply_pressed() -> void:
 	CompanionConfig.summon_march_monster_color = _sm_monster_color.color
 	CompanionConfig.summon_march_monster_offset_x = int(_sm_monster_ox.value)
 	CompanionConfig.summon_march_monster_offset_y = int(_sm_monster_oy.value)
+	CompanionConfig.summon_crowned_sprite_scale = clampf(float(_sm_crown_scale.value), 1.0, 3.0)
+	CompanionConfig.summon_crowned_mob_modulate = _sm_crown_mob_mod.color
+	CompanionConfig.summon_crowned_show_glow = _sm_crown_glow_on.button_pressed
+	CompanionConfig.summon_crowned_glow_color = _sm_crown_glow_color.color
+	CompanionConfig.summon_crowned_glow_rays = clampi(int(_sm_crown_glow_rays.value), 3, 16)
+	CompanionConfig.summon_crowned_glow_spin_deg = clampf(float(_sm_crown_glow_spin.value), 0.0, 720.0)
+	CompanionConfig.summon_crowned_glow_radius_scale = clampf(float(_sm_crown_glow_rad.value), 0.25, 3.0)
+	CompanionConfig.summon_crowned_show_crown = _sm_crown_show.button_pressed
+	CompanionConfig.summon_crowned_crown_scale = clampf(float(_sm_crown_sz.value), 0.1, 3.0)
+	CompanionConfig.summon_crowned_crown_offset_y = clampf(float(_sm_crown_oy.value), -1.5, 1.5)
+	CompanionConfig.summon_crowned_crown_modulate = _sm_crown_mod.color
+	CompanionConfig.summon_crowned_username_color = _sm_crown_user_color.color
+	CompanionConfig.summon_crowned_username_font_size_px = clampi(int(_sm_crown_user_fs.value), 0, 72)
+	CompanionConfig.summon_crowned_show_star_prefix = _sm_crown_star.button_pressed
 	CompanionConfig.bestiary_hud_enabled = _best_on.button_pressed
 	CompanionConfig.bestiary_base_url = _best_url.text.strip_edges()
 	CompanionConfig.bestiary_poll_sec = maxf(0.25, float(_best_poll.value))
@@ -865,6 +1213,7 @@ func _on_apply_pressed() -> void:
 	CompanionConfig.bestiary_zone_height_px = clampi(int(_best_zh.value), 0, 800)
 	CompanionConfig.bestiary_zone_bottom_margin_px = int(_best_zbm.value)
 	CompanionConfig.bestiary_hud_scale = clampf(float(_best_hud_scale.value), 0.5, 4.0)
+	CompanionConfig.bestiary_chrome_scale = clampf(float(_best_chrome_scale.value), 0.5, 4.0)
 	CompanionConfig.bestiary_exp_bar_width_px = clampi(int(_best_bar_w.value), 64, 1600)
 	CompanionConfig.bestiary_exp_bar_height_scale = clampf(float(_best_bar_hs.value), 0.5, 4.0)
 	CompanionConfig.bestiary_use_compact_exp_bar = _best_compact.button_pressed
@@ -922,10 +1271,55 @@ func _on_apply_pressed() -> void:
 	CompanionConfig.alert_zone_height_px = int(_az_h.value)
 	CompanionConfig.alert_zone_bottom_margin_px = int(_az_bm.value)
 	CompanionConfig.alert_text_align = _ata.get_item_text(_ata.selected).strip_edges()
+	if (
+		_alert_chrome_style.selected >= 0
+		and _alert_chrome_style.selected < _SpdUiArt.CHROME_STYLE_IDS.size()
+	):
+		CompanionConfig.alert_chrome_style = _SpdUiArt.CHROME_STYLE_IDS[_alert_chrome_style.selected]
+	CompanionConfig.alert_chrome_scale = clampf(float(_alert_chrome_scale.value), 0.5, 4.0)
 	CompanionConfig.alert_title_font_size_px = int(_alert_title_fs.value)
 	CompanionConfig.alert_subtitle_font_size_px = int(_alert_subtitle_fs.value)
 	CompanionConfig.alert_command_icon_size_px = int(_alert_icon_sz.value)
 	CompanionConfig.alert_mob_idle_anim_fps = float(_mob_idle_fps.value)
+
+	CompanionConfig.paid_notice_enabled = _paid_on.button_pressed
+	CompanionConfig.paid_notice_queue_max = clampi(int(_paid_qmax.value), 1, 32)
+	CompanionConfig.paid_notice_default_ttl_sec = maxf(0.5, float(_paid_ttl.value))
+	CompanionConfig.paid_notice_fade_in_sec = maxf(0.05, float(_paid_fade_in.value))
+	CompanionConfig.paid_notice_fade_out_sec = maxf(0.05, float(_paid_fade_out.value))
+	CompanionConfig.paid_notice_zone_x_px = int(_paid_zx.value)
+	CompanionConfig.paid_notice_zone_y_px = int(_paid_zy.value)
+	CompanionConfig.paid_notice_zone_width_px = clampi(int(_paid_zw.value), 64, 1920)
+	CompanionConfig.paid_notice_zone_height_px = clampi(int(_paid_zh.value), 0, 1080)
+	CompanionConfig.paid_notice_zone_bottom_margin_px = int(_paid_zbm.value)
+	if (
+		_paid_chrome_style.selected >= 0
+		and _paid_chrome_style.selected < _SpdUiArt.CHROME_STYLE_IDS.size()
+	):
+		CompanionConfig.paid_notice_chrome_style = (
+			_SpdUiArt.CHROME_STYLE_IDS[_paid_chrome_style.selected]
+		)
+	CompanionConfig.paid_notice_chrome_scale = clampf(float(_paid_chrome_scale.value), 0.5, 4.0)
+	CompanionConfig.paid_notice_kind_font_size_px = clampi(int(_paid_kind_fs.value), 8, 96)
+	CompanionConfig.paid_notice_title_font_size_px = clampi(int(_paid_title_fs.value), 8, 96)
+	CompanionConfig.paid_notice_body_font_size_px = clampi(int(_paid_body_fs.value), 8, 96)
+	CompanionConfig.paid_notice_kind_font_color = _paid_kind_color.color
+	CompanionConfig.paid_notice_title_font_color = _paid_title_color.color
+	CompanionConfig.paid_notice_body_font_color = _paid_body_color.color
+	CompanionConfig.paid_notice_text_shadow = _paid_shadow.button_pressed
+	CompanionConfig.paid_notice_padding_h_px = clampi(int(_paid_pad_h.value), 0, 64)
+	CompanionConfig.paid_notice_padding_v_px = clampi(int(_paid_pad_v.value), 0, 64)
+	CompanionConfig.paid_notice_line_separation_px = clampi(int(_paid_sep.value), 0, 48)
+	CompanionConfig.paid_notice_text_align = (
+		"center" if _paid_align.selected == 1 else "left"
+	)
+	CompanionConfig.paid_notice_pop_scale = _paid_pop_scale.button_pressed
+	CompanionConfig.paid_notice_show_on_live = _paid_live.button_pressed
+	CompanionConfig.paid_notice_show_on_pause = _paid_pause.button_pressed
+	CompanionConfig.paid_notice_enable_superchat = _paid_superchat.button_pressed
+	CompanionConfig.paid_notice_enable_gifted_membership = _paid_gifted.button_pressed
+	CompanionConfig.paid_notice_enable_sub = _paid_sub.button_pressed
+	CompanionConfig.paid_notice_enable_highlight = _paid_highlight.button_pressed
 
 	CompanionConfig.id_overlay_enabled = _id_on.button_pressed
 	CompanionConfig.id_zone_x_px = int(_iz_x.value)
@@ -941,9 +1335,206 @@ func _on_apply_pressed() -> void:
 	CompanionConfig.id_block_separation_px = int(_id_block.value)
 	CompanionConfig.icon_cell_background_color = _icon_cell_bg.color
 
+	CompanionConfig.chrome_boxes = _collect_chrome_boxes_from_editors()
+
 	CompanionConfig.save_settings()
+	_chrome_draft = CompanionConfig.duplicate_chrome_boxes()
+	_rebuild_chrome_tabs()
 
 
 func _on_reload_pressed() -> void:
 	CompanionConfig.load_settings()
 	_sync_from_config()
+
+
+func _on_save_as_export_defaults() -> void:
+	# Persist UI first so the snapshot matches what you see.
+	_on_apply_pressed()
+	var err: String = CompanionConfig.save_as_shipped_defaults()
+	var path_l := _find_path_label()
+	if path_l:
+		if err.is_empty():
+			path_l.text = (
+				"Export defaults saved (revision %d) → %s — include this file in the next export"
+				% [CompanionConfig.defaults_revision, CompanionConfig.SHIPPED_DEFAULTS_PATH]
+			)
+		else:
+			path_l.text = "Export defaults failed: %s" % err
+	_sync_from_config()
+
+
+func _on_add_chrome_box() -> void:
+	if _chrome_draft.size() >= CompanionConfig.CHROME_BOXES_MAX:
+		return
+	_flush_chrome_editors_into_draft()
+	_chrome_draft.append(CompanionConfig.default_chrome_box(_chrome_draft.size() + 1))
+	_rebuild_chrome_tabs()
+	if _tabs and _chrome_editors.size() > 0:
+		var last: Dictionary = _chrome_editors[_chrome_editors.size() - 1]
+		var sc: Control = last.get("scroll") as Control
+		if sc:
+			_tabs.current_tab = sc.get_index()
+
+
+func _flush_chrome_editors_into_draft() -> void:
+	_chrome_draft = _collect_chrome_boxes_from_editors()
+
+
+func _collect_chrome_boxes_from_editors() -> Array:
+	var out: Array = []
+	for i in range(_chrome_editors.size()):
+		var ed: Dictionary = _chrome_editors[i]
+		var name_le: LineEdit = ed.get("name") as LineEdit
+		var enabled_cb: CheckBox = ed.get("enabled") as CheckBox
+		var style_ob: OptionButton = ed.get("style") as OptionButton
+		var zx: SpinBox = ed.get("zx") as SpinBox
+		var zy: SpinBox = ed.get("zy") as SpinBox
+		var zw: SpinBox = ed.get("zw") as SpinBox
+		var zh: SpinBox = ed.get("zh") as SpinBox
+		var zbm: SpinBox = ed.get("zbm") as SpinBox
+		var chrome_sc: SpinBox = ed.get("chrome_scale") as SpinBox
+		var on_live: CheckBox = ed.get("show_on_live") as CheckBox
+		var on_pause: CheckBox = ed.get("show_on_pause") as CheckBox
+		var id_s := str(ed.get("id", ""))
+		var style_id := "window"
+		if style_ob and style_ob.selected >= 0 and style_ob.selected < _SpdUiArt.CHROME_STYLE_IDS.size():
+			style_id = _SpdUiArt.CHROME_STYLE_IDS[style_ob.selected]
+		var raw := {
+			"id": id_s,
+			"name": name_le.text if name_le else "",
+			"enabled": enabled_cb.button_pressed if enabled_cb else true,
+			"style": style_id,
+			"zone_x_px": int(zx.value) if zx else 48,
+			"zone_y_px": int(zy.value) if zy else 48,
+			"zone_width_px": int(zw.value) if zw else 240,
+			"zone_height_px": int(zh.value) if zh else 160,
+			"zone_bottom_margin_px": int(zbm.value) if zbm else 0,
+			"chrome_scale": float(chrome_sc.value) if chrome_sc else 1.0,
+			"show_on_live": on_live.button_pressed if on_live else true,
+			"show_on_pause": on_pause.button_pressed if on_pause else false,
+		}
+		out.append(CompanionConfig.normalize_chrome_box(raw, i + 1))
+	return out
+
+
+func _clear_chrome_editor_tabs() -> void:
+	if _tabs == null:
+		return
+	for ed in _chrome_editors:
+		var sc: Node = (ed as Dictionary).get("scroll") as Node
+		if sc and is_instance_valid(sc):
+			_tabs.remove_child(sc)
+			sc.queue_free()
+	_chrome_editors.clear()
+
+
+func _rebuild_chrome_tabs() -> void:
+	_clear_chrome_editor_tabs()
+	if _chrome_count_label:
+		_chrome_count_label.text = "Chrome boxes: %d / %d" % [
+			_chrome_draft.size(), CompanionConfig.CHROME_BOXES_MAX
+		]
+	if _tabs == null:
+		return
+	for i in range(_chrome_draft.size()):
+		var entry: Dictionary = CompanionConfig.normalize_chrome_box(_chrome_draft[i], i + 1)
+		var sc := _make_scroll_vbox() as ScrollContainer
+		sc.set_meta("chrome_box_editor", true)
+		_tabs.add_child(sc)
+		var tab_title := str(entry.get("name", "Chrome %d" % (i + 1)))
+		if tab_title.length() > 18:
+			tab_title = tab_title.substr(0, 16) + "…"
+		_tabs.set_tab_title(sc.get_index(), tab_title)
+
+		var name_le := _line()
+		name_le.text = str(entry.get("name", ""))
+		var enabled_cb := CheckBox.new()
+		enabled_cb.button_pressed = bool(entry.get("enabled", true))
+		var style_ob := _opt(PackedStringArray(_SpdUiArt.CHROME_STYLE_LABELS))
+		style_ob.select(_SpdUiArt.chrome_style_id_index(str(entry.get("style", "window"))))
+		var zx := _spin_i(0, 1920)
+		var zy := _spin_i(0, 1080)
+		var zw := _spin_i(32, 1920)
+		var zh := _spin_i(0, 1080)
+		var zbm := _spin_i(0, 400)
+		var chrome_scale := _spin_f(0.5, 4.0, 0.05)
+		var on_live := CheckBox.new()
+		var on_pause := CheckBox.new()
+		zx.value = int(entry.get("zone_x_px", 48))
+		zy.value = int(entry.get("zone_y_px", 48))
+		zw.value = int(entry.get("zone_width_px", 240))
+		zh.value = int(entry.get("zone_height_px", 160))
+		zbm.value = int(entry.get("zone_bottom_margin_px", 0))
+		chrome_scale.value = float(entry.get("chrome_scale", 1.0))
+		on_live.button_pressed = bool(entry.get("show_on_live", true))
+		on_pause.button_pressed = bool(entry.get("show_on_pause", false))
+
+		_add_rows(
+			sc,
+			[
+				["Name (tab title)", name_le],
+				["Enabled", enabled_cb],
+				["Chrome style", style_ob],
+				["Zone X (px)", zx],
+				["Zone Y (px)", zy],
+				["Zone width (px)", zw],
+				["Zone height (0=auto)", zh],
+				["Bottom margin if height is auto", zbm],
+				["Chrome scale (border)", chrome_scale],
+				["Show on Live scene", on_live],
+				["Show on Pause scene", on_pause],
+			]
+		)
+
+		var del_btn := Button.new()
+		del_btn.text = "Delete this chrome box"
+		var del_index := i
+		del_btn.pressed.connect(_on_delete_chrome_box.bind(del_index))
+		(sc.get_node("InnerVBox") as VBoxContainer).add_child(del_btn)
+
+		var ed_index := i
+		name_le.text_changed.connect(_on_chrome_name_changed.bind(ed_index))
+
+		_chrome_editors.append(
+			{
+				"scroll": sc,
+				"id": str(entry.get("id", "")),
+				"name": name_le,
+				"enabled": enabled_cb,
+				"style": style_ob,
+				"zx": zx,
+				"zy": zy,
+				"zw": zw,
+				"zh": zh,
+				"zbm": zbm,
+				"chrome_scale": chrome_scale,
+				"show_on_live": on_live,
+				"show_on_pause": on_pause,
+			}
+		)
+
+
+func _on_chrome_name_changed(_new_text: String, ed_index: int) -> void:
+	if ed_index < 0 or ed_index >= _chrome_editors.size():
+		return
+	var ed: Dictionary = _chrome_editors[ed_index]
+	var sc: Control = ed.get("scroll") as Control
+	var name_le: LineEdit = ed.get("name") as LineEdit
+	if sc == null or name_le == null or _tabs == null:
+		return
+	var tab_title := name_le.text.strip_edges()
+	if tab_title.is_empty():
+		tab_title = "Chrome %d" % (ed_index + 1)
+	if tab_title.length() > 18:
+		tab_title = tab_title.substr(0, 16) + "…"
+	_tabs.set_tab_title(sc.get_index(), tab_title)
+
+
+func _on_delete_chrome_box(ed_index: int) -> void:
+	_flush_chrome_editors_into_draft()
+	if ed_index < 0 or ed_index >= _chrome_draft.size():
+		return
+	_chrome_draft.remove_at(ed_index)
+	_rebuild_chrome_tabs()
+	if _tabs and _chrome_mgmt_sc:
+		_tabs.current_tab = _chrome_mgmt_sc.get_index()

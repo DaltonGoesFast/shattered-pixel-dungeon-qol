@@ -203,6 +203,14 @@ def bank_no_chat(user: str) -> str:
     return f"{u} - No chat points to bank. Earn or spend chat pts first."
 
 
+def channel_points_convert(user: str, channel_points: int, donor_gain: int, donor_total: int) -> str:
+    u = display_name(user) or user
+    return (
+        f"{u} - Converted {channel_points} Channel Points -> +{donor_gain} donor pts. "
+        f"Donor balance: {donor_total} (saved forever)."
+    )
+
+
 # --- Meta: !doublepoints ---
 
 def doublepoints_active(minutes: int) -> str:
@@ -229,10 +237,22 @@ def fard_already_used(user: str) -> str:
 
 # --- Meta: !summon / !topsummoner / !mysummons / bestiary ---
 
-def summon_success(user: str, monster: str, xp: int = 0) -> str:
+def summon_success(
+    user: str,
+    monster: str,
+    xp: int = 0,
+    soft_floor: bool = False,
+    xp_mult: float = 1.0,
+) -> str:
     u = display_name(user) or user
     if xp > 0:
-        return f"{u} summoned a {monster} across the screen! (+{xp} Bestiary XP)"
+        msg = f"{u} summoned a {monster} across the screen! (+{xp} Bestiary XP"
+        if soft_floor and xp_mult > 1.0:
+            # e.g. catch-up XP multiplier x1.25
+            mult_txt = f"{xp_mult:.2f}".rstrip("0").rstrip(".")
+            msg += f", catch-up XP multiplier x{mult_txt}"
+        msg += ")"
+        return msg
     return f"{u} summoned a {monster} across the screen!"
 
 
@@ -265,11 +285,20 @@ def bestiary_status(
 
 def sprint_leader_line(user: str, xp: int, gap: int) -> str:
     if not user:
-        return "No sprint leader this Bestiary level yet - !summon to take the lead!"
+        return (
+            "No eligible sprint leader this Bestiary level yet - !summon to take the lead! "
+            "(Past sprint winners can't crown again until next stream.)"
+        )
     u = display_name(user) or user
     if gap > 0:
-        return f"Sprint leader: {u} with {xp} XP (leads by {gap}). Resets on level-up."
-    return f"Sprint leader: {u} with {xp} XP. Resets on level-up."
+        return (
+            f"Sprint leader: {u} with {xp} XP (leads by {gap}). "
+            "Resets on level-up; winners can't crown again this stream."
+        )
+    return (
+        f"Sprint leader: {u} with {xp} XP. "
+        "Resets on level-up; winners can't crown again this stream."
+    )
 
 
 def heat_leader_line(user: str, xp: int, window_sec: int, your_xp: int = 0) -> str:
@@ -298,7 +327,13 @@ def bestiary_level_up(winner: str, from_zone: str, to_zone: str, donor: int) -> 
     if winner and donor > 0:
         return (
             f"Bestiary level-up! {from_zone} -> {to_zone}. "
-            f"Sprint winner {w} earns {donor} donor points!"
+            f"Sprint winner {w} earns {donor} donor points! "
+            f"(Can't win another sprint crown this stream.)"
+        )
+    if not winner:
+        return (
+            f"Bestiary level-up! {from_zone} -> {to_zone}. "
+            "No eligible sprint winner (prior winners are locked out until next stream)."
         )
     return f"Bestiary level-up! {from_zone} -> {to_zone}."
 

@@ -71,6 +71,7 @@ Import bundle: `Lastest UI/streamerbot/shatter-the-streamer-export-0.2.0` (no `.
 | Doc | Notes |
 |-----|-------|
 | [streaming-system-rework-plan.md](streaming-system-rework-plan.md) | Master plan; phases 0–6 complete |
+| [setpiece-commands-brainstorm.md](setpiece-commands-brainstorm.md) | Draft high-cost setpiece spends (`!mimic`, `!pedestal`, `!trial`, `!ambush`, `!greed`) |
 | [phase-0-action-inventory.md](phase-0-action-inventory.md) | Old → new action mapping |
 | [streamerbot-http-gateway-plan.md](streamerbot-http-gateway-plan.md) | Superseded pointer only |
 

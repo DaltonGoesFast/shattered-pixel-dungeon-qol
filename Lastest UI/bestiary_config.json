@@ -1,38 +1,50 @@
 {
   "heat_window_sec": 900,
   "sprint_donor_reward": 100,
+  "sprint_donor_reward_per_level": 100,
   "per_user_bar_cap_fraction": 0.0,
   "repeat_mob_diminishing": false,
+  "soft_floor": {
+    "enabled": true,
+    "board": "sprint_eligible",
+    "top_n": 3,
+    "bonus": 0.25,
+    "min_unique_summoners": 10,
+    "exclude_users": ["DaltonGoesFast", "DaltonGoesSlow"],
+    "apply_to_bar": true,
+    "apply_to_sprint": true,
+    "apply_to_heat": true
+  },
   "levels": [
     {
       "level": 1,
       "zone": "Sewers",
-      "bar_threshold": 60,
-      "monsters": ["rat", "albino", "snake"]
+      "bar_threshold": 4000,
+      "monsters": ["rat", "albino", "snake", "gnoll", "crab", "slime", "swarm", "thief"]
     },
     {
       "level": 2,
       "zone": "Prison",
-      "bar_threshold": 100,
-      "monsters": ["gnoll", "crab", "slime", "swarm", "thief"]
+      "bar_threshold": 7000,
+      "monsters": ["skeleton", "dm100", "guard", "necromancer"]
     },
     {
       "level": 3,
       "zone": "Caves",
-      "bar_threshold": 140,
-      "monsters": ["skeleton", "dm100", "bat", "brute", "shaman", "spinner"]
+      "bar_threshold": 10000,
+      "monsters": ["bat", "brute", "shaman", "spinner", "ghoul"]
     },
     {
       "level": 4,
       "zone": "City",
-      "bar_threshold": 180,
-      "monsters": ["guard", "necromancer", "ghoul", "elemental", "warlock", "monk", "golem"]
+      "bar_threshold": 14000,
+      "monsters": ["elemental", "warlock", "monk", "golem", "succubus"]
     },
     {
       "level": 5,
       "zone": "Halls",
       "bar_threshold": 0,
-      "monsters": ["succubus", "eye", "scorpio"]
+      "monsters": ["eye", "scorpio"]
     }
   ]
 }

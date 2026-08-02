@@ -11,10 +11,11 @@ Hybrid progression for free `!summon` marches on the Godot companion overlay.
 | System | Behavior | Reward |
 |--------|----------|--------|
 | **Co-op Bestiary bar** | All summons add XP; bar fills → unlock next zone | Shared unlock pool |
-| **Level sprint** | XP since current level started; resets on level-up | Hall of Fame + **100 donor points** |
+| **Level sprint** | XP since current level started; resets on level-up. **One crown per user per stream** (session reset clears) | Hall of Fame + donor pts **100 / 200 / 300 / 400** by zone |
 | **Rolling heat** | XP in last **15 minutes** | **Personal 2×** on chat/passive/donations |
+| **Soft floor (catch-up)** | After **10 unique summoners**, anyone outside top **3 eligible sprint** gets **×1.25** XP | Same mult on sprint + heat + co-op bar; chat notes `catch-up XP multiplier` |
 
-One summon feeds all three buckets with the same XP value.
+One summon feeds all three buckets with the same XP value. Soft floor uses `max(base+1, ceil(xp * 1.25))` so even rats always gain at least +1. Excluded: `DaltonGoesFast`, `DaltonGoesSlow`. Config: `bestiary_config.json` → `soft_floor`.
 
 **Breaking change:** Session-long summon **count** no longer drives `is_top_summoner` / personal 2×. Heat leader does.
 
@@ -22,17 +23,19 @@ One summon feeds all three buckets with the same XP value.
 
 ## Zones (5 levels)
 
+Zones follow SPD **native depth / chapter** (`NATIVE_DEPTH` in `points_command.py`).
+
 | Level | Zone | Monsters |
 |-------|------|----------|
-| 1 | Sewers | rat, albino, snake |
-| 2 | Prison | gnoll, crab, slime, swarm, thief |
-| 3 | Caves | skeleton, dm100, bat, brute, shaman, spinner |
-| 4 | City | guard, necromancer, ghoul, elemental, warlock, monk, golem |
-| 5 | Halls | succubus, eye, scorpio |
+| 1 | Sewers | rat, albino, snake, gnoll, crab, slime, swarm, thief |
+| 2 | Prison | skeleton, dm100, guard, necromancer |
+| 3 | Caves | bat, brute, shaman, spinner, ghoul |
+| 4 | City | elemental, warlock, monk, golem, succubus |
+| 5 | Halls | eye, scorpio |
 
 Config: [`Lastest UI/bestiary_config.json`](../Lastest%20UI/bestiary_config.json).
 
-Default bar thresholds to leave each level: **60 → 100 → 140 → 180** (level 5 has no further bar).
+Default bar thresholds to leave each level: **4000 → 7000 → 10000 → 14000** (~35k XP to Halls; tuned so a hot 30–50 chatter chat takes **>~2 hours**; level 5 has no further bar).
 
 ---
 
@@ -98,7 +101,9 @@ Session reset (`POST /api/session/reset` / Stream Started) clears bestiary state
 ## Points integration
 
 - [`is_top_summoner()`](../Lastest%20UI/points_command.py) → heat leader
-- Sprint winner → `grant_sprint_donor_reward(username, 100)` (flat donor pts, no earn multipliers)
+- Sprint winner → `grant_sprint_donor_reward` scaled by completed level: **100 + 100×(level−1)** (Sewers 100 → City 400). Flat donor pts, no earn multipliers.
+- After crowning, that user is in `sprint_winners` and cannot win another sprint until `POST /api/session/reset` / Stream Started. `!topsummoner` / HUD show the next eligible leader.
+- Crown holders’ `!summon` marches are stamped `crowned: true` on `/api/summon-march`; the Godot companion draws them **larger**, with a **Blessed-champion Flare** (yellow `0xFFFF00`, 6 rays, additive light mode, 90°/s — matching `ChampionEnemy.Blessed` + `effects.Flare`), plus the **Dwarf King crown**.
 
 ---
 

@@ -113,7 +113,7 @@ mult = (doublePoints ? 2 : 1) × (heatLeader ? 2 : 1) × (subOrMember ? 2 : 1)
 ```
 
 - **Earn Points / donations** — `is_top_summoner()` matches the **rolling heat** leader (see [bestiary-summon-system.md](bestiary-summon-system.md)), not session summon count.
-- **Sprint winner** on Bestiary level-up earns a flat **100 donor points** (not the 2× multiplier).
+- **Sprint winner** on Bestiary level-up earns donor points that scale by zone: **100 / 200 / 300 / 400** (Sewers → City). Not affected by the 2× multiplier.
 
 **Deprecated:** Session count → `top_summoner.txt` as the sole 2× source.
 
@@ -159,7 +159,7 @@ mult = (doublePoints ? 2 : 1) × (heatLeader ? 2 : 1) × (subOrMember ? 2 : 1)
 | `!summon badmob` | Invalid monster rejection |
 | `!summon scorpio` at Lv 1 | Locked-zone rejection |
 | `!summon` no arg | Random from **unlocked** pool |
-| Fill Sewers bar | Level-up; sprint winner + 100 donor; Prison unlocks |
+| Fill Sewers / Prison / Caves / City bar | Level-up; sprint winner + **100 / 200 / 300 / 400** donor; next zone unlocks |
 | `!topsummoner` | Sprint leader this level |
 | `!heat` | 15m heat leader (2×) |
 | `!bestiary` | Bar + your sprint/heat XP |

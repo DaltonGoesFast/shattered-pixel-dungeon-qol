@@ -4,7 +4,7 @@ Spend points to mess with the run! Earn up to **500 chat points per stream** (2 
 
 **2× bonuses on chat earn (stack — up to 8×):** global !doublepoints + !fard → **Bestiary heat** leader (`!heat`, last 15 min of summon XP) → sub/member.
 
-**Bestiary:** Free `!summon` fills a shared XP bar and unlocks zones (Sewers → Halls). **Sprint** = most XP this level (Hall of Fame + 100 donor pts on level-up). **Heat** = rolling 15m leader (personal 2×).
+**Bestiary:** Free `!summon` fills a shared XP bar and unlocks zones (Sewers → Halls). **Sprint** = most XP this level (Hall of Fame + 100/200/300/400 donor pts by zone on level-up). **Heat** = rolling 15m leader (personal 2×).
 
 ---
 

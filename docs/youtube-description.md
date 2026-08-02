@@ -9,13 +9,13 @@ DaltonGoesFast Channel Assets by Channel Member Grunt Frostwolf and myself!
 
 SHATTER THE STREAMER — Chat plays along with a live Shattered Pixel Dungeon run. Earn points by chatting and spending them on spawns, curses, scrolls, and more that hit the hero in real time. Free commands light up the stream overlay; paid commands change the dungeon.
 
-BESTIARY — Free !summon marches monsters across the companion overlay and fills a shared XP bar. Unlock zones together (Sewers -> Prison -> Caves -> City -> Halls). Race the Sprint for each level (Hall of Fame + 100 donor pts on win). Hold Heat (last 15 min of summon XP) for personal 2x point gains. Check !bestiary, !heat, !topsummoner, !summonhall.
+BESTIARY — Free !summon marches monsters across the companion overlay and fills a shared XP bar. Unlock zones together (Sewers -> Prison -> Caves -> City -> Halls). Race the Sprint for each level (Hall of Fame + 100/200/300/400 donor pts by zone on win). Hold Heat (last 15 min of summon XP) for personal 2x point gains. Check !bestiary, !heat, !topsummoner, !summonhall.
 
 Stream Commands:
 !fard — once per stream per viewer; OBS + sound; extends global 2× for everyone (+3 min, +6 min for subs/members)
 !summon — free Bestiary march (60s cooldown); starts with Sewers mobs; fill the XP bar to unlock zones
 !bestiary / !summonlevel — co-op bar + unlocked mobs + your sprint/heat XP
-!topsummoner — current Bestiary sprint leader (resets each level-up; Hall of Fame + 100 donor pts on win)
+!topsummoner — current Bestiary sprint leader (resets each level-up; Hall of Fame + 100/200/300/400 donor pts by zone on win)
 !heat / !hot — rolling 15m heat leader (personal 2× points)
 !summonhall — sprint winners this stream
 !mysummons — your summon count + sprint/heat XP

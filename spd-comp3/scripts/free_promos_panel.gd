@@ -3,6 +3,7 @@ extends PanelContainer
 ## Reads [code]free_until[/code] from Lastest UI [code]GET /api/points-config[/code] and shows each active cost key with time left.
 
 const _FONT: FontFile = preload("res://assets/fonts/pixel_font.ttf")
+const _SpdUi := preload("res://scripts/spd_ui_art.gd")
 
 ## Display strings match Lastest UI [code]points_command.py[/code] chat commands ([code]!spawn[/code], [code]!row[/code], etc.). Billing keys stay [code]cost_per_*[/code].
 const _COST_COMMAND_LABEL: Dictionary = {
@@ -55,12 +56,22 @@ func _ready() -> void:
 func _on_cfg() -> void:
 	_poll_accum = 999.0
 	_apply_anchor_pins()
+	_apply_chrome()
 	_apply_compact_container_flags()
 	_apply_size_cap()
 	_apply_fonts()
 	_update_root_visibility()
 	_schedule_reposition()
 	_request_poll()
+
+
+func _apply_chrome() -> void:
+	add_theme_stylebox_override(
+		"panel",
+		_SpdUi.chrome_style(
+			CompanionConfig.free_promos_chrome_style, CompanionConfig.free_promos_chrome_scale
+		)
+	)
 
 
 func _apply_anchor_pins() -> void:

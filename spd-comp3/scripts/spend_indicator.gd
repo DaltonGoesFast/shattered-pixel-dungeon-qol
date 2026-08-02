@@ -3,7 +3,7 @@ extends HBoxContainer
 ## Mirrors WndChallenges rows: RedButton chrome (Chrome.Type.RED_BUTTON) + CheckBox Icons.CHECKED / UNCHECKED on the right.
 ## Locked when [code]spend_disabled.txt[/code] exists (spending off).
 
-const _TEX_RED := preload("res://assets/ui_spd/chrome/red_button.png")
+const _SpdUi := preload("res://scripts/spd_ui_art.gd")
 const _TEX_ON := preload("res://assets/ui_spd/icons/icons_checked.png")
 const _TEX_OFF := preload("res://assets/ui_spd/icons/icons_unchecked.png")
 
@@ -18,11 +18,11 @@ var _last_code: int = -1
 
 func _ready() -> void:
 	_toggle.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_red_strip.add_theme_stylebox_override("panel", _style_red_button())
 	CompanionConfig.settings_saved.connect(_on_cfg)
 	CompanionConfig.settings_loaded.connect(_on_cfg)
 	get_viewport().size_changed.connect(_schedule_reposition)
 	_apply_anchor_pins()
+	_apply_chrome()
 	_apply_label_scale()
 	_apply_visibility()
 	_poll_now(true)
@@ -31,24 +31,22 @@ func _ready() -> void:
 func _on_cfg() -> void:
 	_accum = 0.0
 	_apply_anchor_pins()
+	_apply_chrome()
 	_apply_label_scale()
 	_apply_visibility()
 	_poll_now(true)
 
 
-func _style_red_button() -> StyleBoxTexture:
-	## Same 6×6 @ (38,0) patch as [code]Chrome.RED_BUTTON[/code]: margin 2.
-	var sb := StyleBoxTexture.new()
-	sb.texture = _TEX_RED
-	sb.texture_margin_left = 2
-	sb.texture_margin_top = 2
-	sb.texture_margin_right = 2
-	sb.texture_margin_bottom = 2
-	sb.content_margin_left = 5
-	sb.content_margin_top = 4
-	sb.content_margin_right = 5
-	sb.content_margin_bottom = 4
-	return sb
+func _apply_chrome() -> void:
+	if _red_strip == null:
+		return
+	_red_strip.add_theme_stylebox_override(
+		"panel",
+		_SpdUi.chrome_style(
+			CompanionConfig.spend_indicator_chrome_style,
+			CompanionConfig.spend_indicator_chrome_scale
+		)
+	)
 
 
 func _apply_label_scale() -> void:

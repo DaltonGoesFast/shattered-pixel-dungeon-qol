@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3 uid="uid://spdcompanionmain"]
+[gd_scene load_steps=17 format=3 uid="uid://spdcompanionmain"]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/hud_status.gd" id="2_hud"]
@@ -14,6 +14,8 @@
 [ext_resource type="Script" path="res://scripts/live_water_background.gd" id="12_live_water"]
 [ext_resource type="Script" path="res://scripts/summon_march_controller.gd" id="13_summon_march"]
 [ext_resource type="Script" path="res://scripts/bestiary_hud.gd" id="14_bestiary"]
+[ext_resource type="Script" path="res://scripts/placeable_chrome_boxes.gd" id="15_chrome"]
+[ext_resource type="Script" path="res://scripts/paid_notice_overlay.gd" id="16_paid"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel_bg"]
 bg_color = Color(0.06, 0.07, 0.12, 0.88)
@@ -81,6 +83,19 @@ script = ExtResource("8_title_bg")
 
 [node name="CanvasLayerHUD" type="CanvasLayer" parent="."]
 layer = 1
+
+[node name="CanvasLayerChromeBoxes" type="CanvasLayer" parent="."]
+layer = 2
+
+[node name="PlaceableChromeBoxes" type="Control" parent="CanvasLayerChromeBoxes"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("15_chrome")
 
 [node name="HUDStatus" type="PanelContainer" parent="CanvasLayerHUD"]
 offset_left = 16.0
@@ -328,6 +343,19 @@ offset_right = 420.0
 offset_bottom = 160.0
 mouse_filter = 2
 script = ExtResource("14_bestiary")
+
+[node name="CanvasLayerPaidNotices" type="CanvasLayer" parent="."]
+layer = 11
+
+[node name="PaidNoticeOverlay" type="Control" parent="CanvasLayerPaidNotices"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("16_paid")
 
 [node name="CanvasLayerAlerts" type="CanvasLayer" parent="."]
 layer = 10

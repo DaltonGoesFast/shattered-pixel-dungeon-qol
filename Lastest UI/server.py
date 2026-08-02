@@ -2722,6 +2722,52 @@ def donation_gift_membership_api():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@app.route('/api/channel-points/convert', methods=['POST', 'OPTIONS'])
+def channel_points_convert_api():
+    """Convert Twitch Channel Points redeem into flat donor points (no donation multipliers)."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        from points_command import grant_flat_donor_points
+        import chat_messages
+        body = request.get_json(force=True, silent=True) or {}
+        username = str(body.get('username') or body.get('userName') or '').strip()
+        if not username or username.lower() == 'anonymous':
+            return jsonify({"ok": False, "skipped": True, "message": "Missing username", "error": "username required"}), 400
+        try:
+            channel_points = int(body.get('channelPoints') or body.get('channel_points') or 0)
+        except (TypeError, ValueError):
+            channel_points = 0
+        try:
+            donor_points = int(body.get('donorPoints') or body.get('donor_points') or 0)
+        except (TypeError, ValueError):
+            donor_points = 0
+        if donor_points <= 0 and channel_points > 0:
+            donor_points = channel_points // 20
+        if donor_points <= 0:
+            return jsonify({"ok": False, "message": "donorPoints required", "error": "donorPoints required"}), 400
+        if channel_points <= 0:
+            channel_points = donor_points * 20
+        ok, donor_total, added = grant_flat_donor_points(username, donor_points)
+        if not ok:
+            return jsonify({
+                "ok": False,
+                "message": "Could not grant donor points. Try again in a moment.",
+                "error": "grant failed",
+            }), 503
+        message = chat_messages.channel_points_convert(username, channel_points, added, donor_total)
+        return jsonify({
+            "ok": True,
+            "message": message,
+            "pts": donor_total,
+            "donorPoints": added,
+            "channelPoints": channel_points,
+            "donorTotal": donor_total,
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "message": str(e), "error": str(e)}), 500
+
+
 @app.route('/api/double-points-remaining')
 def double_points_remaining():
     """Return 2x points countdown for OBS Browser Source."""
@@ -2783,7 +2829,12 @@ def summon_march():
                 return jsonify({'ok': False, 'error': 'Invalid or missing monster'}), 400
             # Bestiary unlocked-pool gate (chat_command already gates; reject stale direct POSTs)
             try:
-                from summon_bestiary import is_monster_unlocked, monster_xp, get_state_payload
+                from summon_bestiary import (
+                    is_monster_unlocked,
+                    monster_xp,
+                    get_state_payload,
+                    is_sprint_crowned,
+                )
                 if not is_monster_unlocked(monster):
                     return jsonify({
                         'ok': False,
@@ -2791,9 +2842,11 @@ def summon_march():
                     }), 400
                 xp = int(data.get('xp') or monster_xp(monster) or 0)
                 bestiary_level = int(data.get('bestiary_level') or get_state_payload().get('level') or 1)
+                crowned = bool(data.get('crowned')) or is_sprint_crowned(username)
             except Exception:
                 xp = int(data.get('xp') or 0)
                 bestiary_level = int(data.get('bestiary_level') or 1)
+                crowned = bool(data.get('crowned'))
             event_id = str(uuid.uuid4())
             ts = int(time.time())
             event = {
@@ -2804,10 +2857,12 @@ def summon_march():
                 'layout': layout,
                 'xp': xp,
                 'bestiary_level': bestiary_level,
+                'crowned': crowned,
             }
             _append_summon_march_event(event)
             _record_command_event(username, 'summon_march', monster, True)
-            print(f"Summon march queued: {monster} for {username or '?'} ({event_id})")
+            print(f"Summon march queued: {monster} for {username or '?'} ({event_id})"
+                  + (" [crowned]" if crowned else ""))
             return jsonify({'ok': True, 'id': event_id, 'event': event})
         except Exception as e:
             print(f"Summon march POST error: {e}")

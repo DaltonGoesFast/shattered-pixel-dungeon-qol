@@ -147,28 +147,35 @@ def is_top_summoner(username):
     return False
 
 
-def grant_sprint_donor_reward(username, amount=100):
-    """Flat donor-wallet grant for Bestiary sprint winners (no earn multipliers).
+def grant_flat_donor_points(username, amount):
+    """Flat donor-wallet grant with no earn multipliers (Channel Points, sprint, etc.).
 
-    Increments both pts and donation_pts by amount so the grant is spendable and
-    counted as donor balance.
+    Increments both pts and donation_pts so the grant is spendable and counted as donor.
+    Returns (ok, donor_total, added) or (False, 0, 0) on skip/busy.
     """
     if not username or str(username).strip().lower() in ("", "anonymous"):
-        return False
+        return False, 0, 0
     to_add = max(0, int(amount))
     if to_add <= 0:
-        return False
+        return False, 0, 0
     key = str(username).strip().lower()
     try:
         with points_lock():
             data = read_points()
             pts, last, donation_pts, role = _get_user_data(data, key)
             pts += to_add
-            data[key] = (pts, last, donation_pts + to_add, role)
+            donation_pts += to_add
+            data[key] = (pts, last, donation_pts, role)
             write_points(data)
-        return True
+        return True, donation_pts, to_add
     except TimeoutError:
-        return False
+        return False, 0, 0
+
+
+def grant_sprint_donor_reward(username, amount=100):
+    """Flat donor-wallet grant for Bestiary sprint winners (no earn multipliers)."""
+    ok, _, _ = grant_flat_donor_points(username, amount)
+    return ok
 
 
 def donation_earn_multiplier(is_subscribed=False, is_sponsor=False, username=None):
@@ -315,6 +322,7 @@ def load_config():
         "points_per_message": 2,
         "chat_cooldown_sec": 20,
         "passive_cooldown_sec": 60,
+        "cooldown_bypass_users": ["DaltonGoesFast"],
         "first_words_bonus": 5,
         "chat_point_cap": 500,
         "bank_ratio_manual": 0.10,
@@ -363,6 +371,11 @@ def load_config():
             "points_per_message": max(1, int(cfg.get("points_per_message", defaults["points_per_message"]))),
             "chat_cooldown_sec": max(0, int(cfg.get("chat_cooldown_sec", defaults["chat_cooldown_sec"]))),
             "passive_cooldown_sec": max(0, int(cfg.get("passive_cooldown_sec", defaults["passive_cooldown_sec"]))),
+            "cooldown_bypass_users": [
+                str(u).strip()
+                for u in (cfg.get("cooldown_bypass_users") or defaults["cooldown_bypass_users"])
+                if str(u).strip()
+            ],
             "first_words_bonus": max(0, int(cfg.get("first_words_bonus", defaults["first_words_bonus"]))),
             "chat_point_cap": max(1, int(cfg.get("chat_point_cap", defaults["chat_point_cap"]))),
             "bank_ratio_manual": float(cfg.get("bank_ratio_manual", defaults["bank_ratio_manual"])),
@@ -378,6 +391,17 @@ def load_config():
 def get_config():
     """Cached config (reloads each command to allow live edits)."""
     return load_config()
+
+
+def ignores_command_cooldowns(username: str) -> bool:
+    """True if this user skips chat/passive/summon cooldowns (streamer testing)."""
+    key = (username or "").strip().lower()
+    if not key:
+        return False
+    for u in get_config().get("cooldown_bypass_users") or []:
+        if str(u).strip().lower() == key:
+            return True
+    return False
 
 
 def is_cost_free(cost_key):

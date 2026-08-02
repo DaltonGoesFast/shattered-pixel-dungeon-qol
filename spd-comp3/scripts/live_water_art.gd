@@ -69,5 +69,5 @@ static func _stem_from_asset_path(path: String) -> String:
 
 ## Chapter bands: depths 1–5 → water0, 6–10 → water1, … (same as [code]1 + depth/5[/code] region in vanilla SPD).
 static func _stem_for_depth(depth: int) -> String:
-	var idx := clampi((depth - 1) / 5, 0, 4)
+	var idx := clampi(int((depth - 1) / 5.0), 0, 4)
 	return "water%d" % idx

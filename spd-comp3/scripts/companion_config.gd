@@ -1,6 +1,9 @@
 extends Node
 
 const SETTINGS_PATH := "user://companion_settings.cfg"
+## Bundled with the project/export. When [member defaults_revision] here is newer than user://, user settings are overwritten.
+const SHIPPED_DEFAULTS_PATH := "res://defaults/companion_settings.cfg"
+const _SpdUiArt := preload("res://scripts/spd_ui_art.gd")
 
 ## Fired after settings are written to disk (e.g. from the settings UI or manual save).
 signal settings_saved
@@ -8,6 +11,8 @@ signal settings_saved
 signal settings_loaded
 
 var _notify_listeners: bool = false
+## Matches [code]meta/defaults_revision[/code] in the active cfg. Bumped when saving export defaults.
+var defaults_revision: int = 0
 
 ## Seconds between OBS WebSocket reconnect attempts when disconnected.
 var obs_reconnect_sec: float = 3.0
@@ -49,6 +54,9 @@ var spend_indicator_margin_x: int = 16
 var spend_indicator_margin_y: int = 16
 ## Pixel font size for the spend indicator label ([code]Chat Spending[/code]).
 var spend_indicator_font_size_px: int = 15
+## SPD chrome for the chat spend badge (default red button, matches WndChallenges).
+var spend_indicator_chrome_style: String = "red_button"
+var spend_indicator_chrome_scale: float = 1.0
 ## Seconds between WebSocket reconnect attempts after failure.
 var ws_reconnect_sec: float = 2.0
 ## Optional poll of Flask last snapshot when WS is unavailable.
@@ -79,6 +87,9 @@ var show_ping_alerts: bool = false
 var show_failed_command_alerts: bool = false
 ## Show the top-left connection / snapshot HUD panel (WebSocket, UDP, F2/F5 hints).
 var hud_status_panel_visible: bool = true
+## Last Settings window size (remembered so you do not have to drag-expand every open).
+var settings_window_width_px: int = 1200
+var settings_window_height_px: int = 820
 ## Pixel rect from **top-left of the viewport** for **alert** popups only.
 var alert_zone_x_px: int = 24
 var alert_zone_y_px: int = 80
@@ -109,6 +120,10 @@ var window_per_pixel_transparency_enabled: bool = false
 var render_max_fps: int = 60
 ## Title/subtitle alignment: left or center.
 var alert_text_align: String = "left"
+## SPD chrome style for the alert toast panel (see SpdUiArt.CHROME_STYLE_IDS). Default matches original toast.
+var alert_chrome_style: String = "toast"
+## Thickens alert toast chrome border (nearest-neighbor), same idea as Bestiary / placeable panels.
+var alert_chrome_scale: float = 1.0
 ## Pixel font size for alert title and subtitle (toast text).
 var alert_title_font_size_px: int = 14
 var alert_subtitle_font_size_px: int = 11
@@ -116,6 +131,41 @@ var alert_subtitle_font_size_px: int = 11
 var alert_command_icon_size_px: int = 72
 ## Frames per second for monster idle animation in alerts (static scroll art ignores this).
 var alert_mob_idle_anim_fps: float = 3.0
+
+## Streamer.bot UDP paid/highlight notices (superchat, gifted membership, sub, highlight).
+var paid_notice_enabled: bool = true
+var paid_notice_queue_max: int = 8
+var paid_notice_default_ttl_sec: float = 6.0
+var paid_notice_fade_in_sec: float = 0.35
+var paid_notice_fade_out_sec: float = 0.45
+var paid_notice_zone_x_px: int = 560
+var paid_notice_zone_y_px: int = 80
+var paid_notice_zone_width_px: int = 800
+var paid_notice_zone_height_px: int = 220
+var paid_notice_zone_bottom_margin_px: int = 0
+var paid_notice_chrome_style: String = "toast"
+var paid_notice_chrome_scale: float = 1.5
+var paid_notice_kind_font_size_px: int = 16
+var paid_notice_title_font_size_px: int = 24
+var paid_notice_body_font_size_px: int = 20
+var paid_notice_kind_font_color: Color = Color(1.0, 1.0, 0.35, 1.0)
+var paid_notice_title_font_color: Color = Color(1.0, 1.0, 0.27, 1.0)
+var paid_notice_body_font_color: Color = Color(0.95, 0.92, 0.85, 1.0)
+var paid_notice_text_shadow: bool = true
+var paid_notice_padding_h_px: int = 14
+var paid_notice_padding_v_px: int = 10
+var paid_notice_line_separation_px: int = 6
+## left | center
+var paid_notice_text_align: String = "left"
+## Pop-in scale animation (softens pixel text — off by default).
+var paid_notice_pop_scale: bool = false
+var paid_notice_show_on_live: bool = true
+var paid_notice_show_on_pause: bool = true
+var paid_notice_enable_superchat: bool = true
+var paid_notice_enable_gifted_membership: bool = true
+var paid_notice_enable_sub: bool = true
+var paid_notice_enable_highlight: bool = true
+
 ## Show potion/scroll identification strip from WebSocket snapshot data.
 var id_overlay_enabled: bool = true
 ## Pixel width of each ID cell (portrait tile in the flow grid).
@@ -141,6 +191,9 @@ var free_promos_margin_y: int = 64
 var free_promos_font_size_px: int = 13
 ## Hard cap on panel width (content is narrower when possible).
 var free_promos_max_width_px: int = 320
+## SPD chrome for the free-promos panel (default toast).
+var free_promos_chrome_style: String = "toast"
+var free_promos_chrome_scale: float = 1.0
 ## Poll chat !summon march queue from Lastest UI server (GET /api/summon-march).
 var summon_march_enabled: bool = true
 ## Base URL e.g. http://127.0.0.1:5000 (no trailing path).
@@ -175,6 +228,22 @@ var summon_march_username_offset_x: int = -28
 var summon_march_username_offset_y: int = 24
 var summon_march_monster_offset_x: int = -48
 var summon_march_monster_offset_y: int = -56
+## Sprint crown holders (!summon after winning a level sprint this stream).
+var summon_crowned_sprite_scale: float = 1.28
+var summon_crowned_mob_modulate: Color = Color(1.08, 1.08, 0.92, 1.0)
+var summon_crowned_show_glow: bool = true
+var summon_crowned_glow_color: Color = Color(1.0, 1.0, 0.0, 1.0)
+var summon_crowned_glow_rays: int = 6
+var summon_crowned_glow_spin_deg: float = 90.0
+var summon_crowned_glow_radius_scale: float = 1.0
+var summon_crowned_show_crown: bool = true
+var summon_crowned_crown_scale: float = 0.75
+var summon_crowned_crown_offset_y: float = -0.32
+var summon_crowned_crown_modulate: Color = Color(1.2, 1.05, 0.55, 1.0)
+var summon_crowned_username_color: Color = Color(1.0, 1.0, 0.35, 1.0)
+## 0 = use normal summon username font size.
+var summon_crowned_username_font_size_px: int = 0
+var summon_crowned_show_star_prefix: bool = true
 
 ## Bestiary HUD (GET /api/bestiary) — co-op XP bar, sprint, heat.
 var bestiary_hud_enabled: bool = true
@@ -192,6 +261,8 @@ var bestiary_exp_bar_width_px: int = 256
 var bestiary_exp_bar_height_scale: float = 1.0
 ## Scales the whole Bestiary panel (chrome, bar, fonts, icons). Banner is separate.
 var bestiary_hud_scale: float = 1.0
+## Thickens the grey window chrome border (nearest-neighbor). Independent of HUD scale.
+var bestiary_chrome_scale: float = 1.0
 var bestiary_use_compact_exp_bar: bool = false
 var bestiary_zone_font_size_px: int = 18
 ## Header template. Placeholders: {level} {zone}
@@ -213,6 +284,11 @@ var bestiary_heat_font_color: Color = Color(1.0, 1.0, 1.0, 1.0)
 var bestiary_hall_font_color: Color = Color(1.0, 1.0, 1.0, 1.0)
 var bestiary_banner_font_color: Color = Color(1.0, 1.0, 1.0, 1.0)
 
+## Placeable empty SPD window chrome panels (Dictionary entries). Cap keeps Settings tabs reasonable.
+const CHROME_BOXES_MAX := 16
+## Keys: id, name, enabled, style, zone_*, chrome_scale, show_on_live, show_on_pause.
+var chrome_boxes: Array = []
+
 func _ready() -> void:
 	load_settings()
 	save_settings()
@@ -221,8 +297,25 @@ func _ready() -> void:
 
 func load_settings() -> void:
 	var cfg := ConfigFile.new()
-	if cfg.load(SETTINGS_PATH) != OK:
+	var user_ok := cfg.load(SETTINGS_PATH) == OK
+	var shipped := ConfigFile.new()
+	var shipped_ok := shipped.load(SHIPPED_DEFAULTS_PATH) == OK
+	if shipped_ok:
+		var shipped_rev := int(shipped.get_value("meta", "defaults_revision", 1))
+		var user_rev := int(cfg.get_value("meta", "defaults_revision", 0)) if user_ok else -1
+		if (not user_ok) or user_rev != shipped_rev:
+			# Option B: shipped defaults win when revision differs (or user cfg missing).
+			cfg = shipped
+			var install_err := cfg.save(SETTINGS_PATH)
+			if install_err != OK:
+				push_warning(
+					"CompanionConfig: could not install shipped defaults to %s (%s)"
+					% [SETTINGS_PATH, error_string(install_err)]
+				)
+			user_ok = true
+	if not user_ok:
 		return
+	defaults_revision = int(cfg.get_value("meta", "defaults_revision", defaults_revision))
 	game_ws_host = str(cfg.get_value("network", "game_ws_host", game_ws_host))
 	game_ws_port = int(cfg.get_value("network", "game_ws_port", game_ws_port))
 	streamerbot_udp_port = int(cfg.get_value("network", "streamerbot_udp_port", streamerbot_udp_port))
@@ -266,6 +359,14 @@ func load_settings() -> void:
 		int(cfg.get_value("network", "spend_indicator_font_size_px", spend_indicator_font_size_px)),
 		8,
 		64
+	)
+	spend_indicator_chrome_style = _SpdUiArt.normalize_chrome_style_id(
+		str(cfg.get_value("network", "spend_indicator_chrome_style", spend_indicator_chrome_style))
+	)
+	spend_indicator_chrome_scale = clampf(
+		float(cfg.get_value("network", "spend_indicator_chrome_scale", spend_indicator_chrome_scale)),
+		0.5,
+		4.0
 	)
 	ws_reconnect_sec = float(cfg.get_value("network", "ws_reconnect_sec", ws_reconnect_sec))
 	http_fallback_enabled = bool(cfg.get_value("network", "http_fallback_enabled", http_fallback_enabled))
@@ -338,6 +439,60 @@ func load_settings() -> void:
 	summon_march_monster_offset_y = int(
 		cfg.get_value("ui", "summon_march_monster_offset_y", summon_march_monster_offset_y)
 	)
+	summon_crowned_sprite_scale = clampf(
+		float(cfg.get_value("ui", "summon_crowned_sprite_scale", summon_crowned_sprite_scale)),
+		1.0,
+		3.0
+	)
+	summon_crowned_mob_modulate = _read_color_cfg(
+		cfg, "ui", "summon_crowned_mob_modulate", summon_crowned_mob_modulate
+	)
+	summon_crowned_show_glow = bool(
+		cfg.get_value("ui", "summon_crowned_show_glow", summon_crowned_show_glow)
+	)
+	summon_crowned_glow_color = _read_color_cfg(
+		cfg, "ui", "summon_crowned_glow_color", summon_crowned_glow_color
+	)
+	summon_crowned_glow_rays = clampi(
+		int(cfg.get_value("ui", "summon_crowned_glow_rays", summon_crowned_glow_rays)), 3, 16
+	)
+	summon_crowned_glow_spin_deg = clampf(
+		float(cfg.get_value("ui", "summon_crowned_glow_spin_deg", summon_crowned_glow_spin_deg)),
+		0.0,
+		720.0
+	)
+	summon_crowned_glow_radius_scale = clampf(
+		float(cfg.get_value("ui", "summon_crowned_glow_radius_scale", summon_crowned_glow_radius_scale)),
+		0.25,
+		3.0
+	)
+	summon_crowned_show_crown = bool(
+		cfg.get_value("ui", "summon_crowned_show_crown", summon_crowned_show_crown)
+	)
+	summon_crowned_crown_scale = clampf(
+		float(cfg.get_value("ui", "summon_crowned_crown_scale", summon_crowned_crown_scale)),
+		0.1,
+		3.0
+	)
+	summon_crowned_crown_offset_y = clampf(
+		float(cfg.get_value("ui", "summon_crowned_crown_offset_y", summon_crowned_crown_offset_y)),
+		-1.5,
+		1.5
+	)
+	summon_crowned_crown_modulate = _read_color_cfg(
+		cfg, "ui", "summon_crowned_crown_modulate", summon_crowned_crown_modulate
+	)
+	summon_crowned_username_color = _read_color_cfg(
+		cfg, "ui", "summon_crowned_username_color", summon_crowned_username_color
+	)
+	summon_crowned_username_font_size_px = clampi(
+		int(cfg.get_value("ui", "summon_crowned_username_font_size_px", summon_crowned_username_font_size_px)),
+		0,
+		72
+	)
+	summon_crowned_show_star_prefix = bool(
+		cfg.get_value("ui", "summon_crowned_show_star_prefix", summon_crowned_show_star_prefix)
+	)
 	bestiary_hud_enabled = bool(cfg.get_value("network", "bestiary_hud_enabled", bestiary_hud_enabled))
 	bestiary_base_url = str(cfg.get_value("network", "bestiary_base_url", bestiary_base_url))
 	bestiary_poll_sec = maxf(0.25, float(cfg.get_value("network", "bestiary_poll_sec", bestiary_poll_sec)))
@@ -370,6 +525,9 @@ func load_settings() -> void:
 	)
 	bestiary_hud_scale = clampf(
 		float(cfg.get_value("ui", "bestiary_hud_scale", bestiary_hud_scale)), 0.5, 4.0
+	)
+	bestiary_chrome_scale = clampf(
+		float(cfg.get_value("ui", "bestiary_chrome_scale", bestiary_chrome_scale)), 0.5, 4.0
 	)
 	bestiary_use_compact_exp_bar = bool(
 		cfg.get_value("ui", "bestiary_use_compact_exp_bar", bestiary_use_compact_exp_bar)
@@ -433,11 +591,18 @@ func load_settings() -> void:
 	bestiary_banner_font_color = _read_color_cfg(
 		cfg, "ui", "bestiary_banner_font_color", bestiary_banner_font_color
 	)
+	chrome_boxes = _read_chrome_boxes_cfg(cfg)
 	show_pending_udp_alerts = bool(
 		cfg.get_value("ui", "show_pending_udp_alerts", show_pending_udp_alerts)
 	)
 	hud_status_panel_visible = bool(
 		cfg.get_value("ui", "hud_status_panel_visible", hud_status_panel_visible)
+	)
+	settings_window_width_px = clampi(
+		int(cfg.get_value("ui", "settings_window_width_px", settings_window_width_px)), 600, 3840
+	)
+	settings_window_height_px = clampi(
+		int(cfg.get_value("ui", "settings_window_height_px", settings_window_height_px)), 480, 2160
 	)
 	alert_queue_max = int(cfg.get_value("ui", "alert_queue_max", alert_queue_max))
 	alert_hold_sec = float(cfg.get_value("ui", "alert_hold_sec", alert_hold_sec))
@@ -508,6 +673,12 @@ func load_settings() -> void:
 	)
 	render_max_fps = clampi(int(cfg.get_value("ui", "render_max_fps", render_max_fps)), 0, 480)
 	alert_text_align = str(cfg.get_value("ui", "alert_text_align", alert_text_align))
+	alert_chrome_style = _SpdUiArt.normalize_chrome_style_id(
+		str(cfg.get_value("ui", "alert_chrome_style", alert_chrome_style))
+	)
+	alert_chrome_scale = clampf(
+		float(cfg.get_value("ui", "alert_chrome_scale", alert_chrome_scale)), 0.5, 4.0
+	)
 	alert_title_font_size_px = int(
 		cfg.get_value("ui", "alert_title_font_size_px", alert_title_font_size_px)
 	)
@@ -519,6 +690,100 @@ func load_settings() -> void:
 	)
 	alert_mob_idle_anim_fps = float(
 		cfg.get_value("ui", "alert_mob_idle_anim_fps", alert_mob_idle_anim_fps)
+	)
+	paid_notice_enabled = bool(cfg.get_value("ui", "paid_notice_enabled", paid_notice_enabled))
+	paid_notice_queue_max = clampi(
+		int(cfg.get_value("ui", "paid_notice_queue_max", paid_notice_queue_max)), 1, 32
+	)
+	paid_notice_default_ttl_sec = maxf(
+		0.5, float(cfg.get_value("ui", "paid_notice_default_ttl_sec", paid_notice_default_ttl_sec))
+	)
+	paid_notice_fade_in_sec = maxf(
+		0.05, float(cfg.get_value("ui", "paid_notice_fade_in_sec", paid_notice_fade_in_sec))
+	)
+	paid_notice_fade_out_sec = maxf(
+		0.05, float(cfg.get_value("ui", "paid_notice_fade_out_sec", paid_notice_fade_out_sec))
+	)
+	paid_notice_zone_x_px = int(cfg.get_value("ui", "paid_notice_zone_x_px", paid_notice_zone_x_px))
+	paid_notice_zone_y_px = int(cfg.get_value("ui", "paid_notice_zone_y_px", paid_notice_zone_y_px))
+	paid_notice_zone_width_px = clampi(
+		int(cfg.get_value("ui", "paid_notice_zone_width_px", paid_notice_zone_width_px)), 64, 1920
+	)
+	paid_notice_zone_height_px = clampi(
+		int(cfg.get_value("ui", "paid_notice_zone_height_px", paid_notice_zone_height_px)), 0, 1080
+	)
+	paid_notice_zone_bottom_margin_px = int(
+		cfg.get_value("ui", "paid_notice_zone_bottom_margin_px", paid_notice_zone_bottom_margin_px)
+	)
+	paid_notice_chrome_style = _SpdUiArt.normalize_chrome_style_id(
+		str(cfg.get_value("ui", "paid_notice_chrome_style", paid_notice_chrome_style))
+	)
+	paid_notice_chrome_scale = clampf(
+		float(cfg.get_value("ui", "paid_notice_chrome_scale", paid_notice_chrome_scale)), 0.5, 4.0
+	)
+	paid_notice_kind_font_size_px = clampi(
+		int(cfg.get_value("ui", "paid_notice_kind_font_size_px", paid_notice_kind_font_size_px)),
+		8,
+		96
+	)
+	paid_notice_title_font_size_px = clampi(
+		int(cfg.get_value("ui", "paid_notice_title_font_size_px", paid_notice_title_font_size_px)),
+		8,
+		96
+	)
+	paid_notice_body_font_size_px = clampi(
+		int(cfg.get_value("ui", "paid_notice_body_font_size_px", paid_notice_body_font_size_px)),
+		8,
+		96
+	)
+	paid_notice_kind_font_color = _read_color_cfg(
+		cfg, "ui", "paid_notice_kind_font_color", paid_notice_kind_font_color
+	)
+	paid_notice_title_font_color = _read_color_cfg(
+		cfg, "ui", "paid_notice_title_font_color", paid_notice_title_font_color
+	)
+	paid_notice_body_font_color = _read_color_cfg(
+		cfg, "ui", "paid_notice_body_font_color", paid_notice_body_font_color
+	)
+	paid_notice_text_shadow = bool(
+		cfg.get_value("ui", "paid_notice_text_shadow", paid_notice_text_shadow)
+	)
+	paid_notice_padding_h_px = clampi(
+		int(cfg.get_value("ui", "paid_notice_padding_h_px", paid_notice_padding_h_px)), 0, 64
+	)
+	paid_notice_padding_v_px = clampi(
+		int(cfg.get_value("ui", "paid_notice_padding_v_px", paid_notice_padding_v_px)), 0, 64
+	)
+	paid_notice_line_separation_px = clampi(
+		int(cfg.get_value("ui", "paid_notice_line_separation_px", paid_notice_line_separation_px)),
+		0,
+		48
+	)
+	paid_notice_text_align = _normalize_paid_notice_text_align(
+		str(cfg.get_value("ui", "paid_notice_text_align", paid_notice_text_align))
+	)
+	paid_notice_pop_scale = bool(
+		cfg.get_value("ui", "paid_notice_pop_scale", paid_notice_pop_scale)
+	)
+	paid_notice_show_on_live = bool(
+		cfg.get_value("ui", "paid_notice_show_on_live", paid_notice_show_on_live)
+	)
+	paid_notice_show_on_pause = bool(
+		cfg.get_value("ui", "paid_notice_show_on_pause", paid_notice_show_on_pause)
+	)
+	paid_notice_enable_superchat = bool(
+		cfg.get_value("ui", "paid_notice_enable_superchat", paid_notice_enable_superchat)
+	)
+	paid_notice_enable_gifted_membership = bool(
+		cfg.get_value(
+			"ui", "paid_notice_enable_gifted_membership", paid_notice_enable_gifted_membership
+		)
+	)
+	paid_notice_enable_sub = bool(
+		cfg.get_value("ui", "paid_notice_enable_sub", paid_notice_enable_sub)
+	)
+	paid_notice_enable_highlight = bool(
+		cfg.get_value("ui", "paid_notice_enable_highlight", paid_notice_enable_highlight)
 	)
 	id_overlay_enabled = bool(cfg.get_value("ui", "id_overlay_enabled", id_overlay_enabled))
 	if cfg.has_section_key("ui", "id_cell_width_px"):
@@ -559,6 +824,12 @@ func load_settings() -> void:
 		int(cfg.get_value("ui", "free_promos_max_width_px", free_promos_max_width_px)),
 		160,
 		1600
+	)
+	free_promos_chrome_style = _SpdUiArt.normalize_chrome_style_id(
+		str(cfg.get_value("ui", "free_promos_chrome_style", free_promos_chrome_style))
+	)
+	free_promos_chrome_scale = clampf(
+		float(cfg.get_value("ui", "free_promos_chrome_scale", free_promos_chrome_scale)), 0.5, 4.0
 	)
 	_apply_render_limits()
 	settings_loaded.emit()
@@ -610,6 +881,13 @@ func _copy_id_zone_from_alert_zone() -> void:
 	id_zone_bottom_margin_px = alert_zone_bottom_margin_px
 
 
+func _normalize_paid_notice_text_align(raw: String) -> String:
+	var a := raw.strip_edges().to_lower()
+	if a == "center" or a == "centre" or a == "middle":
+		return "center"
+	return "left"
+
+
 func _read_color_cfg(cfg: ConfigFile, section: String, key: String, fallback: Color) -> Color:
 	if not cfg.has_section_key(section, key):
 		return fallback
@@ -639,6 +917,9 @@ func apply_pixel_zone_layout(
 ) -> void:
 	var cx: int = int(canvas.x)
 	var cy: int = int(canvas.y)
+	# Keep the rect on-canvas so toasts/HUDs cannot sit entirely below/beside the view.
+	x = clampi(x, 0, maxi(cx - 32, 0))
+	y = clampi(y, 0, maxi(cy - 32, 0))
 	var hh: int = h
 	if hh <= 0:
 		hh = cy - y - bottom_margin
@@ -691,8 +972,99 @@ func apply_bestiary_zone_layout(ctrl: Control, canvas: Vector2) -> void:
 	)
 
 
+func apply_paid_notice_zone_layout(ctrl: Control, canvas: Vector2) -> void:
+	apply_pixel_zone_layout(
+		ctrl,
+		canvas,
+		paid_notice_zone_x_px,
+		paid_notice_zone_y_px,
+		paid_notice_zone_width_px,
+		paid_notice_zone_height_px,
+		paid_notice_zone_bottom_margin_px
+	)
+
+
+func default_chrome_box(index: int = 1) -> Dictionary:
+	return {
+		"id": _new_chrome_box_id(),
+		"name": "Chrome box %d" % index,
+		"enabled": true,
+		"style": "window",
+		"zone_x_px": 48,
+		"zone_y_px": 48,
+		"zone_width_px": 240,
+		"zone_height_px": 160,
+		"zone_bottom_margin_px": 0,
+		"chrome_scale": 1.0,
+		"show_on_live": true,
+		"show_on_pause": false,
+	}
+
+
+func normalize_chrome_box(raw: Variant, fallback_index: int = 1) -> Dictionary:
+	var base := default_chrome_box(fallback_index)
+	if typeof(raw) != TYPE_DICTIONARY:
+		return base
+	var d: Dictionary = raw
+	var name_s := str(d.get("name", base["name"])).strip_edges()
+	if name_s.is_empty():
+		name_s = str(base["name"])
+	var id_s := str(d.get("id", "")).strip_edges()
+	if id_s.is_empty():
+		id_s = _new_chrome_box_id()
+	var style_s: String = _SpdUiArt.normalize_chrome_style_id(str(d.get("style", base["style"])))
+	return {
+		"id": id_s,
+		"name": name_s,
+		"enabled": bool(d.get("enabled", true)),
+		"style": style_s,
+		"zone_x_px": int(d.get("zone_x_px", base["zone_x_px"])),
+		"zone_y_px": int(d.get("zone_y_px", base["zone_y_px"])),
+		"zone_width_px": clampi(int(d.get("zone_width_px", base["zone_width_px"])), 32, 1920),
+		"zone_height_px": clampi(int(d.get("zone_height_px", base["zone_height_px"])), 0, 1080),
+		"zone_bottom_margin_px": int(d.get("zone_bottom_margin_px", 0)),
+		"chrome_scale": clampf(float(d.get("chrome_scale", 1.0)), 0.5, 4.0),
+		"show_on_live": bool(d.get("show_on_live", true)),
+		"show_on_pause": bool(d.get("show_on_pause", false)),
+	}
+
+
+func duplicate_chrome_boxes() -> Array:
+	var out: Array = []
+	for i in range(chrome_boxes.size()):
+		out.append(normalize_chrome_box(chrome_boxes[i], i + 1).duplicate(true))
+	return out
+
+
+func _new_chrome_box_id() -> String:
+	return "cb_%d_%d" % [Time.get_ticks_usec(), randi() % 100000]
+
+
+func _serialize_chrome_boxes() -> Array:
+	var out: Array = []
+	var n := mini(chrome_boxes.size(), CHROME_BOXES_MAX)
+	for i in range(n):
+		out.append(normalize_chrome_box(chrome_boxes[i], i + 1))
+	return out
+
+
+func _read_chrome_boxes_cfg(cfg: ConfigFile) -> Array:
+	if not cfg.has_section_key("ui", "chrome_boxes"):
+		return []
+	var raw: Variant = cfg.get_value("ui", "chrome_boxes", [])
+	var out: Array = []
+	if typeof(raw) != TYPE_ARRAY:
+		return out
+	var arr: Array = raw
+	var n := mini(arr.size(), CHROME_BOXES_MAX)
+	for i in range(n):
+		out.append(normalize_chrome_box(arr[i], i + 1))
+	return out
+
+
 func save_settings() -> void:
 	var cfg := ConfigFile.new()
+	cfg.set_value("meta", "defaults_revision", defaults_revision)
 	cfg.set_value("network", "game_ws_host", game_ws_host)
 	cfg.set_value("network", "game_ws_port", game_ws_port)
 	cfg.set_value("network", "streamerbot_udp_port", streamerbot_udp_port)
@@ -713,6 +1085,8 @@ func save_settings() -> void:
 	cfg.set_value("network", "spend_indicator_margin_x", spend_indicator_margin_x)
 	cfg.set_value("network", "spend_indicator_margin_y", spend_indicator_margin_y)
 	cfg.set_value("network", "spend_indicator_font_size_px", spend_indicator_font_size_px)
+	cfg.set_value("network", "spend_indicator_chrome_style", spend_indicator_chrome_style)
+	cfg.set_value("network", "spend_indicator_chrome_scale", spend_indicator_chrome_scale)
 	cfg.set_value("network", "ws_reconnect_sec", ws_reconnect_sec)
 	cfg.set_value("network", "http_fallback_enabled", http_fallback_enabled)
 	cfg.set_value("network", "http_fallback_url", http_fallback_url)
@@ -743,6 +1117,20 @@ func save_settings() -> void:
 	cfg.set_value("ui", "summon_march_username_offset_y", summon_march_username_offset_y)
 	cfg.set_value("ui", "summon_march_monster_offset_x", summon_march_monster_offset_x)
 	cfg.set_value("ui", "summon_march_monster_offset_y", summon_march_monster_offset_y)
+	cfg.set_value("ui", "summon_crowned_sprite_scale", summon_crowned_sprite_scale)
+	cfg.set_value("ui", "summon_crowned_mob_modulate", summon_crowned_mob_modulate)
+	cfg.set_value("ui", "summon_crowned_show_glow", summon_crowned_show_glow)
+	cfg.set_value("ui", "summon_crowned_glow_color", summon_crowned_glow_color)
+	cfg.set_value("ui", "summon_crowned_glow_rays", summon_crowned_glow_rays)
+	cfg.set_value("ui", "summon_crowned_glow_spin_deg", summon_crowned_glow_spin_deg)
+	cfg.set_value("ui", "summon_crowned_glow_radius_scale", summon_crowned_glow_radius_scale)
+	cfg.set_value("ui", "summon_crowned_show_crown", summon_crowned_show_crown)
+	cfg.set_value("ui", "summon_crowned_crown_scale", summon_crowned_crown_scale)
+	cfg.set_value("ui", "summon_crowned_crown_offset_y", summon_crowned_crown_offset_y)
+	cfg.set_value("ui", "summon_crowned_crown_modulate", summon_crowned_crown_modulate)
+	cfg.set_value("ui", "summon_crowned_username_color", summon_crowned_username_color)
+	cfg.set_value("ui", "summon_crowned_username_font_size_px", summon_crowned_username_font_size_px)
+	cfg.set_value("ui", "summon_crowned_show_star_prefix", summon_crowned_show_star_prefix)
 	cfg.set_value("network", "bestiary_hud_enabled", bestiary_hud_enabled)
 	cfg.set_value("network", "bestiary_base_url", bestiary_base_url)
 	cfg.set_value("network", "bestiary_poll_sec", bestiary_poll_sec)
@@ -757,6 +1145,7 @@ func save_settings() -> void:
 	cfg.set_value("ui", "bestiary_exp_bar_width_px", bestiary_exp_bar_width_px)
 	cfg.set_value("ui", "bestiary_exp_bar_height_scale", bestiary_exp_bar_height_scale)
 	cfg.set_value("ui", "bestiary_hud_scale", bestiary_hud_scale)
+	cfg.set_value("ui", "bestiary_chrome_scale", bestiary_chrome_scale)
 	cfg.set_value("ui", "bestiary_use_compact_exp_bar", bestiary_use_compact_exp_bar)
 	cfg.set_value("ui", "bestiary_zone_font_size_px", bestiary_zone_font_size_px)
 	cfg.set_value("ui", "bestiary_header_format", bestiary_header_format)
@@ -774,8 +1163,11 @@ func save_settings() -> void:
 	cfg.set_value("ui", "bestiary_heat_font_color", bestiary_heat_font_color)
 	cfg.set_value("ui", "bestiary_hall_font_color", bestiary_hall_font_color)
 	cfg.set_value("ui", "bestiary_banner_font_color", bestiary_banner_font_color)
+	cfg.set_value("ui", "chrome_boxes", _serialize_chrome_boxes())
 	cfg.set_value("ui", "show_pending_udp_alerts", show_pending_udp_alerts)
 	cfg.set_value("ui", "hud_status_panel_visible", hud_status_panel_visible)
+	cfg.set_value("ui", "settings_window_width_px", settings_window_width_px)
+	cfg.set_value("ui", "settings_window_height_px", settings_window_height_px)
 	cfg.set_value("ui", "alert_queue_max", alert_queue_max)
 	cfg.set_value("ui", "alert_hold_sec", alert_hold_sec)
 	cfg.set_value("ui", "alert_fade_in_sec", alert_fade_in_sec)
@@ -803,10 +1195,42 @@ func save_settings() -> void:
 	cfg.set_value("ui", "window_per_pixel_transparency_enabled", window_per_pixel_transparency_enabled)
 	cfg.set_value("ui", "render_max_fps", render_max_fps)
 	cfg.set_value("ui", "alert_text_align", alert_text_align)
+	cfg.set_value("ui", "alert_chrome_style", alert_chrome_style)
+	cfg.set_value("ui", "alert_chrome_scale", alert_chrome_scale)
 	cfg.set_value("ui", "alert_title_font_size_px", alert_title_font_size_px)
 	cfg.set_value("ui", "alert_subtitle_font_size_px", alert_subtitle_font_size_px)
 	cfg.set_value("ui", "alert_command_icon_size_px", alert_command_icon_size_px)
 	cfg.set_value("ui", "alert_mob_idle_anim_fps", alert_mob_idle_anim_fps)
+	cfg.set_value("ui", "paid_notice_enabled", paid_notice_enabled)
+	cfg.set_value("ui", "paid_notice_queue_max", paid_notice_queue_max)
+	cfg.set_value("ui", "paid_notice_default_ttl_sec", paid_notice_default_ttl_sec)
+	cfg.set_value("ui", "paid_notice_fade_in_sec", paid_notice_fade_in_sec)
+	cfg.set_value("ui", "paid_notice_fade_out_sec", paid_notice_fade_out_sec)
+	cfg.set_value("ui", "paid_notice_zone_x_px", paid_notice_zone_x_px)
+	cfg.set_value("ui", "paid_notice_zone_y_px", paid_notice_zone_y_px)
+	cfg.set_value("ui", "paid_notice_zone_width_px", paid_notice_zone_width_px)
+	cfg.set_value("ui", "paid_notice_zone_height_px", paid_notice_zone_height_px)
+	cfg.set_value("ui", "paid_notice_zone_bottom_margin_px", paid_notice_zone_bottom_margin_px)
+	cfg.set_value("ui", "paid_notice_chrome_style", paid_notice_chrome_style)
+	cfg.set_value("ui", "paid_notice_chrome_scale", paid_notice_chrome_scale)
+	cfg.set_value("ui", "paid_notice_kind_font_size_px", paid_notice_kind_font_size_px)
+	cfg.set_value("ui", "paid_notice_title_font_size_px", paid_notice_title_font_size_px)
+	cfg.set_value("ui", "paid_notice_body_font_size_px", paid_notice_body_font_size_px)
+	cfg.set_value("ui", "paid_notice_kind_font_color", paid_notice_kind_font_color)
+	cfg.set_value("ui", "paid_notice_title_font_color", paid_notice_title_font_color)
+	cfg.set_value("ui", "paid_notice_body_font_color", paid_notice_body_font_color)
+	cfg.set_value("ui", "paid_notice_text_shadow", paid_notice_text_shadow)
+	cfg.set_value("ui", "paid_notice_padding_h_px", paid_notice_padding_h_px)
+	cfg.set_value("ui", "paid_notice_padding_v_px", paid_notice_padding_v_px)
+	cfg.set_value("ui", "paid_notice_line_separation_px", paid_notice_line_separation_px)
+	cfg.set_value("ui", "paid_notice_text_align", paid_notice_text_align)
+	cfg.set_value("ui", "paid_notice_pop_scale", paid_notice_pop_scale)
+	cfg.set_value("ui", "paid_notice_show_on_live", paid_notice_show_on_live)
+	cfg.set_value("ui", "paid_notice_show_on_pause", paid_notice_show_on_pause)
+	cfg.set_value("ui", "paid_notice_enable_superchat", paid_notice_enable_superchat)
+	cfg.set_value("ui", "paid_notice_enable_gifted_membership", paid_notice_enable_gifted_membership)
+	cfg.set_value("ui", "paid_notice_enable_sub", paid_notice_enable_sub)
+	cfg.set_value("ui", "paid_notice_enable_highlight", paid_notice_enable_highlight)
 	cfg.set_value("ui", "id_overlay_enabled", id_overlay_enabled)
 	cfg.set_value("ui", "id_cell_width_px", id_cell_width_px)
 	cfg.set_value("ui", "id_cell_height_px", id_cell_height_px)
@@ -821,6 +1245,8 @@ func save_settings() -> void:
 	cfg.set_value("ui", "free_promos_margin_y", free_promos_margin_y)
 	cfg.set_value("ui", "free_promos_font_size_px", free_promos_font_size_px)
 	cfg.set_value("ui", "free_promos_max_width_px", free_promos_max_width_px)
+	cfg.set_value("ui", "free_promos_chrome_style", free_promos_chrome_style)
+	cfg.set_value("ui", "free_promos_chrome_scale", free_promos_chrome_scale)
 	_apply_render_limits()
 	var err := cfg.save(SETTINGS_PATH)
 	if err == OK and _notify_listeners:
@@ -833,3 +1259,32 @@ func save_settings_quiet() -> void:
 	_notify_listeners = false
 	save_settings()
 	_notify_listeners = prev
+
+
+## Editor-only: bump revision, write user://, copy that file into [constant SHIPPED_DEFAULTS_PATH] for the next export.
+## Returns empty string on success, otherwise an error message.
+func save_as_shipped_defaults() -> String:
+	if not OS.has_feature("editor"):
+		return "Save as export defaults only works in the Godot editor."
+	defaults_revision = maxi(defaults_revision, 0) + 1
+	save_settings_quiet()
+	var abs_shipped := ProjectSettings.globalize_path(SHIPPED_DEFAULTS_PATH)
+	var abs_user := ProjectSettings.globalize_path(SETTINGS_PATH)
+	if abs_shipped.is_empty() or abs_user.is_empty():
+		return "Could not resolve settings paths."
+	var dir_path := abs_shipped.get_base_dir()
+	var mk := DirAccess.make_dir_recursive_absolute(dir_path)
+	if mk != OK and not DirAccess.dir_exists_absolute(dir_path):
+		return "Could not create defaults folder: %s" % error_string(mk)
+	var err := DirAccess.copy_absolute(abs_user, abs_shipped)
+	if err != OK:
+		# Fallback: rewrite via ConfigFile (handles some path edge cases).
+		var cfg := ConfigFile.new()
+		if cfg.load(SETTINGS_PATH) != OK:
+			return "Could not read user settings to copy (%s)." % error_string(err)
+		var save_err := cfg.save(SHIPPED_DEFAULTS_PATH)
+		if save_err != OK:
+			return "Could not write shipped defaults: %s" % error_string(save_err)
+	if _notify_listeners:
+		settings_saved.emit()
+	return ""
