@@ -125,7 +125,7 @@ public class StreamingServer extends WebSocketServer {
 					resp.addProperty("type", "ping_result");
 					resp.addProperty("request_id", requestId);
 					resp.addProperty("success", true);
-					resp.addProperty("version", "QoL-3.3.7");
+					resp.addProperty("version", "QoL-3.3.8");
 					addChatter(resp, usernameFinal);
 					broadcast(resp.toString());
 				}
