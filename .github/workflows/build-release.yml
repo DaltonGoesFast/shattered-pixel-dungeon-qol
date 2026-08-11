@@ -40,6 +40,9 @@ jobs:
 
   android:
     runs-on: ubuntu-latest
+    # secrets cannot be used in step `if:`; map once and test env instead
+    env:
+      HAS_ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
     steps:
       - uses: actions/checkout@v4
 
@@ -56,7 +59,7 @@ jobs:
         run: echo "sdk.dir=$ANDROID_HOME" >> local.properties
 
       - name: Configure release signing
-        if: secrets.ANDROID_KEYSTORE_BASE64
+        if: ${{ env.HAS_ANDROID_KEYSTORE != '' }}
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -72,18 +75,18 @@ jobs:
           EOF
 
       - name: Build signed APK
-        if: secrets.ANDROID_KEYSTORE_BASE64
+        if: ${{ env.HAS_ANDROID_KEYSTORE != '' }}
         run: ./gradlew android:assembleRelease --no-daemon
 
       - name: Stage APK
-        if: secrets.ANDROID_KEYSTORE_BASE64
+        if: ${{ env.HAS_ANDROID_KEYSTORE != '' }}
         run: |
           VER=$(grep -oP "appVersionName\s*=\s*'\K[^']+" build.gradle)
           mkdir -p release
           cp android/build/outputs/apk/release/android-release.apk "release/Shattered-Pixel-Dungeon-QoL-${VER}-android.apk"
 
       - name: Upload Android artifact
-        if: secrets.ANDROID_KEYSTORE_BASE64
+        if: ${{ env.HAS_ANDROID_KEYSTORE != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
