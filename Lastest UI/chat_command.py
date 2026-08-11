@@ -131,7 +131,7 @@ def _apply_capped_chat_award(
         return 0, None, total
 
     if cur_chat >= cap:
-        return 0, None, total
+        return 0, chat_messages.chat_cap_nudge(username, cap), total
 
     actual = min(to_add, cap - cur_chat)
     pts += actual
@@ -680,6 +680,24 @@ def handle_topsummoner() -> ChatResult:
     )
 
 
+def handle_sprint(username: str) -> ChatResult:
+    from summon_bestiary import get_sprint_standing
+    s = get_sprint_standing(username)
+    return ChatResult(
+        ok=True,
+        message=chat_messages.sprint_standing_line(
+            str(s.get("leader") or ""),
+            int(s.get("leader_xp") or 0),
+            int(s.get("gap") or 0),
+            user=username,
+            your_xp=int(s.get("your_xp") or 0),
+            rank=s.get("rank"),
+            crowned=bool(s.get("crowned")),
+        ),
+        extra={"command": "sprint", **s},
+    )
+
+
 def handle_heat(username: str = "") -> ChatResult:
     from summon_bestiary import get_state_payload, user_heat_xp
     payload = get_state_payload()
@@ -690,7 +708,9 @@ def handle_heat(username: str = "") -> ChatResult:
     yours = user_heat_xp(username) if username else 0
     return ChatResult(
         ok=True,
-        message=chat_messages.heat_leader_line(user, xp, window, yours),
+        message=chat_messages.heat_leader_line(
+            user, xp, window, yours, requester=username
+        ),
         extra={"command": "heat", "username": user, "xp": xp},
     )
 
@@ -790,11 +810,42 @@ def handle_stream_info(cmd: str) -> ChatResult:
     return ChatResult(ok=True, message=None, extra={"command": cmd, "stream_info": True})
 
 
-def handle_help() -> ChatResult:
+def _economy_reminder_text() -> str:
+    cfg = get_config()
+    return chat_messages.economy_reminder(
+        int(cfg.get("chat_point_cap", 500)),
+        int(cfg.get("points_per_message", 2)),
+        int(cfg.get("chat_cooldown_sec", 20)),
+        float(cfg.get("bank_ratio_manual", 0.10)),
+    )
+
+
+def handle_economy() -> ChatResult:
+    """Live economy blurb for !economy / Streamer.bot timed reminders."""
+    msg = _economy_reminder_text()
+    return ChatResult(ok=True, message=msg, extra={"command": "economy"})
+
+
+def handle_help(args: list[str] | None = None) -> ChatResult:
+    args = args or []
+    if not args:
+        return ChatResult(
+            ok=True,
+            message=chat_messages.help_link(COMMANDS_DOC_URL, _economy_reminder_text()),
+            extra={"command": "help", "url": COMMANDS_DOC_URL},
+        )
+    topic = args[0]
+    text = chat_messages.command_help(topic)
+    if text:
+        return ChatResult(
+            ok=True,
+            message=text,
+            extra={"command": "help", "topic": topic.lstrip("!").lower()},
+        )
     return ChatResult(
-        ok=True,
-        message=chat_messages.help_link(COMMANDS_DOC_URL),
-        extra={"command": "help", "url": COMMANDS_DOC_URL},
+        ok=False,
+        message=chat_messages.help_unknown(topic),
+        extra={"command": "help", "topic": topic.lstrip("!").lower()},
     )
 
 
@@ -945,6 +996,8 @@ def dispatch_chat_command(body: dict) -> ChatResult:
             result = handle_summon(username, args)
         elif cmd == "topsummoner":
             result = handle_topsummoner()
+        elif cmd == "sprint":
+            result = handle_sprint(username)
         elif cmd in ("heat", "hot"):
             result = handle_heat(username)
         elif cmd in ("bestiary", "summonlevel"):
@@ -954,7 +1007,9 @@ def dispatch_chat_command(body: dict) -> ChatResult:
         elif cmd == "mysummons":
             result = handle_mysummons(username)
         elif cmd in ("help", "commands"):
-            result = handle_help()
+            result = handle_help(args)
+        elif cmd in ("economy", "reminder"):
+            result = handle_economy()
         elif cmd in SPEND_COMMANDS or cmd in COMMAND_ALIASES:
             result = handle_spend(cmd, args, username)
         elif cmd in STREAM_INFO_COMMANDS:

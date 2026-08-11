@@ -105,20 +105,20 @@ func _ensure_chroma_material() -> void:
 func _sync_gradient_uniforms() -> void:
 	if material == null:
 		return
-	var gs := clampf(CompanionConfig.live_water_gradient_fade_start, 0.0, 1.0)
-	var ge := clampf(CompanionConfig.live_water_gradient_fade_end, 0.0, 1.0)
-	if ge < gs:
-		ge = gs
-	material.set_shader_parameter("gradient_fade_start", gs)
-	material.set_shader_parameter("gradient_fade_end", ge)
+	var g := CompanionConfig.live_water_gradient_for(self)
+	material.set_shader_parameter("gradient_fade_start", g.x)
+	material.set_shader_parameter("gradient_fade_end", g.y)
 
 
 func _sync_live_water_layout() -> void:
 	_ensure_chroma_material()
 	_sync_gradient_uniforms()
 	var v: Vector3 = CompanionConfig.live_water_l_shape_uv_vector(self)
+	var feather_v: float = CompanionConfig.live_water_edge_feather_v_uv(self)
 	if material != null:
 		material.set_shader_parameter("l_shape_uv", v)
+		material.set_shader_parameter("edge_feather_v", feather_v)
 	var chroma := get_parent().get_node_or_null("ChromaOverlay") as ColorRect
 	if chroma != null and chroma.material is ShaderMaterial:
 		chroma.material.set_shader_parameter("l_shape_uv", v)
+		chroma.material.set_shader_parameter("edge_feather_v", feather_v)

@@ -50,6 +50,11 @@ Lastest UI/game_summary.json
 Lastest UI/last_seed.txt
 Lastest UI/viewer_points.txt
 Lastest UI/viewer_points.txt.lock
+Lastest UI/viewer_points_undo.txt
+Lastest UI/viewer_points_undo_meta.json
+Lastest UI/companion_settings_remote.json
+Lastest UI/companion_settings_previous.json
+Lastest UI/companion_settings_heartbeat.json
 Lastest UI/hero_inspection.txt
 Lastest UI/config.txt
 Lastest UI/config.json
@@ -125,4 +130,5 @@ docs/points-command-ideas.md
 
 # Machine-local tooling (not project source)
 Streamerbot POST REWORK/
+Streamerbot POST REWORK.7z
 OBS Exports/

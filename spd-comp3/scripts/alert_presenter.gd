@@ -7,12 +7,15 @@ const _SpdUi := preload("res://scripts/spd_ui_art.gd")
 @onready var _slot: Control = $AlertSlot
 @onready var _row: HBoxContainer = $AlertSlot/AlertRow
 @onready var _icons_row: HBoxContainer = $AlertSlot/AlertRow/PanelContainer/MarginContainer/AlertInner/CommandIcons
+@onready var _alert_inner: HBoxContainer = $AlertSlot/AlertRow/PanelContainer/MarginContainer/AlertInner
 @onready var _icon_cell: Control = $AlertSlot/AlertRow/PanelContainer/MarginContainer/AlertInner/CommandIcons/CommandIconCell
 @onready var _icon_cell_bg: ColorRect = $AlertSlot/AlertRow/PanelContainer/MarginContainer/AlertInner/CommandIcons/CommandIconCell/CellBg
 @onready var _icon_margin: MarginContainer = $AlertSlot/AlertRow/PanelContainer/MarginContainer/AlertInner/CommandIcons/CommandIconCell/Margin
 @onready var _icon_rune: TextureRect = $AlertSlot/AlertRow/PanelContainer/MarginContainer/AlertInner/CommandIcons/CommandIconCell/Margin/RuneIcon
 @onready var _icon_item: TextureRect = $AlertSlot/AlertRow/PanelContainer/MarginContainer/AlertInner/CommandIcons/CommandIconCell/ItemIcon
 @onready var _panel: PanelContainer = $AlertSlot/AlertRow/PanelContainer
+@onready var _panel_margin: MarginContainer = $AlertSlot/AlertRow/PanelContainer/MarginContainer
+@onready var _text_vbox: VBoxContainer = $AlertSlot/AlertRow/PanelContainer/MarginContainer/AlertInner/VBox
 @onready var _title: Label = $AlertSlot/AlertRow/PanelContainer/MarginContainer/AlertInner/VBox/Title
 @onready var _subtitle: Label = $AlertSlot/AlertRow/PanelContainer/MarginContainer/AlertInner/VBox/Subtitle
 @onready var _fx: Node2D = $FxAnchor
@@ -51,6 +54,7 @@ func _ready() -> void:
 	_apply_command_icon_sizes()
 	_configure_particles()
 	_apply_alert_chrome()
+	_apply_alert_padding()
 	_apply_alert_layout()
 	_apply_text_alignment()
 	_apply_alert_font_sizes()
@@ -64,6 +68,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.keycode == KEY_F5:
 			CompanionConfig.load_settings()
 			_apply_alert_chrome()
+			_apply_alert_padding()
 			_apply_alert_layout()
 			_apply_text_alignment()
 			_apply_alert_font_sizes()
@@ -77,6 +82,7 @@ func _on_viewport_size_changed() -> void:
 
 func _on_settings_saved() -> void:
 	_apply_alert_chrome()
+	_apply_alert_padding()
 	_apply_alert_layout()
 	_apply_text_alignment()
 	_apply_alert_font_sizes()
@@ -121,11 +127,22 @@ func _apply_alert_chrome() -> void:
 	if _panel == null:
 		return
 	var style_id := str(CompanionConfig.alert_chrome_style)
-	var scale := clampf(CompanionConfig.alert_chrome_scale, 0.5, 4.0)
-	var sb: StyleBoxTexture = _SpdUi.chrome_style(style_id, scale)
+	var chrome_scale := clampf(CompanionConfig.alert_chrome_scale, 0.5, 4.0)
+	var sb: StyleBoxTexture = _SpdUi.chrome_style(style_id, chrome_scale)
 	if sb == null or sb.texture == null:
-		sb = _SpdUi.chrome_style_toast(scale)
+		sb = _SpdUi.chrome_style_toast(chrome_scale)
 	_panel.add_theme_stylebox_override("panel", sb)
+
+
+func _apply_alert_padding() -> void:
+	if _panel_margin == null:
+		return
+	var pad_h := clampi(CompanionConfig.alert_padding_h_px, 0, 64)
+	var pad_v := clampi(CompanionConfig.alert_padding_v_px, 0, 64)
+	_panel_margin.add_theme_constant_override("margin_left", pad_h)
+	_panel_margin.add_theme_constant_override("margin_right", pad_h)
+	_panel_margin.add_theme_constant_override("margin_top", pad_v)
+	_panel_margin.add_theme_constant_override("margin_bottom", pad_v)
 
 
 func _apply_alert_layout() -> void:
@@ -133,7 +150,7 @@ func _apply_alert_layout() -> void:
 		return
 	var canvas: Vector2 = CompanionConfig.layout_canvas_size(self)
 	CompanionConfig.apply_alert_zone_layout(_slot, canvas)
-	# Keep toast row inside the zone (scene had a fixed 140px height that could clip large fonts).
+	# Zone is a max area; toast itself hugs content (not stretched to full zone width).
 	if _row:
 		_slot.clip_contents = false
 		_row.set_anchors_preset(Control.PRESET_TOP_WIDE)
@@ -141,16 +158,90 @@ func _apply_alert_layout() -> void:
 		_row.offset_top = 0.0
 		_row.offset_right = 0.0
 		_row.offset_bottom = maxf(140.0, _slot.size.y)
+		_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_apply_command_icon_sizes()
+	_fit_toast_to_content()
 	if _panel:
 		_panel.pivot_offset = _panel.size * 0.5
 	if _row:
 		_row.pivot_offset = _row.size * 0.5
 
 
+## Shrink toast to icon+text width (capped by zone). Avoids a long empty chrome strip.
+func _fit_toast_to_content() -> void:
+	if _panel == null or _slot == null:
+		return
+	var zone_w := maxf(64.0, _slot.size.x)
+	_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	_panel.set("custom_maximum_size", Vector2(zone_w, 0.0))
+
+	var pad_h := float(clampi(CompanionConfig.alert_padding_h_px, 0, 64) * 2)
+	var sep := 12.0
+	var icon_w := 0.0
+	if _icons_row != null and _icons_row.visible:
+		icon_w = float(maxi(16, CompanionConfig.alert_command_icon_size_px)) + sep
+	var text_max := maxf(64.0, zone_w - pad_h - icon_w)
+
+	if _alert_inner:
+		_alert_inner.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	if _text_vbox:
+		_text_vbox.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	var wrap_title := _size_toast_label(_title, text_max)
+	var wrap_sub := _size_toast_label(_subtitle, text_max)
+	# Long lines need a hard width; shrink+autowrap alone collapses to one glyph.
+	if wrap_title or wrap_sub:
+		_panel.custom_minimum_size = Vector2(zone_w, 0.0)
+		if _text_vbox:
+			_text_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	else:
+		_panel.custom_minimum_size = Vector2.ZERO
+	# Drop VBox gap when subtitle is unused (empty Label still reserved font height).
+	if _text_vbox:
+		_text_vbox.add_theme_constant_override(
+			"separation", 4 if (_subtitle != null and _subtitle.visible) else 0
+		)
+
+
+## Returns true when the label is wrapping to text_max.
+func _size_toast_label(label: Label, text_max: float) -> bool:
+	if label == null or not label.visible or label.text.strip_edges().is_empty():
+		if label != null:
+			label.autowrap_mode = TextServer.AUTOWRAP_OFF
+			label.custom_minimum_size = Vector2.ZERO
+			label.set("custom_maximum_size", Vector2.ZERO)
+		return false
+	label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	var font := label.get_theme_font("font")
+	var font_size := label.get_theme_font_size("font_size")
+	var natural := 0.0
+	if font != null:
+		natural = font.get_string_size(
+			label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size
+		).x
+	# Autowrap only when needed — otherwise min width becomes the full wrap cap
+	# and the toast looks stretched empty again.
+	if natural > text_max and text_max > 0.0:
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		label.custom_minimum_size = Vector2(text_max, 0.0)
+		label.set("custom_maximum_size", Vector2(text_max, 0.0))
+		return true
+	label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	label.custom_minimum_size = Vector2.ZERO
+	label.set("custom_maximum_size", Vector2.ZERO)
+	return false
+
+
 func _apply_command_icon_sizes() -> void:
 	if _icon_cell == null or _icon_rune == null or _icon_item == null:
 		return
+	# Keep mob/scroll art vertically centered beside title/subtitle (was SHRINK_END → bottom-left).
+	if _alert_inner:
+		_alert_inner.alignment = BoxContainer.ALIGNMENT_CENTER
+	if _icons_row:
+		_icons_row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_icon_cell.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var s: int = maxi(16, CompanionConfig.alert_command_icon_size_px)
 	if _active_command_icon_layout == "mob" or _active_command_icon_layout == "scroll":
 		_icon_cell.custom_minimum_size = Vector2(float(s), float(s))
@@ -193,14 +284,9 @@ func _apply_mob_command_icon_geometry() -> void:
 		return
 	_icon_margin.visible = false
 	_icon_item.custom_minimum_size = Vector2.ZERO
-	_icon_item.set_anchor(SIDE_LEFT, 0.0)
-	_icon_item.set_anchor(SIDE_TOP, 0.0)
-	_icon_item.set_anchor(SIDE_RIGHT, 1.0)
-	_icon_item.set_anchor(SIDE_BOTTOM, 1.0)
-	_icon_item.offset_left = 0.0
-	_icon_item.offset_top = 0.0
-	_icon_item.offset_right = 0.0
-	_icon_item.offset_bottom = 0.0
+	_icon_item.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_icon_item.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_icon_item.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 
 
 func _configure_particles() -> void:
@@ -722,6 +808,8 @@ func _play_next() -> void:
 	_apply_mob_frames_from_item(item)
 	_title.text = str(item.get("headline", ""))
 	_subtitle.text = str(item.get("subtitle", ""))
+	_title.visible = not _title.text.strip_edges().is_empty()
+	_subtitle.visible = not _subtitle.text.strip_edges().is_empty()
 	var tex_r: Texture2D = item.get("command_icon_rune", null) as Texture2D
 	var tex_i: Texture2D = item.get("command_icon_item", null) as Texture2D
 	if tex_r == null and tex_i == null:
@@ -752,7 +840,9 @@ func _play_next() -> void:
 		_apply_command_icon_sizes()
 
 	_icons_row.visible = _active_command_icon_layout != "none"
+	_fit_toast_to_content()
 	await get_tree().process_frame
+	_fit_toast_to_content()
 	_panel.pivot_offset = _panel.size * 0.5
 	_row.pivot_offset = _row.size * 0.5
 	var kind := str(item.get("kind", ""))

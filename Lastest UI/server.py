@@ -5,6 +5,7 @@ import os
 import json
 import logging
 import queue
+import shutil
 import uuid
 import threading
 import time
@@ -54,13 +55,20 @@ GAME_SUMMARY_TXT = os.path.join(SCRIPT_DIR, "game_summary.txt")
 GAME_SUMMARY_JSON = os.path.join(SCRIPT_DIR, "game_summary.json")
 POINTS_CONFIG_FILE = os.path.join(SCRIPT_DIR, "points_config.json")
 FREE_UNTIL_FILE = os.path.join(SCRIPT_DIR, "free_until.json")
+SPEND_DISABLED_FILE = os.path.join(SCRIPT_DIR, "spend_disabled.txt")
 VIEWER_POINTS_FILE = os.path.join(SCRIPT_DIR, "viewer_points.txt")
 VIEWER_POINTS_LOCK_FILE = VIEWER_POINTS_FILE + ".lock"
+VIEWER_POINTS_UNDO_FILE = os.path.join(SCRIPT_DIR, "viewer_points_undo.txt")
+VIEWER_POINTS_UNDO_META_FILE = os.path.join(SCRIPT_DIR, "viewer_points_undo_meta.json")
 DOUBLE_POINTS_COUNTDOWN_FILE = os.path.join(SCRIPT_DIR, "double_points_countdown.txt")
 STREAMER_CHAT_SCORE_FILE = os.path.join(SCRIPT_DIR, "streamer_chat_score.json")
 STREAMER_CHAT_SCORE_TXT = os.path.join(SCRIPT_DIR, "streamer_chat_score.txt")
 TOP_SUMMONER_FILE = os.path.join(SCRIPT_DIR, "top_summoner.txt")
 SUMMON_MARCH_QUEUE_FILE = os.path.join(SCRIPT_DIR, "summon_march_queue.jsonl")
+COMPANION_SETTINGS_FILE = os.path.join(SCRIPT_DIR, "companion_settings_remote.json")
+COMPANION_SETTINGS_PREV_FILE = os.path.join(SCRIPT_DIR, "companion_settings_previous.json")
+COMPANION_HEARTBEAT_FILE = os.path.join(SCRIPT_DIR, "companion_settings_heartbeat.json")
+COMPANION_PRESETS_DIR = os.path.join(SCRIPT_DIR, "companion_settings_presets")
 SUMMON_MARCH_QUEUE_MAX = 500
 
 # Game WebSocket: receive live stream from game and serve via HTTP /api/game-data and game_summary.json
@@ -797,7 +805,13 @@ def obs_relay_thread():
             else:
                 if is_refused:
                     last_obs_error_print = now
-                print(f"OBS inv layout error: {e}")
+                    print(
+                        f"OBS inv layout: connection refused at {obs_url} "
+                        f"(start OBS + WebSocket server, or disable in obs_inv_layout.json). "
+                        f"Retrying quietly for {int(OBS_ERROR_THROTTLE)}s."
+                    )
+                else:
+                    print(f"OBS inv layout error: {e}")
         time.sleep(5)
 
 
@@ -884,6 +898,12 @@ def points_config_page():
     return send_from_directory('.', 'points-config.html')
 
 
+@app.route('/companion_settings_panel.js')
+def companion_settings_panel_js():
+    """Companion remote-settings tab UI (loaded by points-config.html)."""
+    return send_from_directory(SCRIPT_DIR, 'companion_settings_panel.js', mimetype='application/javascript')
+
+
 @app.route('/ws-inspect')
 def ws_inspect_page():
     """WebSocket JSON inspector (game data + cost config + viewer points)"""
@@ -923,6 +943,8 @@ def points_config_api():
                 data.setdefault("donation_multiplier_cap", 4)
                 data.setdefault("reset_debounce_hours", 4)
                 data.setdefault("curse_class_kit_duration_turns", 100)
+                data.setdefault("cooldown_bypass_users", ["DaltonGoesFast"])
+                data.setdefault("death_cost_inflation_enabled", True)
             else:
                 data = {
                     "cost_per_gold": 5,
@@ -955,6 +977,19 @@ def points_config_api():
                     "cost_per_corrupt_ally": 100,
                     "cost_per_ring_of_wealth": 100,
                     "command_allowed_roles": {},
+                    "points_per_message": 2,
+                    "chat_cooldown_sec": 20,
+                    "passive_cooldown_sec": 60,
+                    "cooldown_bypass_users": ["DaltonGoesFast"],
+                    "first_words_bonus": 5,
+                    "chat_point_cap": 500,
+                    "bank_ratio_manual": 0.10,
+                    "bank_ratio_auto": 0.05,
+                    "bank_ratio_auto_member": 0.10,
+                    "donation_multiplier_cap": 4,
+                    "reset_debounce_hours": 4,
+                    "curse_class_kit_duration_turns": 100,
+                    "death_cost_inflation_enabled": True,
                 }
             free_until = {}
             if os.path.exists(FREE_UNTIL_FILE):
@@ -970,6 +1005,39 @@ def points_config_api():
     # POST - save
     try:
         data = request.get_json(force=True, silent=True) or {}
+        existing = {}
+        if os.path.exists(POINTS_CONFIG_FILE):
+            try:
+                with open(POINTS_CONFIG_FILE, encoding="utf-8") as f:
+                    existing = json.load(f) or {}
+            except Exception:
+                existing = {}
+
+        if "cooldown_bypass_users" in data:
+            raw_bypass = data.get("cooldown_bypass_users")
+            if isinstance(raw_bypass, str):
+                bypass_users = [u.strip() for u in raw_bypass.split(",") if u.strip()]
+            elif isinstance(raw_bypass, list):
+                bypass_users = [str(u).strip() for u in raw_bypass if str(u).strip()]
+            else:
+                bypass_users = []
+        else:
+            bypass_users = [
+                str(u).strip()
+                for u in (existing.get("cooldown_bypass_users") or ["DaltonGoesFast"])
+                if str(u).strip()
+            ]
+
+        if "command_allowed_roles" in data:
+            allowed_roles = data.get("command_allowed_roles") or {}
+        else:
+            allowed_roles = existing.get("command_allowed_roles") or {}
+
+        if "death_cost_inflation_enabled" in data:
+            death_cost_enabled = bool(data.get("death_cost_inflation_enabled"))
+        else:
+            death_cost_enabled = bool(existing.get("death_cost_inflation_enabled", True))
+
         # Validate and sanitize
         cfg = {
             "cost_per_gold": max(1, int(data.get("cost_per_gold", 5))),
@@ -995,10 +1063,11 @@ def points_config_api():
             "cost_per_sabotage": max(1, int(data.get("cost_per_sabotage", 75))),
             "cost_per_corrupt_ally": max(1, int(data.get("cost_per_corrupt_ally", 100))),
             "cost_per_ring_of_wealth": max(1, int(data.get("cost_per_ring_of_wealth", 100))),
-            "command_allowed_roles": data.get("command_allowed_roles") or {},
+            "command_allowed_roles": allowed_roles,
             "points_per_message": max(1, int(data.get("points_per_message", 2))),
             "chat_cooldown_sec": max(0, int(data.get("chat_cooldown_sec", 20))),
             "passive_cooldown_sec": max(0, int(data.get("passive_cooldown_sec", 60))),
+            "cooldown_bypass_users": bypass_users,
             "first_words_bonus": max(0, int(data.get("first_words_bonus", 5))),
             "chat_point_cap": max(1, int(data.get("chat_point_cap", 500))),
             "bank_ratio_manual": max(0, min(1, float(data.get("bank_ratio_manual", 0.10)))),
@@ -1007,6 +1076,7 @@ def points_config_api():
             "donation_multiplier_cap": max(1, int(data.get("donation_multiplier_cap", 4))),
             "reset_debounce_hours": max(0, float(data.get("reset_debounce_hours", 4))),
             "curse_class_kit_duration_turns": max(1, int(data.get("curse_class_kit_duration_turns", 100))),
+            "death_cost_inflation_enabled": death_cost_enabled,
         }
         for k, v in (data.get("cost_per_monster") or {}).items():
             try:
@@ -1015,14 +1085,84 @@ def points_config_api():
                 pass
         with open(POINTS_CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2)
+        try:
+            from points_command import refresh_death_cost_display_file
+            refresh_death_cost_display_file()
+        except Exception:
+            pass
         return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/death-cost/reset', methods=['POST', 'OPTIONS'])
+def death_cost_reset_api():
+    """Reset death-based harmful cost inflation to 1.0x (same as boss slain)."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        from points_command import on_boss_slain_cost_inflation_reset, get_death_cost_deaths, get_death_cost_multiplier
+        on_boss_slain_cost_inflation_reset()
+        return jsonify({
+            "ok": True,
+            "deaths": get_death_cost_deaths(),
+            "multiplier": get_death_cost_multiplier(),
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/death-cost', methods=['GET', 'OPTIONS'])
+def death_cost_status_api():
+    """Live death-cost inflation status for the manager header."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        from points_command import (
+            is_death_cost_inflation_enabled,
+            get_death_cost_deaths,
+            get_death_cost_multiplier,
+            format_death_cost_display,
+        )
+        enabled = is_death_cost_inflation_enabled()
+        deaths = get_death_cost_deaths()
+        mult = get_death_cost_multiplier()
+        return jsonify({
+            "enabled": enabled,
+            "deaths": deaths,
+            "multiplier": mult,
+            "display": format_death_cost_display(),
+        })
+    except Exception as e:
+        return jsonify({"error": str(e), "enabled": True, "deaths": 0, "multiplier": 1.0, "display": ""}), 500
+
+
+@app.route('/api/spend-disabled', methods=['GET', 'POST', 'OPTIONS'])
+def spend_disabled_api():
+    """Read/toggle spend kill switch (same spend_disabled.txt as Stream Deck)."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    if request.method == 'GET':
+        return jsonify({"disabled": os.path.exists(SPEND_DISABLED_FILE)})
+    try:
+        body = request.get_json(force=True, silent=True) or {}
+        if "disabled" not in body:
+            return jsonify({"error": "disabled boolean required"}), 400
+        disabled = bool(body.get("disabled"))
+        if disabled:
+            with open(SPEND_DISABLED_FILE, "w", encoding="utf-8") as f:
+                f.write("1\n")
+        elif os.path.exists(SPEND_DISABLED_FILE):
+            os.remove(SPEND_DISABLED_FILE)
+        return jsonify({"ok": True, "disabled": os.path.exists(SPEND_DISABLED_FILE)})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 @app.route('/api/cost-free', methods=['POST', 'DELETE', 'OPTIONS'])
 def cost_free_api():
-    """Set a cost as free for N minutes, or cancel. costKey: e.g. cost_per_gold, cost_per_monster.rat"""
+    """Set a cost as free for N minutes, or cancel. costKey: e.g. cost_per_gold, cost_per_monster.rat.
+    Cancel all: DELETE with no costKey, or POST { cancelAll: true }."""
     if request.method == 'OPTIONS':
         return '', 204
     try:
@@ -1033,6 +1173,15 @@ def cost_free_api():
             cost_key = (request.args.get('costKey') or request.args.get('cost_key') or '').strip()
         else:
             cost_key = (body.get('costKey') or body.get('cost_key') or '').strip()
+
+        cancel_all = bool(body.get('cancelAll') or body.get('cancel_all')) or (
+            request.method == 'DELETE' and not cost_key
+        )
+        if cancel_all:
+            with open(FREE_UNTIL_FILE, 'w', encoding='utf-8') as f:
+                json.dump({}, f, indent=2)
+            return jsonify({"ok": True, "cancelledAll": True})
+
         if not cost_key:
             return jsonify({"error": "costKey required"}), 400
         free_until = {}
@@ -1188,6 +1337,83 @@ def _write_viewer_points_raw(data):
         f.write('\n'.join(lines))
 
 
+def _viewer_points_undo_meta():
+    if not os.path.exists(VIEWER_POINTS_UNDO_META_FILE):
+        return None
+    try:
+        with open(VIEWER_POINTS_UNDO_META_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def _snapshot_viewer_points_for_undo(action: str) -> None:
+    """Copy current viewer_points.txt into the one-level undo slot (call while locked)."""
+    if os.path.exists(VIEWER_POINTS_FILE):
+        shutil.copy2(VIEWER_POINTS_FILE, VIEWER_POINTS_UNDO_FILE)
+    else:
+        with open(VIEWER_POINTS_UNDO_FILE, "w", encoding="utf-8") as f:
+            f.write("")
+    meta = {
+        "action": action or "edit",
+        "at": int(time.time()),
+        "at_iso": datetime.now().isoformat(timespec="seconds"),
+    }
+    with open(VIEWER_POINTS_UNDO_META_FILE, "w", encoding="utf-8") as f:
+        json.dump(meta, f, indent=2)
+
+
+def _restore_viewer_points_undo() -> dict:
+    """Swap current file with undo snapshot (second undo = redo). Call while locked."""
+    if not os.path.exists(VIEWER_POINTS_UNDO_FILE):
+        raise FileNotFoundError("No viewer points undo snapshot available")
+    meta = _viewer_points_undo_meta() or {}
+    if os.path.exists(VIEWER_POINTS_FILE):
+        current_tmp = VIEWER_POINTS_UNDO_FILE + ".swap"
+        shutil.copy2(VIEWER_POINTS_FILE, current_tmp)
+        shutil.copy2(VIEWER_POINTS_UNDO_FILE, VIEWER_POINTS_FILE)
+        shutil.move(current_tmp, VIEWER_POINTS_UNDO_FILE)
+    else:
+        shutil.copy2(VIEWER_POINTS_UNDO_FILE, VIEWER_POINTS_FILE)
+    new_meta = {
+        "action": "undo:" + str(meta.get("action") or "edit"),
+        "at": int(time.time()),
+        "at_iso": datetime.now().isoformat(timespec="seconds"),
+        "restored_action": meta.get("action"),
+        "restored_at": meta.get("at"),
+    }
+    with open(VIEWER_POINTS_UNDO_META_FILE, "w", encoding="utf-8") as f:
+        json.dump(new_meta, f, indent=2)
+    return new_meta
+
+
+@app.route('/api/viewer-points/undo', methods=['GET', 'POST', 'OPTIONS'])
+def viewer_points_undo_api():
+    """GET: undo availability. POST: restore last snapshot (swap = redo)."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    if request.method == 'GET':
+        available = os.path.exists(VIEWER_POINTS_UNDO_FILE)
+        meta = _viewer_points_undo_meta() if available else None
+        return jsonify({
+            "available": available,
+            "action": (meta or {}).get("action"),
+            "at": (meta or {}).get("at"),
+            "at_iso": (meta or {}).get("at_iso"),
+        })
+    if not _acquire_viewer_points_lock():
+        return jsonify({"error": "Points file busy, try again"}), 503
+    try:
+        meta = _restore_viewer_points_undo()
+        return jsonify({"ok": True, **meta})
+    except FileNotFoundError as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        _release_viewer_points_lock()
+
+
 @app.route('/api/viewer-points/import', methods=['POST', 'OPTIONS'])
 def viewer_points_import():
     """Bulk import viewer points from JSON. Body: { users: [{username, points, donationPts?, last?, role?}, ...], merge: bool }."""
@@ -1201,6 +1427,7 @@ def viewer_points_import():
     if not _acquire_viewer_points_lock():
         return jsonify({"error": "Points file busy, try again"}), 503
     try:
+        _snapshot_viewer_points_for_undo("import-merge" if merge else "import-replace")
         data = {} if not merge else _read_viewer_points_raw()
         count = 0
         for u in users:
@@ -1249,6 +1476,7 @@ def viewer_points_prune():
     if not _acquire_viewer_points_lock():
         return jsonify({"error": "Points file busy, try again"}), 503
     try:
+        _snapshot_viewer_points_for_undo("prune")
         data = _read_viewer_points_raw()
         to_remove = []
         for k, v in data.items():
@@ -1278,6 +1506,7 @@ def viewer_points_clear_non_donor():
     if not _acquire_viewer_points_lock():
         return jsonify({"error": "Points file busy, try again"}), 503
     try:
+        _snapshot_viewer_points_for_undo("clear-non-donor")
         data = _read_viewer_points_raw()
         for k in data:
             pts, last, donation_pts, role = data[k][0], data[k][1], data[k][2], (data[k][3] if len(data[k]) >= 4 else '')
@@ -1306,6 +1535,7 @@ def viewer_points_bulk_set():
     if not _acquire_viewer_points_lock():
         return jsonify({"error": "Points file busy, try again"}), 503
     try:
+        _snapshot_viewer_points_for_undo("bulk-set")
         data = _read_viewer_points_raw()
         for k in users_filter:
             v = data.get(k, (0, 0, 0, ''))
@@ -1333,6 +1563,7 @@ def viewer_points_bulk_add():
     if not _acquire_viewer_points_lock():
         return jsonify({"error": "Points file busy, try again"}), 503
     try:
+        _snapshot_viewer_points_for_undo("bulk-add")
         data = _read_viewer_points_raw()
         keys = users_filter if users_filter else list(data.keys())
         for k in keys:
@@ -1367,6 +1598,7 @@ def viewer_points_chat_to_donor():
     if not _acquire_viewer_points_lock():
         return jsonify({"error": "Points file busy, try again"}), 503
     try:
+        _snapshot_viewer_points_for_undo("chat-to-donor")
         data = _read_viewer_points_raw()
         count = 0
         for k in users_filter:
@@ -1393,6 +1625,7 @@ def viewer_points_clear_donor_only():
     if not _acquire_viewer_points_lock():
         return jsonify({"error": "Points file busy, try again"}), 503
     try:
+        _snapshot_viewer_points_for_undo("clear-donor")
         data = _read_viewer_points_raw()
         for k in data:
             v = data[k]
@@ -1413,6 +1646,7 @@ def viewer_points_clear_all():
     if not _acquire_viewer_points_lock():
         return jsonify({"error": "Points file busy, try again"}), 503
     try:
+        _snapshot_viewer_points_for_undo("clear-all")
         data = _read_viewer_points_raw()
         for k in data:
             data[k] = (0, 0, 0, '')
@@ -2810,6 +3044,78 @@ def double_points_start():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/double-points-stop', methods=['POST', 'OPTIONS'])
+def double_points_stop():
+    """Clear active 2x points period."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        with open(DOUBLE_POINTS_END_FILE, 'w', encoding='utf-8') as f:
+            f.write('0')
+            f.flush()
+            os.fsync(f.fileno())
+        return jsonify({"ok": True, "active": False})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/double-points-extend', methods=['POST', 'OPTIONS'])
+def double_points_extend():
+    """Extend (or start) 2x by N minutes. Body: { minutes: 5 } (1–1440)."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        body = request.get_json(force=True, silent=True) or {}
+        minutes = body.get('minutes', body.get('mins', 5))
+        minutes = max(1, min(1440, int(minutes) if minutes is not None else 5))
+        from chat_command import _extend_double_points
+        _extend_double_points(minutes * 60)
+        end_ts = 0
+        try:
+            with open(DOUBLE_POINTS_END_FILE, encoding='utf-8') as f:
+                raw = f.read().strip()
+            end_ts = int(raw) if raw else 0
+        except (ValueError, OSError):
+            pass
+        return jsonify({"ok": True, "minutes": minutes, "end_ts": end_ts})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/spawn-costs', methods=['GET', 'OPTIONS'])
+def spawn_costs_api():
+    """Zone-adjusted spawn costs at a depth (query ?depth=N or live game depth)."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    resp_headers = {'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0'}
+    try:
+        from points_command import get_config, compute_spawn_cost, get_current_depth, NATIVE_DEPTH
+        depth_arg = request.args.get('depth')
+        if depth_arg is not None and str(depth_arg).strip() != '':
+            depth = int(depth_arg)
+        else:
+            depth = get_current_depth()
+        cfg = get_config()
+        monsters = sorted(set(list((cfg.get('cost_per_monster') or {}).keys()) + list(NATIVE_DEPTH.keys())))
+        base = {}
+        costs = {}
+        champions = {}
+        for m in monsters:
+            b = int((cfg.get('cost_per_monster') or {}).get(m, cfg.get('default_monster_cost', 100)))
+            adj = compute_spawn_cost(m, depth)
+            base[m] = b
+            costs[m] = adj
+            champions[m] = 2 * adj
+        return jsonify({
+            "depth": depth,
+            "base": base,
+            "costs": costs,
+            "champion": champions,
+        }), 200, resp_headers
+    except Exception as e:
+        return jsonify({"error": str(e), "depth": None, "base": {}, "costs": {}}), 500, resp_headers
+
+
 @app.route('/api/summon-march', methods=['GET', 'POST', 'OPTIONS'])
 def summon_march():
     """Queue summon-march events for Godot companion; Streamer.bot POSTs new summons."""
@@ -2833,7 +3139,7 @@ def summon_march():
                     is_monster_unlocked,
                     monster_xp,
                     get_state_payload,
-                    is_sprint_crowned,
+                    get_march_leader_status,
                 )
                 if not is_monster_unlocked(monster):
                     return jsonify({
@@ -2842,13 +3148,28 @@ def summon_march():
                     }), 400
                 xp = int(data.get('xp') or monster_xp(monster) or 0)
                 bestiary_level = int(data.get('bestiary_level') or get_state_payload().get('level') or 1)
-                crowned = bool(data.get('crowned')) or is_sprint_crowned(username)
+                leader = get_march_leader_status(username)
             except Exception:
                 xp = int(data.get('xp') or 0)
                 bestiary_level = int(data.get('bestiary_level') or 1)
-                crowned = bool(data.get('crowned'))
+                leader = {
+                    'heat_leader': False,
+                    'sprint_rank': 0,
+                    'badge': '',
+                    'crowned': bool(data.get('crowned')),
+                }
             event_id = str(uuid.uuid4())
             ts = int(time.time())
+            badge = str(leader.get('badge') or '').strip().lower()
+            if data.get('badge'):
+                badge = str(data.get('badge')).strip().lower()
+            sprint_rank = int(leader.get('sprint_rank') or 0)
+            if data.get('sprint_rank') not in (None, ''):
+                try:
+                    sprint_rank = int(data.get('sprint_rank'))
+                except (TypeError, ValueError):
+                    pass
+            heat_leader = bool(leader.get('heat_leader')) or bool(data.get('heat_leader'))
             event = {
                 'id': event_id,
                 'ts': ts,
@@ -2857,12 +3178,16 @@ def summon_march():
                 'layout': layout,
                 'xp': xp,
                 'bestiary_level': bestiary_level,
-                'crowned': crowned,
+                'badge': badge,
+                'heat_leader': heat_leader,
+                'sprint_rank': sprint_rank,
+                # Legacy: true for active heat/sprint top-3 badges only (not past winners).
+                'crowned': bool(badge) or bool(data.get('crowned')),
             }
             _append_summon_march_event(event)
             _record_command_event(username, 'summon_march', monster, True)
-            print(f"Summon march queued: {monster} for {username or '?'} ({event_id})"
-                  + (" [crowned]" if crowned else ""))
+            tag = f" [{badge}]" if badge else ""
+            print(f"Summon march queued: {monster} for {username or '?'} ({event_id}){tag}")
             return jsonify({'ok': True, 'id': event_id, 'event': event})
         except Exception as e:
             print(f"Summon march POST error: {e}")
@@ -2899,6 +3224,248 @@ def bestiary_api():
         return jsonify(get_state_payload()), 200, resp_headers
     except Exception as e:
         return jsonify({'error': str(e), 'level': 1, 'bar_xp': 0, 'bar_threshold': 60}), 500, resp_headers
+
+
+@app.route('/api/bestiary-config', methods=['GET', 'POST', 'OPTIONS'])
+def bestiary_config_api():
+    """Get or save bestiary_config.json (zone XP thresholds, heat, soft floor)."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    resp_headers = {'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0'}
+    try:
+        from summon_bestiary import load_config, save_config
+        if request.method == 'GET':
+            return jsonify(load_config(force=True)), 200, resp_headers
+        raw = request.get_json(silent=True)
+        if not isinstance(raw, dict):
+            return jsonify({'error': 'JSON object required'}), 400, resp_headers
+        saved = save_config(raw)
+        return jsonify({'ok': True, 'config': saved}), 200, resp_headers
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500, resp_headers
+
+
+def _default_companion_settings_doc():
+    return {
+        'revision': 0,
+        'updated_at': 0,
+        'source': '',
+        'settings': {},
+    }
+
+
+def _load_companion_settings_doc():
+    doc = _default_companion_settings_doc()
+    if not os.path.exists(COMPANION_SETTINGS_FILE):
+        return doc
+    try:
+        with open(COMPANION_SETTINGS_FILE, encoding='utf-8') as f:
+            raw = json.load(f)
+        if isinstance(raw, dict):
+            doc['revision'] = int(raw.get('revision', 0) or 0)
+            doc['updated_at'] = float(raw.get('updated_at', 0) or 0)
+            doc['source'] = str(raw.get('source', '') or '')
+            settings = raw.get('settings')
+            doc['settings'] = settings if isinstance(settings, dict) else {}
+    except (json.JSONDecodeError, OSError, TypeError, ValueError):
+        pass
+    return doc
+
+
+def _save_companion_settings_doc(doc):
+    out = {
+        'revision': int(doc.get('revision', 0) or 0),
+        'updated_at': float(doc.get('updated_at', 0) or 0),
+        'source': str(doc.get('source', '') or ''),
+        'settings': doc.get('settings') if isinstance(doc.get('settings'), dict) else {},
+    }
+    # Keep previous for one-step undo (before overwrite).
+    try:
+        if os.path.exists(COMPANION_SETTINGS_FILE):
+            with open(COMPANION_SETTINGS_FILE, encoding='utf-8') as f:
+                prev_raw = json.load(f)
+            if isinstance(prev_raw, dict) and prev_raw.get('settings'):
+                with open(COMPANION_SETTINGS_PREV_FILE, 'w', encoding='utf-8') as f:
+                    json.dump(prev_raw, f, indent=2)
+                    f.write('\n')
+    except (json.JSONDecodeError, OSError, TypeError, ValueError):
+        pass
+    with open(COMPANION_SETTINGS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(out, f, indent=2)
+        f.write('\n')
+    return out
+
+
+@app.route('/api/companion-settings', methods=['GET', 'POST', 'OPTIONS'])
+def companion_settings_api():
+    """Remote SPD Companion layout/UI settings (revisioned). Godot polls; HTML edits."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    resp_headers = {'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0'}
+    try:
+        if request.method == 'GET':
+            return jsonify(_load_companion_settings_doc()), 200, resp_headers
+        raw = request.get_json(silent=True)
+        if not isinstance(raw, dict):
+            return jsonify({'error': 'JSON object required'}), 400, resp_headers
+        # Accept either {settings: {...}, source?} or a bare settings object with ui/network keys.
+        if isinstance(raw.get('settings'), dict):
+            settings = raw['settings']
+            source = str(raw.get('source', 'html') or 'html')
+        elif any(k in raw for k in ('ui', 'ui_vertical', 'network')):
+            settings = {k: raw[k] for k in ('ui', 'ui_vertical', 'network') if k in raw}
+            source = str(raw.get('source', 'html') or 'html')
+        else:
+            return jsonify({'error': 'settings object required'}), 400, resp_headers
+        doc = _load_companion_settings_doc()
+        doc['revision'] = int(doc.get('revision', 0) or 0) + 1
+        doc['updated_at'] = time.time()
+        doc['source'] = source
+        doc['settings'] = settings
+        saved = _save_companion_settings_doc(doc)
+        return jsonify({'ok': True, **saved}), 200, resp_headers
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500, resp_headers
+
+
+@app.route('/api/companion-settings/undo', methods=['POST', 'OPTIONS'])
+def companion_settings_undo_api():
+    """Restore previous companion settings blob (bumps revision)."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    resp_headers = {'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0'}
+    try:
+        if not os.path.exists(COMPANION_SETTINGS_PREV_FILE):
+            return jsonify({'error': 'No previous revision'}), 404, resp_headers
+        with open(COMPANION_SETTINGS_PREV_FILE, encoding='utf-8') as f:
+            prev = json.load(f)
+        if not isinstance(prev, dict) or not isinstance(prev.get('settings'), dict):
+            return jsonify({'error': 'Invalid previous revision'}), 400, resp_headers
+        doc = _load_companion_settings_doc()
+        doc['revision'] = int(doc.get('revision', 0) or 0) + 1
+        doc['updated_at'] = time.time()
+        doc['source'] = 'undo'
+        doc['settings'] = prev['settings']
+        saved = _save_companion_settings_doc(doc)
+        return jsonify({'ok': True, **saved}), 200, resp_headers
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500, resp_headers
+
+
+@app.route('/api/companion-settings/heartbeat', methods=['GET', 'POST', 'OPTIONS'])
+def companion_settings_heartbeat_api():
+    """Godot POSTs applied revision; HTML GETs last-seen status."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    resp_headers = {'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0'}
+    try:
+        if request.method == 'GET':
+            hb = {'last_seen': 0, 'applied_revision': 0, 'server_revision': 0}
+            if os.path.exists(COMPANION_HEARTBEAT_FILE):
+                try:
+                    with open(COMPANION_HEARTBEAT_FILE, encoding='utf-8') as f:
+                        raw = json.load(f)
+                    if isinstance(raw, dict):
+                        hb.update(raw)
+                except (json.JSONDecodeError, OSError):
+                    pass
+            doc = _load_companion_settings_doc()
+            hb['server_revision'] = int(doc.get('revision', 0) or 0)
+            return jsonify(hb), 200, resp_headers
+        raw = request.get_json(silent=True) or {}
+        if not isinstance(raw, dict):
+            raw = {}
+        doc = _load_companion_settings_doc()
+        hb = {
+            'last_seen': time.time(),
+            'applied_revision': int(raw.get('applied_revision', 0) or 0),
+            'server_revision': int(doc.get('revision', 0) or 0),
+            'poll_ok': bool(raw.get('poll_ok', True)),
+        }
+        with open(COMPANION_HEARTBEAT_FILE, 'w', encoding='utf-8') as f:
+            json.dump(hb, f, indent=2)
+            f.write('\n')
+        return jsonify({'ok': True, **hb}), 200, resp_headers
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500, resp_headers
+
+
+def _safe_preset_name(name: str) -> str:
+    s = ''.join(c for c in str(name or '').strip() if c.isalnum() or c in ('-', '_', ' ')).strip()
+    return s[:64]
+
+
+@app.route('/api/companion-settings/presets', methods=['GET', 'POST', 'OPTIONS'])
+def companion_settings_presets_api():
+    if request.method == 'OPTIONS':
+        return '', 204
+    resp_headers = {'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0'}
+    try:
+        os.makedirs(COMPANION_PRESETS_DIR, exist_ok=True)
+        if request.method == 'GET':
+            names = []
+            for fn in sorted(os.listdir(COMPANION_PRESETS_DIR)):
+                if fn.endswith('.json'):
+                    names.append(fn[:-5])
+            return jsonify({'presets': names}), 200, resp_headers
+        raw = request.get_json(silent=True)
+        if not isinstance(raw, dict):
+            return jsonify({'error': 'JSON object required'}), 400, resp_headers
+        name = _safe_preset_name(raw.get('name', ''))
+        settings = raw.get('settings')
+        if not name:
+            return jsonify({'error': 'name required'}), 400, resp_headers
+        if not isinstance(settings, dict):
+            return jsonify({'error': 'settings object required'}), 400, resp_headers
+        path = os.path.join(COMPANION_PRESETS_DIR, name + '.json')
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump({'name': name, 'settings': settings, 'saved_at': time.time()}, f, indent=2)
+            f.write('\n')
+        return jsonify({'ok': True, 'name': name}), 200, resp_headers
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500, resp_headers
+
+
+@app.route('/api/companion-settings/presets/<name>', methods=['DELETE', 'OPTIONS'])
+def companion_settings_preset_delete_api(name):
+    if request.method == 'OPTIONS':
+        return '', 204
+    resp_headers = {'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0'}
+    try:
+        safe = _safe_preset_name(name)
+        path = os.path.join(COMPANION_PRESETS_DIR, safe + '.json')
+        if not safe or not os.path.exists(path):
+            return jsonify({'error': 'Preset not found'}), 404, resp_headers
+        os.remove(path)
+        return jsonify({'ok': True}), 200, resp_headers
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500, resp_headers
+
+
+@app.route('/api/companion-settings/presets/<name>/apply', methods=['POST', 'OPTIONS'])
+def companion_settings_preset_apply_api(name):
+    if request.method == 'OPTIONS':
+        return '', 204
+    resp_headers = {'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0'}
+    try:
+        safe = _safe_preset_name(name)
+        path = os.path.join(COMPANION_PRESETS_DIR, safe + '.json')
+        if not safe or not os.path.exists(path):
+            return jsonify({'error': 'Preset not found'}), 404, resp_headers
+        with open(path, encoding='utf-8') as f:
+            raw = json.load(f)
+        settings = raw.get('settings') if isinstance(raw, dict) else None
+        if not isinstance(settings, dict):
+            return jsonify({'error': 'Invalid preset'}), 400, resp_headers
+        doc = _load_companion_settings_doc()
+        doc['revision'] = int(doc.get('revision', 0) or 0) + 1
+        doc['updated_at'] = time.time()
+        doc['source'] = 'preset:' + safe
+        doc['settings'] = settings
+        saved = _save_companion_settings_doc(doc)
+        return jsonify({'ok': True, **saved}), 200, resp_headers
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500, resp_headers
 
 
 @app.route('/api/top-summoner')
@@ -2961,10 +3528,88 @@ def chat_command_api():
         from chat_command import dispatch_chat_command
         body = request.get_json(force=True, silent=True) or {}
         result = dispatch_chat_command(body)
+        raw = (body.get("rawMessage") or body.get("message") or "").strip()
+        req_type = (body.get("type") or "").strip()
+        # Bang-commands and failures: one useful line instead of opaque werkzeug POST logs
+        if raw.startswith("!") or (not result.ok and result.message):
+            user = body.get("username") or body.get("userName") or "?"
+            status = "OK" if result.ok else "FAIL"
+            detail = (result.message or raw or req_type or "?")[:140]
+            print(f"Chat [{status}] {user}: {detail}")
         return jsonify(result.to_api_dict())
     except Exception as e:
         print(f"chat-command error: {e}")
         return jsonify({"ok": False, "message": str(e), "pts": None, "earned": 0}), 500
+
+
+@app.route('/api/session', methods=['GET', 'OPTIONS'])
+def session_status_api():
+    """Live session status for the manager (started / pending stream-end debounce)."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        from chat_command import _load_session_state, get_config
+        state = _load_session_state()
+        debounce_hours = float(get_config().get("reset_debounce_hours", 4))
+        debounce_sec = int(debounce_hours * 3600)
+        offline_at = state.get("stream_offline_at")
+        pending_end = bool(offline_at)
+        retry_after_sec = None
+        if pending_end:
+            elapsed = int(time.time()) - int(offline_at)
+            retry_after_sec = max(0, debounce_sec - elapsed)
+        return jsonify({
+            "stream_started_at": state.get("stream_started_at"),
+            "stream_offline_at": offline_at,
+            "debounce_hours": debounce_hours,
+            "retry_after_sec": retry_after_sec,
+            "pending_end": pending_end,
+            "fard_used_count": len(state.get("fard_used") or {}),
+            "first_words_count": len(state.get("first_words") or {}),
+            "fard_used": sorted((state.get("fard_used") or {}).keys()),
+            "first_words": sorted((state.get("first_words") or {}).keys()),
+        })
+    except Exception as e:
+        return jsonify({"error": str(e), "pending_end": False}), 500
+
+
+@app.route('/api/session/clear-user', methods=['POST', 'OPTIONS'])
+def session_clear_user_api():
+    """Remove one user from fard_used and/or first_words maps. Body: { username, clear: ["fard","first_words"] }."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        from chat_command import _load_session_state, _save_session_state
+        body = request.get_json(force=True, silent=True) or {}
+        username = (body.get('username') or body.get('userName') or '').strip().lower()
+        if not username:
+            return jsonify({"error": "username required"}), 400
+        clear = body.get('clear') or ['fard', 'first_words']
+        if isinstance(clear, str):
+            clear = [clear]
+        clear = [str(c).strip().lower() for c in clear if str(c).strip()]
+        state = _load_session_state()
+        removed = []
+        if 'fard' in clear or 'fard_used' in clear:
+            used = state.setdefault('fard_used', {})
+            if used.pop(username, None) is not None:
+                removed.append('fard')
+            state['fard_used'] = used
+        if 'first_words' in clear or 'firstwords' in clear:
+            fw = state.setdefault('first_words', {})
+            if fw.pop(username, None) is not None:
+                removed.append('first_words')
+            state['first_words'] = fw
+        _save_session_state(state)
+        return jsonify({
+            "ok": True,
+            "username": username,
+            "removed": removed,
+            "fard_used_count": len(state.get('fard_used') or {}),
+            "first_words_count": len(state.get('first_words') or {}),
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @app.route('/api/session/reset', methods=['POST', 'OPTIONS'])
@@ -3076,13 +3721,38 @@ if __name__ == '__main__':
     print("="*50 + "\n")
 
     # Suppress request logs for high-frequency polling endpoints (easier to see commands)
+    _QUIET_PATHS = (
+        '/game_summary',
+        '/api/double-points-remaining',
+        '/api/game-data',
+        '/api/bestiary',
+        '/api/bestiary-config',
+        '/api/companion-settings',
+        '/api/companion-settings/heartbeat',
+        '/api/summon-march',
+        '/api/points-config',
+        '/api/activity-commands',
+        '/api/top-summoner',
+        '/api/heat-leader',
+        '/api/spend-disabled',
+        '/api/death-cost',
+        '/api/session',
+        '/api/spawn-costs',
+    )
+
     class _QuietPollFilter(logging.Filter):
         def filter(self, record):
             msg = record.getMessage()
-            return ('/game_summary' not in msg and
-                    '/api/double-points-remaining' not in msg and
-                    '/api/game-data' not in msg)
+            # Keep non-200 / errors visible even on poll paths
+            if ' 200 ' not in msg and ' 204 ' not in msg:
+                return True
+            return not any(p in msg for p in _QUIET_PATHS)
+
     logging.getLogger('werkzeug').addFilter(_QuietPollFilter())
+    print(
+        "Request log: polling GETs muted (bestiary/summon-march/points-config/…). "
+        "Chat bang-commands print as: Chat [OK|FAIL] user: …\n"
+    )
 
     # Run Flask server
     app.run(host='127.0.0.1', port=5000, debug=False, threaded=True)

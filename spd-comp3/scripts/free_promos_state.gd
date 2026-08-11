@@ -2,6 +2,8 @@ extends Node
 
 ## Shared [code]free_until[/code] state from Lastest UI points-config. [member FreePromosPanel] syncs here; [code]alert_presenter[/code] uses it for faster toasts.
 
+signal active_changed
+
 const COMMAND_TO_COST: Dictionary = {
 	"gold": "cost_per_gold",
 	"curse": "cost_per_curse",
@@ -31,6 +33,12 @@ var _active: Array = []
 
 func set_active(rows: Array) -> void:
 	_active = rows.duplicate(true)
+	active_changed.emit()
+
+
+func get_active() -> Array:
+	_prune_expired()
+	return _active.duplicate(true)
 
 
 func has_any_active() -> bool:

@@ -25,6 +25,8 @@ var obs_ws_port: int = 4455
 var obs_ws_password: String = ""
 ## Substring in the **program** scene name that means “pause / BRB” (show title backdrop, hide ID strip). Empty = never treat as pause.
 var obs_pause_scene_name: String = "LIVE - PAUSE"
+## Substring that means the primary live program scene (LIVE - MAIN). Checked after pause; empty = never treat as main.
+var obs_main_scene_name: String = "LIVE - MAIN"
 ## When true, prints each applied program scene and pause flag to the Godot **Output** panel (Editor) or stdout (exported).
 var obs_log_program_scene: bool = false
 
@@ -52,6 +54,9 @@ var spend_indicator_corner: int = 1
 var spend_indicator_margin_x: int = 16
 ## Pixel inset from the viewport edge along Y (top or bottom, depending on corner).
 var spend_indicator_margin_y: int = 16
+## Inner text padding inside the spend chrome.
+var spend_indicator_padding_h_px: int = 2
+var spend_indicator_padding_v_px: int = 2
 ## Pixel font size for the spend indicator label ([code]Chat Spending[/code]).
 var spend_indicator_font_size_px: int = 15
 ## SPD chrome for the chat spend badge (default red button, matches WndChallenges).
@@ -114,6 +119,8 @@ var live_water_left_strip_top_px: int = 0
 var live_water_gradient_fade_start: float = 0.73
 ## Shader UV.y where fade reaches full black (must be >= [member live_water_gradient_fade_start]).
 var live_water_gradient_fade_end: float = 1.0
+## Soften L-shape edges along Y (top of bottom bar / left-strip top inset), in px. 0 = hard cut.
+var live_water_edge_feather_v_px: int = 0
 ## When true, root viewport + window use per-pixel transparency so OBS (layer below) shows through masked regions. Default off: some Windows exports show a blank/white window with transparency on.
 var window_per_pixel_transparency_enabled: bool = false
 ## Caps redraw rate ([member Engine.max_fps]). **0** = unlimited (higher GPU). **30–60** is usually enough for overlays and lowers compositor/GPU load.
@@ -127,6 +134,9 @@ var alert_chrome_scale: float = 1.0
 ## Pixel font size for alert title and subtitle (toast text).
 var alert_title_font_size_px: int = 14
 var alert_subtitle_font_size_px: int = 11
+## Inner toast text padding (MarginContainer around title/subtitle/icons).
+var alert_padding_h_px: int = 10
+var alert_padding_v_px: int = 8
 ## Width and height (square) for scroll rune + item / mob icons in the alert row (px).
 var alert_command_icon_size_px: int = 72
 ## Frames per second for monster idle animation in alerts (static scroll art ignores this).
@@ -161,6 +171,8 @@ var paid_notice_text_align: String = "left"
 var paid_notice_pop_scale: bool = false
 var paid_notice_show_on_live: bool = true
 var paid_notice_show_on_pause: bool = true
+## Main (horizontal) per-element OBS scene gates (pause / main / other).
+var main_scene_show: Dictionary = {}
 var paid_notice_enable_superchat: bool = true
 var paid_notice_enable_gifted_membership: bool = true
 var paid_notice_enable_sub: bool = true
@@ -188,12 +200,27 @@ var free_promos_panel_visible: bool = true
 var free_promos_corner: int = 2
 var free_promos_margin_x: int = 16
 var free_promos_margin_y: int = 64
+## Inner text padding inside the free-promos chrome.
+var free_promos_padding_h_px: int = 10
+var free_promos_padding_v_px: int = 8
 var free_promos_font_size_px: int = 13
 ## Hard cap on panel width (content is narrower when possible).
 var free_promos_max_width_px: int = 320
 ## SPD chrome for the free-promos panel (default toast).
 var free_promos_chrome_style: String = "toast"
 var free_promos_chrome_scale: float = 1.0
+## Global !doublepoints / !fard 2× overlay (GET /api/double-points-remaining).
+var double_points_panel_visible: bool = true
+var double_points_poll_sec: float = 1.0
+var double_points_corner: int = 1
+var double_points_margin_x: int = 16
+var double_points_margin_y: int = 16
+var double_points_padding_h_px: int = 10
+var double_points_padding_v_px: int = 8
+var double_points_font_size_px: int = 14
+var double_points_font_color: Color = Color(1.0, 0.85, 0.2, 1.0)
+var double_points_chrome_style: String = "toast"
+var double_points_chrome_scale: float = 1.0
 ## Poll chat !summon march queue from Lastest UI server (GET /api/summon-march).
 var summon_march_enabled: bool = true
 ## Base URL e.g. http://127.0.0.1:5000 (no trailing path).
@@ -231,7 +258,9 @@ var summon_march_monster_offset_y: int = -56
 ## Sprint crown holders (!summon after winning a level sprint this stream).
 var summon_crowned_sprite_scale: float = 1.28
 var summon_crowned_mob_modulate: Color = Color(1.08, 1.08, 0.92, 1.0)
+## Flare behind active leaders: gold=yellow, silver, bronze, heat=red (colors fixed in march unit).
 var summon_crowned_show_glow: bool = true
+## Legacy single color (unused for badge glows; kept for cfg compatibility).
 var summon_crowned_glow_color: Color = Color(1.0, 1.0, 0.0, 1.0)
 var summon_crowned_glow_rays: int = 6
 var summon_crowned_glow_spin_deg: float = 90.0
@@ -239,7 +268,8 @@ var summon_crowned_glow_radius_scale: float = 1.0
 var summon_crowned_show_crown: bool = true
 var summon_crowned_crown_scale: float = 0.75
 var summon_crowned_crown_offset_y: float = -0.32
-var summon_crowned_crown_modulate: Color = Color(1.2, 1.05, 0.55, 1.0)
+## Keep near white so heat / silver / bronze art colors stay readable.
+var summon_crowned_crown_modulate: Color = Color(1.0, 1.0, 1.0, 1.0)
 var summon_crowned_username_color: Color = Color(1.0, 1.0, 0.35, 1.0)
 ## 0 = use normal summon username font size.
 var summon_crowned_username_font_size_px: int = 0
@@ -255,8 +285,12 @@ var bestiary_show_hall: bool = true
 var bestiary_zone_x_px: int = 16
 var bestiary_zone_y_px: int = 16
 var bestiary_zone_width_px: int = 420
-var bestiary_zone_height_px: int = 160
+## 0 = hug content height (clamped by canvas − bottom margin). >0 = max height; overflow clips.
+var bestiary_zone_height_px: int = 0
+## When height is 0, keeps the panel above canvas.y − this margin. When height > 0, caps the zone.
 var bestiary_zone_bottom_margin_px: int = 0
+## Extra space inside the grey chrome (on top of the border). Keep low for a tight HUD.
+var bestiary_panel_pad_px: int = 2
 var bestiary_exp_bar_width_px: int = 256
 var bestiary_exp_bar_height_scale: float = 1.0
 ## Scales the whole Bestiary panel (chrome, bar, fonts, icons). Banner is separate.
@@ -273,6 +307,8 @@ var bestiary_chip_name_max_chars: int = 12
 var bestiary_hall_name_max_chars: int = 10
 var bestiary_truncate_names: bool = true
 var bestiary_show_xp_text: bool = true
+## When true, draw XP fraction centered on the exp bar (with outline) instead of below it.
+var bestiary_xp_text_over_bar: bool = false
 var bestiary_level_up_banner_sec: float = 3.0
 ## Multiplier on native boss_slain.png size (127x68). ~4 matches the old ~520px width.
 var bestiary_level_up_banner_scale: float = 4.0
@@ -284,10 +320,35 @@ var bestiary_heat_font_color: Color = Color(1.0, 1.0, 1.0, 1.0)
 var bestiary_hall_font_color: Color = Color(1.0, 1.0, 1.0, 1.0)
 var bestiary_banner_font_color: Color = Color(1.0, 1.0, 1.0, 1.0)
 
+## Poll Flask [code]/api/companion-settings[/code] and apply layout/UI when revision increases.
+var remote_settings_enabled: bool = false
+var remote_settings_base_url: String = "http://127.0.0.1:5000"
+var remote_settings_poll_sec: float = 2.0
+## When true, Apply & save (and upload button) POST current settings to Flask.
+var remote_settings_push_on_save: bool = false
+## Last Flask revision successfully applied locally (not written into remote payload).
+var remote_settings_applied_revision: int = 0
+## True while applying a remote payload (skips auto-push loops).
+var _remote_apply_in_progress: bool = false
+
 ## Placeable empty SPD window chrome panels (Dictionary entries). Cap keeps Settings tabs reasonable.
 const CHROME_BOXES_MAX := 16
-## Keys: id, name, enabled, style, zone_*, chrome_scale, show_on_live, show_on_pause.
+## Keys: id, name, enabled, style, zone_*, chrome_scale, show_on_pause/main/other.
 var chrome_boxes: Array = []
+
+## Layout profile ids for dual-window stream canvases.
+const LAYOUT_MAIN := &"ui"
+const LAYOUT_VERTICAL := &"ui_vertical"
+## OBS program scene buckets (see [method classify_obs_scene]).
+const SCENE_PAUSE := &"pause"
+const SCENE_MAIN := &"main"
+const SCENE_OTHER := &"other"
+const SCENE_UNKNOWN := &"unknown"
+## Second OBS capture window (1080×1920). When false, VerticalCompanionWindow stays hidden.
+var vertical_window_enabled: bool = true
+## Zones / toggles / chrome for the vertical companion window ([code][ui_vertical][/code]).
+var vertical_layout: UiLayoutData = UiLayoutData.default_vertical()
+
 
 func _ready() -> void:
 	load_settings()
@@ -324,6 +385,7 @@ func load_settings() -> void:
 	obs_ws_port = int(cfg.get_value("network", "obs_ws_port", obs_ws_port))
 	obs_ws_password = str(cfg.get_value("network", "obs_ws_password", obs_ws_password))
 	obs_pause_scene_name = str(cfg.get_value("network", "obs_pause_scene_name", obs_pause_scene_name))
+	obs_main_scene_name = str(cfg.get_value("network", "obs_main_scene_name", obs_main_scene_name))
 	obs_log_program_scene = bool(cfg.get_value("network", "obs_log_program_scene", obs_log_program_scene))
 	obs_reconnect_sec = float(cfg.get_value("network", "obs_reconnect_sec", obs_reconnect_sec))
 	spawn_result_file_path = str(
@@ -344,21 +406,39 @@ func load_settings() -> void:
 	spend_indicator_visible = bool(
 		cfg.get_value("network", "spend_indicator_visible", spend_indicator_visible)
 	)
-	spend_indicator_corner = clampi(
-		int(cfg.get_value("network", "spend_indicator_corner", spend_indicator_corner)),
-		0,
-		3
-	)
-	spend_indicator_margin_x = int(
-		cfg.get_value("network", "spend_indicator_margin_x", spend_indicator_margin_x)
-	)
-	spend_indicator_margin_y = int(
-		cfg.get_value("network", "spend_indicator_margin_y", spend_indicator_margin_y)
-	)
+	# Prefer [ui] spend corner/margins; fall back to legacy [network] once.
+	if cfg.has_section_key("ui", "spend_indicator_corner"):
+		spend_indicator_corner = clampi(
+			int(cfg.get_value("ui", "spend_indicator_corner", spend_indicator_corner)), 0, 3
+		)
+		spend_indicator_margin_x = int(
+			cfg.get_value("ui", "spend_indicator_margin_x", spend_indicator_margin_x)
+		)
+		spend_indicator_margin_y = int(
+			cfg.get_value("ui", "spend_indicator_margin_y", spend_indicator_margin_y)
+		)
+	else:
+		spend_indicator_corner = clampi(
+			int(cfg.get_value("network", "spend_indicator_corner", spend_indicator_corner)),
+			0,
+			3
+		)
+		spend_indicator_margin_x = int(
+			cfg.get_value("network", "spend_indicator_margin_x", spend_indicator_margin_x)
+		)
+		spend_indicator_margin_y = int(
+			cfg.get_value("network", "spend_indicator_margin_y", spend_indicator_margin_y)
+		)
 	spend_indicator_font_size_px = clampi(
 		int(cfg.get_value("network", "spend_indicator_font_size_px", spend_indicator_font_size_px)),
 		8,
 		64
+	)
+	spend_indicator_padding_h_px = clampi(
+		int(cfg.get_value("ui", "spend_indicator_padding_h_px", spend_indicator_padding_h_px)), 0, 64
+	)
+	spend_indicator_padding_v_px = clampi(
+		int(cfg.get_value("ui", "spend_indicator_padding_v_px", spend_indicator_padding_v_px)), 0, 64
 	)
 	spend_indicator_chrome_style = _SpdUiArt.normalize_chrome_style_id(
 		str(cfg.get_value("network", "spend_indicator_chrome_style", spend_indicator_chrome_style))
@@ -376,6 +456,9 @@ func load_settings() -> void:
 	)
 	free_promos_http_url = str(cfg.get_value("network", "free_promos_http_url", free_promos_http_url))
 	free_promos_poll_sec = maxf(0.5, float(cfg.get_value("network", "free_promos_poll_sec", free_promos_poll_sec)))
+	double_points_poll_sec = maxf(
+		0.5, float(cfg.get_value("network", "double_points_poll_sec", double_points_poll_sec))
+	)
 	summon_march_enabled = bool(cfg.get_value("network", "summon_march_enabled", summon_march_enabled))
 	summon_march_base_url = str(cfg.get_value("network", "summon_march_base_url", summon_march_base_url))
 	summon_march_poll_sec = maxf(0.15, float(cfg.get_value("network", "summon_march_poll_sec", summon_march_poll_sec)))
@@ -496,6 +579,23 @@ func load_settings() -> void:
 	bestiary_hud_enabled = bool(cfg.get_value("network", "bestiary_hud_enabled", bestiary_hud_enabled))
 	bestiary_base_url = str(cfg.get_value("network", "bestiary_base_url", bestiary_base_url))
 	bestiary_poll_sec = maxf(0.25, float(cfg.get_value("network", "bestiary_poll_sec", bestiary_poll_sec)))
+	remote_settings_enabled = bool(
+		cfg.get_value("network", "remote_settings_enabled", remote_settings_enabled)
+	)
+	remote_settings_base_url = str(
+		cfg.get_value("network", "remote_settings_base_url", remote_settings_base_url)
+	)
+	remote_settings_poll_sec = maxf(
+		0.5, float(cfg.get_value("network", "remote_settings_poll_sec", remote_settings_poll_sec))
+	)
+	remote_settings_push_on_save = bool(
+		cfg.get_value("network", "remote_settings_push_on_save", remote_settings_push_on_save)
+	)
+	remote_settings_applied_revision = int(
+		cfg.get_value(
+			"network", "remote_settings_applied_revision", remote_settings_applied_revision
+		)
+	)
 	bestiary_show_sprint_chip = bool(
 		cfg.get_value("network", "bestiary_show_sprint_chip", bestiary_show_sprint_chip)
 	)
@@ -510,6 +610,9 @@ func load_settings() -> void:
 		bestiary_zone_height_px = int(cfg.get_value("ui", "bestiary_zone_height_px", bestiary_zone_height_px))
 		bestiary_zone_bottom_margin_px = int(
 			cfg.get_value("ui", "bestiary_zone_bottom_margin_px", bestiary_zone_bottom_margin_px)
+		)
+		bestiary_panel_pad_px = clampi(
+			int(cfg.get_value("ui", "bestiary_panel_pad_px", bestiary_panel_pad_px)), 0, 64
 		)
 	else:
 		# Seed from alert zone once for older cfgs
@@ -553,6 +656,9 @@ func load_settings() -> void:
 		cfg.get_value("ui", "bestiary_truncate_names", bestiary_truncate_names)
 	)
 	bestiary_show_xp_text = bool(cfg.get_value("ui", "bestiary_show_xp_text", bestiary_show_xp_text))
+	bestiary_xp_text_over_bar = bool(
+		cfg.get_value("ui", "bestiary_xp_text_over_bar", bestiary_xp_text_over_bar)
+	)
 	bestiary_level_up_banner_sec = maxf(
 		0.5, float(cfg.get_value("ui", "bestiary_level_up_banner_sec", bestiary_level_up_banner_sec))
 	)
@@ -591,7 +697,7 @@ func load_settings() -> void:
 	bestiary_banner_font_color = _read_color_cfg(
 		cfg, "ui", "bestiary_banner_font_color", bestiary_banner_font_color
 	)
-	chrome_boxes = _read_chrome_boxes_cfg(cfg)
+	chrome_boxes = _read_chrome_boxes_cfg(cfg, "ui")
 	show_pending_udp_alerts = bool(
 		cfg.get_value("ui", "show_pending_udp_alerts", show_pending_udp_alerts)
 	)
@@ -668,6 +774,11 @@ func load_settings() -> void:
 	)
 	if live_water_gradient_fade_end < live_water_gradient_fade_start:
 		live_water_gradient_fade_end = live_water_gradient_fade_start
+	live_water_edge_feather_v_px = clampi(
+		int(cfg.get_value("ui", "live_water_edge_feather_v_px", live_water_edge_feather_v_px)),
+		0,
+		2048
+	)
 	window_per_pixel_transparency_enabled = bool(
 		cfg.get_value("ui", "window_per_pixel_transparency_enabled", window_per_pixel_transparency_enabled)
 	)
@@ -684,6 +795,12 @@ func load_settings() -> void:
 	)
 	alert_subtitle_font_size_px = int(
 		cfg.get_value("ui", "alert_subtitle_font_size_px", alert_subtitle_font_size_px)
+	)
+	alert_padding_h_px = clampi(
+		int(cfg.get_value("ui", "alert_padding_h_px", alert_padding_h_px)), 0, 64
+	)
+	alert_padding_v_px = clampi(
+		int(cfg.get_value("ui", "alert_padding_v_px", alert_padding_v_px)), 0, 64
 	)
 	alert_command_icon_size_px = int(
 		cfg.get_value("ui", "alert_command_icon_size_px", alert_command_icon_size_px)
@@ -771,6 +888,7 @@ func load_settings() -> void:
 	paid_notice_show_on_pause = bool(
 		cfg.get_value("ui", "paid_notice_show_on_pause", paid_notice_show_on_pause)
 	)
+	_load_main_scene_show(cfg)
 	paid_notice_enable_superchat = bool(
 		cfg.get_value("ui", "paid_notice_enable_superchat", paid_notice_enable_superchat)
 	)
@@ -815,6 +933,12 @@ func load_settings() -> void:
 	)
 	free_promos_margin_x = int(cfg.get_value("ui", "free_promos_margin_x", free_promos_margin_x))
 	free_promos_margin_y = int(cfg.get_value("ui", "free_promos_margin_y", free_promos_margin_y))
+	free_promos_padding_h_px = clampi(
+		int(cfg.get_value("ui", "free_promos_padding_h_px", free_promos_padding_h_px)), 0, 64
+	)
+	free_promos_padding_v_px = clampi(
+		int(cfg.get_value("ui", "free_promos_padding_v_px", free_promos_padding_v_px)), 0, 64
+	)
 	free_promos_font_size_px = clampi(
 		int(cfg.get_value("ui", "free_promos_font_size_px", free_promos_font_size_px)),
 		8,
@@ -831,11 +955,50 @@ func load_settings() -> void:
 	free_promos_chrome_scale = clampf(
 		float(cfg.get_value("ui", "free_promos_chrome_scale", free_promos_chrome_scale)), 0.5, 4.0
 	)
+	double_points_panel_visible = bool(
+		cfg.get_value("ui", "double_points_panel_visible", double_points_panel_visible)
+	)
+	double_points_corner = clampi(
+		int(cfg.get_value("ui", "double_points_corner", double_points_corner)), 0, 3
+	)
+	double_points_margin_x = int(
+		cfg.get_value("ui", "double_points_margin_x", double_points_margin_x)
+	)
+	double_points_margin_y = int(
+		cfg.get_value("ui", "double_points_margin_y", double_points_margin_y)
+	)
+	double_points_padding_h_px = clampi(
+		int(cfg.get_value("ui", "double_points_padding_h_px", double_points_padding_h_px)), 0, 64
+	)
+	double_points_padding_v_px = clampi(
+		int(cfg.get_value("ui", "double_points_padding_v_px", double_points_padding_v_px)), 0, 64
+	)
+	double_points_font_size_px = clampi(
+		int(cfg.get_value("ui", "double_points_font_size_px", double_points_font_size_px)), 8, 48
+	)
+	double_points_font_color = _read_color_cfg(
+		cfg, "ui", "double_points_font_color", double_points_font_color
+	)
+	double_points_chrome_style = _SpdUiArt.normalize_chrome_style_id(
+		str(cfg.get_value("ui", "double_points_chrome_style", double_points_chrome_style))
+	)
+	double_points_chrome_scale = clampf(
+		float(cfg.get_value("ui", "double_points_chrome_scale", double_points_chrome_scale)), 0.5, 4.0
+	)
+	_load_vertical_layout(cfg)
 	_apply_render_limits()
 	settings_loaded.emit()
 
 
-## Pixel size of the root 2D view (game / OBS capture area). Uses the viewport visible rect.
+func live_water_gradient_for(for_control: Control) -> Vector2:
+	var L := layout_data_for(for_control)
+	var gs := clampf(L.live_water_gradient_fade_start, 0.0, 1.0)
+	var ge := clampf(L.live_water_gradient_fade_end, 0.0, 1.0)
+	if ge < gs:
+		ge = gs
+	return Vector2(gs, ge)
+
+
 func _apply_render_limits() -> void:
 	var cap := render_max_fps
 	Engine.max_fps = cap if cap > 0 else 0
@@ -852,13 +1015,404 @@ func layout_canvas_size(for_control: Control) -> Vector2:
 
 ## Normalized L-shape params for shaders: x = bottom band height fraction, y = left strip width fraction, z = left strip top Y fraction.
 func live_water_l_shape_uv_vector(for_control: Control) -> Vector3:
+	var L := layout_data_for(for_control)
 	var sz := layout_canvas_size(for_control)
 	var denom_y := maxf(sz.y, 1.0)
 	var denom_x := maxf(sz.x, 1.0)
-	var bf := clampf(float(live_water_bottom_bar_px) / denom_y, 0.0, 1.0)
-	var lf := clampf(float(live_water_left_strip_px) / denom_x, 0.0, 1.0)
-	var lt := clampf(float(live_water_left_strip_top_px) / denom_y, 0.0, 1.0)
+	var bf := clampf(float(L.live_water_bottom_bar_px) / denom_y, 0.0, 1.0)
+	var lf := clampf(float(L.live_water_left_strip_px) / denom_x, 0.0, 1.0)
+	var lt := clampf(float(L.live_water_left_strip_top_px) / denom_y, 0.0, 1.0)
 	return Vector3(bf, lf, lt)
+
+
+## Soft edge height as UV.y fraction for [code]edge_feather_v[/code] shader uniform.
+func live_water_edge_feather_v_uv(for_control: Control) -> float:
+	var L := layout_data_for(for_control)
+	var sz := layout_canvas_size(for_control)
+	return clampf(float(maxi(0, L.live_water_edge_feather_v_px)) / maxf(sz.y, 1.0), 0.0, 1.0)
+
+
+func layout_profile_for(node: Node) -> StringName:
+	var n: Node = node
+	while n:
+		if n.has_method("get_layout_profile"):
+			return n.call("get_layout_profile") as StringName
+		if "layout_profile" in n:
+			var p: Variant = n.get("layout_profile")
+			if typeof(p) == TYPE_STRING_NAME or typeof(p) == TYPE_STRING:
+				var s := StringName(str(p))
+				if s == LAYOUT_VERTICAL or s == LAYOUT_MAIN:
+					return s
+		n = n.get_parent()
+	return LAYOUT_MAIN
+
+
+func is_vertical_layout(node: Node) -> bool:
+	return layout_profile_for(node) == LAYOUT_VERTICAL
+
+
+## Main layout snapshot (current CompanionConfig zone fields) or vertical_layout.
+func layout_data_for(node: Node) -> UiLayoutData:
+	if is_vertical_layout(node):
+		return vertical_layout
+	return _main_layout_snapshot()
+
+
+func _main_layout_snapshot() -> UiLayoutData:
+	var L := UiLayoutData.new()
+	L.alert_zone_x_px = alert_zone_x_px
+	L.alert_zone_y_px = alert_zone_y_px
+	L.alert_zone_width_px = alert_zone_width_px
+	L.alert_zone_height_px = alert_zone_height_px
+	L.alert_zone_bottom_margin_px = alert_zone_bottom_margin_px
+	L.id_zone_x_px = id_zone_x_px
+	L.id_zone_y_px = id_zone_y_px
+	L.id_zone_width_px = id_zone_width_px
+	L.id_zone_height_px = id_zone_height_px
+	L.id_zone_bottom_margin_px = id_zone_bottom_margin_px
+	L.bestiary_zone_x_px = bestiary_zone_x_px
+	L.bestiary_zone_y_px = bestiary_zone_y_px
+	L.bestiary_zone_width_px = bestiary_zone_width_px
+	L.bestiary_zone_height_px = bestiary_zone_height_px
+	L.bestiary_zone_bottom_margin_px = bestiary_zone_bottom_margin_px
+	L.paid_notice_zone_x_px = paid_notice_zone_x_px
+	L.paid_notice_zone_y_px = paid_notice_zone_y_px
+	L.paid_notice_zone_width_px = paid_notice_zone_width_px
+	L.paid_notice_zone_height_px = paid_notice_zone_height_px
+	L.paid_notice_zone_bottom_margin_px = paid_notice_zone_bottom_margin_px
+	L.live_water_bottom_bar_px = live_water_bottom_bar_px
+	L.live_water_left_strip_px = live_water_left_strip_px
+	L.live_water_left_strip_top_px = live_water_left_strip_top_px
+	L.live_water_gradient_fade_start = live_water_gradient_fade_start
+	L.live_water_gradient_fade_end = live_water_gradient_fade_end
+	L.live_water_edge_feather_v_px = live_water_edge_feather_v_px
+	L.spend_indicator_corner = spend_indicator_corner
+	L.spend_indicator_margin_x = spend_indicator_margin_x
+	L.spend_indicator_margin_y = spend_indicator_margin_y
+	L.free_promos_corner = free_promos_corner
+	L.free_promos_margin_x = free_promos_margin_x
+	L.free_promos_margin_y = free_promos_margin_y
+	L.double_points_corner = double_points_corner
+	L.double_points_margin_x = double_points_margin_x
+	L.double_points_margin_y = double_points_margin_y
+	L.chrome_boxes = chrome_boxes
+	L.show_live_water = true
+	L.show_title = true
+	L.show_chrome_boxes = true
+	L.show_id_overlay = id_overlay_enabled
+	L.show_alerts = true
+	L.show_paid_notices = paid_notice_enabled
+	L.show_bestiary = bestiary_hud_enabled
+	L.show_summon_march = summon_march_enabled
+	L.show_spend_indicator = spend_indicator_visible
+	L.show_free_promos = free_promos_panel_visible
+	L.show_double_points = double_points_panel_visible
+	L.hide_spend_when_off = false
+	ensure_main_scene_show()
+	L.scene_show = main_scene_show.duplicate(true)
+	L.ensure_scene_show()
+	return L
+
+
+func chrome_boxes_for(node: Node) -> Array:
+	if is_vertical_layout(node):
+		return vertical_layout.chrome_boxes
+	return chrome_boxes
+
+
+func duplicate_chrome_boxes_for_profile(profile: StringName) -> Array:
+	var src: Array = vertical_layout.chrome_boxes if profile == LAYOUT_VERTICAL else chrome_boxes
+	var out: Array = []
+	for i in range(src.size()):
+		out.append(normalize_chrome_box(src[i], i + 1).duplicate(true))
+	return out
+
+
+func element_enabled(node: Node, key: String) -> bool:
+	var L := layout_data_for(node)
+	match key:
+		"live_water":
+			return L.show_live_water
+		"title":
+			return L.show_title
+		"chrome_boxes":
+			return L.show_chrome_boxes
+		"id_overlay":
+			return L.show_id_overlay and (id_overlay_enabled if not is_vertical_layout(node) else true)
+		"alerts":
+			return L.show_alerts
+		"paid_notices":
+			return L.show_paid_notices and (paid_notice_enabled if not is_vertical_layout(node) else true)
+		"bestiary":
+			return L.show_bestiary and (bestiary_hud_enabled if not is_vertical_layout(node) else true)
+		"summon_march":
+			return L.show_summon_march and (summon_march_enabled if not is_vertical_layout(node) else true)
+		"spend_indicator":
+			return L.show_spend_indicator and (spend_indicator_visible if not is_vertical_layout(node) else true)
+		"free_promos":
+			return L.show_free_promos and (free_promos_panel_visible if not is_vertical_layout(node) else true)
+		"double_points":
+			return L.show_double_points and (
+				double_points_panel_visible if not is_vertical_layout(node) else true
+			)
+		_:
+			return true
+	return true
+
+
+## OBS program scene → pause / main / other (pause wins if both markers match).
+func classify_obs_scene(scene_name: String) -> StringName:
+	var sn := scene_name.strip_edges()
+	var pause_m := obs_pause_scene_name.strip_edges()
+	if not pause_m.is_empty() and sn.contains(pause_m):
+		return SCENE_PAUSE
+	var main_m := obs_main_scene_name.strip_edges()
+	if not main_m.is_empty() and sn.contains(main_m):
+		return SCENE_MAIN
+	return SCENE_OTHER
+
+
+func ensure_main_scene_show() -> void:
+	var defaults := UiLayoutData.default_scene_show()
+	# Migrate legacy paid live/pause into paid_notices row when scene_show missing.
+	if main_scene_show.is_empty():
+		main_scene_show = defaults.duplicate(true)
+		var paid: Dictionary = main_scene_show.get("paid_notices", {})
+		paid["pause"] = paid_notice_show_on_pause
+		paid["main"] = paid_notice_show_on_live
+		paid["other"] = paid_notice_show_on_live
+		main_scene_show["paid_notices"] = paid
+	var merged: Dictionary = {}
+	for key in UiLayoutData.element_keys():
+		var fb: Dictionary = defaults.get(key, {"pause": true, "main": true, "other": true})
+		merged[key] = UiLayoutData.normalize_scene_entry(main_scene_show.get(key, null), fb)
+	main_scene_show = merged
+
+
+## Feature enable (layout show_* / globals) AND OBS scene gate for this canvas.
+func element_visible_on_scene(node: Node, key: String, kind: StringName) -> bool:
+	if not element_enabled(node, key):
+		return false
+	var L := layout_data_for(node)
+	return L.allows_scene(key, kind)
+
+
+func _load_main_scene_show(cfg: ConfigFile) -> void:
+	main_scene_show = {}
+	if cfg.has_section_key("ui", "main_scene_show"):
+		var raw: Variant = cfg.get_value("ui", "main_scene_show", {})
+		if typeof(raw) == TYPE_DICTIONARY:
+			main_scene_show = (raw as Dictionary).duplicate(true)
+	ensure_main_scene_show()
+
+
+func _save_main_scene_show(cfg: ConfigFile) -> void:
+	ensure_main_scene_show()
+	cfg.set_value("ui", "main_scene_show", main_scene_show.duplicate(true))
+
+
+func _load_vertical_layout(cfg: ConfigFile) -> void:
+	var seeded := UiLayoutData.default_vertical()
+	vertical_window_enabled = bool(
+		cfg.get_value("ui_vertical", "vertical_window_enabled", vertical_window_enabled)
+	)
+	var sec := "ui_vertical"
+	var L := vertical_layout if vertical_layout != null else UiLayoutData.default_vertical()
+	L.alert_zone_x_px = int(cfg.get_value(sec, "alert_zone_x_px", seeded.alert_zone_x_px))
+	L.alert_zone_y_px = int(cfg.get_value(sec, "alert_zone_y_px", seeded.alert_zone_y_px))
+	L.alert_zone_width_px = int(cfg.get_value(sec, "alert_zone_width_px", seeded.alert_zone_width_px))
+	L.alert_zone_height_px = int(cfg.get_value(sec, "alert_zone_height_px", seeded.alert_zone_height_px))
+	L.alert_zone_bottom_margin_px = int(
+		cfg.get_value(sec, "alert_zone_bottom_margin_px", seeded.alert_zone_bottom_margin_px)
+	)
+	L.id_zone_x_px = int(cfg.get_value(sec, "id_zone_x_px", seeded.id_zone_x_px))
+	L.id_zone_y_px = int(cfg.get_value(sec, "id_zone_y_px", seeded.id_zone_y_px))
+	L.id_zone_width_px = int(cfg.get_value(sec, "id_zone_width_px", seeded.id_zone_width_px))
+	L.id_zone_height_px = int(cfg.get_value(sec, "id_zone_height_px", seeded.id_zone_height_px))
+	L.id_zone_bottom_margin_px = int(
+		cfg.get_value(sec, "id_zone_bottom_margin_px", seeded.id_zone_bottom_margin_px)
+	)
+	L.bestiary_zone_x_px = int(cfg.get_value(sec, "bestiary_zone_x_px", seeded.bestiary_zone_x_px))
+	L.bestiary_zone_y_px = int(cfg.get_value(sec, "bestiary_zone_y_px", seeded.bestiary_zone_y_px))
+	L.bestiary_zone_width_px = int(
+		cfg.get_value(sec, "bestiary_zone_width_px", seeded.bestiary_zone_width_px)
+	)
+	L.bestiary_zone_height_px = int(
+		cfg.get_value(sec, "bestiary_zone_height_px", seeded.bestiary_zone_height_px)
+	)
+	L.bestiary_zone_bottom_margin_px = int(
+		cfg.get_value(sec, "bestiary_zone_bottom_margin_px", seeded.bestiary_zone_bottom_margin_px)
+	)
+	L.paid_notice_zone_x_px = int(
+		cfg.get_value(sec, "paid_notice_zone_x_px", seeded.paid_notice_zone_x_px)
+	)
+	L.paid_notice_zone_y_px = int(
+		cfg.get_value(sec, "paid_notice_zone_y_px", seeded.paid_notice_zone_y_px)
+	)
+	L.paid_notice_zone_width_px = int(
+		cfg.get_value(sec, "paid_notice_zone_width_px", seeded.paid_notice_zone_width_px)
+	)
+	L.paid_notice_zone_height_px = int(
+		cfg.get_value(sec, "paid_notice_zone_height_px", seeded.paid_notice_zone_height_px)
+	)
+	L.paid_notice_zone_bottom_margin_px = int(
+		cfg.get_value(
+			sec, "paid_notice_zone_bottom_margin_px", seeded.paid_notice_zone_bottom_margin_px
+		)
+	)
+	L.live_water_bottom_bar_px = clampi(
+		int(cfg.get_value(sec, "live_water_bottom_bar_px", seeded.live_water_bottom_bar_px)), 0, 8192
+	)
+	L.live_water_left_strip_px = clampi(
+		int(cfg.get_value(sec, "live_water_left_strip_px", seeded.live_water_left_strip_px)), 0, 8192
+	)
+	L.live_water_left_strip_top_px = clampi(
+		int(cfg.get_value(sec, "live_water_left_strip_top_px", seeded.live_water_left_strip_top_px)),
+		0,
+		8192
+	)
+	L.live_water_gradient_fade_start = clampf(
+		float(
+			cfg.get_value(sec, "live_water_gradient_fade_start", seeded.live_water_gradient_fade_start)
+		),
+		0.0,
+		1.0
+	)
+	L.live_water_gradient_fade_end = clampf(
+		float(cfg.get_value(sec, "live_water_gradient_fade_end", seeded.live_water_gradient_fade_end)),
+		0.0,
+		1.0
+	)
+	if L.live_water_gradient_fade_end < L.live_water_gradient_fade_start:
+		L.live_water_gradient_fade_end = L.live_water_gradient_fade_start
+	L.live_water_edge_feather_v_px = clampi(
+		int(cfg.get_value(sec, "live_water_edge_feather_v_px", seeded.live_water_edge_feather_v_px)),
+		0,
+		2048
+	)
+	L.spend_indicator_corner = clampi(
+		int(cfg.get_value(sec, "spend_indicator_corner", seeded.spend_indicator_corner)), 0, 3
+	)
+	L.spend_indicator_margin_x = int(
+		cfg.get_value(sec, "spend_indicator_margin_x", seeded.spend_indicator_margin_x)
+	)
+	L.spend_indicator_margin_y = int(
+		cfg.get_value(sec, "spend_indicator_margin_y", seeded.spend_indicator_margin_y)
+	)
+	L.free_promos_corner = clampi(
+		int(cfg.get_value(sec, "free_promos_corner", seeded.free_promos_corner)), 0, 3
+	)
+	L.free_promos_margin_x = int(cfg.get_value(sec, "free_promos_margin_x", seeded.free_promos_margin_x))
+	L.free_promos_margin_y = int(cfg.get_value(sec, "free_promos_margin_y", seeded.free_promos_margin_y))
+	L.double_points_corner = clampi(
+		int(cfg.get_value(sec, "double_points_corner", seeded.double_points_corner)), 0, 3
+	)
+	L.double_points_margin_x = int(
+		cfg.get_value(sec, "double_points_margin_x", seeded.double_points_margin_x)
+	)
+	L.double_points_margin_y = int(
+		cfg.get_value(sec, "double_points_margin_y", seeded.double_points_margin_y)
+	)
+	L.chrome_boxes = _read_chrome_boxes_cfg(cfg, sec)
+	L.show_live_water = bool(cfg.get_value(sec, "show_live_water", true))
+	L.show_title = bool(cfg.get_value(sec, "show_title", true))
+	L.show_chrome_boxes = bool(cfg.get_value(sec, "show_chrome_boxes", true))
+	L.show_id_overlay = bool(cfg.get_value(sec, "show_id_overlay", true))
+	L.show_alerts = bool(cfg.get_value(sec, "show_alerts", true))
+	L.show_paid_notices = bool(cfg.get_value(sec, "show_paid_notices", true))
+	L.show_bestiary = bool(cfg.get_value(sec, "show_bestiary", true))
+	L.show_summon_march = bool(cfg.get_value(sec, "show_summon_march", true))
+	L.show_spend_indicator = bool(cfg.get_value(sec, "show_spend_indicator", true))
+	L.show_free_promos = bool(cfg.get_value(sec, "show_free_promos", true))
+	L.show_double_points = bool(cfg.get_value(sec, "show_double_points", true))
+	L.hide_spend_when_off = bool(
+		cfg.get_value(sec, "hide_spend_when_off", seeded.hide_spend_when_off)
+	)
+	if cfg.has_section_key(sec, "scene_show"):
+		var raw_ss: Variant = cfg.get_value(sec, "scene_show", {})
+		if typeof(raw_ss) == TYPE_DICTIONARY:
+			L.scene_show = (raw_ss as Dictionary).duplicate(true)
+	else:
+		# Seed from show_* masters: if an element is off on vertical, all scene buckets off.
+		L.scene_show = UiLayoutData.default_scene_show()
+		_seed_vertical_scene_show_from_toggles(L)
+	L.ensure_scene_show()
+	vertical_layout = L
+
+
+func _seed_vertical_scene_show_from_toggles(L: UiLayoutData) -> void:
+	var map := {
+		"live_water": L.show_live_water,
+		"title": L.show_title,
+		"chrome_boxes": L.show_chrome_boxes,
+		"id_overlay": L.show_id_overlay,
+		"alerts": L.show_alerts,
+		"paid_notices": L.show_paid_notices,
+		"bestiary": L.show_bestiary,
+		"summon_march": L.show_summon_march,
+		"spend_indicator": L.show_spend_indicator,
+		"free_promos": L.show_free_promos,
+		"double_points": L.show_double_points,
+	}
+	for key in map.keys():
+		if not bool(map[key]):
+			L.scene_show[key] = {"pause": false, "main": false, "other": false}
+
+
+func _save_vertical_layout(cfg: ConfigFile) -> void:
+	var sec := "ui_vertical"
+	var L := vertical_layout if vertical_layout != null else UiLayoutData.default_vertical()
+	cfg.set_value(sec, "vertical_window_enabled", vertical_window_enabled)
+	cfg.set_value(sec, "alert_zone_x_px", L.alert_zone_x_px)
+	cfg.set_value(sec, "alert_zone_y_px", L.alert_zone_y_px)
+	cfg.set_value(sec, "alert_zone_width_px", L.alert_zone_width_px)
+	cfg.set_value(sec, "alert_zone_height_px", L.alert_zone_height_px)
+	cfg.set_value(sec, "alert_zone_bottom_margin_px", L.alert_zone_bottom_margin_px)
+	cfg.set_value(sec, "id_zone_x_px", L.id_zone_x_px)
+	cfg.set_value(sec, "id_zone_y_px", L.id_zone_y_px)
+	cfg.set_value(sec, "id_zone_width_px", L.id_zone_width_px)
+	cfg.set_value(sec, "id_zone_height_px", L.id_zone_height_px)
+	cfg.set_value(sec, "id_zone_bottom_margin_px", L.id_zone_bottom_margin_px)
+	cfg.set_value(sec, "bestiary_zone_x_px", L.bestiary_zone_x_px)
+	cfg.set_value(sec, "bestiary_zone_y_px", L.bestiary_zone_y_px)
+	cfg.set_value(sec, "bestiary_zone_width_px", L.bestiary_zone_width_px)
+	cfg.set_value(sec, "bestiary_zone_height_px", L.bestiary_zone_height_px)
+	cfg.set_value(sec, "bestiary_zone_bottom_margin_px", L.bestiary_zone_bottom_margin_px)
+	cfg.set_value(sec, "paid_notice_zone_x_px", L.paid_notice_zone_x_px)
+	cfg.set_value(sec, "paid_notice_zone_y_px", L.paid_notice_zone_y_px)
+	cfg.set_value(sec, "paid_notice_zone_width_px", L.paid_notice_zone_width_px)
+	cfg.set_value(sec, "paid_notice_zone_height_px", L.paid_notice_zone_height_px)
+	cfg.set_value(sec, "paid_notice_zone_bottom_margin_px", L.paid_notice_zone_bottom_margin_px)
+	cfg.set_value(sec, "live_water_bottom_bar_px", L.live_water_bottom_bar_px)
+	cfg.set_value(sec, "live_water_left_strip_px", L.live_water_left_strip_px)
+	cfg.set_value(sec, "live_water_left_strip_top_px", L.live_water_left_strip_top_px)
+	cfg.set_value(sec, "live_water_gradient_fade_start", L.live_water_gradient_fade_start)
+	cfg.set_value(sec, "live_water_gradient_fade_end", L.live_water_gradient_fade_end)
+	cfg.set_value(sec, "live_water_edge_feather_v_px", L.live_water_edge_feather_v_px)
+	cfg.set_value(sec, "spend_indicator_corner", L.spend_indicator_corner)
+	cfg.set_value(sec, "spend_indicator_margin_x", L.spend_indicator_margin_x)
+	cfg.set_value(sec, "spend_indicator_margin_y", L.spend_indicator_margin_y)
+	cfg.set_value(sec, "free_promos_corner", L.free_promos_corner)
+	cfg.set_value(sec, "free_promos_margin_x", L.free_promos_margin_x)
+	cfg.set_value(sec, "free_promos_margin_y", L.free_promos_margin_y)
+	cfg.set_value(sec, "double_points_corner", L.double_points_corner)
+	cfg.set_value(sec, "double_points_margin_x", L.double_points_margin_x)
+	cfg.set_value(sec, "double_points_margin_y", L.double_points_margin_y)
+	cfg.set_value(sec, "chrome_boxes", _serialize_chrome_boxes_list(L.chrome_boxes))
+	cfg.set_value(sec, "show_live_water", L.show_live_water)
+	cfg.set_value(sec, "show_title", L.show_title)
+	cfg.set_value(sec, "show_chrome_boxes", L.show_chrome_boxes)
+	cfg.set_value(sec, "show_id_overlay", L.show_id_overlay)
+	cfg.set_value(sec, "show_alerts", L.show_alerts)
+	cfg.set_value(sec, "show_paid_notices", L.show_paid_notices)
+	cfg.set_value(sec, "show_bestiary", L.show_bestiary)
+	cfg.set_value(sec, "show_summon_march", L.show_summon_march)
+	cfg.set_value(sec, "show_spend_indicator", L.show_spend_indicator)
+	cfg.set_value(sec, "show_free_promos", L.show_free_promos)
+	cfg.set_value(sec, "show_double_points", L.show_double_points)
+	cfg.set_value(sec, "hide_spend_when_off", L.hide_spend_when_off)
+	L.ensure_scene_show()
+	cfg.set_value(sec, "scene_show", L.scene_show.duplicate(true))
 
 
 func _migrate_alert_zone_from_legacy(cfg: ConfigFile) -> void:
@@ -937,50 +1491,58 @@ func apply_pixel_zone_layout(
 
 
 func apply_alert_zone_layout(ctrl: Control, canvas: Vector2) -> void:
+	var L := layout_data_for(ctrl)
 	apply_pixel_zone_layout(
 		ctrl,
 		canvas,
-		alert_zone_x_px,
-		alert_zone_y_px,
-		alert_zone_width_px,
-		alert_zone_height_px,
-		alert_zone_bottom_margin_px
+		L.alert_zone_x_px,
+		L.alert_zone_y_px,
+		L.alert_zone_width_px,
+		L.alert_zone_height_px,
+		L.alert_zone_bottom_margin_px
 	)
 
 
 func apply_id_zone_layout(ctrl: Control, canvas: Vector2) -> void:
+	var L := layout_data_for(ctrl)
 	apply_pixel_zone_layout(
 		ctrl,
 		canvas,
-		id_zone_x_px,
-		id_zone_y_px,
-		id_zone_width_px,
-		id_zone_height_px,
-		id_zone_bottom_margin_px
+		L.id_zone_x_px,
+		L.id_zone_y_px,
+		L.id_zone_width_px,
+		L.id_zone_height_px,
+		L.id_zone_bottom_margin_px
 	)
 
 
 func apply_bestiary_zone_layout(ctrl: Control, canvas: Vector2) -> void:
+	## Width/X/Y always apply. Height 0 = temporary stub; [code]BestiaryHud[/code] refits to content.
+	var L := layout_data_for(ctrl)
+	var h := L.bestiary_zone_height_px
+	if h <= 0:
+		h = 64
 	apply_pixel_zone_layout(
 		ctrl,
 		canvas,
-		bestiary_zone_x_px,
-		bestiary_zone_y_px,
-		bestiary_zone_width_px,
-		bestiary_zone_height_px,
-		bestiary_zone_bottom_margin_px
+		L.bestiary_zone_x_px,
+		L.bestiary_zone_y_px,
+		L.bestiary_zone_width_px,
+		h,
+		L.bestiary_zone_bottom_margin_px
 	)
 
 
 func apply_paid_notice_zone_layout(ctrl: Control, canvas: Vector2) -> void:
+	var L := layout_data_for(ctrl)
 	apply_pixel_zone_layout(
 		ctrl,
 		canvas,
-		paid_notice_zone_x_px,
-		paid_notice_zone_y_px,
-		paid_notice_zone_width_px,
-		paid_notice_zone_height_px,
-		paid_notice_zone_bottom_margin_px
+		L.paid_notice_zone_x_px,
+		L.paid_notice_zone_y_px,
+		L.paid_notice_zone_width_px,
+		L.paid_notice_zone_height_px,
+		L.paid_notice_zone_bottom_margin_px
 	)
 
 
@@ -996,8 +1558,20 @@ func default_chrome_box(index: int = 1) -> Dictionary:
 		"zone_height_px": 160,
 		"zone_bottom_margin_px": 0,
 		"chrome_scale": 1.0,
-		"show_on_live": true,
 		"show_on_pause": false,
+		"show_on_main": true,
+		"show_on_other": true,
+		"header_text": "",
+		"body_text": "",
+		"header_font_size_px": 24,
+		"body_font_size_px": 16,
+		"header_font_color": Color(1.0, 1.0, 0.27, 1.0),
+		"body_font_color": Color(0.95, 0.92, 0.85, 1.0),
+		"text_align": "left",
+		"text_shadow": true,
+		"padding_h_px": 14,
+		"padding_v_px": 10,
+		"line_separation_px": 6,
 	}
 
 
@@ -1013,6 +1587,11 @@ func normalize_chrome_box(raw: Variant, fallback_index: int = 1) -> Dictionary:
 	if id_s.is_empty():
 		id_s = _new_chrome_box_id()
 	var style_s: String = _SpdUiArt.normalize_chrome_style_id(str(d.get("style", base["style"])))
+	var align_s := str(d.get("text_align", base["text_align"])).strip_edges().to_lower()
+	if align_s == "centre" or align_s == "middle":
+		align_s = "center"
+	elif align_s != "center":
+		align_s = "left"
 	return {
 		"id": id_s,
 		"name": name_s,
@@ -1020,13 +1599,49 @@ func normalize_chrome_box(raw: Variant, fallback_index: int = 1) -> Dictionary:
 		"style": style_s,
 		"zone_x_px": int(d.get("zone_x_px", base["zone_x_px"])),
 		"zone_y_px": int(d.get("zone_y_px", base["zone_y_px"])),
-		"zone_width_px": clampi(int(d.get("zone_width_px", base["zone_width_px"])), 32, 1920),
-		"zone_height_px": clampi(int(d.get("zone_height_px", base["zone_height_px"])), 0, 1080),
+		"zone_width_px": clampi(int(d.get("zone_width_px", base["zone_width_px"])), 32, 4096),
+		"zone_height_px": clampi(int(d.get("zone_height_px", base["zone_height_px"])), 0, 4096),
 		"zone_bottom_margin_px": int(d.get("zone_bottom_margin_px", 0)),
 		"chrome_scale": clampf(float(d.get("chrome_scale", 1.0)), 0.5, 4.0),
-		"show_on_live": bool(d.get("show_on_live", true)),
 		"show_on_pause": bool(d.get("show_on_pause", false)),
+		"show_on_main": bool(
+			d.get("show_on_main", d.get("show_on_live", true))
+		),
+		"show_on_other": bool(
+			d.get("show_on_other", d.get("show_on_live", true))
+		),
+		"header_text": str(d.get("header_text", "")),
+		"body_text": str(d.get("body_text", "")),
+		"header_font_size_px": clampi(
+			int(d.get("header_font_size_px", base["header_font_size_px"])), 8, 96
+		),
+		"body_font_size_px": clampi(
+			int(d.get("body_font_size_px", base["body_font_size_px"])), 8, 96
+		),
+		"header_font_color": _chrome_box_color(
+			d.get("header_font_color", base["header_font_color"]), base["header_font_color"]
+		),
+		"body_font_color": _chrome_box_color(
+			d.get("body_font_color", base["body_font_color"]), base["body_font_color"]
+		),
+		"text_align": align_s,
+		"text_shadow": bool(d.get("text_shadow", true)),
+		"padding_h_px": clampi(int(d.get("padding_h_px", base["padding_h_px"])), 0, 64),
+		"padding_v_px": clampi(int(d.get("padding_v_px", base["padding_v_px"])), 0, 64),
+		"line_separation_px": clampi(
+			int(d.get("line_separation_px", base["line_separation_px"])), 0, 48
+		),
 	}
+
+
+func _chrome_box_color(v: Variant, fallback: Color) -> Color:
+	if v is Color:
+		return v as Color
+	if v is String:
+		var s: String = (v as String).strip_edges()
+		if s.is_valid_html_color():
+			return Color(s)
+	return fallback
 
 
 func duplicate_chrome_boxes() -> Array:
@@ -1041,17 +1656,21 @@ func _new_chrome_box_id() -> String:
 
 
 func _serialize_chrome_boxes() -> Array:
+	return _serialize_chrome_boxes_list(chrome_boxes)
+
+
+func _serialize_chrome_boxes_list(boxes: Array) -> Array:
 	var out: Array = []
-	var n := mini(chrome_boxes.size(), CHROME_BOXES_MAX)
+	var n := mini(boxes.size(), CHROME_BOXES_MAX)
 	for i in range(n):
-		out.append(normalize_chrome_box(chrome_boxes[i], i + 1))
+		out.append(normalize_chrome_box(boxes[i], i + 1))
 	return out
 
 
-func _read_chrome_boxes_cfg(cfg: ConfigFile) -> Array:
-	if not cfg.has_section_key("ui", "chrome_boxes"):
+func _read_chrome_boxes_cfg(cfg: ConfigFile, section: String = "ui") -> Array:
+	if not cfg.has_section_key(section, "chrome_boxes"):
 		return []
-	var raw: Variant = cfg.get_value("ui", "chrome_boxes", [])
+	var raw: Variant = cfg.get_value(section, "chrome_boxes", [])
 	var out: Array = []
 	if typeof(raw) != TYPE_ARRAY:
 		return out
@@ -1073,6 +1692,7 @@ func save_settings() -> void:
 	cfg.set_value("network", "obs_ws_port", obs_ws_port)
 	cfg.set_value("network", "obs_ws_password", obs_ws_password)
 	cfg.set_value("network", "obs_pause_scene_name", obs_pause_scene_name)
+	cfg.set_value("network", "obs_main_scene_name", obs_main_scene_name)
 	cfg.set_value("network", "obs_log_program_scene", obs_log_program_scene)
 	cfg.set_value("network", "obs_reconnect_sec", obs_reconnect_sec)
 	cfg.set_value("network", "spawn_result_file_path", spawn_result_file_path)
@@ -1081,6 +1701,12 @@ func save_settings() -> void:
 	cfg.set_value("network", "spend_lock_file_path", spend_lock_file_path)
 	cfg.set_value("network", "spend_lock_poll_sec", spend_lock_poll_sec)
 	cfg.set_value("network", "spend_indicator_visible", spend_indicator_visible)
+	cfg.set_value("ui", "spend_indicator_corner", spend_indicator_corner)
+	cfg.set_value("ui", "spend_indicator_margin_x", spend_indicator_margin_x)
+	cfg.set_value("ui", "spend_indicator_margin_y", spend_indicator_margin_y)
+	cfg.set_value("ui", "spend_indicator_padding_h_px", spend_indicator_padding_h_px)
+	cfg.set_value("ui", "spend_indicator_padding_v_px", spend_indicator_padding_v_px)
+	# Keep writing legacy network keys for older tooling.
 	cfg.set_value("network", "spend_indicator_corner", spend_indicator_corner)
 	cfg.set_value("network", "spend_indicator_margin_x", spend_indicator_margin_x)
 	cfg.set_value("network", "spend_indicator_margin_y", spend_indicator_margin_y)
@@ -1093,6 +1719,7 @@ func save_settings() -> void:
 	cfg.set_value("network", "http_poll_interval_sec", http_poll_interval_sec)
 	cfg.set_value("network", "free_promos_http_url", free_promos_http_url)
 	cfg.set_value("network", "free_promos_poll_sec", free_promos_poll_sec)
+	cfg.set_value("network", "double_points_poll_sec", double_points_poll_sec)
 	cfg.set_value("network", "summon_march_enabled", summon_march_enabled)
 	cfg.set_value("network", "summon_march_base_url", summon_march_base_url)
 	cfg.set_value("network", "summon_march_poll_sec", summon_march_poll_sec)
@@ -1134,6 +1761,11 @@ func save_settings() -> void:
 	cfg.set_value("network", "bestiary_hud_enabled", bestiary_hud_enabled)
 	cfg.set_value("network", "bestiary_base_url", bestiary_base_url)
 	cfg.set_value("network", "bestiary_poll_sec", bestiary_poll_sec)
+	cfg.set_value("network", "remote_settings_enabled", remote_settings_enabled)
+	cfg.set_value("network", "remote_settings_base_url", remote_settings_base_url)
+	cfg.set_value("network", "remote_settings_poll_sec", remote_settings_poll_sec)
+	cfg.set_value("network", "remote_settings_push_on_save", remote_settings_push_on_save)
+	cfg.set_value("network", "remote_settings_applied_revision", remote_settings_applied_revision)
 	cfg.set_value("network", "bestiary_show_sprint_chip", bestiary_show_sprint_chip)
 	cfg.set_value("network", "bestiary_show_heat_chip", bestiary_show_heat_chip)
 	cfg.set_value("network", "bestiary_show_hall", bestiary_show_hall)
@@ -1142,6 +1774,7 @@ func save_settings() -> void:
 	cfg.set_value("ui", "bestiary_zone_width_px", bestiary_zone_width_px)
 	cfg.set_value("ui", "bestiary_zone_height_px", bestiary_zone_height_px)
 	cfg.set_value("ui", "bestiary_zone_bottom_margin_px", bestiary_zone_bottom_margin_px)
+	cfg.set_value("ui", "bestiary_panel_pad_px", bestiary_panel_pad_px)
 	cfg.set_value("ui", "bestiary_exp_bar_width_px", bestiary_exp_bar_width_px)
 	cfg.set_value("ui", "bestiary_exp_bar_height_scale", bestiary_exp_bar_height_scale)
 	cfg.set_value("ui", "bestiary_hud_scale", bestiary_hud_scale)
@@ -1154,6 +1787,7 @@ func save_settings() -> void:
 	cfg.set_value("ui", "bestiary_hall_name_max_chars", bestiary_hall_name_max_chars)
 	cfg.set_value("ui", "bestiary_truncate_names", bestiary_truncate_names)
 	cfg.set_value("ui", "bestiary_show_xp_text", bestiary_show_xp_text)
+	cfg.set_value("ui", "bestiary_xp_text_over_bar", bestiary_xp_text_over_bar)
 	cfg.set_value("ui", "bestiary_level_up_banner_sec", bestiary_level_up_banner_sec)
 	cfg.set_value("ui", "bestiary_level_up_banner_scale", bestiary_level_up_banner_scale)
 	cfg.set_value("ui", "bestiary_level_up_banner_font_size_px", bestiary_level_up_banner_font_size_px)
@@ -1192,6 +1826,7 @@ func save_settings() -> void:
 	cfg.set_value("ui", "live_water_left_strip_top_px", live_water_left_strip_top_px)
 	cfg.set_value("ui", "live_water_gradient_fade_start", live_water_gradient_fade_start)
 	cfg.set_value("ui", "live_water_gradient_fade_end", live_water_gradient_fade_end)
+	cfg.set_value("ui", "live_water_edge_feather_v_px", live_water_edge_feather_v_px)
 	cfg.set_value("ui", "window_per_pixel_transparency_enabled", window_per_pixel_transparency_enabled)
 	cfg.set_value("ui", "render_max_fps", render_max_fps)
 	cfg.set_value("ui", "alert_text_align", alert_text_align)
@@ -1199,6 +1834,8 @@ func save_settings() -> void:
 	cfg.set_value("ui", "alert_chrome_scale", alert_chrome_scale)
 	cfg.set_value("ui", "alert_title_font_size_px", alert_title_font_size_px)
 	cfg.set_value("ui", "alert_subtitle_font_size_px", alert_subtitle_font_size_px)
+	cfg.set_value("ui", "alert_padding_h_px", alert_padding_h_px)
+	cfg.set_value("ui", "alert_padding_v_px", alert_padding_v_px)
 	cfg.set_value("ui", "alert_command_icon_size_px", alert_command_icon_size_px)
 	cfg.set_value("ui", "alert_mob_idle_anim_fps", alert_mob_idle_anim_fps)
 	cfg.set_value("ui", "paid_notice_enabled", paid_notice_enabled)
@@ -1227,6 +1864,7 @@ func save_settings() -> void:
 	cfg.set_value("ui", "paid_notice_pop_scale", paid_notice_pop_scale)
 	cfg.set_value("ui", "paid_notice_show_on_live", paid_notice_show_on_live)
 	cfg.set_value("ui", "paid_notice_show_on_pause", paid_notice_show_on_pause)
+	_save_main_scene_show(cfg)
 	cfg.set_value("ui", "paid_notice_enable_superchat", paid_notice_enable_superchat)
 	cfg.set_value("ui", "paid_notice_enable_gifted_membership", paid_notice_enable_gifted_membership)
 	cfg.set_value("ui", "paid_notice_enable_sub", paid_notice_enable_sub)
@@ -1243,10 +1881,23 @@ func save_settings() -> void:
 	cfg.set_value("ui", "free_promos_corner", free_promos_corner)
 	cfg.set_value("ui", "free_promos_margin_x", free_promos_margin_x)
 	cfg.set_value("ui", "free_promos_margin_y", free_promos_margin_y)
+	cfg.set_value("ui", "free_promos_padding_h_px", free_promos_padding_h_px)
+	cfg.set_value("ui", "free_promos_padding_v_px", free_promos_padding_v_px)
 	cfg.set_value("ui", "free_promos_font_size_px", free_promos_font_size_px)
 	cfg.set_value("ui", "free_promos_max_width_px", free_promos_max_width_px)
 	cfg.set_value("ui", "free_promos_chrome_style", free_promos_chrome_style)
 	cfg.set_value("ui", "free_promos_chrome_scale", free_promos_chrome_scale)
+	cfg.set_value("ui", "double_points_panel_visible", double_points_panel_visible)
+	cfg.set_value("ui", "double_points_corner", double_points_corner)
+	cfg.set_value("ui", "double_points_margin_x", double_points_margin_x)
+	cfg.set_value("ui", "double_points_margin_y", double_points_margin_y)
+	cfg.set_value("ui", "double_points_padding_h_px", double_points_padding_h_px)
+	cfg.set_value("ui", "double_points_padding_v_px", double_points_padding_v_px)
+	cfg.set_value("ui", "double_points_font_size_px", double_points_font_size_px)
+	cfg.set_value("ui", "double_points_font_color", double_points_font_color)
+	cfg.set_value("ui", "double_points_chrome_style", double_points_chrome_style)
+	cfg.set_value("ui", "double_points_chrome_scale", double_points_chrome_scale)
+	_save_vertical_layout(cfg)
 	_apply_render_limits()
 	var err := cfg.save(SETTINGS_PATH)
 	if err == OK and _notify_listeners:
@@ -1288,3 +1939,192 @@ func save_as_shipped_defaults() -> String:
 	if _notify_listeners:
 		settings_saved.emit()
 	return ""
+
+
+## Scalars / strings / colors synced via Flask (layout, fonts, toggles). Machine secrets & paths excluded.
+## Plain typed Array (not PackedStringArray(...)) so this stays a valid const expression in GDScript.
+const REMOTE_UI_KEYS: Array[String] = [
+	"spend_indicator_visible", "spend_indicator_corner", "spend_indicator_margin_x", "spend_indicator_margin_y",
+	"spend_indicator_padding_h_px", "spend_indicator_padding_v_px", "spend_indicator_font_size_px",
+	"spend_indicator_chrome_style", "spend_indicator_chrome_scale",
+	"show_pending_udp_alerts", "alert_queue_max", "alert_hold_sec", "alert_fade_in_sec", "alert_fade_out_sec",
+	"alert_hold_sec_when_free", "alert_fade_in_sec_when_free", "alert_fade_out_sec_when_free",
+	"show_ping_alerts", "show_failed_command_alerts", "hud_status_panel_visible",
+	"alert_zone_x_px", "alert_zone_y_px", "alert_zone_width_px", "alert_zone_height_px", "alert_zone_bottom_margin_px",
+	"id_zone_x_px", "id_zone_y_px", "id_zone_width_px", "id_zone_height_px", "id_zone_bottom_margin_px",
+	"live_water_bottom_bar_px", "live_water_left_strip_px", "live_water_left_strip_top_px",
+	"live_water_gradient_fade_start", "live_water_gradient_fade_end", "live_water_edge_feather_v_px",
+	"window_per_pixel_transparency_enabled", "render_max_fps",
+	"alert_text_align", "alert_chrome_style", "alert_chrome_scale",
+	"alert_title_font_size_px", "alert_subtitle_font_size_px", "alert_padding_h_px", "alert_padding_v_px",
+	"alert_command_icon_size_px", "alert_mob_idle_anim_fps",
+	"paid_notice_enabled", "paid_notice_queue_max", "paid_notice_default_ttl_sec",
+	"paid_notice_fade_in_sec", "paid_notice_fade_out_sec",
+	"paid_notice_zone_x_px", "paid_notice_zone_y_px", "paid_notice_zone_width_px",
+	"paid_notice_zone_height_px", "paid_notice_zone_bottom_margin_px",
+	"paid_notice_chrome_style", "paid_notice_chrome_scale",
+	"paid_notice_kind_font_size_px", "paid_notice_title_font_size_px", "paid_notice_body_font_size_px",
+	"paid_notice_kind_font_color", "paid_notice_title_font_color", "paid_notice_body_font_color",
+	"paid_notice_text_shadow", "paid_notice_padding_h_px", "paid_notice_padding_v_px",
+	"paid_notice_line_separation_px", "paid_notice_text_align", "paid_notice_pop_scale",
+	"paid_notice_show_on_live", "paid_notice_show_on_pause",
+	"paid_notice_enable_superchat", "paid_notice_enable_gifted_membership",
+	"paid_notice_enable_sub", "paid_notice_enable_highlight",
+	"id_overlay_enabled", "id_cell_width_px", "id_cell_height_px", "id_cell_padding_px",
+	"id_known_icon_fraction", "id_flow_h_separation_px", "id_block_separation_px", "icon_cell_background_color",
+	"free_promos_panel_visible", "free_promos_corner", "free_promos_margin_x", "free_promos_margin_y",
+	"free_promos_padding_h_px", "free_promos_padding_v_px", "free_promos_font_size_px",
+	"free_promos_max_width_px", "free_promos_chrome_style", "free_promos_chrome_scale",
+	"double_points_panel_visible", "double_points_corner", "double_points_margin_x", "double_points_margin_y",
+	"double_points_padding_h_px", "double_points_padding_v_px", "double_points_font_size_px",
+	"double_points_font_color", "double_points_chrome_style", "double_points_chrome_scale",
+	"summon_march_duration_sec", "summon_march_max_concurrent",
+	"summon_march_lane_y_fraction", "summon_march_lane_y_min_fraction", "summon_march_lane_y_max_fraction",
+	"summon_march_lane_spacing_px", "summon_march_edge_margin_px", "summon_march_mob_fps",
+	"summon_march_sprite_size_px", "summon_march_show_username", "summon_march_username_centered",
+	"summon_march_show_monster_name", "summon_march_username_font_size_px", "summon_march_monster_font_size_px",
+	"summon_march_username_color", "summon_march_monster_color",
+	"summon_march_username_offset_x", "summon_march_username_offset_y",
+	"summon_march_monster_offset_x", "summon_march_monster_offset_y",
+	"summon_crowned_sprite_scale", "summon_crowned_mob_modulate", "summon_crowned_show_glow",
+	"summon_crowned_glow_color", "summon_crowned_glow_rays", "summon_crowned_glow_spin_deg",
+	"summon_crowned_glow_radius_scale", "summon_crowned_show_crown", "summon_crowned_crown_scale",
+	"summon_crowned_crown_offset_y", "summon_crowned_crown_modulate", "summon_crowned_username_color",
+	"summon_crowned_username_font_size_px", "summon_crowned_show_star_prefix",
+	"bestiary_show_sprint_chip", "bestiary_show_heat_chip", "bestiary_show_hall",
+	"bestiary_zone_x_px", "bestiary_zone_y_px", "bestiary_zone_width_px", "bestiary_zone_height_px",
+	"bestiary_zone_bottom_margin_px", "bestiary_panel_pad_px", "bestiary_exp_bar_width_px",
+	"bestiary_exp_bar_height_scale", "bestiary_hud_scale", "bestiary_chrome_scale",
+	"bestiary_use_compact_exp_bar", "bestiary_zone_font_size_px", "bestiary_header_format",
+	"bestiary_chip_font_size_px", "bestiary_chip_name_max_chars", "bestiary_hall_name_max_chars",
+	"bestiary_truncate_names", "bestiary_show_xp_text", "bestiary_xp_text_over_bar",
+	"bestiary_level_up_banner_sec", "bestiary_level_up_banner_scale", "bestiary_level_up_banner_font_size_px",
+	"bestiary_zone_font_color", "bestiary_xp_font_color", "bestiary_sprint_font_color",
+	"bestiary_heat_font_color", "bestiary_hall_font_color", "bestiary_banner_font_color",
+]
+
+
+func _remote_encode_value(v: Variant) -> Variant:
+	if v is Color:
+		return (v as Color).to_html(true)
+	return v
+
+
+func _remote_decode_color(v: Variant, fallback: Color) -> Color:
+	if v is Color:
+		return v as Color
+	if v is String:
+		var s := (v as String).strip_edges()
+		if s.is_valid_html_color():
+			return Color(s)
+	return fallback
+
+
+func _chrome_boxes_to_remote(boxes: Array) -> Array:
+	var out: Array = []
+	var n := mini(boxes.size(), CHROME_BOXES_MAX)
+	for i in range(n):
+		var box := normalize_chrome_box(boxes[i], i + 1).duplicate(true)
+		box["header_font_color"] = _remote_encode_value(box.get("header_font_color", Color.WHITE))
+		box["body_font_color"] = _remote_encode_value(box.get("body_font_color", Color.WHITE))
+		out.append(box)
+	return out
+
+
+## JSON-safe settings blob for Flask /points-config (no passwords, hosts, or absolute paths).
+func to_remote_dict() -> Dictionary:
+	var ui: Dictionary = {}
+	for key in REMOTE_UI_KEYS:
+		ui[key] = _remote_encode_value(get(key))
+	ensure_main_scene_show()
+	ui["main_scene_show"] = main_scene_show.duplicate(true)
+	ui["chrome_boxes"] = _chrome_boxes_to_remote(chrome_boxes)
+	var vert := vertical_layout.to_remote_dict() if vertical_layout != null else {}
+	if typeof(vert.get("chrome_boxes", null)) == TYPE_ARRAY:
+		vert["chrome_boxes"] = _chrome_boxes_to_remote(vert["chrome_boxes"])
+	vert["vertical_window_enabled"] = vertical_window_enabled
+	return {
+		"network": {
+			"obs_scene_sync_enabled": obs_scene_sync_enabled,
+			"obs_pause_scene_name": obs_pause_scene_name,
+			"obs_main_scene_name": obs_main_scene_name,
+			"obs_log_program_scene": obs_log_program_scene,
+			"summon_march_enabled": summon_march_enabled,
+			"summon_march_skip_backlog": summon_march_skip_backlog,
+			"bestiary_hud_enabled": bestiary_hud_enabled,
+		},
+		"ui": ui,
+		"ui_vertical": vert,
+	}
+
+
+## Apply a remote settings dict (partial merge). Returns number of top-level keys touched.
+func apply_remote_dict(payload: Dictionary) -> int:
+	if payload.is_empty():
+		return 0
+	var touched := 0
+	var net: Variant = payload.get("network", {})
+	if typeof(net) == TYPE_DICTIONARY:
+		var nd: Dictionary = net
+		if nd.has("obs_scene_sync_enabled"):
+			obs_scene_sync_enabled = bool(nd["obs_scene_sync_enabled"])
+			touched += 1
+		if nd.has("obs_pause_scene_name"):
+			obs_pause_scene_name = str(nd["obs_pause_scene_name"])
+			touched += 1
+		if nd.has("obs_main_scene_name"):
+			obs_main_scene_name = str(nd["obs_main_scene_name"])
+			touched += 1
+		if nd.has("obs_log_program_scene"):
+			obs_log_program_scene = bool(nd["obs_log_program_scene"])
+			touched += 1
+		if nd.has("summon_march_enabled"):
+			summon_march_enabled = bool(nd["summon_march_enabled"])
+			touched += 1
+		if nd.has("summon_march_skip_backlog"):
+			summon_march_skip_backlog = bool(nd["summon_march_skip_backlog"])
+			touched += 1
+		if nd.has("bestiary_hud_enabled"):
+			bestiary_hud_enabled = bool(nd["bestiary_hud_enabled"])
+			touched += 1
+	var ui_raw: Variant = payload.get("ui", {})
+	if typeof(ui_raw) == TYPE_DICTIONARY:
+		var ui: Dictionary = ui_raw
+		for key in REMOTE_UI_KEYS:
+			if not ui.has(key):
+				continue
+			var cur: Variant = get(key)
+			var incoming: Variant = ui[key]
+			if cur is Color:
+				set(key, _remote_decode_color(incoming, cur as Color))
+			elif typeof(cur) == TYPE_BOOL:
+				set(key, bool(incoming))
+			elif typeof(cur) == TYPE_INT:
+				set(key, int(incoming))
+			elif typeof(cur) == TYPE_FLOAT:
+				set(key, float(incoming))
+			elif typeof(cur) == TYPE_STRING:
+				set(key, str(incoming))
+			else:
+				set(key, incoming)
+			touched += 1
+		if ui.has("main_scene_show") and typeof(ui["main_scene_show"]) == TYPE_DICTIONARY:
+			main_scene_show = (ui["main_scene_show"] as Dictionary).duplicate(true)
+			ensure_main_scene_show()
+			touched += 1
+		if ui.has("chrome_boxes") and typeof(ui["chrome_boxes"]) == TYPE_ARRAY:
+			chrome_boxes = _serialize_chrome_boxes_list(ui["chrome_boxes"])
+			touched += 1
+	var vert_raw: Variant = payload.get("ui_vertical", {})
+	if typeof(vert_raw) == TYPE_DICTIONARY:
+		var vd: Dictionary = vert_raw
+		if vd.has("vertical_window_enabled"):
+			vertical_window_enabled = bool(vd["vertical_window_enabled"])
+			touched += 1
+		if vertical_layout == null:
+			vertical_layout = UiLayoutData.default_vertical()
+		vertical_layout.apply_remote_dict(vd)
+		if vd.has("chrome_boxes") and typeof(vd["chrome_boxes"]) == TYPE_ARRAY:
+			vertical_layout.chrome_boxes = _serialize_chrome_boxes_list(vd["chrome_boxes"])
+		touched += 1
+	return touched

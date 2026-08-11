@@ -1,10 +1,14 @@
 extends Node2D
 ## Monster march across the overlay; uses MobCommandArt walk frames when available.
-## Sprint crown holders march as oversized hostile champions wearing the Dwarf King crown.
+## Active leaders wear crowns: heat, or sprint gold / silver / bronze (top 3).
+## Past sprint winners are not crowned on marches — Hall / level-up banner is enough.
 
 const _MobArt := preload("res://scripts/mob_command_art.gd")
 const _FONT: FontFile = preload("res://assets/fonts/pixel_font.ttf")
-const _CROWN_TEX: Texture2D = preload("res://assets/item_sheet/crown.png")
+const _CROWN_GOLD: Texture2D = preload("res://assets/item_sheet/crown.png")
+const _CROWN_SILVER: Texture2D = preload("res://assets/item_sheet/crown_silver.png")
+const _CROWN_BRONZE: Texture2D = preload("res://assets/item_sheet/crown_bronze.png")
+const _CROWN_HEAT: Texture2D = preload("res://assets/item_sheet/crown_heat.png")
 
 var _sprite: Sprite2D
 var _crown: Sprite2D = null
@@ -12,7 +16,8 @@ var _idle_frames: Array[Texture2D] = []
 var _anim_idx: int = 0
 var _anim_accum: float = 0.0
 var _march_duration: float = 6.0
-var _crowned: bool = false
+## heat | gold | silver | bronze | ""
+var _badge: String = ""
 var _aura: Node2D = null
 
 
@@ -22,7 +27,9 @@ func setup(event: Dictionary, viewport_size: Vector2) -> void:
 	var monster := str(event.get("monster", "rat")).to_lower()
 	var username := str(event.get("username", ""))
 	var layout := str(event.get("layout", "horizontal")).to_lower()
-	_crowned = _event_is_crowned(event, username)
+	_badge = _resolve_badge(event, username)
+	if not _badge.is_empty():
+		print("[SummonMarch] %s badge=%s" % [username, _badge])
 
 	_build_visual(monster, username)
 
@@ -31,39 +38,84 @@ func setup(event: Dictionary, viewport_size: Vector2) -> void:
 	else:
 		_march_horizontal(viewport_size)
 
-	set_process(_idle_frames.size() > 1 or _crowned)
+	set_process(_idle_frames.size() > 1 or not _badge.is_empty())
 
 
-func _event_is_crowned(event: Dictionary, username: String) -> bool:
-	if bool(event.get("crowned", false)) or bool(event.get("champion", false)):
-		return true
+func _is_leader() -> bool:
+	return not _badge.is_empty()
+
+
+func _resolve_badge(event: Dictionary, username: String) -> String:
+	var raw := str(event.get("badge", "")).strip_edges().to_lower()
+	match raw:
+		"heat", "gold", "silver", "bronze":
+			return raw
+	# Heat (red) first, then sprint metals.
+	if bool(event.get("heat_leader", false)):
+		return "heat"
+	var rank := int(event.get("sprint_rank", 0))
+	match rank:
+		1:
+			return "gold"
+		2:
+			return "silver"
+		3:
+			return "bronze"
+	return _badge_from_bestiary_poll(username)
+
+
+func _badge_from_bestiary_poll(username: String) -> String:
 	if username.is_empty():
-		return false
+		return ""
 	var svc := get_node_or_null("/root/BestiaryPollService")
 	if svc == null:
-		return false
+		return ""
 	var payload: Variant = svc.get("last_payload")
 	if typeof(payload) != TYPE_DICTIONARY:
-		return false
+		return ""
 	var key := username.to_lower()
-	var winners: Variant = payload.get("sprint_winners", [])
-	if typeof(winners) == TYPE_ARRAY:
-		for w in winners:
-			if str(w).to_lower() == key:
-				return true
+	var heat: Variant = payload.get("heat", {})
+	if typeof(heat) == TYPE_DICTIONARY:
+		if str(heat.get("username", "")).to_lower() == key:
+			return "heat"
 	var sprint: Variant = payload.get("sprint", {})
 	if typeof(sprint) == TYPE_DICTIONARY:
-		var stream_w: Variant = sprint.get("winners_this_stream", [])
-		if typeof(stream_w) == TYPE_ARRAY:
-			for w in stream_w:
-				if str(w).to_lower() == key:
-					return true
-	return false
+		var top: Variant = sprint.get("top", [])
+		if typeof(top) == TYPE_ARRAY:
+			for entry in top:
+				if typeof(entry) != TYPE_DICTIONARY:
+					continue
+				if str(entry.get("username", "")).to_lower() != key:
+					continue
+				match int(entry.get("rank", 0)):
+					1:
+						return "gold"
+					2:
+						return "silver"
+					3:
+						return "bronze"
+		if str(sprint.get("username", "")).to_lower() == key:
+			return "gold"
+	return ""
+
+
+func _crown_texture_for_badge(badge: String) -> Texture2D:
+	match badge:
+		"heat":
+			return _CROWN_HEAT
+		"silver":
+			return _CROWN_SILVER
+		"bronze":
+			return _CROWN_BRONZE
+		"gold":
+			return _CROWN_GOLD
+		_:
+			return null
 
 
 func _sprite_target_size() -> float:
 	var base := float(clampi(CompanionConfig.summon_march_sprite_size_px, 16, 256))
-	if not _crowned:
+	if not _is_leader():
 		return base
 	return base * clampf(CompanionConfig.summon_crowned_sprite_scale, 1.0, 3.0)
 
@@ -83,29 +135,29 @@ func _build_visual(monster: String, username: String) -> void:
 		_sprite.texture = _idle_frames[0]
 		var tex_size := _sprite.texture.get_size()
 		if tex_size.x > 0 and tex_size.y > 0:
-			var scale := sprite_px / maxf(tex_size.x, tex_size.y)
-			_sprite.scale = Vector2(scale, scale)
+			var spr_scale := sprite_px / maxf(tex_size.x, tex_size.y)
+			_sprite.scale = Vector2(spr_scale, spr_scale)
 	# FX first (behind), then mob on top — normal blend so green chroma doesn't erase ADD glow.
-	if _crowned:
+	if _is_leader():
 		_sprite.modulate = CompanionConfig.summon_crowned_mob_modulate
 		if CompanionConfig.summon_crowned_show_glow:
 			_add_crowned_fx(sprite_px)
 	add_child(_sprite)
-	if _crowned and CompanionConfig.summon_crowned_show_crown:
-		_add_kings_crown(sprite_px)
+	if _is_leader() and CompanionConfig.summon_crowned_show_crown:
+		_add_leader_crown(sprite_px)
 
 	if CompanionConfig.summon_march_show_username and not username.is_empty():
 		var user_label := Label.new()
-		var star: bool = _crowned and CompanionConfig.summon_crowned_show_star_prefix
+		var star: bool = _is_leader() and CompanionConfig.summon_crowned_show_star_prefix
 		user_label.text = ("★ " if star else "") + username
 		var user_fs := CompanionConfig.summon_march_username_font_size_px
-		if _crowned and CompanionConfig.summon_crowned_username_font_size_px > 0:
+		if _is_leader() and CompanionConfig.summon_crowned_username_font_size_px > 0:
 			user_fs = CompanionConfig.summon_crowned_username_font_size_px
 		user_label.add_theme_font_size_override("font_size", user_fs)
 		user_label.add_theme_font_override("font", _FONT)
 		user_label.modulate = (
 			CompanionConfig.summon_crowned_username_color
-			if _crowned
+			if _is_leader()
 			else CompanionConfig.summon_march_username_color
 		)
 		user_label.z_index = 5
@@ -115,7 +167,7 @@ func _build_visual(monster: String, username: String) -> void:
 	if CompanionConfig.summon_march_show_monster_name:
 		var name_label := Label.new()
 		name_label.text = SummonMarchRegistry.display_name(monster)
-		if _crowned and CompanionConfig.summon_crowned_show_star_prefix:
+		if _is_leader() and CompanionConfig.summon_crowned_show_star_prefix:
 			name_label.text += " ★"
 		name_label.position = Vector2(
 			CompanionConfig.summon_march_monster_offset_x,
@@ -127,23 +179,36 @@ func _build_visual(monster: String, username: String) -> void:
 		name_label.add_theme_font_override("font", _FONT)
 		name_label.modulate = (
 			CompanionConfig.summon_crowned_username_color
-			if _crowned
+			if _is_leader()
 			else CompanionConfig.summon_march_monster_color
 		)
 		name_label.z_index = 5
 		add_child(name_label)
 
 
+func _glow_color_for_badge(badge: String) -> Color:
+	match badge:
+		"heat":
+			return Color(1.0, 0.18, 0.12, 1.0)  # red
+		"silver":
+			return Color(0.78, 0.82, 0.92, 1.0)  # cool silver
+		"bronze":
+			return Color(0.85, 0.48, 0.22, 1.0)  # bronze
+		"gold":
+			return Color(1.0, 1.0, 0.0, 1.0)  # Blessed yellow
+		_:
+			return Color(1.0, 1.0, 0.0, 1.0)
+
+
 func _add_crowned_fx(sprite_px: float) -> void:
-	## Port of CharSprite AURA + effects.Flare for Blessed (yellow, 6 rays, light mode).
-	## See ChampionEnemy.Blessed (color 0xFFFF00, rays 6) and Flare.java mesh.
-	var glow_color: Color = CompanionConfig.summon_crowned_glow_color
+	## Flare aura: gold=yellow, silver/bronze metal tones, heat=red.
+	var glow_color: Color = _glow_color_for_badge(_badge)
 	var n := clampi(CompanionConfig.summon_crowned_glow_rays, 3, 16)
 	var spin_deg := maxf(0.0, CompanionConfig.summon_crowned_glow_spin_deg)
 	var rad_scale := clampf(CompanionConfig.summon_crowned_glow_radius_scale, 0.25, 3.0)
 
 	_aura = Node2D.new()
-	_aura.name = "BlessedFlare"
+	_aura.name = "LeaderFlare"
 	_aura.z_index = 0
 	_aura.rotation_degrees = 45.0  # Flare default starting angle
 	var mat: CanvasItemMaterial = CanvasItemMaterial.new()
@@ -181,21 +246,25 @@ func _add_crowned_fx(sprite_px: float) -> void:
 		spin.tween_property(_aura, "rotation_degrees", 360.0, 360.0 / spin_deg).as_relative()
 
 
-func _add_kings_crown(sprite_px: float) -> void:
-	## Dwarf King crown on the head (extra on top of Blessed flare).
+func _add_leader_crown(sprite_px: float) -> void:
+	## Heat / gold / silver / bronze crown for active competition leaders.
+	var tex: Texture2D = _crown_texture_for_badge(_badge)
+	if tex == null:
+		return
 	_crown = Sprite2D.new()
-	_crown.name = "KingsCrown"
-	_crown.texture = _CROWN_TEX
+	_crown.name = "LeaderCrown"
+	_crown.texture = tex
 	_crown.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_crown.centered = true
 	_crown.z_index = 4
-	var tex_w := maxf(_CROWN_TEX.get_size().x, 1.0)
+	var tex_w := maxf(tex.get_size().x, 1.0)
 	var crown_frac := clampf(CompanionConfig.summon_crowned_crown_scale, 0.1, 3.0)
 	var cscale := (sprite_px * crown_frac) / tex_w
 	_crown.scale = Vector2(cscale, cscale)
 	# Offset Y is a fraction of sprite height; negative = above center (default -0.32).
 	_crown.position = Vector2(0.0, sprite_px * CompanionConfig.summon_crowned_crown_offset_y)
-	_crown.modulate = CompanionConfig.summon_crowned_crown_modulate
+	# Crown art is already colored — no tint.
+	_crown.modulate = Color.WHITE
 	add_child(_crown)
 	var bob := create_tween().set_loops()
 	var y0 := _crown.position.y
@@ -231,7 +300,7 @@ func _process(delta: float) -> void:
 
 func _vertical_content_extent() -> float:
 	var ext := _sprite_target_size() * 0.5
-	if _crowned:
+	if _is_leader():
 		ext *= 1.15
 	if CompanionConfig.summon_march_show_monster_name:
 		var top := absf(float(CompanionConfig.summon_march_monster_offset_y))

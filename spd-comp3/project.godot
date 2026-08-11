@@ -20,12 +20,14 @@ config/icon="res://icon.svg"
 
 CompanionConfig="*res://scripts/companion_config.gd"
 FreePromosState="*res://scripts/free_promos_state.gd"
+DoublePointsState="*res://scripts/double_points_state.gd"
 GameWebSocketClient="*res://scripts/game_websocket_client.gd"
 StreamerBotUdp="*res://scripts/streamerbot_udp_listener.gd"
 SpawnResultFileBridge="*res://scripts/spawn_result_file_bridge.gd"
 ObsWebSocketClient="*res://scripts/obs_websocket_client.gd"
 SummonPollService="*res://scripts/summon_poll_service.gd"
 BestiaryPollService="*res://scripts/bestiary_poll_service.gd"
+CompanionSettingsPollService="*res://scripts/companion_settings_poll_service.gd"
 
 [display]
 
@@ -34,6 +36,7 @@ window/size/viewport_height=1080
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/per_pixel_transparency/allowed=true
+##RequiredsoSettings+VerticalcompanionarerealOSwindows(OBScancaptureeach),notembeddedoverlaysinsidethe1080pmainview.window/subwindows/embed_subwindows=false
 
 [physics]
 

@@ -15,8 +15,12 @@ public class CPHInline
                 if (!TryGetNonempty("output0", out raw))
                     if (!TryGetNonempty("output1", out raw))
                     {
+                        // Server down / restart: keep apiMessage empty so R1's
+                        // "If apiMessage Is Null or Empty" branch stays silent
+                        // (avoids chat spam on every message / !command).
+                        CPH.LogInfo("ParseChatResponse: empty API response (is Lastest UI server.py running?)");
                         CPH.SetArgument("apiOk", "false");
-                        CPH.SetArgument("apiMessage", "API request failed (empty response).");
+                        CPH.SetArgument("apiMessage", "");
                         CPH.SetArgument("apiPts", "");
                         CPH.SetArgument("apiHasPresentation", "0");
                         CPH.SetArgument("apiPresentationChat", "");
@@ -72,9 +76,11 @@ public class CPHInline
         }
         catch (Exception ex)
         {
+            // Silent in chat — bad/HTML responses during downtime would spam otherwise.
             CPH.LogInfo("ParseChatResponse: " + ex.Message);
             CPH.SetArgument("apiOk", "false");
-            CPH.SetArgument("apiMessage", "API response parse error.");
+            CPH.SetArgument("apiMessage", "");
+            CPH.SetArgument("apiPts", "");
             CPH.SetArgument("apiHasPresentation", "0");
             CPH.SetArgument("apiPresentationChat", "");
         }

@@ -8,6 +8,7 @@ const _TEX_ON := preload("res://assets/ui_spd/icons/icons_checked.png")
 const _TEX_OFF := preload("res://assets/ui_spd/icons/icons_unchecked.png")
 
 @onready var _red_strip: PanelContainer = $RedStrip
+@onready var _row_margin: MarginContainer = $RedStrip/RowMargin
 @onready var _status_label: Label = $RedStrip/RowMargin/HBox/StatusLabel
 @onready var _toggle: TextureRect = $RedStrip/RowMargin/HBox/ToggleTex
 
@@ -23,6 +24,7 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_schedule_reposition)
 	_apply_anchor_pins()
 	_apply_chrome()
+	_apply_padding()
 	_apply_label_scale()
 	_apply_visibility()
 	_poll_now(true)
@@ -32,6 +34,7 @@ func _on_cfg() -> void:
 	_accum = 0.0
 	_apply_anchor_pins()
 	_apply_chrome()
+	_apply_padding()
 	_apply_label_scale()
 	_apply_visibility()
 	_poll_now(true)
@@ -47,6 +50,17 @@ func _apply_chrome() -> void:
 			CompanionConfig.spend_indicator_chrome_scale
 		)
 	)
+
+
+func _apply_padding() -> void:
+	if _row_margin == null:
+		return
+	var pad_h := clampi(CompanionConfig.spend_indicator_padding_h_px, 0, 64)
+	var pad_v := clampi(CompanionConfig.spend_indicator_padding_v_px, 0, 64)
+	_row_margin.add_theme_constant_override("margin_left", pad_h)
+	_row_margin.add_theme_constant_override("margin_right", pad_h)
+	_row_margin.add_theme_constant_override("margin_top", pad_v)
+	_row_margin.add_theme_constant_override("margin_bottom", pad_v)
 
 
 func _apply_label_scale() -> void:
@@ -70,7 +84,7 @@ func _apply_anchor_pins() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if not CompanionConfig.spend_indicator_visible:
+	if not CompanionConfig.element_enabled(self, "spend_indicator"):
 		return
 	if CompanionConfig.spend_lock_file_path.strip_edges().is_empty():
 		return
@@ -84,7 +98,14 @@ func _physics_process(delta: float) -> void:
 
 func _apply_visibility() -> void:
 	var path_ok: bool = not CompanionConfig.spend_lock_file_path.strip_edges().is_empty()
-	visible = CompanionConfig.spend_indicator_visible and path_ok
+	var want := CompanionConfig.element_enabled(self, "spend_indicator") and path_ok
+	if want and CompanionConfig.is_vertical_layout(self):
+		var L := CompanionConfig.layout_data_for(self)
+		if L.hide_spend_when_off:
+			var path: String = CompanionConfig.spend_lock_file_path.strip_edges()
+			if FileAccess.file_exists(path):
+				want = false
+	visible = want
 	if not visible:
 		_last_code = -1
 		return
@@ -99,9 +120,10 @@ func _reposition_to_corner() -> void:
 	if not visible:
 		return
 	var r: Rect2 = get_viewport().get_visible_rect()
-	var mx: int = CompanionConfig.spend_indicator_margin_x
-	var my: int = CompanionConfig.spend_indicator_margin_y
-	var corner: int = clampi(CompanionConfig.spend_indicator_corner, 0, 3)
+	var L := CompanionConfig.layout_data_for(self)
+	var mx: int = L.spend_indicator_margin_x
+	var my: int = L.spend_indicator_margin_y
+	var corner: int = clampi(L.spend_indicator_corner, 0, 3)
 	var sz: Vector2 = get_rect().size
 	if sz.x < 2.0 or sz.y < 2.0:
 		return
@@ -124,7 +146,7 @@ func _reposition_to_corner() -> void:
 
 
 func _poll_now(force: bool) -> void:
-	if not CompanionConfig.spend_indicator_visible:
+	if not CompanionConfig.element_enabled(self, "spend_indicator"):
 		return
 	var path: String = CompanionConfig.spend_lock_file_path.strip_edges()
 	if path.is_empty():
@@ -136,4 +158,7 @@ func _poll_now(force: bool) -> void:
 	_last_code = code
 	_toggle.texture = _TEX_OFF if locked else _TEX_ON
 	_toggle.modulate = Color.WHITE
-	_schedule_reposition()
+	# Vertical may hide entirely while locked; re-evaluate after each poll.
+	_apply_visibility()
+	if visible:
+		_schedule_reposition()

@@ -51,13 +51,16 @@
   "points_per_message": 2,
   "chat_cooldown_sec": 20,
   "passive_cooldown_sec": 60,
-  "cooldown_bypass_users": ["DaltonGoesFast"],
-  "first_words_bonus": 5,
-  "chat_point_cap": 500,
+  "cooldown_bypass_users": [
+    "DaltonGoesFast"
+  ],
+  "first_words_bonus": 100,
+  "chat_point_cap": 300,
   "bank_ratio_manual": 0.1,
   "bank_ratio_auto": 0.05,
   "bank_ratio_auto_member": 0.1,
   "donation_multiplier_cap": 4,
   "reset_debounce_hours": 4.0,
-  "curse_class_kit_duration_turns": 100
+  "curse_class_kit_duration_turns": 100,
+  "death_cost_inflation_enabled": false
 }

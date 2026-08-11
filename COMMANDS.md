@@ -2,9 +2,9 @@
 
 **Shatter the Streamer** — Chat plays along with a live *Shattered Pixel Dungeon* run. Earn points by chatting and spend them on spawns, curses, scrolls, and more that hit the hero in real time. Free commands light up the stream overlay; paid commands change the dungeon.
 
-**Bestiary** — Free `!summon` marches monsters across the companion overlay and fills a **shared XP bar**. Unlock zones together (Sewers → Prison → Caves → City → Halls). Race the **Sprint** for each level (Hall of Fame + **100/200/300/400 donor pts** by zone; **one crown per viewer per stream**). Hold **Heat** (last 15 min of summon XP) for **personal 2×** point gains. Check `!bestiary`, `!heat`, `!topsummoner`, `!summonhall`. Details: [docs/bestiary-summon-system.md](docs/bestiary-summon-system.md).
+**Bestiary** — Free `!summon` marches monsters across the companion overlay and fills a **shared XP bar**. Unlock zones together (Sewers → Prison → Caves → City → Halls). Race the **Sprint** for each level (Hall of Fame + **100/200/300/400 donor pts** by zone; **one crown per viewer per stream**). Hold **Heat** (last 15 min of summon XP) for **personal 2×** point gains. Check `!bestiary`, `!heat`, `!sprint`, `!topsummoner`, `!summonhall`. Details: [docs/bestiary-summon-system.md](docs/bestiary-summon-system.md).
 
-**Economy v1.1:** Earn **2 pts per message** (20s cooldown). Up to **500 chat points per stream**; use **`!bank`** to save **10%** into **donor points** (permanent). Chat resets when the stream ends; donor points never expire.
+**Economy v1.1:** Earn **2 pts per message** (20s cooldown). Chat cap / bank % come from live `points_config.json` (`chat_point_cap` — currently often **300**); use **`!bank`** to save **10%** into **donor points** (permanent). Chat resets when the stream ends; donor points never expire. Chat blurb: **`!economy`** / **`!reminder`** (or bare **`!help`**) always uses the live cap.
 
 **2× bonuses on chat earn (stack — up to 8×):** global !doublepoints + !fard → **Bestiary heat** leader (`!heat`) → sub/member. **Donations** (Super Chat, bits, gifts) use the same bonus sources but cap at **4×** total.
 
@@ -18,9 +18,12 @@
 | **!summon** | Monster march on the **companion overlay** (not in-game). **60s** cooldown. Starts with **Sewers** mobs; fill the co-op XP bar to unlock more. `!summon rat` or random from the unlocked pool |
 | **!bestiary** / **!summonlevel** | Co-op bar (level / zone / XP) + unlocked list + **your** sprint XP and heat XP |
 | **!topsummoner** | **Sprint** leader this Bestiary level among viewers who haven’t crowned yet this stream (resets on level-up; not the 2× heat crown) |
+| **!sprint** | Sprint leader **plus your rank/XP** this Bestiary level (same race as `!topsummoner`) |
 | **!heat** / **!hot** | Rolling **15 min** heat leader — that viewer earns **personal 2×** on point gains |
 | **!summonhall** | Hall of Fame — sprint winners for completed zones this stream |
 | **!mysummons** | Your summon count this stream + sprint XP + heat XP |
+| **!economy** / **!reminder** | Live chat-cap / earn / bank blurb from current `points_config.json` (use this for timed Streamer.bot reminders) |
+| **!help** / **!commands** | Same live economy line + link to this doc |
 
 *Technical setup:* [docs/fard-system.md](docs/fard-system.md), [docs/bestiary-summon-system.md](docs/bestiary-summon-system.md), [docs/summon-march-system.md](docs/summon-march-system.md).
 

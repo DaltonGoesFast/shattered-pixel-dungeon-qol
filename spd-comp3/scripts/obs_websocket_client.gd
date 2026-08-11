@@ -6,6 +6,8 @@ signal connected_to_obs
 signal disconnected_from_obs
 ## True when the current **program** scene name contains [member CompanionConfig.obs_pause_scene_name] (non-empty).
 signal pause_scene_active_changed(is_pause_scene: bool)
+## Current OBS program scene bucket: pause / main / other (see CompanionConfig.SCENE_*).
+signal program_scene_kind_changed(kind: StringName)
 
 const _OP_HELLO := 0
 const _OP_IDENTIFY := 1
@@ -26,6 +28,8 @@ var _rpc_version: int = 1
 var _req_seq: int = 0
 ## Dedup by exact scene name, not pause bool — otherwise startup on a non-pause scene never emitted (both were [code]false[/code]).
 var _last_scene_applied: String = "\u0001"
+var current_scene_kind: StringName = CompanionConfig.SCENE_UNKNOWN
+var current_scene_name: String = ""
 
 
 func _ready() -> void:
@@ -47,6 +51,8 @@ func _on_settings_reloaded() -> void:
 	_reconnect_acc = 0.0
 	if had_ident:
 		_last_scene_applied = "\u0001"
+		current_scene_kind = CompanionConfig.SCENE_UNKNOWN
+		current_scene_name = ""
 		disconnected_from_obs.emit()
 	call_deferred("_try_connect")
 
@@ -177,11 +183,23 @@ func _apply_scene_name(scene_name: String) -> void:
 	if sn == _last_scene_applied:
 		return
 	_last_scene_applied = sn
-	var marker := CompanionConfig.obs_pause_scene_name.strip_edges()
-	var want_pause: bool = not marker.is_empty() and sn.contains(marker)
+	current_scene_name = sn
+	var kind := CompanionConfig.classify_obs_scene(sn)
+	current_scene_kind = kind
+	var want_pause: bool = kind == CompanionConfig.SCENE_PAUSE
 	if CompanionConfig.obs_log_program_scene:
-		print("ObsWebSocket: program scene %s → pause=%s (marker %s)" % [sn, want_pause, marker])
+		print(
+			"ObsWebSocket: program scene %s → kind=%s pause=%s (pause marker %s, main marker %s)"
+			% [
+				sn,
+				String(kind),
+				want_pause,
+				CompanionConfig.obs_pause_scene_name,
+				CompanionConfig.obs_main_scene_name,
+			]
+		)
 	pause_scene_active_changed.emit(want_pause)
+	program_scene_kind_changed.emit(kind)
 
 
 func _scene_name_from_response_dict(d: Dictionary) -> String:

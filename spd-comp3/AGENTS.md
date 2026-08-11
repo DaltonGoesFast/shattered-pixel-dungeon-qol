@@ -17,7 +17,7 @@ Godot **desktop** companion for **Shattered Pixel Dungeon QoL** streaming: **rea
 ## OBS WebSocket (optional scene-driven layout)
 
 - **Enable** in OBS: **Tools → WebSocket Server Settings** (plugin **obs-websocket** 5.x). Default URL `ws://127.0.0.1:4455`; set a password if you use one.
-- **Companion:** Settings → Network → enable **OBS: sync title vs ID layer**, set **program scene name** to match OBS exactly (default `LIVE - PAUSE`).
+- **Companion:** Settings → OBS → enable sync; set **LIVE - PAUSE** and **LIVE - MAIN** substrings (defaults match those names). Per-element show/hide for pause/main/other on Horizontal and Vertical is under **Scene gates**.
 - **Behavior:** When the **current program scene** matches that name → **TitleBackdrop** visible, **CanvasLayerID** (ID strip) hidden. Any **other** program scene → title hidden, ID layer shown (inner visibility still follows `id_overlay_enabled` + snapshot when the layer is on).
 - **Protocol:** Subscribes to **Scenes** events; uses `GetCurrentProgramScene` on connect and `CurrentProgramSceneChanged` afterward.
 
@@ -141,26 +141,39 @@ If the overlay writes **`spawn_result.txt`** and your Streamer.bot C# reads it (
 - **Race:** If C# runs and deletes the file **before** the next poll, Godot may miss one event—use a short poll (e.g. **0.05–0.1**), or add a short **Delay** before the C# action so the companion usually sees the file first.
 - Alert **icons** from this file are **off** by default (`spawn_result_file_icons=false`). Turn **on** only if the middle segment reliably carries a scroll/rune or `ScrollOf*` name.
 
-## Placeable chrome boxes (empty SPD window frames)
+## Placeable chrome boxes (SPD window frames + optional text)
 
-- **Settings → UI panels → Add chrome box** creates an empty SPD chrome panel on the canvas.
-- Each box gets its own settings tab: **Chrome style** (all `Chrome.Type` slices: window, silver window, toasts, red/grey buttons, tag, gem, scroll, tabs, blank), enable, pixel zone (`x/y/w/h`, height `0` = auto), chrome scale, **Show on Live** / **Show on Pause**.
+- **Settings → UI panels → Add chrome box** creates a chrome panel on the canvas.
+- Edit boxes from **Settings → UI panels**: pick **Layout** (Main or Vertical), then a box, then set **Chrome style**, optional **header / body** text (empty = blank frame), font sizes/colors, align, padding, pixel zone (`x/y/w/h`, height `0` = auto), chrome scale, **Show on Live** / **Show on Pause**.
 - Style ids + labels live in `SpdUiArt.CHROME_STYLE_*`; margins match `Chrome.java`. Assets under `assets/ui_spd/chrome/`.
-- Max **16** boxes. Persisted as `[ui] chrome_boxes` (array of dictionaries; `style` defaults to `window`) in `user://companion_settings.cfg`.
-- Runtime: `CanvasLayerChromeBoxes` / `scripts/placeable_chrome_boxes.gd` (layer 2). When OBS sync is off or disconnected, a box shows if either scene checkbox is on.
+- Max **16** boxes per layout. Persisted as `[ui] chrome_boxes` (main) and `[ui_vertical] chrome_boxes` in `user://companion_settings.cfg`.
+- Runtime: `CanvasLayerChromeBoxes` / `scripts/placeable_chrome_boxes.gd` (layer 2) inside each `stream_canvas` instance. When OBS sync is off or disconnected, a box shows if either scene checkbox is on.
+
+## Vertical companion window (1080×1920)
+
+- Second OS window titled **SPD Companion — Vertical** for a dedicated OBS Window Capture (`CAP - COMP V`). Same live feeds as main; own layout profile.
+- Project: `display/window/subwindows/embed_subwindows=false` (required — embedding draws the 1080×1920 vertical canvas on top of Main and hides F2).
+- Vertical Window sets `content_scale_size=1080×1920` + `CONTENT_SCALE_MODE_CANVAS_ITEMS` so it does **not** inherit the project's 1920×1080 stretch base (wrong base caused overflow / sliced title when moved).
+- Opens beside the main window (not centered on top of it).
+- Shared canvas scene: [`scenes/stream_canvas.tscn`](scenes/stream_canvas.tscn) instanced under Main and under [`scenes/vertical_companion_window.tscn`](scenes/vertical_companion_window.tscn).
+- **F4** toggles the vertical window. Settings → **Vertical**: enable window, per-element show toggles, zones, live-water L, corner pins.
+- Config section **`[ui_vertical]`**: same zone keys as main layout plus `show_*` element flags and `vertical_window_enabled`.
+- Pause: title+torches centered for portrait; summon march stays visible. Vertical march units force `layout: "vertical"`.
+- Free-promos panel on vertical **reads** `FreePromosState` (main window owns the HTTP poll).
 
 ## Summon march + Bestiary (Lastest UI HTTP)
 
 - **March queue:** `GET http://127.0.0.1:5000/api/summon-march?since=<id>` — autoload `SummonPollService`.
 - **Bestiary HUD:** `GET http://127.0.0.1:5000/api/bestiary` — autoload `BestiaryPollService`; scene `BestiaryHud` (SPD `status_pane` exp bar + chrome).
+- **Remote settings:** `GET/POST http://127.0.0.1:5000/api/companion-settings` — autoload `CompanionSettingsPollService`. Enable in Settings → **Remote** (poll on, leave **push on save** off for HTML-as-source-of-truth). Seed once with **Upload current to Flask**, then edit from Lastest UI `/points-config` → **Companion** tabs (F2-like: scene gates, alerts, paid, bestiary HUD, ID, corners, live water, chrome, vertical, summon, advanced JSON). Heartbeat: `POST/GET /api/companion-settings/heartbeat`. Presets + undo also on that API. Does **not** sync OBS password, hosts, or absolute file paths.
 - Full rules: [`../docs/bestiary-summon-system.md`](../docs/bestiary-summon-system.md).
-- Settings → **Bestiary** tab: enable, URL, poll, zone layout, exp bar width, fonts, banner duration.
+- Settings → **Bestiary**: enable, URL, poll, zone layout, exp bar width, fonts, banner duration.
 - **Asset sync:** copy `../core/src/main/assets/interfaces/status_pane.png` → `assets/ui_spd/status_pane/status_pane.png` (atlas rects in `scripts/spd_ui_art.gd` match `StatusPane.java`).
 - Chat: `!summon`, `!bestiary` / `!summonlevel` (bar + your XP), `!topsummoner` (sprint), `!heat` / `!hot` (2×), `!summonhall`, `!mysummons`; `!points` includes sprint/heat XP.
 
 ## Local settings file (`user://companion_settings.cfg`)
 
-Created on first run. You can edit in a text editor, or use the in-app **Settings** window (**F2** or the HUD button), then **Apply & save**. That writes this file and reconnects WebSocket / UDP where needed. **F5** still reloads from disk without opening the window (and reconnects WS/UDP via the game client autoload). **F3** toggles the top-left connection/snapshot status panel (hidden state is saved without reconnecting listeners).
+Created on first run. You can edit in a text editor, or use the in-app **Settings** window (**F2** or the HUD button), then **Apply & save**. That writes this file and reconnects WebSocket / UDP where needed. **F5** still reloads from disk without opening the window (and reconnects WS/UDP via the game client autoload). **F3** toggles the top-left connection/snapshot status panel (hidden state is saved without reconnecting listeners). **F4** toggles the vertical companion window.
 
 ### Export defaults (overwrite user:// on revision bump)
 
@@ -202,6 +215,14 @@ Created on first run. You can edit in a text editor, or use the in-app **Setting
 - `alert_text_align` (default `left`) — `left` or `center`
 - `id_overlay_enabled` (default `true`)
 - `id_cell_width_px`, `id_cell_height_px`, `id_cell_padding_px`, `id_known_icon_fraction`, `id_flow_h_separation_px`, `id_block_separation_px`
+- `spend_indicator_corner` / `spend_indicator_margin_x` / `spend_indicator_margin_y` (also mirrored under `[network]` for older tooling)
+
+**`[ui_vertical]`**
+
+- `vertical_window_enabled` (default `true`)
+- Zone / live-water / corner keys matching the main layout (alert, id, bestiary, paid, live_water_*, spend_*, free_promos_*)
+- `chrome_boxes` — separate list from `[ui]`
+- Per-element toggles: `show_live_water`, `show_title`, `show_chrome_boxes`, `show_id_overlay`, `show_alerts`, `show_paid_notices`, `show_bestiary`, `show_summon_march`, `show_spend_indicator`, `show_free_promos`
 
 Legacy configs without `alert_zone_x_px` are migrated once from old `alert_layout_margin_px`, `alert_slot_width_fraction`, and `id_overlay_top_offset_px` (then ID zone is initialized equal to the alert zone from that migration).
 

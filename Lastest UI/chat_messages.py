@@ -75,8 +75,26 @@ def not_enough_points(user: str, cost: int, total: int, detail: str = "") -> str
 
 
 USAGE = {
+    "help": "Usage: !help or !help <command> - bare !help links to the full command list on GitHub.",
+    "points": "Usage: !points - show your chat points, donor points, and Bestiary sprint/heat XP.",
+    "economy": "Usage: !economy / !reminder - live chat-cap / earn / bank rules from current config.",
+    "bank": "Usage: !bank, !bank all, or !bank <amount> - convert chat pts to donor pts at 10%.",
+    "toppoints": "Usage: !toppoints / !leaderboard - top 3 by donor points.",
+    "givepoints": "Usage: !givepoints <amount> <target> (example: !givepoints 50 @bob)",
+    "fard": "Usage: !fard - once per stream: OBS flash + sound; extends global 2x (+3 min, +6 for subs/members).",
+    "summon": "Usage: !summon [monster] - overlay march (60s CD). Unlocks more zones via co-op XP.",
+    "bestiary": "Usage: !bestiary / !summonlevel - co-op bar, unlocked mobs, your sprint/heat XP.",
+    "topsummoner": "Usage: !topsummoner - sprint leader this Bestiary level (not heat).",
+    "sprint": "Usage: !sprint - sprint leader this Bestiary level, plus your rank/XP.",
+    "heat": "Usage: !heat / !hot - 15-min heat leader (personal 2x on point gains).",
+    "summonhall": "Usage: !summonhall - Hall of Fame: sprint winners for completed zones this stream.",
+    "mysummons": "Usage: !mysummons - your summon count this stream + sprint XP + heat XP.",
+    "kesha": "Usage: !kesha - OBS overlay flash + sound (~2s); 60s global / 10 min per-user cooldown.",
+    "mimic": "Usage: !mimic / !tooth - mimic sound if Mimic Tooth trinket is in the run.",
+    "challenge": "Usage: !challenge / !challenges - reply with active challenges.",
+    "seed": "Usage: !seed - reply with current dungeon seed.",
     "spawn": "Usage: !spawn <monster> (e.g. !spawn rat)",
-    "champion": "Usage: !champion <monster> (e.g. !champion rat). Costs 2× zone-adjusted spawn cost.",
+    "champion": "Usage: !champion <monster> (e.g. !champion rat). Costs 2x zone-adjusted spawn cost.",
     "gold": "Usage: !gold <amount> (e.g. !gold 10). Amount must be 1-100.",
     "curse": "Usage: !curse (curses a random equipped item)",
     "gas": "Usage: !gas (spawns random gas near you)",
@@ -95,9 +113,25 @@ USAGE = {
     "dew": "Usage: !dew (drops a dewdrop near hero)",
     "plant": "Usage: !plant (plants a random plant near hero; fails if Barren Land enabled)",
     "corruptally": "Usage: !corruptally (summons a corrupted ally from the current biome)",
-    "givepoints": "Usage: !givepoints <amount> <target> (example: !givepoints 50 @bob)",
-    "bank": "Usage: !bank, !bank all, or !bank <amount>",
+    "hex": "Usage: !hex (applies Hex debuff)",
+    "degrade": "Usage: !degrade (applies Degrade debuff)",
+    "sabotage": "Usage: !sabotage (removes one random positive buff)",
     "doublepoints": "Usage: !doublepoints <minutes> (e.g. !doublepoints 5 for 5 minutes, max 120)",
+}
+
+# Aliases -> USAGE key for !help <command>
+HELP_ALIASES = {
+    "commands": "help",
+    "reminder": "economy",
+    "2x": "doublepoints",
+    "hot": "heat",
+    "summonlevel": "bestiary",
+    "leaderboard": "toppoints",
+    "challenges": "challenge",
+    "tooth": "mimic",
+    "corrupt_ally": "corruptally",
+    "balance": "points",
+    "transfer": "givepoints",
 }
 
 
@@ -109,8 +143,41 @@ def unknown_command(name: str) -> str:
     return f"Unknown command !{name}. Type !help for the full command list or !points for your balance."
 
 
-def help_link(url: str) -> str:
-    return f"Full command list & prices: {url}"
+def help_link(url: str, economy_line: str = "") -> str:
+    link = f"Full command list & prices: {url}"
+    eco = (economy_line or "").strip()
+    return f"{eco} {link}" if eco else link
+
+
+def economy_reminder(
+    chat_cap: int,
+    pts_per_message: int = 2,
+    chat_cooldown_sec: int = 20,
+    bank_ratio_manual: float = 0.10,
+) -> str:
+    """Viewer-facing economy blurb from live points_config (chat cap, earn, bank)."""
+    cap = max(1, int(chat_cap))
+    pts = max(1, int(pts_per_message))
+    cd = max(0, int(chat_cooldown_sec))
+    pct = int(round(max(0.0, float(bank_ratio_manual)) * 100))
+    return (
+        f"Earn up to {cap} chat points per stream ({pts} pts/msg, {cd}s cooldown). "
+        f"!bank saves {pct}% as permanent donor pts. Chat resets at stream end; donor pts never expire."
+    )
+
+
+def command_help(name: str) -> str | None:
+    """Return the definition/usage for a command name, or None if unknown."""
+    key = (name or "").strip().lstrip("!").lower()
+    if not key:
+        return None
+    key = HELP_ALIASES.get(key, key)
+    return USAGE.get(key)
+
+
+def help_unknown(name: str) -> str:
+    shown = (name or "").strip().lstrip("!") or name
+    return f"Unknown command !{shown}. Type !help for the full command list."
 
 
 # --- Stream info (handled by separate Streamer.bot Command actions) ---
@@ -301,12 +368,54 @@ def sprint_leader_line(user: str, xp: int, gap: int) -> str:
     )
 
 
-def heat_leader_line(user: str, xp: int, window_sec: int, your_xp: int = 0) -> str:
-    mins = max(1, int(window_sec) // 60)
+def sprint_standing_line(
+    leader: str,
+    leader_xp: int,
+    gap: int,
+    user: str = "",
+    your_xp: int = 0,
+    rank: int | None = None,
+    crowned: bool = False,
+) -> str:
+    """Leader + caller's place for !sprint."""
+    if not leader:
+        base = (
+            "No eligible sprint leader this Bestiary level yet - !summon to take the lead! "
+            "(Past sprint winners can't crown again until next stream.)"
+        )
+    else:
+        u_lead = display_name(leader) or leader
+        if gap > 0:
+            base = f"Sprint leader: {u_lead} with {leader_xp} XP (leads by {gap})."
+        else:
+            base = f"Sprint leader: {u_lead} with {leader_xp} XP."
     if not user:
-        return f"No heat leader in the last {mins} min - !summon to claim personal 2x!"
+        return base if not leader else f"{base} Resets on level-up."
     u = display_name(user) or user
-    yours = f" You have {your_xp} heat XP." if your_xp > 0 else ""
+    if crowned:
+        return f"{base} {u}: already crowned this stream (can't win again)."
+    if rank == 1:
+        return f"{base} {u}: you're #1!"
+    if rank is not None:
+        behind = max(0, int(leader_xp) - int(your_xp))
+        return f"{base} {u}: #{rank} with {your_xp} XP ({behind} behind)."
+    return f"{base} {u}: not on the board - !summon to race!"
+
+
+def heat_leader_line(
+    user: str,
+    xp: int,
+    window_sec: int,
+    your_xp: int = 0,
+    requester: str = "",
+) -> str:
+    mins = max(1, int(window_sec) // 60)
+    req = display_name(requester) if requester else ""
+    yours = f" {req} has {your_xp} heat XP." if req else ""
+    if not user:
+        empty = f"No heat leader in the last {mins} min - !summon to claim personal 2x!"
+        return f"{empty}{yours}" if yours else empty
+    u = display_name(user) or user
     return f"Heat leader ({mins}m): {u} with {xp} XP - personal 2x active.{yours}"
 
 

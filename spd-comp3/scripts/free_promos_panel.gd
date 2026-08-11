@@ -48,6 +48,8 @@ func _ready() -> void:
 	CompanionConfig.settings_saved.connect(_on_cfg)
 	CompanionConfig.settings_loaded.connect(_on_cfg)
 	get_viewport().size_changed.connect(_schedule_reposition)
+	if not FreePromosState.active_changed.is_connected(_on_free_state_changed):
+		FreePromosState.active_changed.connect(_on_free_state_changed)
 	_apply_anchor_pins()
 	_apply_compact_container_flags()
 	_on_cfg()
@@ -57,12 +59,28 @@ func _on_cfg() -> void:
 	_poll_accum = 999.0
 	_apply_anchor_pins()
 	_apply_chrome()
+	_apply_padding()
 	_apply_compact_container_flags()
 	_apply_size_cap()
 	_apply_fonts()
+	if CompanionConfig.is_vertical_layout(self):
+		_pull_from_shared_state()
+	else:
+		_update_root_visibility()
+		_schedule_reposition()
+		_request_poll()
+
+
+func _on_free_state_changed() -> void:
+	if CompanionConfig.is_vertical_layout(self):
+		_pull_from_shared_state()
+
+
+func _pull_from_shared_state() -> void:
+	_active = FreePromosState.get_active()
+	_rebuild_list()
 	_update_root_visibility()
 	_schedule_reposition()
-	_request_poll()
 
 
 func _apply_chrome() -> void:
@@ -72,6 +90,17 @@ func _apply_chrome() -> void:
 			CompanionConfig.free_promos_chrome_style, CompanionConfig.free_promos_chrome_scale
 		)
 	)
+
+
+func _apply_padding() -> void:
+	if _margin == null:
+		return
+	var pad_h := clampi(CompanionConfig.free_promos_padding_h_px, 0, 64)
+	var pad_v := clampi(CompanionConfig.free_promos_padding_v_px, 0, 64)
+	_margin.add_theme_constant_override("margin_left", pad_h)
+	_margin.add_theme_constant_override("margin_right", pad_h)
+	_margin.add_theme_constant_override("margin_top", pad_v)
+	_margin.add_theme_constant_override("margin_bottom", pad_v)
 
 
 func _apply_anchor_pins() -> void:
@@ -111,6 +140,13 @@ func _apply_size_cap() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if CompanionConfig.is_vertical_layout(self):
+		_tick_accum += delta
+		if _tick_accum >= 1.0:
+			_tick_accum = 0.0
+			_pull_from_shared_state()
+			_refresh_time_labels()
+		return
 	if not _should_run():
 		return
 	_poll_accum += delta
@@ -145,17 +181,25 @@ func _should_run() -> bool:
 
 
 func _sync_free_state() -> void:
+	if CompanionConfig.is_vertical_layout(self):
+		return
 	FreePromosState.set_active(_active)
 
 
 func _update_root_visibility() -> void:
 	var url_ok: bool = not CompanionConfig.free_promos_http_url.strip_edges().is_empty()
-	visible = CompanionConfig.free_promos_panel_visible and url_ok and not _active.is_empty()
+	visible = (
+		CompanionConfig.element_enabled(self, "free_promos")
+		and url_ok
+		and not _active.is_empty()
+	)
 	if not visible:
 		_schedule_reposition()
 
 
 func _request_poll() -> void:
+	if CompanionConfig.is_vertical_layout(self):
+		return
 	if not _should_run():
 		return
 	if _http.get_http_client_status() != HTTPClient.STATUS_DISCONNECTED:
@@ -356,9 +400,10 @@ func _reposition_to_corner() -> void:
 	if not visible:
 		return
 	var r: Rect2 = get_viewport().get_visible_rect()
-	var mx: int = CompanionConfig.free_promos_margin_x
-	var my: int = CompanionConfig.free_promos_margin_y
-	var corner: int = clampi(CompanionConfig.free_promos_corner, 0, 3)
+	var L := CompanionConfig.layout_data_for(self)
+	var mx: int = L.free_promos_margin_x
+	var my: int = L.free_promos_margin_y
+	var corner: int = clampi(L.free_promos_corner, 0, 3)
 	var sz: Vector2 = get_rect().size
 	if sz.x < 2.0 or sz.y < 2.0:
 		return

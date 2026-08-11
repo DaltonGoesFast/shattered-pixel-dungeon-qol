@@ -23,7 +23,7 @@ var _body_label: Label
 var _queue: Array[Dictionary] = []
 var _busy: bool = false
 var _obs_scene_known: bool = false
-var _pause_active: bool = false
+var _scene_kind: StringName = CompanionConfig.SCENE_UNKNOWN
 
 
 func _ready() -> void:
@@ -36,7 +36,10 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_apply_layout)
 	var obs := get_node_or_null("/root/ObsWebSocketClient")
 	if obs:
-		obs.pause_scene_active_changed.connect(_on_obs_pause)
+		if obs.has_signal("program_scene_kind_changed"):
+			obs.program_scene_kind_changed.connect(_on_obs_scene_kind)
+		else:
+			obs.pause_scene_active_changed.connect(_on_obs_pause)
 		obs.disconnected_from_obs.connect(_on_obs_disconnected)
 	_on_cfg()
 
@@ -93,31 +96,28 @@ func _on_cfg() -> void:
 	_update_layer_visibility()
 
 
+func _on_obs_scene_kind(kind: StringName) -> void:
+	_obs_scene_known = true
+	_scene_kind = kind
+	_update_layer_visibility()
+
+
 func _on_obs_pause(is_pause: bool) -> void:
 	_obs_scene_known = true
-	_pause_active = is_pause
+	_scene_kind = CompanionConfig.SCENE_PAUSE if is_pause else CompanionConfig.SCENE_MAIN
 	_update_layer_visibility()
 
 
 func _on_obs_disconnected() -> void:
 	_obs_scene_known = false
-	_pause_active = false
+	_scene_kind = CompanionConfig.SCENE_UNKNOWN
 	_update_layer_visibility()
 
 
 func _update_layer_visibility() -> void:
-	var layer := get_parent() as CanvasLayer
-	var show := CompanionConfig.paid_notice_enabled
-	if show:
-		var on_live := CompanionConfig.paid_notice_show_on_live
-		var on_pause := CompanionConfig.paid_notice_show_on_pause
-		if not _obs_scene_known:
-			show = on_live or on_pause
-		else:
-			show = on_pause if _pause_active else on_live
-	if layer:
-		layer.visible = show
-	visible = show
+	## CanvasLayer visibility is owned by StreamCanvas scene gates; keep self in sync.
+	var kind := _scene_kind if _obs_scene_known else CompanionConfig.SCENE_UNKNOWN
+	visible = CompanionConfig.element_visible_on_scene(self, "paid_notices", kind)
 
 
 func _apply_chrome() -> void:

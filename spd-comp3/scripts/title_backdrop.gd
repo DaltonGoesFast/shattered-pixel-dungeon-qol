@@ -1,7 +1,7 @@
 extends Control
 ## Title parallax modeled on [TitleBackground] (Shattered Pixel Dungeon): **arches** (base scroll), cluster / small-far / mid×2 / small-close
 ## using exported [code]arches[/code], [code]large debris[/code] + [code]small debris[/code] PNGs. Bounded pools for floating layers; arches capped by [constant ARCH_PIECES_MAX].
-## Layout assumes **landscape** (stream / OBS); portrait branches are omitted.
+## Layout supports landscape (main) and portrait (vertical companion window).
 
 const ASSET := "res://assets/title_screen/"
 const SCROLL_BASE := 15.0
@@ -27,6 +27,8 @@ const MID2_DEBRIS_SCALE_MAX := 1.4
 const TITLE_CHROME_SCALE := 2.704
 ## Vertical layout: title group is centered within this fraction of viewport height from the top.
 const TITLE_CHROME_TOP_BAND := 0.46
+## Portrait (h > w): tighter top band so title+torches match the cropped pause look.
+const TITLE_CHROME_TOP_BAND_PORTRAIT := 0.30
 
 ## Recycle only after the sprite quad has fully crossed the **visible** viewport top (same canvas space as [method _debris_bottom_global]). Pivot is bottom-centered like Java [code]y + height[/code]; small margin in px.
 const RECYCLE_PAST_TOP_PX := 4.0
@@ -704,7 +706,8 @@ func _layout_chrome() -> void:
 
 	_sync_texrect_min_from_texture(_banner)
 	_banner.scale = Vector2(s, s)
-	var region_h := maxf(th, _h * TITLE_CHROME_TOP_BAND)
+	var band := TITLE_CHROME_TOP_BAND_PORTRAIT if _h > _w * 1.05 else TITLE_CHROME_TOP_BAND
+	var region_h := maxf(th, _h * band)
 	_banner.position = Vector2((_w - tw) * 0.5, (region_h - th) * 0.5 + 6.0)
 
 	var gw0 := float(_glow_tex.get_width())

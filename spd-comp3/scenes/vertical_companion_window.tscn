@@ -1,0 +1,21 @@
+[gd_scene format=3 uid="uid://uq6bhgu3ho02"]
+
+[ext_resource type="Script" path="res://scripts/vertical_companion_window.gd" id="1_vert"]
+[ext_resource type="PackedScene" path="res://scenes/stream_canvas.tscn" id="2_stream"]
+
+[node name="VerticalCompanionWindow" type="Window"]
+title = "SPD Companion — Vertical"
+initial_position = 0
+size = Vector2i(1080, 1920)
+content_scale_size = Vector2i(1080, 1920)
+content_scale_mode = 1
+content_scale_aspect = 1
+content_scale_factor = 1.0
+unresizable = true
+transient = false
+exclusive = false
+visible = false
+script = ExtResource("1_vert")
+
+[node name="StreamCanvas" parent="." instance=ExtResource("2_stream")]
+layout_profile = &"ui_vertical"

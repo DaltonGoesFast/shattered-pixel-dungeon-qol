@@ -119,6 +119,8 @@ Streamer.bot has **Is Null or Empty** only (no “Is NOT…”). Invert the bran
   - If `%commandSource%` Equals (Ignore Case) `youtube` → **YouTube Message:** `%apiMessage%`
   - If `%commandSource%` Equals (Ignore Case) `twitch` → **Twitch Message:** `%apiMessage%`
 
+`ParseChatResponse.cs` leaves `%apiMessage%` **empty** when the overlay server is down (empty/unparseable response) so a restart does not flood chat. Check Streamer.bot **Action History / logs** for `ParseChatResponse: empty API response…`.
+
 `BuildChatCommandBody.cs` copies `%eventSource%` into `%commandSource%` (Message Received does not set `commandSource` by default).
 
 **No** Run Program. **No** `spawn_result.txt`.

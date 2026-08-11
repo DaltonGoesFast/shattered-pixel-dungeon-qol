@@ -70,6 +70,11 @@ Implemented in [`summon_bestiary.monster_xp()`](../Lastest%20UI/summon_bestiary.
 | Route | Purpose |
 |-------|---------|
 | `GET /api/bestiary` | Full HUD payload (level, bar, sprint, heat, hall, unlocked) |
+| `GET/POST /api/bestiary-config` | Read/write `bestiary_config.json` (thresholds, heat, soft floor). Also editable on `/points-config` → Bestiary |
+| `GET/POST /api/companion-settings` | Revisioned companion layout/UI for Godot poll (`CompanionSettingsPollService`). Primary editor: `/points-config` → Companion tabs. Seed once from F2 → Remote → Upload. |
+| `GET/POST /api/companion-settings/heartbeat` | Companion last-seen / applied revision (Status tab) |
+| `GET/POST/DELETE /api/companion-settings/presets[…]` | Named presets; `…/presets/<name>/apply` bumps revision |
+| `POST /api/companion-settings/undo` | Restore previous settings blob (one step) |
 | `GET /api/top-summoner` | Sprint leader (`kind: sprint`) |
 | `GET /api/heat-leader` | Heat leader + window |
 | `POST /api/summon-march` | Rejects monsters not in unlocked pool; events include `xp`, `bestiary_level` |
@@ -102,8 +107,11 @@ Session reset (`POST /api/session/reset` / Stream Started) clears bestiary state
 
 - [`is_top_summoner()`](../Lastest%20UI/points_command.py) → heat leader
 - Sprint winner → `grant_sprint_donor_reward` scaled by completed level: **100 + 100×(level−1)** (Sewers 100 → City 400). Flat donor pts, no earn multipliers.
-- After crowning, that user is in `sprint_winners` and cannot win another sprint until `POST /api/session/reset` / Stream Started. `!topsummoner` / HUD show the next eligible leader.
-- Crown holders’ `!summon` marches are stamped `crowned: true` on `/api/summon-march`; the Godot companion draws them **larger**, with a **Blessed-champion Flare** (yellow `0xFFFF00`, 6 rays, additive light mode, 90°/s — matching `ChampionEnemy.Blessed` + `effects.Flare`), plus the **Dwarf King crown**.
+- After crowning, that user is in `sprint_winners` and cannot win another sprint until `POST /api/session/reset` / Stream Started. `!topsummoner` / HUD show the next eligible leader. The level-up banner / Hall strip names the winner — **no permanent march crown** for past winners.
+- **Active competition** marches get crowns via `/api/summon-march` fields `badge` / `sprint_rank` / `heat_leader`:
+  - `heat` → `crown_heat.png` (current heat leader)
+  - `gold` / `silver` / `bronze` → sprint ranks 1–3 (`crown.png`, `crown_silver.png`, `crown_bronze.png`)
+  - Heat wins if both apply. Companion may also resolve badges from Bestiary poll `sprint.top` + `heat.username`.
 
 ---
 

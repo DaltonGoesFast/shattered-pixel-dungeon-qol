@@ -45,13 +45,13 @@ def _default_config() -> dict:
         },
         # Zones match NATIVE_DEPTH chapter: (depth-1)//5 (see points_command / StreamingCommandHandler).
         "levels": [
-            {"level": 1, "zone": "Sewers", "bar_threshold": 4000,
+            {"level": 1, "zone": "Sewers", "bar_threshold": 1000,
              "monsters": ["rat", "albino", "snake", "gnoll", "crab", "slime", "swarm", "thief"]},
-            {"level": 2, "zone": "Prison", "bar_threshold": 7000,
+            {"level": 2, "zone": "Prison", "bar_threshold": 1500,
              "monsters": ["skeleton", "dm100", "guard", "necromancer"]},
-            {"level": 3, "zone": "Caves", "bar_threshold": 10000,
+            {"level": 3, "zone": "Caves", "bar_threshold": 2000,
              "monsters": ["bat", "brute", "shaman", "spinner", "ghoul"]},
-            {"level": 4, "zone": "City", "bar_threshold": 14000,
+            {"level": 4, "zone": "City", "bar_threshold": 2500,
              "monsters": ["elemental", "warlock", "monk", "golem", "succubus"]},
             {"level": 5, "zone": "Halls", "bar_threshold": 0,
              "monsters": ["eye", "scorpio"]},
@@ -83,6 +83,93 @@ def load_config(force: bool = False) -> dict:
             pass
     _config_cache = cfg
     _config_mtime = mtime
+    return cfg
+
+
+def save_config(cfg: dict) -> dict:
+    """Write bestiary_config.json and refresh cache. Returns normalized config."""
+    global _config_cache, _config_mtime
+    normalized = normalize_config(cfg if isinstance(cfg, dict) else {})
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(normalized, f, indent=2)
+        f.write("\n")
+    try:
+        _config_mtime = os.path.getmtime(CONFIG_FILE)
+    except OSError:
+        _config_mtime = time.time()
+    _config_cache = normalized
+    return normalized
+
+
+def normalize_config(raw: dict) -> dict:
+    """Merge raw into defaults; clamp thresholds and soft_floor fields."""
+    cfg = _default_config()
+    if not isinstance(raw, dict):
+        return cfg
+    for k, v in raw.items():
+        if k == "levels":
+            continue
+        if k == "soft_floor" and isinstance(v, dict):
+            base_sf = dict(cfg.get("soft_floor") or {})
+            base_sf.update(v)
+            if "exclude_users" in v and isinstance(v["exclude_users"], list):
+                base_sf["exclude_users"] = [str(u).strip() for u in v["exclude_users"] if str(u).strip()]
+            cfg["soft_floor"] = base_sf
+        else:
+            cfg[k] = v
+    cfg["heat_window_sec"] = max(60, int(cfg.get("heat_window_sec", 900) or 900))
+    cfg["sprint_donor_reward"] = max(0, int(cfg.get("sprint_donor_reward", 100) or 0))
+    cfg["sprint_donor_reward_per_level"] = max(
+        0, int(cfg.get("sprint_donor_reward_per_level", 100) or 0)
+    )
+    try:
+        cfg["per_user_bar_cap_fraction"] = max(
+            0.0, min(1.0, float(cfg.get("per_user_bar_cap_fraction", 0.0) or 0.0))
+        )
+    except (TypeError, ValueError):
+        cfg["per_user_bar_cap_fraction"] = 0.0
+    cfg["repeat_mob_diminishing"] = bool(cfg.get("repeat_mob_diminishing", False))
+    sf = cfg.get("soft_floor") if isinstance(cfg.get("soft_floor"), dict) else {}
+    sf["enabled"] = bool(sf.get("enabled", True))
+    sf["top_n"] = max(1, int(sf.get("top_n", 3) or 3))
+    try:
+        sf["bonus"] = max(0.0, float(sf.get("bonus", 0.25) or 0.0))
+    except (TypeError, ValueError):
+        sf["bonus"] = 0.25
+    sf["min_unique_summoners"] = max(0, int(sf.get("min_unique_summoners", 10) or 0))
+    sf["apply_to_bar"] = bool(sf.get("apply_to_bar", True))
+    sf["apply_to_sprint"] = bool(sf.get("apply_to_sprint", True))
+    sf["apply_to_heat"] = bool(sf.get("apply_to_heat", True))
+    cfg["soft_floor"] = sf
+    levels_in = raw.get("levels")
+    if isinstance(levels_in, list) and levels_in:
+        out_levels: list[dict] = []
+        defaults_by_lvl = {
+            int(e.get("level", 0)): e for e in (_default_config().get("levels") or [])
+        }
+        for entry in levels_in:
+            if not isinstance(entry, dict):
+                continue
+            lvl = int(entry.get("level", 0) or 0)
+            if lvl <= 0:
+                continue
+            base = dict(defaults_by_lvl.get(lvl) or {"level": lvl, "zone": f"Level {lvl}", "monsters": []})
+            zone = str(entry.get("zone", base.get("zone", f"Level {lvl}"))).strip() or base.get("zone")
+            thr = int(entry.get("bar_threshold", base.get("bar_threshold", 0)) or 0)
+            if lvl >= 5:
+                thr = 0
+            else:
+                thr = max(0, thr)
+            monsters = entry.get("monsters", base.get("monsters") or [])
+            if not isinstance(monsters, list):
+                monsters = list(base.get("monsters") or [])
+            monsters = [str(m).strip().lower() for m in monsters if str(m).strip()]
+            out_levels.append(
+                {"level": lvl, "zone": zone, "bar_threshold": thr, "monsters": monsters}
+            )
+        out_levels.sort(key=lambda e: int(e.get("level", 0)))
+        if out_levels:
+            cfg["levels"] = out_levels
     return cfg
 
 
@@ -299,6 +386,15 @@ def get_heat_leader() -> tuple[str, int]:
         return _leader_from_scores(scores, display_map)
 
 
+def clear_heat_events() -> None:
+    """Wipe the rolling heat window (sprint XP / bar unchanged). For demos/tests."""
+    with _lock:
+        state = _load_state()
+        state["heat_events"] = []
+        _save_state(state)
+        _write_heat_leader_file("", 0)
+
+
 def _sprint_ineligible_keys(state: dict) -> set[str]:
     """Users who already won a sprint crown this stream (until session reset)."""
     out: set[str] = set()
@@ -400,7 +496,11 @@ def soft_floor_multiplier(
     """Return (mult, applied). Mid-pack catch-up on eligible sprint board.
 
     Gate: enabled, enough unique summoners this stream, user not excluded,
+    user not current heat leader, user not a prior sprint crown this stream,
     and user not in top_n eligible sprint (XP before this summon).
+
+    Heat / past crowns are checked from ``state`` (no lock) so this is safe
+    inside ``apply_summon``'s critical section.
     """
     sf = _soft_floor_cfg(cfg)
     if not sf or not bool(sf.get("enabled", False)):
@@ -411,13 +511,26 @@ def soft_floor_multiplier(
     if key in _soft_floor_exclude_keys(sf):
         return 1.0, False
 
+    # Already-rewarded leaders are off the eligible sprint top-N board, so without
+    # these checks they always looked "mid-pack" and kept getting catch-up.
+    ineligible = _sprint_ineligible_keys(state)
+    if key in ineligible:
+        return 1.0, False
+
+    cfg = cfg or load_config()
+    window = int(cfg.get("heat_window_sec", 900))
+    now = int(time.time())
+    heat_events = _prune_heat(list(state.get("heat_events") or []), now, window)
+    heat_key, _heat_xp = _leader_from_scores(_heat_scores(heat_events))
+    if heat_key and heat_key == key:
+        return 1.0, False
+
     min_unique = max(1, int(sf.get("min_unique_summoners", 10) or 10))
     counts = state.get("session_summon_counts") or {}
     if len(_unique_summoner_keys(counts, key)) < min_unique:
         return 1.0, False
 
     top_n = max(1, int(sf.get("top_n", 3) or 3))
-    ineligible = _sprint_ineligible_keys(state)
     ranked = _eligible_sprint_ranked(dict(state.get("sprint_xp") or {}), ineligible)
     if key in _top_band_keys(ranked, top_n):
         return 1.0, False
@@ -438,12 +551,68 @@ def _apply_xp_mult(xp: int, mult: float) -> int:
 
 
 def is_sprint_crowned(username: str) -> bool:
-    """True if this viewer already holds a sprint crown this stream (Hall / sprint_winners)."""
+    """True if this viewer already won a sprint this stream (Hall / sprint_winners).
+
+    Used for eligibility / chat only — march crowns are active leaders via
+    get_march_leader_status(), not past winners.
+    """
     key = (username or "").strip().lower()
     if not key:
         return False
     with _lock:
         return key in _sprint_ineligible_keys(_load_state())
+
+
+def get_march_leader_status(username: str) -> dict[str, Any]:
+    """Active-competition badges for summon-march VFX.
+
+    - heat: current heat leader (personal 2×)
+    - gold / silver / bronze: eligible sprint ranks 1–3 this Bestiary level
+    Heat wins if both apply. Past sprint winners are not auto-badged.
+    """
+    key = (username or "").strip().lower()
+    empty = {
+        "heat_leader": False,
+        "sprint_rank": 0,
+        "badge": "",
+        "crowned": False,
+    }
+    if not key:
+        return empty
+
+    heat_user, _heat_xp = get_heat_leader()
+    is_heat = bool(heat_user) and heat_user.strip().lower() == key
+
+    with _lock:
+        state = _load_state()
+        sprint = dict(state.get("sprint_xp") or {})
+        ineligible = _sprint_ineligible_keys(state)
+    ranked = _eligible_sprint_ranked(sprint, ineligible)
+    sprint_rank = 0
+    for i, (k, _xp) in enumerate(ranked[:3], 1):
+        if k == key:
+            sprint_rank = i
+            break
+
+    # Heat (red) wins over sprint metals so the heat crown is always visible
+    # on the current heat leader's marches.
+    badge = ""
+    if is_heat:
+        badge = "heat"
+    elif sprint_rank == 1:
+        badge = "gold"
+    elif sprint_rank == 2:
+        badge = "silver"
+    elif sprint_rank == 3:
+        badge = "bronze"
+
+    return {
+        "heat_leader": is_heat,
+        "sprint_rank": sprint_rank,
+        "badge": badge,
+        # Legacy field: true for any active badge (not past HoF winners).
+        "crowned": bool(badge),
+    }
 
 
 def get_sprint_leader() -> tuple[str, int, int]:
@@ -453,6 +622,40 @@ def get_sprint_leader() -> tuple[str, int, int]:
         sprint = dict(state.get("sprint_xp") or {})
         ineligible = _sprint_ineligible_keys(state)
     return _pick_eligible_sprint_leader(sprint, ineligible)
+
+
+def get_sprint_standing(username: str = "") -> dict[str, Any]:
+    """Leader + caller's place on the eligible sprint board (for !sprint)."""
+    key = (username or "").strip().lower()
+    with _lock:
+        state = _load_state()
+        sprint = dict(state.get("sprint_xp") or {})
+        ineligible = _sprint_ineligible_keys(state)
+    scores, display_map = _sprint_scores(sprint)
+    ranked = _eligible_sprint_ranked(sprint, ineligible)
+    leader_user, leader_xp, gap = "", 0, 0
+    if ranked:
+        top_key, leader_xp = ranked[0]
+        leader_user = display_map.get(top_key, top_key)
+        second = ranked[1][1] if len(ranked) > 1 else 0
+        gap = max(0, leader_xp - second)
+    your_xp = int(scores.get(key, 0) or 0) if key else 0
+    crowned = bool(key and key in ineligible)
+    rank: Optional[int] = None
+    if key and not crowned and your_xp > 0:
+        for i, (k, _xp) in enumerate(ranked, 1):
+            if k == key:
+                rank = i
+                break
+    return {
+        "leader": leader_user,
+        "leader_xp": leader_xp,
+        "gap": gap,
+        "your_xp": your_xp,
+        "rank": rank,
+        "crowned": crowned,
+        "eligible_count": len(ranked),
+    }
 
 
 def _write_heat_leader_file(username: str, score: int) -> None:
@@ -728,6 +931,14 @@ def get_state_payload() -> dict[str, Any]:
         ineligible = _sprint_ineligible_keys(state)
         sprint_user, sprint_xp, sprint_gap = _pick_eligible_sprint_leader(sprint, ineligible)
         sprint_winners = sorted(ineligible)
+        _scores_map, display_map = _sprint_scores(sprint)
+        sprint_top: list[dict[str, Any]] = []
+        for i, (k, xp) in enumerate(_eligible_sprint_ranked(sprint, ineligible)[:3], 1):
+            sprint_top.append({
+                "rank": i,
+                "username": display_map.get(k, k),
+                "xp": int(xp),
+            })
 
         heat_scores = _heat_scores(events)
         heat_display = {
@@ -759,6 +970,7 @@ def get_state_payload() -> dict[str, Any]:
                 "gap": sprint_gap,
                 "has_leader": bool(sprint_user),
                 "winners_this_stream": sprint_winners,
+                "top": sprint_top,
             },
             "heat": {
                 "username": heat_user,

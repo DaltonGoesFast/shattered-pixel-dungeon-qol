@@ -8,7 +8,7 @@ func _ready() -> void:
 
 
 func _on_summon_received(event: Dictionary) -> void:
-	if not CompanionConfig.summon_march_enabled:
+	if not CompanionConfig.element_enabled(self, "summon_march"):
 		return
 	var max_n: int = clampi(CompanionConfig.summon_march_max_concurrent, 1, 32)
 	# Drop oldest finished-bound units when over capacity
@@ -22,6 +22,10 @@ func _on_summon_received(event: Dictionary) -> void:
 	var unit: Node2D = _UnitScene.instantiate()
 	add_child(unit)
 
+	var payload: Dictionary = event.duplicate(true)
+	if CompanionConfig.is_vertical_layout(self):
+		payload["layout"] = "vertical"
+
 	var viewport_size := get_viewport_rect().size
 	if unit.has_method("setup"):
-		unit.setup(event, viewport_size)
+		unit.setup(payload, viewport_size)

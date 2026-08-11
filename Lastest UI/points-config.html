@@ -194,20 +194,85 @@
       border-radius: 4px;
     }
     input[type="number"] { width: 80px; }
+    .companion-layout {
+      display: flex;
+      gap: 0.75rem;
+      align-items: stretch;
+      min-height: 320px;
+      margin-top: 0.35rem;
+    }
+    .companion-nav {
+      flex: 0 0 168px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      max-height: 520px;
+      overflow-y: auto;
+      border-right: 1px solid var(--spd-border);
+      padding-right: 0.5rem;
+    }
+    .companion-nav-btn {
+      text-align: left;
+      background: transparent;
+      color: var(--spd-muted-on-surface);
+      border: 1px solid transparent;
+      padding: 0.4rem 0.55rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .companion-nav-btn:hover { color: var(--spd-text); background: var(--spd-surface-dark); }
+    .companion-nav-btn.active {
+      color: var(--spd-text);
+      background: var(--spd-surface-dark);
+      border-color: var(--spd-accent);
+    }
+    .companion-pages { flex: 1; min-width: 0; max-height: 520px; overflow-y: auto; }
+    .companion-page-title { margin: 0 0 0.5rem; font-size: 1rem; }
+    .companion-footer {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem 0.75rem;
+      margin-top: 0.75rem;
+      padding-top: 0.65rem;
+      border-top: 1px solid var(--spd-border);
+    }
+    .companion-rev, .companion-dirty-label { font-size: 0.85rem; color: var(--spd-muted-on-surface); }
+    .companion-dirty-label.companion-dirty { color: var(--spd-accent); }
+    .companion-json {
+      width: 100%; box-sizing: border-box;
+      font-family: ui-monospace, Consolas, monospace; font-size: 0.75rem;
+      background: var(--spd-surface-dark); color: var(--spd-text);
+      border: 1px solid var(--spd-border); border-radius: 4px; padding: 0.4rem;
+    }
+    .companion-gates { font-size: 0.8rem; }
+    .companion-field-row label { min-width: 160px; }
+    .companion-lead { margin-bottom: 0.5rem; }
+    @media (max-width: 720px) {
+      .companion-layout { flex-direction: column; }
+      .companion-nav { flex: none; flex-direction: row; flex-wrap: wrap; max-height: none; border-right: none; border-bottom: 1px solid var(--spd-border); padding-bottom: 0.5rem; }
+    }
     .monsters {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 0.75rem 1rem;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 0.85rem 1.25rem;
     }
     .monsters .row {
       margin-bottom: 0;
-      gap: 0.5rem;
+      gap: 0.25rem 0.5rem;
       min-width: 0;
       display: grid;
-      grid-template-columns: 1fr 56px auto;
+      grid-template-columns: minmax(0, 1fr) 56px auto;
+      grid-template-areas:
+        "label input free"
+        "eff   eff   eff"
+        "cd    cd    cancel";
       align-items: center;
+      overflow: hidden;
     }
     .monsters label {
+      grid-area: label;
       min-width: 0;
       font-size: 0.9rem;
       white-space: nowrap;
@@ -215,9 +280,22 @@
       text-overflow: ellipsis;
     }
     .monsters input {
+      grid-area: input;
       width: 56px;
       box-sizing: border-box;
     }
+    .monsters .free-btn { grid-area: free; justify-self: start; }
+    .monsters .monster-eff {
+      grid-area: eff;
+      margin-left: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+      line-height: 1.25;
+    }
+    .monsters .free-countdown { grid-area: cd; justify-self: start; }
+    .monsters .cancel-free-btn { grid-area: cancel; justify-self: end; }
     button {
       background: var(--spd-accent);
       color: var(--spd-text-on-accent);
@@ -314,6 +392,41 @@
     .game-status { font-size: 0.85rem; color: var(--spd-muted-on-bg); }
     .game-status.connected { color: var(--spd-success); }
     .game-status.error { color: var(--spd-error); }
+    .live-status {
+      display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px;
+      margin-left: 10px; vertical-align: middle;
+    }
+    .live-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem;
+      background: var(--spd-surface-dark); color: var(--spd-text-on-surface-dark);
+      border: 1px solid var(--spd-border); white-space: nowrap;
+    }
+    .live-badge.warn { border-color: var(--spd-accent); color: var(--spd-accent); }
+    .live-badge.off { opacity: 0.55; }
+    .live-badge.btnlike { cursor: pointer; }
+    .live-badge.btnlike:hover { border-color: var(--spd-accent); }
+    .unsaved-hint { color: var(--spd-accent); font-size: 0.85rem; margin-left: 6px; display: none; }
+    .unsaved-hint.show { display: inline; }
+    .free-promos-strip {
+      margin: 0 0 0.75rem 0; padding: 0.5rem 0.65rem; border: 1px solid var(--spd-border);
+      border-radius: 6px; background: var(--spd-surface-dark); font-size: 0.85rem;
+    }
+    .free-promos-strip.empty { display: none; }
+    .free-promos-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 0.35rem; }
+    .free-promo-chip {
+      display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px;
+      border-radius: 4px; border: 1px solid var(--spd-border); background: var(--spd-surface);
+    }
+    .cmd-disable-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 4px 10px; margin: 0.35rem 0 0.75rem 0; font-size: 0.85rem;
+    }
+    .cmd-disable-grid label { display: flex; align-items: center; gap: 0.35rem; min-width: 0; cursor: pointer; }
+    .monster-eff { font-size: 0.75rem; color: var(--spd-muted-on-surface); margin-left: 4px; white-space: nowrap; }
+    .monster-eff.diff { color: var(--spd-accent); }
+    .monsters .monster-eff { margin-left: 0; }
+    .activity-failed { color: var(--spd-error) !important; }
+    .session-user-lists { font-size: 0.85rem; color: var(--spd-muted-on-surface); max-height: 90px; overflow-y: auto; margin: 0.25rem 0 0.5rem 0; }
     #viewer_points_list table { width: 100%; border-collapse: collapse; background: var(--spd-viewer-list); color: var(--spd-text-on-viewer-list); }
     #viewer_points_list th, #viewer_points_list td { padding: 4px 8px; background: var(--spd-viewer-list); color: var(--spd-text-on-viewer-list); border-bottom: 1px solid var(--spd-border); }
     #viewer_points_list th { text-align: left; }
@@ -362,6 +475,7 @@
       <button type="button" id="themeResetCustom" style="margin-top:10px;font-size:0.85rem;background:var(--spd-btn-secondary);">Reset to dark defaults</button>
     </div>
     <button id="save">Save costs</button>
+    <span id="unsavedHint" class="unsaved-hint" title="Cost fields changed since last save">Unsaved</span>
     <button id="exportConfig" style="margin-left:4px;background:var(--spd-btn-secondary);" title="Download current config (costs + optional layout)">Export</button>
     <button id="importConfig" style="margin-left:4px;background:var(--spd-btn-secondary);" title="Load config from a JSON file">Import</button>
     <input type="file" id="importConfigFile" accept=".json" style="display:none;">
@@ -376,6 +490,12 @@
       <button type="button" id="presetDelete" style="margin-left:2px;padding:2px 8px;font-size:0.85rem;background:var(--spd-danger);">Delete</button>
     </span>
     <span id="gameStatus" class="game-status" style="margin-left:12px;" title="Game WebSocket (port 5001)">—</span>
+    <span id="liveStatus" class="live-status" title="Live stream status">
+      <span id="badgeSpend" class="live-badge btnlike" title="Click to toggle spend kill switch">Spend: …</span>
+      <span id="badge2x" class="live-badge off" style="display:none;">2x: —</span>
+      <span id="badgeDeath" class="live-badge">Death: …</span>
+      <span id="badgeBestiary" class="live-badge">Bestiary: …</span>
+    </span>
     <span id="msg" style="margin-left:8px;"></span>
   </p>
 
@@ -387,15 +507,34 @@
       <label for="freeMins">Free for (mins):</label>
       <input type="number" id="freeMins" min="1" max="1440" value="5" style="width:64px;">
     </div>
+    <div id="freePromosStrip" class="free-promos-strip empty">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <strong>Active free promos</strong>
+        <button type="button" id="cancelAllFree" class="free-btn" style="margin:0;">Cancel all</button>
+      </div>
+      <div id="freePromosList" class="free-promos-list"></div>
+    </div>
     <h3 style="margin:0.5rem 0;font-size:1rem;color:var(--spd-muted-on-surface);">Economy v1.1</h3>
     <div class="row"><label for="points_per_message">Pts per message:</label><input type="number" id="points_per_message" min="1" value="2"></div>
     <div class="row"><label for="chat_cooldown_sec">Chat cooldown (sec):</label><input type="number" id="chat_cooldown_sec" min="0" value="20"></div>
+    <div class="row"><label for="passive_cooldown_sec" title="Cooldown for passive earn / presence ticks">Passive cooldown (sec):</label><input type="number" id="passive_cooldown_sec" min="0" value="60"></div>
+    <div class="row"><label for="first_words_bonus" title="Bonus chat pts on a viewer's first message this stream">First words bonus:</label><input type="number" id="first_words_bonus" min="0" value="5"></div>
     <div class="row"><label for="chat_point_cap">Chat cap:</label><input type="number" id="chat_point_cap" min="1" value="500"></div>
     <div class="row"><label for="bank_ratio_manual">Bank ratio (manual):</label><input type="number" id="bank_ratio_manual" min="0" max="1" step="0.01" value="0.10"></div>
     <div class="row"><label for="bank_ratio_auto">Bank ratio (auto):</label><input type="number" id="bank_ratio_auto" min="0" max="1" step="0.01" value="0.05"></div>
     <div class="row"><label for="bank_ratio_auto_member">Bank ratio (auto member):</label><input type="number" id="bank_ratio_auto_member" min="0" max="1" step="0.01" value="0.10"></div>
     <div class="row"><label for="donation_multiplier_cap">Donation mult cap:</label><input type="number" id="donation_multiplier_cap" min="1" value="4"></div>
-    <div class="row" style="margin-bottom:0.75rem;padding-bottom:0.75rem;border-bottom:1px solid var(--spd-border);"><label for="reset_debounce_hours">Reset debounce (hrs):</label><input type="number" id="reset_debounce_hours" min="0" step="0.5" value="4"></div>
+    <div class="row"><label for="reset_debounce_hours">Reset debounce (hrs):</label><input type="number" id="reset_debounce_hours" min="0" step="0.5" value="4"></div>
+    <div class="row"><label for="cooldown_bypass_users" title="Comma-separated usernames that skip chat/passive/summon cooldowns">Cooldown bypass users:</label><input type="text" id="cooldown_bypass_users" style="width:220px;" value="DaltonGoesFast"></div>
+    <div class="row" style="margin-bottom:0.75rem;padding-bottom:0.75rem;border-bottom:1px solid var(--spd-border);">
+      <label for="death_cost_inflation_enabled" title="+50% harmful command costs per hero death (resets on boss kill)">Death cost inflation:</label>
+      <input type="checkbox" id="death_cost_inflation_enabled" checked>
+      <button type="button" id="deathCostReset" class="free-btn" title="Reset death counter to 0x (same as boss kill)">Reset</button>
+      <span id="deathCostLive" style="margin-left:8px;font-size:0.85rem;color:var(--spd-muted-on-surface);">Currently: …</span>
+    </div>
+    <h3 style="margin:0.5rem 0;font-size:1rem;color:var(--spd-muted-on-surface);">Command enables</h3>
+    <p class="sub" style="margin:0 0 0.35rem 0;">Unchecked = disabled for chat spends.</p>
+    <div id="cmdDisableGrid" class="cmd-disable-grid"></div>
     <div class="costs-scroll">
     <div class="row" data-cost-key="cost_per_gold" data-cmd="gold">
       <label for="cost_per_gold">Gold (per 1):</label>
@@ -560,7 +699,8 @@
 
   <section id="section-monsters" data-section="monsters">
     <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>Monster costs (per spawn)</h2>
-    <p class="sub" style="margin-bottom: 0.75rem;">Half price when spawned deeper than that mob’s normal first floor. Shallower: chapter gap (5-floor blocks) picks base, +20%, or +40% on table price (rounded). Champion: 2× zone-adjusted spawn cost.</p>
+    <p class="sub" style="margin-bottom: 0.5rem;">Half price when spawned deeper than that mob’s normal first floor. Shallower: chapter gap (5-floor blocks) picks base, +20%, or +40% on table price (rounded). Champion: 2× zone-adjusted spawn cost.</p>
+    <div class="row" style="margin-bottom:0.5rem;"><span style="color:var(--spd-muted-on-surface);font-size:0.9rem;">Live depth:</span> <span id="spawnDepthLabel">—</span></div>
     <div class="monsters" id="monsters"></div>
   </section>
   <div class="column-drop-zone" data-column="left" id="dropZoneLeft">Drop here</div>
@@ -581,11 +721,19 @@
       <button id="set_points">Set</button>
       <label title="Percent of chat-only points to move to donor">Chat→Donor % <input type="number" id="chatToDonorPercent" min="0" max="100" value="100" style="width:52px;padding:2px 4px;"></label>
       <button id="chatToDonor" style="background:var(--spd-btn-secondary);" title="Convert a percentage of selected users' chat points to donor points">Chat → Donor</button>
-      <button id="clearNonDonor" style="background:var(--spd-btn-secondary);">Delete all points</button>
-      <button id="clearAll" style="background:var(--spd-danger);">Delete all donor points</button>
+      <button id="clearNonDonor" style="background:var(--spd-btn-secondary);" title="Wipe chat-only points; donors keep their donor balance">Clear chat points</button>
+      <button id="clearAll" style="background:var(--spd-danger);" title="Remove donor points; chat-only balance is kept">Clear donor points</button>
+      <button id="vpUndo" style="background:var(--spd-btn-secondary);" disabled title="Restore viewer points from before the last bulk change">Undo</button>
       <button id="exportViewerCsv" style="background:var(--spd-btn-secondary);" title="Download viewer points as CSV">Export CSV</button>
       <button id="importViewerCsv" style="background:var(--spd-btn-secondary);" title="Import viewer points from CSV">Import CSV</button>
       <input type="file" id="importViewerCsvFile" accept=".csv" style="display:none;">
+      <span style="display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:4px;width:100%;" title="Manual Channel Points → donor (when Twitch reward misfires)">
+        <span style="color:var(--spd-muted-on-surface);font-size:0.85rem;">CPR convert:</span>
+        <input type="text" id="cprUsername" placeholder="username" style="width:120px;padding:2px 4px;">
+        <label style="font-size:0.85rem;">CP <input type="number" id="cprChannelPoints" min="0" value="0" style="width:72px;padding:2px 4px;"></label>
+        <label style="font-size:0.85rem;">Donor <input type="number" id="cprDonorPoints" min="0" value="0" style="width:64px;padding:2px 4px;" title="0 = channel/20"></label>
+        <button type="button" id="cprConvert" style="background:var(--spd-btn-secondary);">Convert</button>
+      </span>
       <span style="display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:4px;" title="Remove viewers who match all conditions">
         <span style="color:var(--spd-muted-on-surface);font-size:0.85rem;">Prune:</span>
         <label style="font-size:0.85rem;">inactive ≥ <input type="number" id="pruneDays" min="1" max="3650" value="2" style="width:44px;padding:2px 4px;"> d</label>
@@ -655,8 +803,65 @@
       <label for="doublePointsMins" style="min-width:100px;">2x points (min):</label>
       <input type="number" id="doublePointsMins" min="1" max="1440" value="5" style="width:56px;">
       <button id="doublePointsStart" style="margin:0;">Start 2x</button>
+      <button id="doublePointsExtend" style="margin:0;background:var(--spd-btn-secondary);">Extend</button>
+      <button id="doublePointsStop" style="margin:0;background:var(--spd-danger);">Stop 2x</button>
       <span id="doublePointsCountdown" class="free-countdown" style="margin-left:8px;">—</span>
     </div>
+  </section>
+  <section id="section-session" data-section="session">
+    <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>Session</h2>
+    <p class="sub" style="margin-bottom: 0.75rem;">Stream start resets fard / first-words / summon / bestiary session (not viewer points). Stream end auto-banks chat then wipes chat after debounce.</p>
+    <div class="row"><span style="color:var(--spd-muted-on-surface);font-size:0.9rem;">Started:</span> <span id="sessionStartedLabel">—</span></div>
+    <div class="row"><span style="color:var(--spd-muted-on-surface);font-size:0.9rem;">End debounce:</span> <span id="sessionPendingLabel">—</span></div>
+    <div class="row"><span style="color:var(--spd-muted-on-surface);font-size:0.9rem;">Fard used:</span> <span id="sessionFardCount">0</span></div>
+    <div id="sessionFardList" class="session-user-lists">—</div>
+    <div class="row"><span style="color:var(--spd-muted-on-surface);font-size:0.9rem;">First words:</span> <span id="sessionFirstWordsCount">0</span></div>
+    <div id="sessionFirstWordsList" class="session-user-lists">—</div>
+    <div class="row" style="margin-top:0.35rem;gap:6px;flex-wrap:wrap;">
+      <input type="text" id="sessionClearUser" placeholder="username" style="width:140px;">
+      <button type="button" id="sessionClearFard" style="background:var(--spd-btn-secondary);">Clear fard</button>
+      <button type="button" id="sessionClearFirstWords" style="background:var(--spd-btn-secondary);">Clear first-words</button>
+    </div>
+    <div class="row" style="margin-top:0.5rem;gap:8px;">
+      <button type="button" id="sessionReset" title="Clear per-stream session flags + bestiary session">Stream Started / Reset</button>
+      <button type="button" id="sessionScheduleEnd" style="background:var(--spd-btn-secondary);" title="Schedule debounced stream-end auto-bank">Schedule stream end</button>
+      <button type="button" id="sessionForceEnd" style="background:var(--spd-danger);" title="Immediately auto-bank chat pts and wipe chat">Force end now</button>
+    </div>
+  </section>
+  <section id="section-bestiary" data-section="bestiary">
+    <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>Bestiary</h2>
+    <p class="sub" style="margin-bottom: 0.5rem;">Live glance (GET /api/bestiary). Companion HUD polls this — thresholds here update the bar; Godot layout/fonts stay in Settings (F2).</p>
+    <div class="row"><span id="bestiaryGlanceBar" style="font-size:0.95rem;">—</span></div>
+    <div class="row" style="margin-top:0.35rem;"><span style="color:var(--spd-muted-on-surface);font-size:0.85rem;">Sprint:</span> <span id="bestiaryGlanceSprint">—</span></div>
+    <div class="row"><span style="color:var(--spd-muted-on-surface);font-size:0.85rem;">Heat:</span> <span id="bestiaryGlanceHeat">—</span></div>
+    <div class="row" style="margin-top:0.35rem;"><span style="color:var(--spd-muted-on-surface);font-size:0.85rem;">Hall:</span></div>
+    <div id="bestiaryGlanceHall" class="session-user-lists">—</div>
+    <hr style="border:none;border-top:1px solid var(--spd-border);margin:0.75rem 0;">
+    <p class="sub" style="margin-bottom: 0.5rem;">Config (<code>bestiary_config.json</code>)</p>
+    <div class="row"><label for="bestiary_heat_window_sec" title="Rolling heat window">Heat window (sec):</label><input type="number" id="bestiary_heat_window_sec" min="60" value="900"></div>
+    <div class="row"><label for="bestiary_sprint_donor_reward" title="Donor points to sprint winner when a zone clears">Sprint donor reward:</label><input type="number" id="bestiary_sprint_donor_reward" min="0" value="100"></div>
+    <div class="row"><label for="bestiary_sprint_donor_reward_per_level" title="Extra donor pts × zone level">Reward per level:</label><input type="number" id="bestiary_sprint_donor_reward_per_level" min="0" value="100"></div>
+    <div class="row"><label for="bestiary_per_user_bar_cap" title="0 = off; e.g. 0.25 caps one user at 25% of bar XP">Per-user bar cap:</label><input type="number" id="bestiary_per_user_bar_cap" min="0" max="1" step="0.05" value="0"></div>
+    <div class="row"><label><input type="checkbox" id="bestiary_repeat_mob_diminishing"> Repeat-mob diminishing XP</label></div>
+    <p class="sub" style="margin:0.65rem 0 0.35rem;">Soft floor (underdogs)</p>
+    <div class="row"><label><input type="checkbox" id="bestiary_sf_enabled" checked> Soft floor enabled</label></div>
+    <div class="row"><label for="bestiary_sf_top_n">Top N excluded:</label><input type="number" id="bestiary_sf_top_n" min="1" value="3"></div>
+    <div class="row"><label for="bestiary_sf_bonus" title="e.g. 0.25 = +25%">Bonus:</label><input type="number" id="bestiary_sf_bonus" min="0" max="2" step="0.05" value="0.25"></div>
+    <div class="row"><label for="bestiary_sf_min_unique">Min unique summoners:</label><input type="number" id="bestiary_sf_min_unique" min="0" value="10"></div>
+    <div class="row"><label for="bestiary_sf_exclude">Exclude users:</label><input type="text" id="bestiary_sf_exclude" style="width:min(100%,220px);" placeholder="user1, user2"></div>
+    <div class="row"><label><input type="checkbox" id="bestiary_sf_bar" checked> Apply to bar</label></div>
+    <div class="row"><label><input type="checkbox" id="bestiary_sf_sprint" checked> Apply to sprint</label></div>
+    <div class="row"><label><input type="checkbox" id="bestiary_sf_heat" checked> Apply to heat</label></div>
+    <p class="sub" style="margin:0.65rem 0 0.35rem;">Zone XP thresholds (Halls stays 0 = maxed)</p>
+    <div id="bestiaryLevelsEditor"></div>
+    <div class="row" style="margin-top:0.5rem;gap:0.5rem;flex-wrap:wrap;">
+      <button type="button" id="bestiaryConfigSave">Save bestiary config</button>
+      <button type="button" id="bestiaryConfigReload">Reload</button>
+    </div>
+  </section>
+  <section id="section-companion" data-section="companion">
+    <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>Companion</h2>
+    <div id="companionPanelRoot" class="companion-panel-root"></div>
   </section>
   <section id="section-activity" data-section="activity">
     <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>Activity</h2>
@@ -668,8 +873,14 @@
           <span>Hide &quot;Game data loaded&quot; messages</span>
         </label>
       </div>
-      <div class="activity-filter-wrap" style="margin-top:0.5rem;">
-        <input type="text" id="activityFilter" placeholder="Filter activity…" autocomplete="off" style="width:100%;padding:0.35rem 0.5rem;font-size:0.85rem;border:1px solid var(--spd-border);border-radius:4px;background:var(--spd-activity-list);color:var(--spd-text-on-activity-list);box-sizing:border-box;">
+      <div class="activity-filter-wrap" style="margin-top:0.5rem;display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+        <select id="activityTypeFilter" style="padding:0.35rem 0.5rem;font-size:0.85rem;background:var(--spd-surface-dark);color:var(--spd-text);border:1px solid var(--spd-border);border-radius:4px;">
+          <option value="all">All</option>
+          <option value="spend">Spend</option>
+          <option value="summon">Summon</option>
+          <option value="failed">Failed</option>
+        </select>
+        <input type="text" id="activityFilter" placeholder="Filter activity…" autocomplete="off" style="flex:1;min-width:140px;padding:0.35rem 0.5rem;font-size:0.85rem;border:1px solid var(--spd-border);border-radius:4px;background:var(--spd-activity-list);color:var(--spd-text-on-activity-list);box-sizing:border-box;">
       </div>
       <div id="activityList" style="max-height:200px;overflow-y:auto;font-size:0.85rem;margin-top:0.5rem;"></div>
     </details>
@@ -704,6 +915,9 @@
       <div class="config-row"><label><input type="checkbox" id="cfg-section-viewer" checked> Viewer points</label></div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-game" checked> Game data (WebSocket)</label></div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-score" checked> Streamer vs Chat Score</label></div>
+      <div class="config-row"><label><input type="checkbox" id="cfg-section-session" checked> Session</label></div>
+      <div class="config-row"><label><input type="checkbox" id="cfg-section-bestiary" checked> Bestiary</label></div>
+      <div class="config-row"><label><input type="checkbox" id="cfg-section-companion" checked> Companion</label></div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-activity" checked> Activity</label></div>
       <div class="btns">
         <button id="overallConfigReset">Reset</button>
@@ -714,6 +928,7 @@
   </div>
 
 
+  <script src="/companion_settings_panel.js"></script>
   <script>
     const MONSTERS = [
       'rat', 'albino', 'snake', 'gnoll', 'crab', 'slime', 'swarm', 'thief',
@@ -722,13 +937,397 @@
       'succubus', 'eye', 'scorpio'
     ];
 
+    const SPEND_COMMANDS = [
+      ['spawn', 'spawn'], ['champion', 'champion'], ['gold', 'gold'], ['curse', 'curse'],
+      ['gas', 'gas'], ['scroll', 'scroll'], ['ring_of_wealth', 'row'], ['trap', 'trap'],
+      ['bomb', 'bomb'], ['transmute', 'transmute'], ['bee', 'bee'], ['ward', 'ward'],
+      ['buff', 'buff'], ['debuff', 'debuff'], ['wand', 'wand'], ['heal', 'heal'],
+      ['cleanse', 'cleanse'], ['dew', 'dew'], ['plant', 'plant'], ['corrupt_ally', 'corruptally'],
+      ['hex', 'hex'], ['degrade', 'degrade'], ['sabotage', 'sabotage'],
+    ];
+    const SPEND_CMD_IDS = new Set(SPEND_COMMANDS.map(([id]) => id));
+
     let freeUntilData = {};
+    let spawnCostPreview = { depth: null, base: {}, costs: {} };
 
     function showMsg(text, ok) {
       const el = document.getElementById('msg');
       el.textContent = text;
       el.className = 'msg ' + (ok ? 'ok' : 'err');
       el.style.display = 'block';
+    }
+
+    let costsDirty = false;
+    function setCostsDirty(dirty) {
+      costsDirty = !!dirty;
+      const hint = document.getElementById('unsavedHint');
+      if (hint) hint.classList.toggle('show', costsDirty);
+    }
+
+    function formatTs(sec) {
+      if (!sec) return '—';
+      try {
+        return new Date(Number(sec) * 1000).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
+      } catch (_) {
+        return String(sec);
+      }
+    }
+
+    function formatDuration(sec) {
+      sec = Math.max(0, Math.floor(Number(sec) || 0));
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = sec % 60;
+      if (h > 0) return h + 'h ' + m + 'm';
+      if (m > 0) return m + 'm ' + s + 's';
+      return s + 's';
+    }
+
+    function updateDeathCostLive(d) {
+      const el = document.getElementById('deathCostLive');
+      const badge = document.getElementById('badgeDeath');
+      if (!d) return;
+      let liveText = 'Currently: …';
+      let badgeText = 'Death: …';
+      let badgeClass = 'live-badge';
+      if (d.enabled === false) {
+        liveText = 'Currently: disabled';
+        badgeText = 'Death: off';
+        badgeClass += ' off';
+      } else if ((d.deaths || 0) <= 0) {
+        liveText = 'Currently: normal (1.0x)';
+        badgeText = 'Death: 1.0x';
+      } else {
+        const mult = Number(d.multiplier || 1).toFixed(2);
+        liveText = 'Currently: ' + mult + 'x (' + d.deaths + ' death' + (d.deaths === 1 ? '' : 's') + ')';
+        badgeText = 'Death: ' + mult + 'x (' + d.deaths + ')';
+        badgeClass += ' warn';
+      }
+      if (el) el.textContent = liveText;
+      if (badge) {
+        badge.textContent = badgeText;
+        badge.className = badgeClass;
+        badge.title = d.display || liveText;
+      }
+    }
+
+    function updateSessionPanel(d) {
+      const startedEl = document.getElementById('sessionStartedLabel');
+      const pendingEl = document.getElementById('sessionPendingLabel');
+      if (!d) return;
+      if (startedEl) startedEl.textContent = formatTs(d.stream_started_at);
+      if (pendingEl) {
+        if (d.pending_end) {
+          const left = d.retry_after_sec != null ? formatDuration(d.retry_after_sec) : '?';
+          pendingEl.textContent = 'Pending end — ' + left + ' left (debounce ' + (d.debounce_hours ?? 4) + 'h)';
+        } else {
+          pendingEl.textContent = 'Not scheduled';
+        }
+      }
+      const fardCount = document.getElementById('sessionFardCount');
+      const fwCount = document.getElementById('sessionFirstWordsCount');
+      const fardList = document.getElementById('sessionFardList');
+      const fwList = document.getElementById('sessionFirstWordsList');
+      const fardUsers = d.fard_used || [];
+      const fwUsers = d.first_words || [];
+      if (fardCount) fardCount.textContent = String(d.fard_used_count != null ? d.fard_used_count : fardUsers.length);
+      if (fwCount) fwCount.textContent = String(d.first_words_count != null ? d.first_words_count : fwUsers.length);
+      if (fardList) fardList.textContent = fardUsers.length ? fardUsers.join(', ') : '—';
+      if (fwList) fwList.textContent = fwUsers.length ? fwUsers.join(', ') : '—';
+    }
+
+    let _bestiaryCfgCache = null;
+
+    function fillBestiaryLevelsEditor(levels) {
+      const host = document.getElementById('bestiaryLevelsEditor');
+      if (!host) return;
+      host.innerHTML = '';
+      (levels || []).forEach(entry => {
+        const lvl = entry.level ?? 0;
+        const thr = entry.bar_threshold ?? 0;
+        const zone = entry.zone || ('Level ' + lvl);
+        const monsters = Array.isArray(entry.monsters) ? entry.monsters.join(', ') : '';
+        const div = document.createElement('div');
+        div.className = 'row';
+        div.style.flexWrap = 'wrap';
+        div.style.alignItems = 'flex-start';
+        div.dataset.bestiaryLevel = String(lvl);
+        const thrDisabled = lvl >= 5 ? ' disabled title="Halls has no bar"' : '';
+        div.innerHTML =
+          `<label style="min-width:4.5rem;">L${lvl}</label>` +
+          `<input type="text" data-bf="zone" value="${String(zone).replace(/"/g, '&quot;')}" style="width:88px;" title="Zone name">` +
+          `<input type="number" data-bf="thr" min="0" value="${thr}"${thrDisabled} style="width:72px;" title="Bar XP threshold">` +
+          `<input type="text" data-bf="monsters" value="${String(monsters).replace(/"/g, '&quot;')}" style="flex:1;min-width:140px;width:auto;" title="Monsters (comma-separated)">`;
+        host.appendChild(div);
+      });
+    }
+
+    function applyBestiaryConfigForm(cfg) {
+      if (!cfg || typeof cfg !== 'object') return;
+      _bestiaryCfgCache = cfg;
+      const setN = (id, v, d) => { const e = document.getElementById(id); if (e) e.value = v ?? d; };
+      const setC = (id, v) => { const e = document.getElementById(id); if (e) e.checked = !!v; };
+      setN('bestiary_heat_window_sec', cfg.heat_window_sec, 900);
+      setN('bestiary_sprint_donor_reward', cfg.sprint_donor_reward, 100);
+      setN('bestiary_sprint_donor_reward_per_level', cfg.sprint_donor_reward_per_level, 100);
+      setN('bestiary_per_user_bar_cap', cfg.per_user_bar_cap_fraction, 0);
+      setC('bestiary_repeat_mob_diminishing', cfg.repeat_mob_diminishing);
+      const sf = cfg.soft_floor || {};
+      setC('bestiary_sf_enabled', sf.enabled !== false);
+      setN('bestiary_sf_top_n', sf.top_n, 3);
+      setN('bestiary_sf_bonus', sf.bonus, 0.25);
+      setN('bestiary_sf_min_unique', sf.min_unique_summoners, 10);
+      setN('bestiary_sf_exclude', Array.isArray(sf.exclude_users) ? sf.exclude_users.join(', ') : '', '');
+      setC('bestiary_sf_bar', sf.apply_to_bar !== false);
+      setC('bestiary_sf_sprint', sf.apply_to_sprint !== false);
+      setC('bestiary_sf_heat', sf.apply_to_heat !== false);
+      fillBestiaryLevelsEditor(cfg.levels || []);
+    }
+
+    function collectBestiaryConfigPayload() {
+      const base = (_bestiaryCfgCache && typeof _bestiaryCfgCache === 'object') ? { ..._bestiaryCfgCache } : {};
+      const levels = [];
+      document.querySelectorAll('#bestiaryLevelsEditor .row[data-bestiary-level]').forEach(row => {
+        const lvl = parseInt(row.dataset.bestiaryLevel, 10) || 0;
+        const zoneEl = row.querySelector('[data-bf="zone"]');
+        const thrEl = row.querySelector('[data-bf="thr"]');
+        const monEl = row.querySelector('[data-bf="monsters"]');
+        const monsters = (monEl?.value || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+        levels.push({
+          level: lvl,
+          zone: (zoneEl?.value || '').trim() || ('Level ' + lvl),
+          bar_threshold: lvl >= 5 ? 0 : Math.max(0, parseInt(thrEl?.value, 10) || 0),
+          monsters,
+        });
+      });
+      const exclude = (document.getElementById('bestiary_sf_exclude')?.value || '')
+        .split(',').map(s => s.trim()).filter(Boolean);
+      const prevSf = (base.soft_floor && typeof base.soft_floor === 'object') ? base.soft_floor : {};
+      return {
+        ...base,
+        heat_window_sec: Math.max(60, parseInt(document.getElementById('bestiary_heat_window_sec')?.value, 10) || 900),
+        sprint_donor_reward: Math.max(0, parseInt(document.getElementById('bestiary_sprint_donor_reward')?.value, 10) || 0),
+        sprint_donor_reward_per_level: Math.max(0, parseInt(document.getElementById('bestiary_sprint_donor_reward_per_level')?.value, 10) || 0),
+        per_user_bar_cap_fraction: Math.max(0, Math.min(1, parseFloat(document.getElementById('bestiary_per_user_bar_cap')?.value) || 0)),
+        repeat_mob_diminishing: !!document.getElementById('bestiary_repeat_mob_diminishing')?.checked,
+        soft_floor: {
+          ...prevSf,
+          enabled: !!document.getElementById('bestiary_sf_enabled')?.checked,
+          top_n: Math.max(1, parseInt(document.getElementById('bestiary_sf_top_n')?.value, 10) || 3),
+          bonus: Math.max(0, parseFloat(document.getElementById('bestiary_sf_bonus')?.value) || 0),
+          min_unique_summoners: Math.max(0, parseInt(document.getElementById('bestiary_sf_min_unique')?.value, 10) || 0),
+          exclude_users: exclude,
+          apply_to_bar: !!document.getElementById('bestiary_sf_bar')?.checked,
+          apply_to_sprint: !!document.getElementById('bestiary_sf_sprint')?.checked,
+          apply_to_heat: !!document.getElementById('bestiary_sf_heat')?.checked,
+        },
+        levels,
+      };
+    }
+
+
+
+    function loadBestiaryConfig() {
+      return fetch('/api/bestiary-config')
+        .then(r => r.json())
+        .then(data => {
+          if (data && data.error) throw new Error(data.error);
+          applyBestiaryConfigForm(data);
+          return data;
+        })
+        .catch(e => { console.warn('bestiary-config load', e); });
+    }
+
+    function saveBestiaryConfig() {
+      const payload = collectBestiaryConfigPayload();
+      fetch('/api/bestiary-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.error) throw new Error(data.error);
+          if (data.config) applyBestiaryConfigForm(data.config);
+          showMsg('Bestiary config saved', true);
+          logActivity('Bestiary config saved');
+          refreshLiveStatus();
+        })
+        .catch(e => showMsg('Bestiary save failed: ' + e.message, false));
+    }
+
+    function updateBestiaryGlance(bestiary) {
+      if (!bestiary || bestiary.error) return;
+      const barEl = document.getElementById('bestiaryGlanceBar');
+      const sprintEl = document.getElementById('bestiaryGlanceSprint');
+      const heatEl = document.getElementById('bestiaryGlanceHeat');
+      const hallEl = document.getElementById('bestiaryGlanceHall');
+      const lvl = bestiary.level ?? '?';
+      const zone = bestiary.zone || '';
+      const xp = bestiary.bar_xp ?? 0;
+      const thr = bestiary.bar_threshold ?? 0;
+      const bar = thr > 0 ? (xp + '/' + thr) : 'MAX';
+      if (barEl) barEl.textContent = 'L' + lvl + (zone ? ' ' + zone : '') + ' — ' + bar + ' XP';
+      const sprint = bestiary.sprint || {};
+      if (sprintEl) {
+        sprintEl.textContent = sprint.has_leader
+          ? ((sprint.username || '?') + ' — ' + (sprint.xp || 0) + ' XP' + (sprint.gap > 0 ? ' (leads by ' + sprint.gap + ')' : ''))
+          : 'No sprint leader';
+      }
+      const heat = bestiary.heat || {};
+      if (heatEl) {
+        const mins = Math.max(1, Math.floor((heat.window_sec || 900) / 60));
+        heatEl.textContent = heat.has_leader
+          ? ((heat.username || '?') + ' — ' + (heat.xp || 0) + ' XP (' + mins + 'm)')
+          : 'No heat leader';
+      }
+      if (hallEl) {
+        const hall = bestiary.hall_of_fame || [];
+        if (!hall.length) hallEl.textContent = '—';        else {
+          hallEl.innerHTML = hall.slice(-5).reverse().map(e => {
+            const z = e.zone || ('Lv' + (e.level || '?'));
+            return escapeHtml(z + ': ' + (e.user || '?') + ' (' + (e.xp || 0) + ' XP)');
+          }).join('<br>');
+        }
+      }
+    }
+
+    function applySpawnCostPreview() {
+      const depthEl = document.getElementById('spawnDepthLabel');
+      if (depthEl) {
+        depthEl.textContent = spawnCostPreview.depth != null ? String(spawnCostPreview.depth) : '— (no game depth)';
+      }
+      document.querySelectorAll('#monsters .row[data-cost-key]').forEach(row => {
+        const key = row.dataset.costKey || '';
+        const m = key.replace(/^cost_per_monster\./, '');
+        let eff = row.querySelector('.monster-eff');
+        if (!eff) {
+          eff = document.createElement('span');
+          eff.className = 'monster-eff';
+          const inp = row.querySelector('input[data-monster]');
+          if (inp) inp.insertAdjacentElement('afterend', eff);
+          else row.appendChild(eff);
+        }
+        const base = spawnCostPreview.base[m];
+        const cost = spawnCostPreview.costs[m];
+        if (base == null || cost == null || spawnCostPreview.depth == null) {
+          eff.textContent = '';
+          eff.removeAttribute('title');
+          eff.classList.remove('diff');
+          return;
+        }
+        const champ = cost * 2;
+        if (base === cost) {
+          eff.textContent = 'champ ' + champ;
+          eff.title = 'Effective ' + cost + ' (same as base); champion ' + champ;
+          eff.classList.remove('diff');
+        } else {
+          eff.textContent = base + ' → ' + cost + ' · champ ' + champ;
+          eff.title = 'Base ' + base + ' → depth-adjusted ' + cost + '; champion ' + champ;
+          eff.classList.add('diff');
+        }
+      });
+    }
+
+    function refreshSpawnCosts() {
+      fetch('/api/spawn-costs')
+        .then(r => r.json())
+        .then(d => {
+          if (d.error) return;
+          spawnCostPreview = { depth: d.depth, base: d.base || {}, costs: d.costs || {} };
+          applySpawnCostPreview();
+        })
+        .catch(() => {});
+    }
+
+    function renderCmdDisableGrid(roles) {
+      const grid = document.getElementById('cmdDisableGrid');
+      if (!grid) return;
+      roles = roles || {};
+      grid.innerHTML = SPEND_COMMANDS.map(([id, label]) => {
+        const disabled = roles[id] === 'disabled';
+        return '<label><input type="checkbox" class="cmd-enable" data-cmd="' + id + '"' + (disabled ? '' : ' checked') + '> !' + label + '</label>';
+      }).join('');
+      grid.querySelectorAll('.cmd-enable').forEach(cb => {
+        cb.addEventListener('change', () => setCostsDirty(true));
+      });
+    }
+
+    function collectCommandAllowedRoles() {
+      const roles = {};
+      document.querySelectorAll('.cmd-enable').forEach(cb => {
+        if (!cb.checked) roles[cb.dataset.cmd] = 'disabled';
+      });
+      return roles;
+    }
+
+    function renderFreePromosStrip() {
+      const strip = document.getElementById('freePromosStrip');
+      const list = document.getElementById('freePromosList');
+      if (!strip || !list) return;
+      const now = Math.floor(Date.now() / 1000);
+      const entries = Object.entries(freeUntilData || {}).filter(([, ts]) => ts > now);
+      if (!entries.length) {
+        strip.classList.add('empty');
+        list.innerHTML = '';
+        return;
+      }
+      strip.classList.remove('empty');
+      list.innerHTML = entries.map(([key, ts]) => {
+        const sec = ts - now;
+        const label = key.replace(/^cost_per_monster\./, 'spawn ').replace(/^cost_per_/, '');
+        return '<span class="free-promo-chip" data-cost-key="' + escapeHtml(key) + '">' +
+          escapeHtml(label) + ' ' + formatCountdown(sec) +
+          ' <button type="button" class="cancel-free-btn free-promo-cancel" style="display:inline;padding:0 4px;font-size:0.75rem;">×</button></span>';
+      }).join('');
+    }
+
+    let _spendDisabled = false;
+    function refreshLiveStatus() {
+      Promise.all([
+        fetch('/api/spend-disabled').then(r => r.json()).catch(() => null),
+        fetch('/api/death-cost').then(r => r.json()).catch(() => null),
+        fetch('/api/double-points-remaining').then(r => r.json()).catch(() => null),
+        fetch('/api/bestiary').then(r => r.json()).catch(() => null),
+        fetch('/api/session').then(r => r.json()).catch(() => null),
+      ]).then(([spend, death, twox, bestiary, session]) => {
+        const spendBadge = document.getElementById('badgeSpend');
+        if (spend && spendBadge) {
+          _spendDisabled = !!spend.disabled;
+          spendBadge.textContent = _spendDisabled ? 'Spend: OFF' : 'Spend: ON';
+          spendBadge.className = 'live-badge btnlike' + (_spendDisabled ? ' warn' : '');
+          spendBadge.title = _spendDisabled
+            ? 'Spending disabled — click to enable'
+            : 'Spending enabled — click to pause spends';
+        }
+        if (death) updateDeathCostLive(death);
+        const badge2x = document.getElementById('badge2x');
+        const countdownEl = document.getElementById('doublePointsCountdown');
+        if (twox && badge2x) {
+          if (twox.active && twox.display) {
+            badge2x.style.display = '';
+            badge2x.className = 'live-badge warn';
+            badge2x.textContent = '2x: ' + twox.display;
+            if (countdownEl) countdownEl.textContent = '2x: ' + twox.display;
+          } else {
+            badge2x.style.display = 'none';
+            if (countdownEl) countdownEl.textContent = '—';
+          }
+        }
+        const bestBadge = document.getElementById('badgeBestiary');
+        if (bestiary && bestBadge && !bestiary.error) {
+          const lvl = bestiary.level ?? '?';
+          const zone = bestiary.zone || '';
+          const xp = bestiary.bar_xp ?? 0;
+          const thr = bestiary.bar_threshold ?? 0;
+          const bar = thr > 0 ? (xp + '/' + thr) : 'MAX';
+          bestBadge.textContent = 'Bestiary L' + lvl + (zone ? ' ' + zone : '') + ' ' + bar;
+          bestBadge.title = bestBadge.textContent;
+          updateBestiaryGlance(bestiary);
+        }
+        if (session) updateSessionPanel(session);
+      });
+      refreshSpawnCosts();
     }
 
     const ACTIVITY_MAX = 50;
@@ -764,7 +1363,10 @@
           events.sort((a, b) => (a.time || 0) - (b.time || 0));
           let maxTs = since;
           events.forEach(ev => {
-            logActivity(formatCommandActivityMessage(ev));
+            logActivity(formatCommandActivityMessage(ev), {
+              success: ev.success !== false,
+              command: ev.command || '',
+            });
             if (ev.time > maxTs) maxTs = ev.time;
           });
           setLastCommandTs(maxTs);
@@ -784,9 +1386,15 @@
     function saveActivityLog(arr) {
       try { sessionStorage.setItem(ACTIVITY_STORAGE, JSON.stringify(arr)); } catch (_) {}
     }
-    function logActivity(text) {
+    function logActivity(text, meta) {
       const arr = getActivityLog();
-      arr.unshift({ time: Date.now(), text });
+      const entry = { time: Date.now(), text };
+      if (meta) {
+        if (meta.success === false) entry.success = false;
+        else if (meta.success === true) entry.success = true;
+        if (meta.command) entry.command = meta.command;
+      }
+      arr.unshift(entry);
       if (arr.length > ACTIVITY_MAX) arr.length = ACTIVITY_MAX;
       saveActivityLog(arr);
       renderActivityList();
@@ -795,9 +1403,24 @@
       const el = document.getElementById('activityList');
       if (!el) return;
       const filterEl = document.getElementById('activityFilter');
+      const typeEl = document.getElementById('activityTypeFilter');
       const q = (filterEl && filterEl.value || '').trim().toLowerCase();
+      const type = (typeEl && typeEl.value) || 'all';
       const arr = getActivityLog();
-      const filtered = q === '' ? arr : arr.filter(entry => (entry.text || '').toLowerCase().includes(q));
+      let filtered = arr;
+      if (type === 'failed') filtered = filtered.filter(e => e.success === false || /\(failed\)$/i.test(e.text || ''));
+      else if (type === 'summon') filtered = filtered.filter(e => {
+        const c = (e.command || '').toLowerCase();
+        return c === 'summon' || c.startsWith('summon') || /:!?\s*summon/i.test(e.text || '') || /summon/i.test(e.text || '');
+      });
+      else if (type === 'spend') filtered = filtered.filter(e => {
+        const c = (e.command || '').toLowerCase();
+        if (c && SPEND_CMD_IDS.has(c)) return true;
+        if (c && (c === 'summon' || c.startsWith('summon'))) return false;
+        const t = (e.text || '').toLowerCase();
+        return SPEND_COMMANDS.some(([, label]) => t.includes('!' + label));
+      });
+      if (q) filtered = filtered.filter(entry => (entry.text || '').toLowerCase().includes(q));
       if (arr.length === 0) {
         el.innerHTML = '<p style="margin:0;">No activity yet.</p>';
         return;
@@ -809,7 +1432,8 @@
       el.innerHTML = filtered.map(entry => {
         const d = new Date(entry.time);
         const t = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        return '<div style="margin-bottom:4px;">' + t + ' — ' + escapeHtml(entry.text) + '</div>';
+        const failed = entry.success === false || /\(failed\)$/i.test(entry.text || '');
+        return '<div class="' + (failed ? 'activity-failed' : '') + '" style="margin-bottom:4px;">' + t + ' — ' + escapeHtml(entry.text) + '</div>';
       }).join('');
     }
 
@@ -840,6 +1464,7 @@
         }
         if (cancelEl) cancelEl.style.display = '';
       });
+      renderFreePromosStrip();
     }
 
     function load() {
@@ -871,6 +1496,8 @@
           setIf('cost_per_sabotage', data.cost_per_sabotage, 75);
           setIf('points_per_message', data.points_per_message, 2);
           setIf('chat_cooldown_sec', data.chat_cooldown_sec, 20);
+          setIf('passive_cooldown_sec', data.passive_cooldown_sec, 60);
+          setIf('first_words_bonus', data.first_words_bonus, 5);
           setIf('chat_point_cap', data.chat_point_cap, 500);
           setIf('bank_ratio_manual', data.bank_ratio_manual, 0.10);
           setIf('bank_ratio_auto', data.bank_ratio_auto, 0.05);
@@ -878,6 +1505,13 @@
           setIf('donation_multiplier_cap', data.donation_multiplier_cap, 4);
           setIf('reset_debounce_hours', data.reset_debounce_hours, 4);
           setIf('curse_class_kit_duration_turns', data.curse_class_kit_duration_turns, 100);
+          const bypass = Array.isArray(data.cooldown_bypass_users)
+            ? data.cooldown_bypass_users.join(', ')
+            : (data.cooldown_bypass_users || 'DaltonGoesFast');
+          setIf('cooldown_bypass_users', bypass, 'DaltonGoesFast');
+          const deathCostEl = document.getElementById('death_cost_inflation_enabled');
+          if (deathCostEl) deathCostEl.checked = data.death_cost_inflation_enabled !== false;
+          renderCmdDisableGrid(data.command_allowed_roles || {});
           const monsters = data.cost_per_monster || {};
           const container = document.getElementById('monsters');
           container.innerHTML = '';
@@ -885,11 +1519,14 @@
             const div = document.createElement('div');
             div.className = 'row';
             div.dataset.costKey = 'cost_per_monster.' + m;
-            div.innerHTML = `<label>${m}:</label><input type="number" data-monster="${m}" min="0" value="${monsters[m] ?? ''}"><button type="button" class="free-btn">Free</button><span class="free-countdown" style="display:none;"></span><button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>`;
+            div.innerHTML = `<label>${m}:</label><input type="number" data-monster="${m}" min="0" value="${monsters[m] ?? ''}"><span class="monster-eff"></span><button type="button" class="free-btn">Free</button><span class="free-countdown" style="display:none;"></span><button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>`;
             container.appendChild(div);
           });
           freeUntilData = data.free_until || {};
           updateFreeCountdowns();
+          setCostsDirty(false);
+          refreshLiveStatus();
+          applySpawnCostPreview();
         })
         .catch(e => showMsg('Failed to load: ' + e.message, false));
     }
@@ -956,12 +1593,20 @@
         cost_per_sabotage: parseInt(document.getElementById('cost_per_sabotage')?.value, 10) || 75,
         points_per_message: parseInt(document.getElementById('points_per_message')?.value, 10) || 2,
         chat_cooldown_sec: parseInt(document.getElementById('chat_cooldown_sec')?.value, 10) || 20,
+        passive_cooldown_sec: parseInt(document.getElementById('passive_cooldown_sec')?.value, 10) || 60,
+        first_words_bonus: Math.max(0, parseInt(document.getElementById('first_words_bonus')?.value, 10) || 0),
         chat_point_cap: parseInt(document.getElementById('chat_point_cap')?.value, 10) || 500,
         bank_ratio_manual: parseFloat(document.getElementById('bank_ratio_manual')?.value) || 0.10,
         bank_ratio_auto: parseFloat(document.getElementById('bank_ratio_auto')?.value) || 0.05,
         bank_ratio_auto_member: parseFloat(document.getElementById('bank_ratio_auto_member')?.value) || 0.10,
         donation_multiplier_cap: parseInt(document.getElementById('donation_multiplier_cap')?.value, 10) || 4,
         reset_debounce_hours: parseFloat(document.getElementById('reset_debounce_hours')?.value) || 4,
+        cooldown_bypass_users: (document.getElementById('cooldown_bypass_users')?.value || '')
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean),
+        death_cost_inflation_enabled: !!document.getElementById('death_cost_inflation_enabled')?.checked,
+        command_allowed_roles: collectCommandAllowedRoles(),
       };
       fetch('/api/points-config', {
         method: 'POST',
@@ -971,8 +1616,10 @@
         .then(r => r.json())
         .then(data => {
           if (data.error) throw new Error(data.error);
+          setCostsDirty(false);
           showMsg('Saved!', true);
           logActivity('Costs saved');
+          refreshLiveStatus();
         })
         .catch(e => showMsg('Save failed: ' + e.message, false));
     }
@@ -1218,19 +1865,56 @@
     const VP_REFRESH_STORAGE = 'vp_refresh_sec';
     const VP_REFRESH_DEFAULT = 10;
     const OVERALL_CONFIG_STORAGE = 'overlay_layout_config';
-    const OVERALL_CONFIG_DEFAULT = { columns: 3, sections: { general: true, monsters: true, viewer: true, game: true, score: true, activity: true }, order: ['general', 'monsters', 'viewer', 'game', 'score'], columnCounts: [2, 1, 3], monsterColumns: 2, monsterSectionWidth: 540 };
+    const OVERALL_CONFIG_DEFAULT = { columns: 3, sections: { general: true, monsters: true, viewer: true, game: true, score: true, session: true, bestiary: true, companion: true, activity: true }, order: ['general', 'monsters', 'viewer', 'companion', 'game', 'score', 'session', 'bestiary'], columnCounts: [2, 2, 4], monsterColumns: 2, monsterSectionWidth: 540 };
     function getOverallConfig() {
       try {
         const s = localStorage.getItem(OVERALL_CONFIG_STORAGE);
         if (s) {
           const c = JSON.parse(s);
           if (c && typeof c.columns === 'number' && c.sections) {
-            if (!Array.isArray(c.order)) c.order = ['general', 'monsters', 'viewer', 'game', 'score'];
+            if (!Array.isArray(c.order)) c.order = ['general', 'monsters', 'viewer', 'companion', 'game', 'score', 'session', 'bestiary'];
             c.order = c.order.filter(id => id !== 'helpers_hurters');
             if (c.sections && c.sections.helpers_hurters != null) delete c.sections.helpers_hurters;
-            if (!Array.isArray(c.columnCounts) || c.columnCounts.length !== 3) c.columnCounts = [2, 1, 2];
+            if (c.sections.session == null) c.sections.session = true;
+            if (c.sections.bestiary == null) c.sections.bestiary = true;
+            let migrated = false;
+            if (c.sections.companion == null) { c.sections.companion = true; migrated = true; }
+            if (localStorage.getItem('overlay_companion_migrate_v2') !== '1') {
+              c.sections.companion = true;
+              c.order = c.order.filter(id => id !== 'companion');
+              const vi = c.order.indexOf('viewer');
+              if (vi >= 0) c.order.splice(vi + 1, 0, 'companion');
+              else c.order.push('companion');
+              const movable0 = c.order.filter(id => id !== 'activity').length;
+              const leftN0 = Math.min(2, movable0);
+              const centerN0 = Math.min(2, Math.max(0, movable0 - leftN0));
+              c.columnCounts = [leftN0, centerN0, Math.max(0, movable0 - leftN0 - centerN0)];
+              migrated = true;
+              try { localStorage.setItem('overlay_companion_migrate_v2', '1'); } catch (_) {}
+            } else if (!c.order.includes('companion')) {
+              const vi = c.order.indexOf('viewer');
+              if (vi >= 0) c.order.splice(vi + 1, 0, 'companion');
+              else c.order.push('companion');
+              migrated = true;
+            }
+            if (!c.order.includes('session')) { c.order.push('session'); migrated = true; }
+            if (!c.order.includes('bestiary')) { c.order.push('bestiary'); migrated = true; }
+            if (!Array.isArray(c.columnCounts) || c.columnCounts.length !== 3) {
+              c.columnCounts = [2, 2, 4];
+              migrated = true;
+            }
+            const movable = c.order.filter(id => id !== 'activity').length;
+            if (c.columnCounts[0] + c.columnCounts[1] + c.columnCounts[2] !== movable) {
+              const leftN = Math.min(2, movable);
+              const centerN = Math.min(2, Math.max(0, movable - leftN));
+              c.columnCounts = [leftN, centerN, Math.max(0, movable - leftN - centerN)];
+              migrated = true;
+            }
             if (c.monsterColumns == null) c.monsterColumns = 2;
             if (c.monsterSectionWidth == null) c.monsterSectionWidth = 420;
+            if (migrated) {
+              try { localStorage.setItem(OVERALL_CONFIG_STORAGE, JSON.stringify(c)); } catch (_) {}
+            }
             return c;
           }
         }
@@ -1260,14 +1944,19 @@
         grid.classList.add('col-' + Math.max(1, Math.min(3, cfg.columns)));
         applyColumnWidths();
       }
-      ['general', 'monsters', 'viewer', 'game', 'score', 'activity'].forEach(id => {
+      ['general', 'monsters', 'viewer', 'game', 'score', 'session', 'bestiary', 'companion', 'activity'].forEach(id => {
         const el = document.getElementById('section-' + id);
         if (el) el.style.display = (cfg.sections[id] !== false) ? '' : 'none';
       });
-      const order = cfg.order || ['general', 'monsters', 'viewer', 'game', 'score'];
+      const order = cfg.order || ['general', 'monsters', 'viewer', 'companion', 'game', 'score', 'session', 'bestiary'];
       const orderFiltered = order.filter(id => id !== 'activity');
-      let counts = cfg.columnCounts || [2, 1, 2];
-      if (counts[0] + counts[1] + counts[2] !== 5) counts = [2, 1, 2];
+      let counts = cfg.columnCounts || [2, 1, 4];
+      const movable = orderFiltered.length || 7;
+      if (counts[0] + counts[1] + counts[2] !== movable) {
+        const leftN = Math.min(2, movable);
+        const centerN = Math.min(2, Math.max(0, movable - leftN));
+        counts = [leftN, centerN, Math.max(0, movable - leftN - centerN)];
+      }
       const [leftN, centerN, rightN] = [counts[0], counts[1], counts[2]];
       if (!colLeft || !colRight || !colCenter) return;
       const dropLeft = document.getElementById('dropZoneLeft');
@@ -1459,6 +2148,23 @@
     }
 
     let viewerPointsData = [];
+    function refreshVpUndoStatus() {
+      const btn = document.getElementById('vpUndo');
+      if (!btn) return;
+      fetch('/api/viewer-points/undo')
+        .then(r => r.json())
+        .then(d => {
+          const available = !!d.available;
+          btn.disabled = !available;
+          if (available && d.action) {
+            const when = d.at_iso ? (' @ ' + d.at_iso) : '';
+            btn.title = 'Undo last: ' + d.action + when + ' (click again to redo)';
+          } else {
+            btn.title = 'Restore viewer points from before the last bulk change';
+          }
+        })
+        .catch(() => { btn.disabled = true; });
+    }
     function filterViewerPoints() {
       const q = (document.getElementById('vp_search').value || '').trim().toLowerCase();
       const rows = document.querySelectorAll('#viewer_points_list tbody tr');
@@ -1483,6 +2189,7 @@
           vpLastUpdate = Date.now();
           if (viewerPointsData.length === 0) {
             container.innerHTML = '<p style="color:var(--spd-muted-on-viewer-list);font-size:0.9rem;">No viewers yet. Type a username above and click Add or Set.</p>';
+            refreshVpUndoStatus();
             return;
           }
           const donationPts = (d) => (d.donationPts != null ? d.donationPts : 0);
@@ -1499,6 +2206,7 @@
               });
             });
           }
+          refreshVpUndoStatus();
           container.querySelectorAll('.save-row').forEach(btn => {
             btn.addEventListener('click', () => {
               const tr = btn.closest('tr');
@@ -1609,13 +2317,32 @@
         .catch(e => showMsg('Failed: ' + e.message, false));
     }
     document.body.addEventListener('click', (e) => {
+      if (e.target.closest('#cancelAllFree')) return;
       const freeBtn = e.target.closest('.free-btn');
       const cancelBtn = e.target.closest('.cancel-free-btn');
-      const row = (freeBtn || cancelBtn) && (freeBtn || cancelBtn).closest('.row[data-cost-key]');
-      const costKey = row && row.dataset.costKey;
+      if (!freeBtn && !cancelBtn) return;
+      const chip = (freeBtn || cancelBtn).closest('.free-promo-chip[data-cost-key]');
+      const row = (freeBtn || cancelBtn).closest('.row[data-cost-key]');
+      const costKey = (chip && chip.dataset.costKey) || (row && row.dataset.costKey);
       if (!costKey) return;
-      if (freeBtn) setCostFree(costKey);
+      if (freeBtn && !cancelBtn) setCostFree(costKey);
       else if (cancelBtn) cancelCostFree(costKey);
+    });
+    document.getElementById('cancelAllFree').addEventListener('click', () => {
+      if (!confirm('Cancel all free promos?')) return;
+      fetch('/api/cost-free', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cancelAll: true }),
+      })
+        .then(r => r.json()).then(d => {
+          if (d.error) throw new Error(d.error);
+          freeUntilData = {};
+          updateFreeCountdowns();
+          showMsg('All free promos cancelled', true);
+          logActivity('Free promos: cancel all');
+        })
+        .catch(e => showMsg('Failed: ' + e.message, false));
     });
 
     document.getElementById('save').addEventListener('click', save);
@@ -1626,11 +2353,17 @@
       if (file) importConfigFile(file);
       e.target.value = '';
     });
+    ['section-general', 'section-monsters'].forEach(id => {
+      const sec = document.getElementById(id);
+      if (!sec) return;
+      sec.addEventListener('input', () => setCostsDirty(true));
+      sec.addEventListener('change', () => setCostsDirty(true));
+    });
     refreshPresetsSelect();
     document.getElementById('presetSaveAs').addEventListener('click', saveCurrentAsPreset);
     document.getElementById('presetApply').addEventListener('click', applyPreset);
     document.getElementById('presetDelete').addEventListener('click', deletePreset);
-    document.getElementById('refresh').addEventListener('click', () => { load(); loadViewerPoints(); loadScoreData(); showMsg('Refreshed', true); logActivity('Refreshed'); });
+    document.getElementById('refresh').addEventListener('click', () => { load(); loadBestiaryConfig(); if (window.CompanionSettingsPanel) CompanionSettingsPanel.load(); loadViewerPoints(); loadScoreData(); refreshLiveStatus(); showMsg('Refreshed', true); logActivity('Refreshed'); });
     renderActivityList();
     const activityHideGameLoadedEl = document.getElementById('activityHideGameLoaded');
     if (activityHideGameLoadedEl) {
@@ -1662,7 +2395,7 @@
         body: JSON.stringify({ points: chat, donationPts: donor, users }),
       })
         .then(r => r.json())
-        .then(d => { if (d.error) throw new Error(d.error); showMsg(`Added to ${d.count} users`, true); loadViewerPoints(true); logActivity('VP: bulk add ' + (d.count || 0) + ' users'); })
+        .then(d => { if (d.error) throw new Error(d.error); showMsg(`Added to ${d.count} users`, true); loadViewerPoints(true); refreshVpUndoStatus(); logActivity('VP: bulk add ' + (d.count || 0) + ' users'); })
         .catch(e => showMsg('Failed: ' + e.message, false));
     });
     document.getElementById('set_points').addEventListener('click', () => {
@@ -1687,7 +2420,7 @@
         body: JSON.stringify({ points: totalPts, donationPts: donorPts, users }),
       })
         .then(r => r.json())
-        .then(d => { if (d.error) throw new Error(d.error); showMsg(`Set ${d.count} users to ${totalPts} pts`, true); loadViewerPoints(true); logActivity('VP: set ' + (d.count || 0) + ' users'); })
+        .then(d => { if (d.error) throw new Error(d.error); showMsg(`Set ${d.count} users to ${totalPts} pts`, true); loadViewerPoints(true); refreshVpUndoStatus(); logActivity('VP: set ' + (d.count || 0) + ' users'); })
         .catch(e => showMsg('Failed: ' + e.message, false));
     });
     document.getElementById('chatToDonor').addEventListener('click', () => {
@@ -1709,20 +2442,32 @@
         body: JSON.stringify({ users, percent: pct }),
       })
         .then(r => r.json())
-        .then(d => { if (d.error) throw new Error(d.error); showMsg(`Converted ${pct}% chat→donor for ${d.count} users`, true); loadViewerPoints(true); logActivity('VP: Chat→Donor ' + pct + '% ' + (d.count || 0) + ' users'); })
+        .then(d => { if (d.error) throw new Error(d.error); showMsg(`Converted ${pct}% chat→donor for ${d.count} users`, true); loadViewerPoints(true); refreshVpUndoStatus(); logActivity('VP: Chat→Donor ' + pct + '% ' + (d.count || 0) + ' users'); })
         .catch(e => showMsg('Failed: ' + e.message, false));
     });
     document.getElementById('clearNonDonor').addEventListener('click', () => {
-      if (!confirm('Delete all non-donor points? Donors will keep their donation amount.')) return;
+      if (!confirm('Clear all chat-only points? Donors keep their donor balance.')) return;
       fetch('/api/viewer-points/clear-non-donor', { method: 'POST' })
-        .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('Non-donor points cleared', true); loadViewerPoints(true); logActivity('VP: cleared non-donor'); })
+        .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('Chat points cleared', true); loadViewerPoints(true); refreshVpUndoStatus(); logActivity('VP: cleared chat points'); })
         .catch(e => showMsg('Failed: ' + e.message, false));
     });
     document.getElementById('clearAll').addEventListener('click', () => {
       if (!confirm('Remove all donor points? Chat points will be kept.')) return;
       fetch('/api/viewer-points/bulk/clear-donor', { method: 'POST' })
-        .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('Donor points cleared', true); loadViewerPoints(true); logActivity('VP: cleared donor'); })
+        .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('Donor points cleared', true); loadViewerPoints(true); refreshVpUndoStatus(); logActivity('VP: cleared donor'); })
         .catch(e => showMsg('Failed: ' + e.message, false));
+    });
+    document.getElementById('vpUndo').addEventListener('click', () => {
+      fetch('/api/viewer-points/undo', { method: 'POST' })
+        .then(r => r.json()).then(d => {
+          if (d.error) throw new Error(d.error);
+          const label = d.restored_action || d.action || 'last change';
+          showMsg('Viewer points restored (' + label + ')', true);
+          loadViewerPoints(true);
+          refreshVpUndoStatus();
+          logActivity('VP: undo ' + label);
+        })
+        .catch(e => showMsg('Undo failed: ' + e.message, false));
     });
     document.getElementById('exportViewerCsv').addEventListener('click', exportViewerCsv);
     document.getElementById('importViewerCsv').addEventListener('click', importViewerCsv);
@@ -1757,6 +2502,7 @@
           if (d.error) throw new Error(d.error);
           showMsg('Pruned ' + (d.count || 0) + ' users', true);
           loadViewerPoints(true);
+          refreshVpUndoStatus();
           logActivity('VP: pruned ' + (d.count || 0) + ' (≥' + days + 'd, donor<' + minDonor + (maxChatPts !== null ? ', chat≤' + maxChatPts : '') + ')');
         })
         .catch(e => showMsg('Prune failed: ' + e.message, false));
@@ -1780,12 +2526,132 @@
         .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); loadScoreData(); showMsg('Score reset', true); logActivity('Score reset'); })
         .catch(e => showMsg('Failed: ' + e.message, false));
     });
+    document.getElementById('deathCostReset').addEventListener('click', () => {
+      if (!confirm('Reset death cost inflation to 1.0x?')) return;
+      fetch('/api/death-cost/reset', { method: 'POST' })
+        .then(r => r.json()).then(d => {
+          if (d.error) throw new Error(d.error);
+          const mult = Number(d.multiplier || 1).toFixed(2);
+          showMsg('Death cost reset to ' + mult + 'x', true);
+          logActivity('Death cost inflation reset');
+          updateDeathCostLive({ enabled: true, deaths: d.deaths || 0, multiplier: d.multiplier || 1 });
+          refreshLiveStatus();
+        })
+        .catch(e => showMsg('Failed: ' + e.message, false));
+    });
+    document.getElementById('badgeSpend').addEventListener('click', () => {
+      const turnOff = !_spendDisabled;
+      if (turnOff && !confirm('Disable spending? Viewers will not be able to use spend commands.')) return;
+      fetch('/api/spend-disabled', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ disabled: turnOff }),
+      })
+        .then(r => r.json()).then(d => {
+          if (d.error) throw new Error(d.error);
+          showMsg(d.disabled ? 'Spending disabled' : 'Spending enabled', true);
+          logActivity(d.disabled ? 'Spend: OFF' : 'Spend: ON');
+          refreshLiveStatus();
+        })
+        .catch(e => showMsg('Failed: ' + e.message, false));
+    });
+    document.getElementById('sessionReset').addEventListener('click', () => {
+      if (!confirm('Reset stream session? Clears fard, first-words, summon/bestiary session. Does NOT wipe viewer points.')) return;
+      fetch('/api/session/reset', { method: 'POST' })
+        .then(r => r.json()).then(d => {
+          if (d.error || d.ok === false) throw new Error(d.error || d.message || 'reset failed');
+          showMsg('Session reset', true);
+          logActivity('Session reset');
+          refreshLiveStatus();
+        })
+        .catch(e => showMsg('Failed: ' + e.message, false));
+    });
+    document.getElementById('sessionScheduleEnd').addEventListener('click', () => {
+      fetch('/api/session/end', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ force: false }) })
+        .then(r => r.json()).then(d => {
+          if (d.error || d.ok === false) throw new Error(d.error || 'schedule failed');
+          if (d.executed) {
+            showMsg('Stream end executed (auto-bank)', true);
+            logActivity('Session end executed');
+          } else {
+            showMsg('Stream end scheduled', true);
+            logActivity('Session end scheduled');
+          }
+          refreshLiveStatus();
+        })
+        .catch(e => showMsg('Failed: ' + e.message, false));
+    });
+    document.getElementById('sessionForceEnd').addEventListener('click', () => {
+      if (!confirm('FORCE stream end now? This auto-banks chat points and wipes chat balances immediately.')) return;
+      fetch('/api/session/end', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ force: true }) })
+        .then(r => r.json()).then(d => {
+          if (d.error || d.ok === false) throw new Error(d.error || 'force end failed');
+          const n = d.users_affected != null ? d.users_affected : '?';
+          const donor = d.donor_pts_awarded != null ? d.donor_pts_awarded : '?';
+          showMsg('Force end: ' + n + ' users, +' + donor + ' donor', true);
+          logActivity('Session force end (' + n + ' users)');
+          loadViewerPoints(true);
+          refreshLiveStatus();
+        })
+        .catch(e => showMsg('Failed: ' + e.message, false));
+    });
     document.getElementById('doublePointsStart').addEventListener('click', () => {
       const mins = Math.max(1, Math.min(1440, parseInt(document.getElementById('doublePointsMins').value, 10) || 5));
       fetch('/api/double-points-start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ minutes: mins }) })
-        .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('2x points started for ' + mins + ' min', true); logActivity('2x points started'); })
+        .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('2x points started for ' + mins + ' min', true); logActivity('2x points started'); refreshLiveStatus(); })
         .catch(e => showMsg('Failed: ' + e.message, false));
     });
+    document.getElementById('doublePointsExtend').addEventListener('click', () => {
+      const mins = Math.max(1, Math.min(1440, parseInt(document.getElementById('doublePointsMins').value, 10) || 5));
+      fetch('/api/double-points-extend', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ minutes: mins }) })
+        .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('2x extended +' + mins + ' min', true); logActivity('2x points extended'); refreshLiveStatus(); })
+        .catch(e => showMsg('Failed: ' + e.message, false));
+    });
+    document.getElementById('doublePointsStop').addEventListener('click', () => {
+      fetch('/api/double-points-stop', { method: 'POST' })
+        .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('2x points stopped', true); logActivity('2x points stopped'); refreshLiveStatus(); })
+        .catch(e => showMsg('Failed: ' + e.message, false));
+    });
+    function sessionClearUser(kinds) {
+      const username = (document.getElementById('sessionClearUser')?.value || '').trim();
+      if (!username) { showMsg('Enter a username', false); return; }
+      fetch('/api/session/clear-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, clear: kinds }),
+      })
+        .then(r => r.json()).then(d => {
+          if (d.error || d.ok === false) throw new Error(d.error || 'clear failed');
+          showMsg('Cleared ' + (d.removed || []).join(', ') + ' for ' + username, true);
+          logActivity('Session clear ' + kinds.join('+') + ': ' + username);
+          refreshLiveStatus();
+        })
+        .catch(e => showMsg('Failed: ' + e.message, false));
+    }
+    document.getElementById('sessionClearFard').addEventListener('click', () => sessionClearUser(['fard']));
+    document.getElementById('sessionClearFirstWords').addEventListener('click', () => sessionClearUser(['first_words']));
+    document.getElementById('cprConvert').addEventListener('click', () => {
+      const username = (document.getElementById('cprUsername')?.value || document.getElementById('vp_search')?.value || '').trim();
+      const channelPoints = parseInt(document.getElementById('cprChannelPoints')?.value, 10) || 0;
+      const donorPoints = parseInt(document.getElementById('cprDonorPoints')?.value, 10) || 0;
+      if (!username) { showMsg('Enter CPR username', false); return; }
+      if (channelPoints <= 0 && donorPoints <= 0) { showMsg('Enter channel points or donor points', false); return; }
+      fetch('/api/channel-points/convert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, channelPoints, donorPoints }),
+      })
+        .then(r => r.json()).then(d => {
+          if (d.error || d.ok === false) throw new Error(d.error || d.message || 'convert failed');
+          showMsg(d.message || ('Converted for ' + username), true);
+          logActivity('CPR convert: ' + username);
+          loadViewerPoints(true);
+        })
+        .catch(e => showMsg('Failed: ' + e.message, false));
+    });
+    setInterval(refreshLiveStatus, 2500);
+    refreshLiveStatus();
+    renderCmdDisableGrid({});
     (function updateDoublePointsCountdown() {
       const el = document.getElementById('doublePointsCountdown');
       if (!el) return;
@@ -1807,6 +2673,9 @@
       document.getElementById('cfg-section-viewer').checked = cfg.sections.viewer !== false;
       document.getElementById('cfg-section-game').checked = cfg.sections.game !== false;
       document.getElementById('cfg-section-score').checked = cfg.sections.score !== false;
+      document.getElementById('cfg-section-session').checked = cfg.sections.session !== false;
+      document.getElementById('cfg-section-bestiary').checked = cfg.sections.bestiary !== false;
+      document.getElementById('cfg-section-companion').checked = cfg.sections.companion !== false;
       document.getElementById('cfg-section-activity').checked = cfg.sections.activity !== false;
       document.getElementById('overallConfigModal').classList.add('open');
     });
@@ -1814,7 +2683,7 @@
       if (e.target.id === 'overallConfigModal') e.target.classList.remove('open');
     });
     document.getElementById('overallConfigApply').addEventListener('click', () => {
-      const order = getSectionOrder().length ? getSectionOrder() : ['general', 'monsters', 'viewer', 'game', 'score'];
+      const order = getSectionOrder().length ? getSectionOrder() : ['general', 'monsters', 'viewer', 'companion', 'game', 'score', 'session', 'bestiary'];
       const monsterCols = document.querySelector('input[name="monsterCols"]:checked').value;
       const cfg = getOverallConfig();
       const applied = {
@@ -1825,6 +2694,9 @@
           viewer: document.getElementById('cfg-section-viewer').checked,
           game: document.getElementById('cfg-section-game').checked,
           score: document.getElementById('cfg-section-score').checked,
+          session: document.getElementById('cfg-section-session').checked,
+          bestiary: document.getElementById('cfg-section-bestiary').checked,
+          companion: document.getElementById('cfg-section-companion').checked,
           activity: document.getElementById('cfg-section-activity').checked,
         },
         order,
@@ -1843,12 +2715,16 @@
       document.getElementById('cfg-section-viewer').checked = true;
       document.getElementById('cfg-section-game').checked = true;
       document.getElementById('cfg-section-score').checked = true;
+      document.getElementById('cfg-section-session').checked = true;
+      document.getElementById('cfg-section-bestiary').checked = true;
+      document.getElementById('cfg-section-companion').checked = true;
       document.getElementById('cfg-section-activity').checked = true;
     });
     document.getElementById('overallConfigRestoreLayout').addEventListener('click', () => {
       const cfg = getOverallConfig();
-      cfg.order = ['general', 'monsters', 'viewer', 'game', 'score'];
-      cfg.columnCounts = [2, 1, 2];
+      cfg.order = ['general', 'monsters', 'viewer', 'companion', 'game', 'score', 'session', 'bestiary'];
+      cfg.columnCounts = [2, 2, 4];
+      cfg.sections.companion = true;
       saveOverallConfig(cfg);
       document.getElementById('overallConfigModal').classList.remove('open');
       applyOverallConfig();
@@ -1856,12 +2732,35 @@
     document.getElementById('vp_search').addEventListener('input', filterViewerPoints);
     const activityFilterEl = document.getElementById('activityFilter');
     if (activityFilterEl) activityFilterEl.addEventListener('input', renderActivityList);
+    const activityTypeFilterEl = document.getElementById('activityTypeFilter');
+    if (activityTypeFilterEl) activityTypeFilterEl.addEventListener('change', renderActivityList);
     ['vp_search', 'new_points', 'new_donation'].forEach(id => {
       document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') addViewerUser(); });
     });
     applyOverallConfig();
     applyColumnWidths();
     load();
+    loadBestiaryConfig();
+    document.getElementById('bestiaryConfigSave')?.addEventListener('click', saveBestiaryConfig);
+    document.getElementById('bestiaryConfigReload')?.addEventListener('click', () => {
+      loadBestiaryConfig().then(() => { showMsg('Bestiary config reloaded', true); });
+    });
+    (function initCompanionPanel() {
+      const root = document.getElementById('companionPanelRoot');
+      const section = document.getElementById('section-companion');
+      if (section) section.style.display = '';
+      if (window.CompanionSettingsPanel) {
+        try {
+          CompanionSettingsPanel.init({ showMsg, logActivity });
+        } catch (e) {
+          console.error(e);
+          if (root) root.innerHTML = '<p class="sub" style="color:var(--spd-error);">Companion panel failed to init: ' + (e && e.message ? e.message : e) + '</p>';
+        }
+      } else if (root) {
+        root.innerHTML = '<p class="sub" style="color:var(--spd-error);">Could not load <code>/companion_settings_panel.js</code>. Restart Flask and hard-refresh (Ctrl+F5).</p>';
+      }
+    })();
+
 
     (function setupColumnResize() {
       const grid = document.getElementById('mainGrid');

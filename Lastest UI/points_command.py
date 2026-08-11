@@ -330,6 +330,7 @@ def load_config():
         "bank_ratio_auto_member": 0.10,
         "donation_multiplier_cap": 4,
         "reset_debounce_hours": 4,
+        "death_cost_inflation_enabled": True,
     }
     if not os.path.exists(CONFIG_FILE):
         return defaults
@@ -383,6 +384,10 @@ def load_config():
             "bank_ratio_auto_member": float(cfg.get("bank_ratio_auto_member", defaults["bank_ratio_auto_member"])),
             "donation_multiplier_cap": max(1, int(cfg.get("donation_multiplier_cap", defaults["donation_multiplier_cap"]))),
             "reset_debounce_hours": max(0, float(cfg.get("reset_debounce_hours", defaults["reset_debounce_hours"]))),
+            "death_cost_inflation_enabled": bool(cfg.get(
+                "death_cost_inflation_enabled",
+                defaults["death_cost_inflation_enabled"],
+            )),
         }
     except Exception:
         return defaults
@@ -391,6 +396,11 @@ def load_config():
 def get_config():
     """Cached config (reloads each command to allow live edits)."""
     return load_config()
+
+
+def is_death_cost_inflation_enabled() -> bool:
+    """True when hero deaths should inflate harmful command costs."""
+    return bool(get_config().get("death_cost_inflation_enabled", True))
 
 
 def ignores_command_cooldowns(username: str) -> bool:
@@ -445,6 +455,8 @@ def get_death_cost_deaths() -> int:
 
 
 def get_death_cost_multiplier() -> float:
+    if not is_death_cost_inflation_enabled():
+        return 1.0
     deaths = get_death_cost_deaths()
     if deaths <= 0:
         return 1.0
@@ -452,7 +464,9 @@ def get_death_cost_multiplier() -> float:
 
 
 def format_death_cost_display() -> str:
-    """OBS-friendly one-liner; empty when costs are normal."""
+    """OBS-friendly one-liner; empty when costs are normal or feature is off."""
+    if not is_death_cost_inflation_enabled():
+        return ""
     deaths = get_death_cost_deaths()
     if deaths <= 0:
         return ""
@@ -477,6 +491,9 @@ def refresh_death_cost_display_file() -> str:
 
 def on_hero_death_cost_inflation() -> int:
     """Increment death counter (+50% harmful costs per death, compounded)."""
+    if not is_death_cost_inflation_enabled():
+        refresh_death_cost_display_file()
+        return get_death_cost_deaths()
     state = _load_death_cost_state()
     state["deaths"] = state.get("deaths", 0) + 1
     _save_death_cost_state(state)
@@ -492,7 +509,7 @@ def on_boss_slain_cost_inflation_reset() -> None:
 
 def apply_death_cost_inflation(command_id: str, cost: int) -> int:
     """Apply compound +50% per death to harmful commands; helpful commands exempt."""
-    if cost <= 0:
+    if cost <= 0 or not is_death_cost_inflation_enabled():
         return cost
     cmd = (command_id or "").lower()
     if cmd in DEATH_COST_EXEMPT_COMMANDS:
@@ -750,11 +767,12 @@ def _early_spawn_multiplier(depth: int, native: int) -> int:
     return 1
 
 
-def compute_spawn_cost(monster: str) -> int:
+def compute_spawn_cost(monster: str, depth: int | None = None) -> int:
     """Late discount when deeper than native; early surcharge when shallower (+20% per tier step above baseline)."""
     cfg = get_config()
     base = cfg["cost_per_monster"].get(monster, cfg["default_monster_cost"])
-    depth = get_current_depth()
+    if depth is None:
+        depth = get_current_depth()
     native = NATIVE_DEPTH.get(monster)
     if depth is None or native is None:
         return base
@@ -767,9 +785,9 @@ def compute_spawn_cost(monster: str) -> int:
     return base
 
 
-def compute_champion_cost(monster: str) -> int:
+def compute_champion_cost(monster: str, depth: int | None = None) -> int:
     """2× zone-adjusted spawn cost (same early/late rules as !spawn)."""
-    return 2 * compute_spawn_cost(monster)
+    return 2 * compute_spawn_cost(monster, depth)
 
 
 def _http_error_msg(e, default_timeout: str) -> str:

@@ -4,6 +4,8 @@ extends Control
 const _SpdUi := preload("res://scripts/spd_ui_art.gd")
 
 var _panel: PanelContainer
+var _panel_margin: MarginContainer
+var _main_vbox: VBoxContainer
 var _zone_label: Label
 var _bar_holder: Control
 var _exp_track: ColorRect
@@ -13,6 +15,7 @@ var _exp_text: Label
 var _sprint_label: Label
 var _heat_label: Label
 var _hall_row: HBoxContainer
+var _chips_row: HBoxContainer
 var _banner: TextureRect
 var _banner_label: Label
 var _banner_tween: Tween
@@ -72,25 +75,27 @@ func _build() -> void:
 	add_child(_panel)
 
 	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 8)
-	margin.add_theme_constant_override("margin_right", 8)
-	margin.add_theme_constant_override("margin_top", 6)
-	margin.add_theme_constant_override("margin_bottom", 6)
+	_panel_margin = margin
+	_apply_panel_padding()
 	_panel.add_child(margin)
 
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 4)
+	vbox.add_theme_constant_override("separation", 2)
 	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	margin.add_child(vbox)
+	_main_vbox = vbox
 
 	_zone_label = Label.new()
 	_zone_label.text = _format_header(1, "Sewers")
+	_zone_label.clip_text = true
+	_zone_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_zone_label.add_theme_font_override("font", _SpdUi.hud_font())
 	_SpdUi.apply_label_smooth(_zone_label)
 	vbox.add_child(_zone_label)
 
 	_bar_holder = Control.new()
 	_bar_holder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_bar_holder.clip_contents = false
 	_sync_bar_holder_min_size()
 	vbox.add_child(_bar_holder)
 
@@ -110,14 +115,17 @@ func _build() -> void:
 
 	_exp_text = Label.new()
 	_exp_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_exp_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_exp_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_exp_text.add_theme_font_override("font", _SpdUi.hud_font())
 	_SpdUi.apply_label_smooth(_exp_text)
 	vbox.add_child(_exp_text)
 
 	var chips := HBoxContainer.new()
-	chips.add_theme_constant_override("separation", 8)
+	chips.add_theme_constant_override("separation", 4)
 	chips.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.add_child(chips)
+	_chips_row = chips
 
 	var sprint_panel := PanelContainer.new()
 	sprint_panel.add_theme_stylebox_override("panel", _SpdUi.chrome_style_red_button())
@@ -178,24 +186,75 @@ func _build() -> void:
 func _mount_banner_on_layer() -> void:
 	var layer := get_parent()
 	if layer == null:
-		add_child(_banner)
-		add_child(_banner_label)
+		if _banner.get_parent() != self:
+			if _banner.get_parent():
+				_banner.get_parent().remove_child(_banner)
+			add_child.call_deferred(_banner)
+		if _banner_label.get_parent() != self:
+			if _banner_label.get_parent():
+				_banner_label.get_parent().remove_child(_banner_label)
+			add_child.call_deferred(_banner_label)
 		return
 	if _banner.get_parent() != layer:
 		if _banner.get_parent():
 			_banner.get_parent().remove_child(_banner)
-		layer.add_child(_banner)
+		# Defer: parent CanvasLayer may still be mid-_ready when HUD builds.
+		layer.add_child.call_deferred(_banner)
 	if _banner_label.get_parent() != layer:
 		if _banner_label.get_parent():
 			_banner_label.get_parent().remove_child(_banner_label)
-		layer.add_child(_banner_label)
+		layer.add_child.call_deferred(_banner_label)
 
 
 func _content_width() -> float:
-	## Panel follows HUD zone width; exp bar fills that (bar width is a floor only).
+	## Unscaled panel content width (= zone width / HUD scale).
+	return _panel_layout_width()
+
+
+func _panel_layout_width() -> float:
 	var zone_w := float(maxi(CompanionConfig.bestiary_zone_width_px, 64))
-	var bar_w := float(clampi(CompanionConfig.bestiary_exp_bar_width_px, 64, 1600))
-	return maxf(zone_w, bar_w + 24.0)
+	var hud_s := clampf(CompanionConfig.bestiary_hud_scale, 0.5, 4.0)
+	return maxf(48.0, zone_w / hud_s)
+
+
+func _apply_panel_padding() -> void:
+	var pad := clampi(CompanionConfig.bestiary_panel_pad_px, 0, 64)
+	if _panel_margin:
+		_panel_margin.add_theme_constant_override("margin_left", pad)
+		_panel_margin.add_theme_constant_override("margin_right", pad)
+		_panel_margin.add_theme_constant_override("margin_top", pad)
+		_panel_margin.add_theme_constant_override("margin_bottom", pad)
+	if _main_vbox:
+		_main_vbox.add_theme_constant_override("separation", 2 if pad <= 4 else 4)
+
+
+func _bestiary_chrome_style() -> StyleBoxTexture:
+	## Border thickens with chrome scale; padding comes from MarginContainer only.
+	var sb := _SpdUi.chrome_style_window(CompanionConfig.bestiary_chrome_scale)
+	sb.content_margin_left = 0
+	sb.content_margin_right = 0
+	sb.content_margin_top = 0
+	sb.content_margin_bottom = 0
+	return sb
+
+
+func _fit_zone_height(canvas: Vector2) -> void:
+	## Height 0 → hug panel. Height > 0 → fixed max; clip overflow. Bottom margin caps against canvas.
+	var hud_s := clampf(CompanionConfig.bestiary_hud_scale, 0.5, 4.0)
+	var y := int(offset_top)
+	var max_h := maxi(32, int(canvas.y) - y - CompanionConfig.bestiary_zone_bottom_margin_px)
+	var panel_h := 64.0
+	if _panel:
+		panel_h = maxf(32.0, _panel.get_combined_minimum_size().y * hud_s)
+	var hh: int
+	var h_set := CompanionConfig.bestiary_zone_height_px
+	if h_set <= 0:
+		hh = clampi(int(ceil(panel_h)), 32, max_h)
+		clip_contents = panel_h > float(max_h) + 0.5
+	else:
+		hh = clampi(h_set, 32, max_h)
+		clip_contents = true
+	offset_bottom = offset_top + float(hh)
 
 
 func _exp_native_size() -> Vector2:
@@ -215,12 +274,41 @@ func _bar_draw_size(holder_w: float) -> Vector2:
 	return Vector2(maxf(32.0, bar_w), bar_h)
 
 
+func _xp_text_font_size() -> int:
+	var zfs := clampi(CompanionConfig.bestiary_zone_font_size_px, 8, 96)
+	return maxi(8, zfs - 2)
+
+
 func _sync_bar_holder_min_size() -> void:
 	if _bar_holder == null:
 		return
-	var draw := _bar_draw_size(0.0)
-	var inner_w := maxf(draw.x, _content_width() - 24.0)
-	_bar_holder.custom_minimum_size = Vector2(inner_w, draw.y)
+	var draw_sz := _bar_draw_size(0.0)
+	var inner_w := maxf(draw_sz.x, _content_width() - 24.0)
+	var h := draw_sz.y
+	if CompanionConfig.bestiary_xp_text_over_bar and CompanionConfig.bestiary_show_xp_text:
+		h = maxf(h, float(_xp_text_font_size() + 6))
+	_bar_holder.custom_minimum_size = Vector2(inner_w, h)
+
+
+func _apply_xp_text_placement() -> void:
+	if _exp_text == null or _bar_holder == null or _main_vbox == null:
+		return
+	var over := CompanionConfig.bestiary_xp_text_over_bar
+	if over:
+		if _exp_text.get_parent() != _bar_holder:
+			if _exp_text.get_parent():
+				_exp_text.get_parent().remove_child(_exp_text)
+			_bar_holder.add_child(_exp_text)
+		_exp_text.z_index = 5
+	else:
+		if _exp_text.get_parent() != _main_vbox:
+			if _exp_text.get_parent():
+				_exp_text.get_parent().remove_child(_exp_text)
+			_main_vbox.add_child(_exp_text)
+			_main_vbox.move_child(_exp_text, _bar_holder.get_index() + 1)
+		_exp_text.z_index = 0
+		_exp_text.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+		_exp_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 
 func _layout_exp_bar(_unused: Variant = null) -> void:
@@ -229,14 +317,18 @@ func _layout_exp_bar(_unused: Variant = null) -> void:
 	var holder_w := _bar_holder.size.x
 	if holder_w < 1.0:
 		holder_w = maxf(64.0, _content_width() - 24.0)
-	var draw := _bar_draw_size(holder_w)
-	var bar_w := draw.x
-	var bar_h := draw.y
+	var draw_sz := _bar_draw_size(holder_w)
+	var bar_w := draw_sz.x
+	var bar_h := draw_sz.y
+	var holder_h := maxf(bar_h, _bar_holder.size.y)
+	if CompanionConfig.bestiary_xp_text_over_bar and CompanionConfig.bestiary_show_xp_text:
+		holder_h = maxf(holder_h, float(_xp_text_font_size() + 6))
+	var y_off := (holder_h - bar_h) * 0.5
 	var frac := 0.0
 	if not _last_payload.is_empty():
 		frac = clampf(float(_last_payload.get("bar_fraction", 0.0)), 0.0, 1.0)
 
-	_exp_track.position = Vector2.ZERO
+	_exp_track.position = Vector2(0.0, y_off)
 	_exp_track.size = Vector2(bar_w, bar_h)
 
 	# Crop the left portion of the SPD exp strip (don't squash the rounded tip).
@@ -254,9 +346,13 @@ func _layout_exp_bar(_unused: Variant = null) -> void:
 		)
 		_exp_fill.texture = _exp_fill_atlas
 	var fill_w := bar_w * frac
-	_exp_fill.position = Vector2.ZERO
+	_exp_fill.position = Vector2(0.0, y_off)
 	_exp_fill.size = Vector2(fill_w, bar_h)
 	_exp_fill.visible = fill_w >= 0.5
+
+	if _exp_text and CompanionConfig.bestiary_xp_text_over_bar:
+		_exp_text.position = Vector2(0.0, 0.0)
+		_exp_text.size = Vector2(bar_w, holder_h)
 
 
 func _layout_banner(canvas: Vector2) -> void:
@@ -289,21 +385,23 @@ func _layout_banner(canvas: Vector2) -> void:
 func _apply_layout() -> void:
 	var canvas := CompanionConfig.layout_canvas_size(self)
 	CompanionConfig.apply_bestiary_zone_layout(self, canvas)
-	var content_w := _content_width()
 	var hud_s := clampf(CompanionConfig.bestiary_hud_scale, 0.5, 4.0)
+	var panel_w := _panel_layout_width()
+	_apply_panel_padding()
 	if _panel:
-		# Layout size is unscaled; scale grows chrome/fonts/bar/icons together.
-		_panel.custom_minimum_size = Vector2(content_w, 0)
+		# Width tracks zone; scale grows visual size. Height hugs content (then zone refit).
+		_panel.custom_minimum_size = Vector2(panel_w, 0)
 		_panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		_panel.scale = Vector2(hud_s, hud_s)
-		_panel.add_theme_stylebox_override(
-			"panel", _SpdUi.chrome_style_window(CompanionConfig.bestiary_chrome_scale)
-		)
+		_panel.add_theme_stylebox_override("panel", _bestiary_chrome_style())
 	_sync_bar_holder_min_size()
 	_refresh_fonts()
+	_apply_xp_text_placement()
 	_exp_fill_atlas = _SpdUi.exp_fill_texture(CompanionConfig.bestiary_use_compact_exp_bar)
 	_exp_fill.texture = _exp_fill_atlas
 	_layout_exp_bar()
+	_fit_zone_height(canvas)
 	_layout_banner(canvas)
 
 
@@ -328,9 +426,25 @@ func _refresh_fonts() -> void:
 		_zone_label.add_theme_font_size_override("font_size", zfs)
 		_zone_label.add_theme_color_override("font_color", CompanionConfig.bestiary_zone_font_color)
 	if _exp_text:
-		_exp_text.add_theme_font_size_override("font_size", maxi(8, zfs - 2))
-		_exp_text.add_theme_color_override("font_color", CompanionConfig.bestiary_xp_font_color)
+		_exp_text.add_theme_font_size_override("font_size", _xp_text_font_size())
+		var xp_col := CompanionConfig.bestiary_xp_font_color
+		var over := CompanionConfig.bestiary_xp_text_over_bar
+		if over and xp_col.a < 0.9:
+			xp_col.a = 1.0
+		_exp_text.add_theme_color_override("font_color", xp_col)
 		_exp_text.visible = CompanionConfig.bestiary_show_xp_text
+		if over:
+			_exp_text.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.95))
+			_exp_text.add_theme_constant_override("shadow_offset_x", 1)
+			_exp_text.add_theme_constant_override("shadow_offset_y", 1)
+			_exp_text.add_theme_constant_override("outline_size", 3)
+			_exp_text.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
+		else:
+			_exp_text.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0))
+			_exp_text.add_theme_constant_override("shadow_offset_x", 0)
+			_exp_text.add_theme_constant_override("shadow_offset_y", 0)
+			_exp_text.add_theme_constant_override("outline_size", 0)
+			_exp_text.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0))
 	if _sprint_label:
 		_sprint_label.add_theme_font_size_override("font_size", cfs)
 		_sprint_label.add_theme_color_override("font_color", CompanionConfig.bestiary_sprint_font_color)

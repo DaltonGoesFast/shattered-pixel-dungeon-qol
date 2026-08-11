@@ -186,30 +186,30 @@ static func _style_from_path(
 	cb: int,
 	border_scale: float = 1.0,
 ) -> StyleBoxTexture:
-	var scale := clampf(border_scale, 0.5, 4.0)
+	var border_s := clampf(border_scale, 0.5, 4.0)
 	var tex := _load_tex(path)
 	var sb := StyleBoxTexture.new()
 	if tex:
-		if absf(scale - 1.0) > 0.01:
+		if absf(border_s - 1.0) > 0.01:
 			var img: Image = tex.get_image()
 			if img != null:
 				img = img.duplicate()
-				var w := maxi(1, int(round(float(img.get_width()) * scale)))
-				var h := maxi(1, int(round(float(img.get_height()) * scale)))
+				var w := maxi(1, int(round(float(img.get_width()) * border_s)))
+				var h := maxi(1, int(round(float(img.get_height()) * border_s)))
 				img.resize(w, h, Image.INTERPOLATE_NEAREST)
 				sb.texture = ImageTexture.create_from_image(img)
 			else:
 				sb.texture = tex
 		else:
 			sb.texture = tex
-	sb.texture_margin_left = float(ml) * scale
-	sb.texture_margin_top = float(mt) * scale
-	sb.texture_margin_right = float(mr) * scale
-	sb.texture_margin_bottom = float(mb) * scale
-	sb.content_margin_left = float(cl) * scale
-	sb.content_margin_top = float(ct) * scale
-	sb.content_margin_right = float(cr) * scale
-	sb.content_margin_bottom = float(cb) * scale
+	sb.texture_margin_left = float(ml) * border_s
+	sb.texture_margin_top = float(mt) * border_s
+	sb.texture_margin_right = float(mr) * border_s
+	sb.texture_margin_bottom = float(mb) * border_s
+	sb.content_margin_left = float(cl) * border_s
+	sb.content_margin_top = float(ct) * border_s
+	sb.content_margin_right = float(cr) * border_s
+	sb.content_margin_bottom = float(cb) * border_s
 	return sb
 
 
@@ -242,9 +242,9 @@ static func hud_font() -> Font:
 	var soft: FontFile = base.duplicate() as FontFile
 	if soft == null:
 		return base
-	# 1 = gray antialiasing, 1 = light hinting (avoid FontFile enum names for parser compat)
-	soft.antialiasing = 1
-	soft.hinting = 1
+	# Gray antialiasing + light hinting for readable overlay text.
+	soft.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
+	soft.hinting = TextServer.HINTING_LIGHT
 	soft.oversampling = 2.0
 	_hud_font_cache = soft
 	return soft
