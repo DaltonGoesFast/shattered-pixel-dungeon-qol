@@ -107,7 +107,12 @@ public class FileUtils {
 						}
 
 					} catch (Exception e) {
-						temp.delete();
+						if (!temp.delete() && temp.exists()) {
+							// Fallback when libGDX delete fails after a bad read (Windows locks)
+							try {
+								temp.file().delete();
+							} catch (Exception ignored) {}
+						}
 					}
 
 					foundTemp = true;
@@ -189,9 +194,15 @@ public class FileUtils {
 	}
 	
 	private static Bundle bundleFromStream( InputStream input ) throws IOException{
-		Bundle bundle = Bundle.read( input );
-		input.close();
-		return bundle;
+		try {
+			return Bundle.read( input );
+		} finally {
+			// Always close: if Bundle.read fails (e.g. truncated .spdtmp), leaving the
+			// stream open can lock the file on Windows so cleanTempFiles can't delete it.
+			try {
+				input.close();
+			} catch (Exception ignored) {}
+		}
 	}
 	
 	// bundle writing

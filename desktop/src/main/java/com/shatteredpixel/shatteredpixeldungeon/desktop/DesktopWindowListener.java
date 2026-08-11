@@ -52,19 +52,11 @@ public class DesktopWindowListener implements Lwjgl3WindowListener {
 		}
 	}
 	public boolean closeRequested () {
-		// Never block the LWJGL close callback — a hung writer/websocket stop used to
-		// prevent halt(), leaving :desktop:debug stuck at IDLE with SE binary alive.
-		// Watchdog guarantees process death even if cleanup hangs.
-		Thread watchdog = new Thread(() -> {
-			try {
-				Thread.sleep(3000);
-			} catch (InterruptedException ignored) {}
-			System.out.println("[Desktop] Force-exit (watchdog)");
-			Runtime.getRuntime().halt(0);
-		}, "DesktopRunExitWatchdog");
-		watchdog.setDaemon(true);
-		watchdog.start();
-
+		// Return true so LWJGL runs a normal close → Game.pause() → Dungeon.saveAll().
+		// Do NOT halt() from the cleanup thread: that used to kill the JVM mid-save and
+		// leave *.spdtmp files, so WelcomeScene showed the save-interrupted warning every
+		// subsequent launch. Stop streaming/training off-thread (those stops can hang).
+		// Watchdog is a last resort only if the process never exits on its own.
 		Thread cleanup = new Thread(() -> {
 			try {
 				TrainingExportBootstrapper.stop();
@@ -72,11 +64,21 @@ public class DesktopWindowListener implements Lwjgl3WindowListener {
 			} catch (Throwable t) {
 				t.printStackTrace();
 			}
-			System.out.println("[Desktop] Exit after cleanup");
-			Runtime.getRuntime().halt(0);
-		}, "DesktopRunExit");
-		cleanup.setDaemon(false);
+			System.out.println("[Desktop] Exit cleanup finished (streaming/training)");
+		}, "DesktopRunExitCleanup");
+		cleanup.setDaemon(true);
 		cleanup.start();
+
+		Thread watchdog = new Thread(() -> {
+			try {
+				Thread.sleep(10000);
+			} catch (InterruptedException ignored) {}
+			System.out.println("[Desktop] Force-exit (watchdog)");
+			Runtime.getRuntime().halt(0);
+		}, "DesktopRunExitWatchdog");
+		watchdog.setDaemon(true);
+		watchdog.start();
+
 		return true;
 	}
 	public void filesDropped ( String[] strings ) { }
