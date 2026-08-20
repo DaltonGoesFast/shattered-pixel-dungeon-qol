@@ -2,9 +2,9 @@
 
 > **Superseded (Phase 5):** The live setup is the **9-action HTTP gateway**, not the ~40-action model below.  
 > **Use these instead:**
-> - **Build / maintain:** [streamerbot-http-gateway-apply.md](streamerbot-http-gateway-apply.md)
-> - **Roadmap:** [streaming-system-rework-plan.md](streaming-system-rework-plan.md)
-> - **Quick setup:** [streaming-setup-guide.md](streaming-setup-guide.md)
+> - **Build / maintain:** [streamerbot-http-gateway-apply.md](../streamerbot-http-gateway-apply.md)
+> - **Roadmap:** [streaming-system-rework-plan.md](../streaming-system-rework-plan.md)
+> - **Quick setup:** [streaming-setup-guide.md](../streaming-setup-guide.md)
 > - **Off-stream tests:** `Lastest UI/phase3_rapid_test.ps1`
 > - **Import bot:** `Lastest UI/streamerbot/shatter-the-streamer-export-0.2.0.txt` (export from your live R1–R9 bot)
 
@@ -21,20 +21,20 @@
 | R9 Presentation | `!fard` OBS + sound (queued from R1) |
 | R10 Stream end | Stream Offline → `POST /api/session/end` (debounced chat wipe + auto-bank) |
 
-**Economy v1.1 (server):** 2 pt/msg, 20s CD, 500 chat cap, `!bank` (10%), donor wallet, donation **4×** cap, stream-end auto-bank (5% / 10% members). Spec: [Chat Command Economy v1.md](Chat%20Command%20Economy%20v1.md). Apply: [economy-v11-apply.md](economy-v11-apply.md).
+**Economy v1.1 (server):** 2 pt/msg, 20s CD, 500 chat cap, `!bank` (10%), donor wallet, donation **4×** cap, stream-end auto-bank (5% / 10% members). Spec: [Chat Command Economy v1.md](../Chat%20Command%20Economy%20v1.md). Apply: [economy-v11-apply.md](../economy-v11-apply.md).
 
 **No** per-command Streamer.bot actions. **No** `spawn_result.txt` / `donation_result.txt` in the live path.  
 C# snippets: `Lastest UI/streamerbot/phase2/`.
 
-**Fard:** Server returns `message` + `presentation` → R1 chat reply + R9 OBS/sound. See [fard-system.md](fard-system.md).  
-**Summon march:** `!summon` handled in R1; Godot overlay polls `/api/summon-march`. See [summon-march-system.md](summon-march-system.md).
+**Fard:** Server returns `message` + `presentation` → R1 chat reply + R9 OBS/sound. See [fard-system.md](../fard-system.md).  
+**Summon march:** `!summon` handled in R1; Godot overlay polls `/api/summon-march`. See [summon-march-system.md](../summon-march-system.md).
 
 ---
 
 ## Archived: ~40-action walkthrough (pre–HTTP gateway)
 
 The content below (~3800 lines) documents the **old** Run Program + `spawn_result.txt` + per-command C# parsers.  
-**Do not build new setups from it.** Index: [archive/README.md](archive/README.md).
+**Do not build new setups from it.** Index: [README.md](README.md).
 
 ---
 
@@ -66,7 +66,7 @@ Use this list when updating an **existing** setup. Game code fixes (corrupt `!al
 |------|-----|----------------|
 | **`!wand` Run a Program** | Unified wand: **one** cost (`cost_per_wand`), weighted random effect in the game. | [Action 18](#action-18-cursed-wand-effect-wand-with-points) |
 | **Cheer + Super Chat optional args** | So bits / Super Chat get the same **stacking 2×** as chat (!doublepoints, **top summoner**, sub/member). Without the extra args, only global double points + top summoner apply on donations. | [Action 20](#action-20-earn-points-cheer), [Action 21](#action-21-earn-points-super-chat), [argument reference](#cheer--super-chat--argument-reference). |
-| **Top summoner 2× (chat earn)** | Session leader from `!summon` — handled on server via R1; see [summon-march-system.md](summon-march-system.md). | Legacy C# in archived Actions 01–03 below. |
+| **Top summoner 2× (chat earn)** | Session leader from `!summon` — handled on server via R1; see [summon-march-system.md](../summon-march-system.md). | Legacy C# in archived Actions 01–03 below. |
 | **Gift sub / gift membership** | Not automatic — add [Action 40](#action-40-earn-points-gift-sub--gift-membership). | [Action 40](#action-40-earn-points-gift-sub--gift-membership) (after `!plant`). |
 | **Super Chat / Cheer** | Donation points require Actions 20–21 on the points queue; see HTTP fallback if Run Program fails. | [Action 20](#action-20-earn-points-cheer), [Action 21](#action-21-earn-points-super-chat). |
 | **Chat → donor by %** | Transfer part of chat-only points into donor points from the overlay. | Open **points-config** in the browser (`/points-config`): set **Chat→Donor %** next to the button, then **Chat → Donor**. Not a Streamer.bot change. |
@@ -284,7 +284,7 @@ bool IsTopSummoner(string userKey)
 - **Passive cooldown:** `60` seconds (change `COOLDOWN_SEC` in Earn Points passive; shares `lastEarn` with chat)
 - **Points costs:** Edit `points_config.json` or open **http://localhost:5000** in your browser (main control page; overlay server must be running). The overlay also has **Delete all points** (clears non-donor only; donors keep donation) and **Delete all donor points** (full wipe).
 - **Donation rate:** 1 point per $0.01 (Super Chat uses Frankfurter API for conversion; not in points config)
-- **Fard extends 2×:** Viewers use `!fard` once per stream to add **+3 min** (**+6 min** for subs/members) to global 2×. See [fard-system.md](fard-system.md) and R1/R9 in [streamerbot-http-gateway-apply.md](streamerbot-http-gateway-apply.md).
+- **Fard extends 2×:** Viewers use `!fard` once per stream to add **+3 min** (**+6 min** for subs/members) to global 2×. See [fard-system.md](../fard-system.md) and R1/R9 in [streamerbot-http-gateway-apply.md](../streamerbot-http-gateway-apply.md).
 - **Top summoner 2×:** Session `!summon` leader earns 2× on personal points (chat, passive, First Words, donations). See [Top summoner 2×](#top-summoner-2-personal-points).
 - **Subscriber / member 2×:** Twitch subscribers and YouTube channel members earn 2× points. Uses Streamer.bot variables `isSubscribed` (Twitch) and `userIsSponsor` (YouTube). Stacks with double points and top summoner (e.g. **8×** when all three apply).
 
@@ -2462,7 +2462,7 @@ public class CPHInline
 
 ## Action 23: Spend OFF / Action 24: Spend ON (Stream Deck switch) — legacy
 
-> **Live setup (R8):** Use **one** action — `R8 - Spend Toggle` with `SpendToggle.cs`. See [streamerbot-http-gateway-apply.md](streamerbot-http-gateway-apply.md) Step 6. Assign the same action to **both** Toggle On and Toggle Off on the Streamer.bot Action Switch key; branch on `%state%` (`0` = spend off, `1` = spend on).
+> **Live setup (R8):** Use **one** action — `R8 - Spend Toggle` with `SpendToggle.cs`. See [streamerbot-http-gateway-apply.md](../streamerbot-http-gateway-apply.md) Step 6. Assign the same action to **both** Toggle On and Toggle Off on the Streamer.bot Action Switch key; branch on `%state%` (`0` = spend off, `1` = spend on).
 
 **Purpose (old two-action model):** Separate actions for Stream Deck switches — Spend ON (enable spending) vs Spend OFF (disable spending). Users can still earn points; they just can't use spend commands that check `spend_disabled.txt` while it exists. **All** such spends (including heal, hex, etc.) respect Spend OFF.
 
@@ -3780,7 +3780,7 @@ If you update from an older export, replace `AcquirePointsLock` / `ReleasePoints
 - For **`!wand`**, the opposite: **do not** require extra text after the command for the script — use **`wand %userName%`** in Run a Program.
 - Edit `POINTS_PER_MESSAGE`, `POINTS_PER_TICK`, and `COOLDOWN_SEC` (in Earn Points on chat for chat, Earn Points passive for passive) in the C# code. Edit points costs via http://localhost:5000/points-config or `points_config.json`.
 - **Double points** persists until the duration ends. To clear it when the stream starts, add `File.WriteAllText(DOUBLE_FILE, "0");` to an optional points-reset action (see Action 22 collapsible).
-- **Fard / 2× timer:** `!fard` extends global 2× (see [fard-system.md](fard-system.md)). Countdown displays minutes only via overlay server.
+- **Fard / 2× timer:** `!fard` extends global 2× (see [fard-system.md](../fard-system.md)). Countdown displays minutes only via overlay server.
 - **Top summoner:** `!summon` session leader earns 2× personal points — [Top summoner 2×](#top-summoner-2-personal-points), [summon apply guide](streamerbot-summon-march-apply.md).
 - **Super Chat / Cheer / gifts:** Require Streamer.bot Actions **20**, **21**, and **40** (or HTTP `/api/donation/*`). Uses `points_command.py` (`superchat`, `cheer`, `giftmembership`). Super Chat currency via Frankfurter (free, no key). Add all donation actions to the same blocking queue as earn/spend. Anonymous cheers are skipped.
 
@@ -3788,7 +3788,7 @@ If you update from an older export, replace `AcquirePointsLock` / `ReleasePoints
 
 ## User-Facing Summary
 
-- **[youtube-description.md](youtube-description.md)** — Full YouTube description (channel assets, stream commands !fard/!summon, Discord, chat commands)
-- **[user-facing-summary.md](user-facing-summary.md)** — Chat commands only (copy-paste block)
-- **[twitch-panel.md](twitch-panel.md)** — Formatted version for Twitch panels
-- **[COMMANDS.md](../COMMANDS.md)** — Full command reference including free !fard / !summon
+- **[youtube-description.md](../youtube-description.md)** — Full YouTube description (channel assets, stream commands !fard/!summon, Discord, chat commands)
+- **[user-facing-summary.md](../user-facing-summary.md)** — Chat commands only (copy-paste block)
+- **[twitch-panel.md](../twitch-panel.md)** — Formatted version for Twitch panels
+- **[COMMANDS.md](../../COMMANDS.md)** — Full command reference including free !fard / !summon

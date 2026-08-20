@@ -10,7 +10,7 @@ Single implementation roadmap for two coupled reworks:
 
 **Economy spec (rules, tuning, analysis):** [Chat Command Economy v1.md](Chat%20Command%20Economy%20v1.md) — do not duplicate analysis tables here.
 
-**Related:** [streamerbot-points-from-scratch.md](streamerbot-points-from-scratch.md), [fard-system.md](fard-system.md), [summon-march-system.md](summon-march-system.md), [streaming-setup-guide.md](streaming-setup-guide.md)
+**Related:** [archive/streamerbot-points-from-scratch.md](archive/streamerbot-points-from-scratch.md), [fard-system.md](fard-system.md), [summon-march-system.md](summon-march-system.md), [streaming-setup-guide.md](streaming-setup-guide.md)
 
 ---
 
@@ -322,7 +322,7 @@ Called by router (and optionally First Words):
 
 ## Phase 0 — Prep (~2–4 h)
 
-- [x] Map every current action → delete / merge / keep — [phase-0-action-inventory.md](phase-0-action-inventory.md)
+- [x] Map every current action → delete / merge / keep — [archive/phase-0-action-inventory.md](archive/phase-0-action-inventory.md)
 - [x] Port chat message strings to server catalog — `Lastest UI/chat_messages.py`
 - [x] Confirm OBS source names — `Lastest UI/presentation_config.py` (`GROUP - Farder`, `totalfard.txt`, `fart-with-reverb.mp3`)
 - [x] Export backup of current Streamer.bot — fresh export saved; see [README-backup.md](../Lastest%20UI/streamerbot/README-backup.md)
@@ -393,7 +393,7 @@ Called by router (and optionally First Words):
 ## Phase 5 — Cleanup + replicability (~4–6 h)
 
 - [x] Remove `LEGACY_FILE_MODE` and file handoff from production path (`run_points_command`)
-- [x] Rewrite [streamerbot-points-from-scratch.md](streamerbot-points-from-scratch.md) for 9-action model (superseded header + archive)
+- [x] Rewrite [archive/streamerbot-points-from-scratch.md](archive/streamerbot-points-from-scratch.md) for 9-action model (superseded header + archive)
 - [x] Fard + summon consolidated in [Streamer.bot meta commands](#streamerbot-meta-commands-fard--summon) below
 - [x] Generate `Lastest UI/streamerbot/shatter-the-streamer-export-0.2.0` (**manual** export — no `.txt` extension)
 - [x] See [Replication appendix](#replication-appendix)
@@ -526,7 +526,7 @@ Mirror defaults in `points_command.py` `load_config()` and `points-config.html` 
 - [x] `docs/user-facing-summary.md`
 - [x] `docs/twitch-panel.md`
 - [x] `docs/youtube-description.md`
-- [x] `docs/streamerbot-points-from-scratch.md` — cap, 2 pt/20s, 4× donations, bank, reset
+- [x] `docs/archive/streamerbot-points-from-scratch.md` — cap, 2 pt/20s, 4× donations, bank, reset
 - [x] `docs/stream-info-commands.md` — native `!kesha` / `!seed` / `!mimic` / `!challenge` (outside R1)
 - [x] `docs/fard-system.md`, `docs/summon-march-system.md` — R1/R9 architecture (July 2026)
 - [x] `docs/streaming-setup-guide.md`, `docs/project-structure.md` — documentation map + gateway-first setup
@@ -535,7 +535,7 @@ Mirror defaults in `points_command.py` `load_config()` and `points-config.html` 
 
 ## Streamer.bot meta commands (fard + summon)
 
-Consolidated from [streamerbot-fard-rework-apply.md](streamerbot-fard-rework-apply.md) and [streamerbot-summon-march-apply.md](streamerbot-summon-march-apply.md). **No separate Streamer.bot actions** — both route through **R1**.
+Consolidated from [archive/streamerbot-fard-rework-apply.md](archive/streamerbot-fard-rework-apply.md) and [archive/streamerbot-summon-march-apply.md](archive/streamerbot-summon-march-apply.md). **No separate Streamer.bot actions** — both route through **R1**.
 
 ### `!fard`
 

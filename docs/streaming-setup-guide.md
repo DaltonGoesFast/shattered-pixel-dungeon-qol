@@ -112,7 +112,7 @@ curl "http://localhost:5000/api/summon-march"
 curl http://localhost:5000/api/top-summoner
 ```
 - Requires overlay server only (game can be offline). Events append to `Lastest UI/summon_march_queue.jsonl`.
-- Streamer.bot setup: [summon-march-system.md](summon-march-system.md) (`!summon` via R1). Bestiary rules: [bestiary-summon-system.md](bestiary-summon-system.md). Legacy separate action: [streamerbot-summon-march-apply.md](streamerbot-summon-march-apply.md) (archived).
+- Streamer.bot setup: [summon-march-system.md](summon-march-system.md) (`!summon` via R1). Bestiary rules: [bestiary-summon-system.md](bestiary-summon-system.md). Legacy separate action: [archive/streamerbot-summon-march-apply.md](archive/streamerbot-summon-march-apply.md) (archived).
 - Viewer-facing copy: [user-facing-summary.md](user-facing-summary.md), [youtube-description.md](youtube-description.md), [twitch-panel.md](twitch-panel.md), [COMMANDS.md](../COMMANDS.md).
 
 ---
@@ -137,7 +137,7 @@ curl http://localhost:5000/api/top-summoner
 ### 4.1 Option A — Import export (fastest)
 
 - **Current:** `Lastest UI/streamerbot/shatter-the-streamer-export-0.2.0`
-- **Legacy (~40 actions):** `shatter-the-streamer-export-0.1.0.txt` — do not use for new setups
+- **Legacy (~40 actions):** [archive/shatter-the-streamer-export-0.1.0.txt](archive/shatter-the-streamer-export-0.1.0.txt) — do not use for new setups
 
 After import:
 
@@ -150,7 +150,7 @@ After import:
 
 Follow [streamerbot-http-gateway-apply.md](streamerbot-http-gateway-apply.md) and paste C# from `Lastest UI/streamerbot/phase2/`.
 
-Do **not** build new setups from the archived walkthrough in [streamerbot-points-from-scratch.md](streamerbot-points-from-scratch.md) (kept for reference only).
+Do **not** build new setups from the archived walkthrough in [archive/streamerbot-points-from-scratch.md](archive/streamerbot-points-from-scratch.md) (kept for reference only).
 
 ### 4.3 OBS
 

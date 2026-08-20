@@ -251,7 +251,7 @@ func _poll():
 ## Related docs (main repo)
 
 - [summon-march-system.md](summon-march-system.md) — full system overview
-- [streamerbot-summon-march-apply.md](streamerbot-summon-march-apply.md) — legacy standalone `!summon` (archived); live path is R1 — [summon-march-system.md](summon-march-system.md)
+- [archive/streamerbot-summon-march-apply.md](archive/streamerbot-summon-march-apply.md) — legacy standalone `!summon` (archived); live path is R1 — [summon-march-system.md](summon-march-system.md)
 - [streaming-setup-guide.md](streaming-setup-guide.md) — server startup
 
 ---

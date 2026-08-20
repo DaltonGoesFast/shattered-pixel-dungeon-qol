@@ -44,4 +44,4 @@ python server.py   # separate window
 | OBS source names | `Lastest UI/presentation_config.py` |
 | Points file | Next to scripts (`viewer_points.txt`); admin UI at `/points-config` |
 
-Legacy path list in [streamerbot-points-from-scratch.md](docs/streamerbot-points-from-scratch.md) applies only to the **archived** ~40-action bot — see [docs/archive/README.md](docs/archive/README.md).
+Legacy path list in [docs/archive/streamerbot-points-from-scratch.md](docs/archive/streamerbot-points-from-scratch.md) applies only to the **archived** ~40-action bot — see [docs/archive/README.md](docs/archive/README.md).

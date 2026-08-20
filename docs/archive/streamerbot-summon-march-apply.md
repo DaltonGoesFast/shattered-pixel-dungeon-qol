@@ -1,6 +1,6 @@
 # Summon March — Streamer.bot Apply Guide
 
-> **Superseded (Phase 5):** `!summon` routes through **R1** only (no separate summon action). See [streaming-system-rework-plan.md](streaming-system-rework-plan.md) § Streamer.bot meta commands and [summon-march-system.md](summon-march-system.md).
+> **Superseded (Phase 5):** `!summon` routes through **R1** only (no separate summon action). See [streaming-system-rework-plan.md](../streaming-system-rework-plan.md) § Streamer.bot meta commands and [summon-march-system.md](../summon-march-system.md).
 
 ## Current setup (HTTP gateway)
 

@@ -48,7 +48,7 @@ If you want to use the game data in another project, you can:
 - `game_summary.txt` / `game_summary.json`: Runtime outputs (gitignored).
 - `streamerbot/`: Export `shatter-the-streamer-export-0.2.0`, phase2 C# snippets, batch helpers.
 
-**Streamer.bot setup:** [docs/streamerbot-http-gateway-apply.md](../docs/streamerbot-http-gateway-apply.md) — not the archived body of [streamerbot-points-from-scratch.md](../docs/streamerbot-points-from-scratch.md).
+**Streamer.bot setup:** [docs/streamerbot-http-gateway-apply.md](../docs/streamerbot-http-gateway-apply.md) — not the archived body of [streamerbot-points-from-scratch.md](../docs/archive/streamerbot-points-from-scratch.md).
 
 **Tests:** `test_chat_command_api.ps1`, `phase3_rapid_test.ps1`.
 

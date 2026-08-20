@@ -44,7 +44,7 @@ Opening `C:\SPD\LastestUI` in Explorer should show `points_command.py`, `server.
 
 Run the server from the **real** folder or via the junction (same files):
 
-- From `Lastest UI`: `python server.py` (see [streaming-setup-guide.md](streaming-setup-guide.md)), **or**
+- From `Lastest UI`: `python server.py` (see [streaming-setup-guide.md](../streaming-setup-guide.md)), **or**
 - Your repo’s `start.bat` if you use one.
 
 Keep **`config.json`**, **`points_config.json`**, etc. in that folder as usual.

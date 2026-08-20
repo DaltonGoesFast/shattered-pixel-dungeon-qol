@@ -4,7 +4,7 @@ Once-per-stream community command: viewers use **`!fard`** once to flash OBS, pl
 
 **Build / troubleshoot Streamer.bot:** [streamerbot-http-gateway-apply.md](streamerbot-http-gateway-apply.md) (R1 + R9). **Meta overview:** [streaming-system-rework-plan.md](streaming-system-rework-plan.md) § Streamer.bot meta commands.
 
-**Restore pre–HTTP-gateway fard:** import [`Lastest UI/streamerbot/fard-pre-rework-export.txt`](../Lastest%20UI/streamerbot/fard-pre-rework-export.txt).
+**Restore pre–HTTP-gateway fard:** import [`docs/archive/fard-pre-rework-export.txt`](archive/fard-pre-rework-export.txt).
 
 **Related:** [summon-march-system.md](summon-march-system.md), [COMMANDS.md](../COMMANDS.md), [presentation_config.py](../Lastest%20UI/presentation_config.py).
 
@@ -66,4 +66,4 @@ Defaults are in **`presentation_config.py`** (e.g. `HUD :: GROUP - Farder`, `TEX
 
 ## Archived apply guide
 
-Step-by-step for the **old** standalone `!fard` action (pre-gateway): [streamerbot-fard-rework-apply.md](streamerbot-fard-rework-apply.md) (superseded header at top).
+Step-by-step for the **old** standalone `!fard` action (pre-gateway): [archive/streamerbot-fard-rework-apply.md](archive/streamerbot-fard-rework-apply.md) (superseded header at top).

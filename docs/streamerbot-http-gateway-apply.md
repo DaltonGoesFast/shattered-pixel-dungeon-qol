@@ -3,7 +3,7 @@
 Step-by-step setup for the **9-action** model on a **fresh** Streamer.bot copy.  
 **Prerequisites:** Phase 1 done (`server.py` running, `/api/chat-command` tests pass).
 
-**Related:** [streaming-system-rework-plan.md](streaming-system-rework-plan.md), [phase-0-action-inventory.md](phase-0-action-inventory.md), [presentation_config.py](../Lastest%20UI/presentation_config.py)
+**Related:** [streaming-system-rework-plan.md](streaming-system-rework-plan.md), [archive/phase-0-action-inventory.md](archive/phase-0-action-inventory.md), [presentation_config.py](../Lastest%20UI/presentation_config.py)
 
 **C# snippets (copy-paste):** [Lastest UI/streamerbot/phase2/](../Lastest%20UI/streamerbot/phase2/)
 

@@ -6,7 +6,7 @@ Free chat command: viewers use **`!summon`** (**60 s** per-user cooldown) to que
 
 **Live wiring:** **R1** + `chat_command.py` (no separate Streamer.bot summon action). **Spec below.** **Stream-info / OBS:** [streaming-system-rework-plan.md](streaming-system-rework-plan.md) § Streamer.bot meta commands. **Related:** [fard-system.md](fard-system.md), [streaming-setup-guide.md](streaming-setup-guide.md).
 
-**Legacy apply steps:** [streamerbot-summon-march-apply.md](streamerbot-summon-march-apply.md) (archived section only).
+**Legacy apply steps:** [archive/streamerbot-summon-march-apply.md](archive/streamerbot-summon-march-apply.md) (archived section only).
 
 ---
 

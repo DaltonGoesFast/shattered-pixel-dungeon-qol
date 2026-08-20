@@ -1,6 +1,6 @@
 # Streamer.bot Setup: !spawn Command (Phase 3)
 
-> **Superseded:** `!spawn` is handled by **R1** → `/api/chat-command`. Use [streamerbot-http-gateway-apply.md](streamerbot-http-gateway-apply.md). This doc is **legacy** (per-command HTTP to `/api/spawn-command`).
+> **Superseded:** `!spawn` is handled by **R1** → `/api/chat-command`. Use [streamerbot-http-gateway-apply.md](../streamerbot-http-gateway-apply.md). This doc is **legacy** (per-command HTTP to `/api/spawn-command`).
 
 Connect chat `!spawn <monster>` to the SPD overlay server. Works with **Twitch and YouTube**. Cooldowns are handled in Streamer.bot (server cooldown is set to 0).
 
@@ -164,7 +164,7 @@ To use the current game seed in chat commands (e.g. `!seed`), fetch from the ove
 
 ## Points System (From Scratch)
 
-A file-based points system with no extensions. **Live setup:** [streamerbot-http-gateway-apply.md](streamerbot-http-gateway-apply.md). **Archived:** [streamerbot-points-from-scratch.md](streamerbot-points-from-scratch.md).
+A file-based points system with no extensions. **Live setup:** [streamerbot-http-gateway-apply.md](../streamerbot-http-gateway-apply.md). **Archived:** [streamerbot-points-from-scratch.md](streamerbot-points-from-scratch.md).
 
 **Quick summary:** Three C# actions—Earn Points (on message), Check Points (!points), Spawn Monster (!spawn with cost). Points stored in `Lastest UI/viewer_points.txt`.
 

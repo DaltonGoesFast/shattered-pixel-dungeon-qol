@@ -2,7 +2,7 @@
 
 **Status:** **Implemented** (server-side — July 2026). Streamer.bot Stream Offline wiring is manual; see [economy-v11-apply.md](economy-v11-apply.md).
 
-**Related:** [streaming-system-rework-plan.md](streaming-system-rework-plan.md), [COMMANDS.md](../COMMANDS.md), [streamerbot-points-from-scratch.md](streamerbot-points-from-scratch.md), [fard-system.md](fard-system.md), [summon-march-system.md](summon-march-system.md), [streaming-setup-guide.md](streaming-setup-guide.md)
+**Related:** [streaming-system-rework-plan.md](streaming-system-rework-plan.md), [COMMANDS.md](../COMMANDS.md), [archive/streamerbot-points-from-scratch.md](archive/streamerbot-points-from-scratch.md), [fard-system.md](fard-system.md), [summon-march-system.md](summon-march-system.md), [streaming-setup-guide.md](streaming-setup-guide.md)
 
 ---
 
@@ -419,7 +419,7 @@ For each user in `viewer_points.txt`:
 | `points-config.html` | UI for cap/ratios; reset trigger |
 | `server.py` | `POST /api/session/end` (debounced stream reset) |
 | Streamer.bot (thin) | Stream Offline trigger → `POST /api/session/end` — **only new SB wiring in v1.1** |
-| Docs | This file + `COMMANDS.md`, `user-facing-summary.md`, `twitch-panel.md`, `youtube-description.md`, `streamerbot-points-from-scratch.md` |
+| Docs | This file + `COMMANDS.md`, `user-facing-summary.md`, `twitch-panel.md`, `youtube-description.md`, `archive/streamerbot-points-from-scratch.md` |
 
 **Phase 6 checklist:** See [streaming-system-rework-plan.md § Phase 6](streaming-system-rework-plan.md#phase-6--economy-v11-server-only-after-plumbing-stable).
 
@@ -434,7 +434,7 @@ On implementation, update together:
 - [ ] `docs/user-facing-summary.md`
 - [ ] `docs/twitch-panel.md`
 - [ ] `docs/youtube-description.md`
-- [ ] `docs/streamerbot-points-from-scratch.md` — 9-action model, server earn module, cap, 2 pt/20s, 4× donations, `!bank`, reset
+- [ ] `docs/archive/streamerbot-points-from-scratch.md` — 9-action model, server earn module, cap, 2 pt/20s, 4× donations, `!bank`, reset
 - [ ] `points_config.json` + Python defaults + HTML `value=` — keep identical
 
 ---

@@ -1,6 +1,6 @@
 # Phase 0 — Action Inventory
 
-**Parent plan:** [streaming-system-rework-plan.md](streaming-system-rework-plan.md)  
+**Parent plan:** [streaming-system-rework-plan.md](../streaming-system-rework-plan.md)  
 **Status:** Complete (July 2026)  
 **Source of truth for current actions:** [streamerbot-points-from-scratch.md](streamerbot-points-from-scratch.md)
 
@@ -96,8 +96,8 @@ On a user's first message, Message Received and First Words may both fire. Serve
 
 | Backup | Location | Scope |
 |--------|----------|-------|
-| Pre-fard export | `Lastest UI/streamerbot/fard-pre-rework-export.txt` | Fard actions only |
-| Full bot v0.1.0 | `Lastest UI/streamerbot/shatter-the-streamer-export-0.1.0.txt` | Earlier full export |
+| Pre-fard export | [fard-pre-rework-export.txt](fard-pre-rework-export.txt) | Fard actions only |
+| Full bot v0.1.0 | [shatter-the-streamer-export-0.1.0.txt](shatter-the-streamer-export-0.1.0.txt) | Earlier full export |
 | **Required before Phase 4** | Export manually → `shatter-the-streamer-export-0.2.0-pre-cutover.txt` | Full current bot |
 
 See [Lastest UI/streamerbot/README-backup.md](../Lastest%20UI/streamerbot/README-backup.md) for export steps.

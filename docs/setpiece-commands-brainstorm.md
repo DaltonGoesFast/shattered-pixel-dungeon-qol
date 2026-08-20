@@ -2,7 +2,7 @@
 
 **Status:** Brainstorm / outline only — **not implemented**. Refine here before coding.
 
-**Related:** [COMMANDS.md](../COMMANDS.md), [Chat Command Economy v1.md](Chat%20Command%20Economy%20v1.md), [streamerbot-points-from-scratch.md](streamerbot-points-from-scratch.md), [stream-info-commands.md](stream-info-commands.md)
+**Related:** [COMMANDS.md](../COMMANDS.md), [Chat Command Economy v1.md](Chat%20Command%20Economy%20v1.md), [archive/streamerbot-points-from-scratch.md](archive/streamerbot-points-from-scratch.md), [stream-info-commands.md](stream-info-commands.md)
 
 These are higher-cost **Shatter the Streamer** spends that change the map, arm delayed taxes, or open side content — above near-hero effects like `!spawn` / `!trap` / `!bomb`.
 

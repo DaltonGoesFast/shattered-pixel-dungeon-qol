@@ -1,16 +1,16 @@
 # Fard Rework — Streamer.bot Apply Guide
 
-> **Superseded (Phase 5):** Fard is **R1 + R9** in the HTTP gateway. See [streamerbot-http-gateway-apply.md](streamerbot-http-gateway-apply.md) and [archive/README.md](archive/README.md).
+> **Superseded (Phase 5):** Fard is **R1 + R9** in the HTTP gateway. See [streamerbot-http-gateway-apply.md](../streamerbot-http-gateway-apply.md) and [README.md](README.md).
 
 Step-by-step instructions to paste into Streamer.bot. Repo code (`server.py`, `points_command.py`) is updated separately.
 
-**Reference:** [fard-system.md](fard-system.md) (planned rework), [fard_system_rework plan](../.cursor/plans/fard_system_rework_0adf992a.plan.md).
+**Reference:** [fard-system.md](../fard-system.md) (planned rework), [fard_system_rework plan](../.cursor/plans/fard_system_rework_0adf992a.plan.md).
 
 ---
 
 ## Step 0 — Backup (do this first)
 
-1. **Pre-rework export saved in repo:** [`Lastest UI/streamerbot/fard-pre-rework-export.txt`](../Lastest%20UI/streamerbot/fard-pre-rework-export.txt) — import in Streamer.bot to restore the old unlimited-fard / top-farder setup.
+1. **Pre-rework export saved in repo:** [`fard-pre-rework-export.txt`](fard-pre-rework-export.txt) — import in Streamer.bot to restore the old unlimited-fard / top-farder setup.
 2. Export **Earn Points (chat)**, **Earn Points (passive)**, and donation actions (Cheer, Super Chat, gift) separately if you want those backed up too.
 3. Save any new exports somewhere outside this repo before changing anything.
 
