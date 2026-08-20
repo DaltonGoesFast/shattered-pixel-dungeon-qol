@@ -13,6 +13,7 @@ Shattered Pixel Dungeon QoL + **Shatter the Streamer** streaming integration.
 | Viewer / panel copy | [COMMANDS.md](../COMMANDS.md), [user-facing-summary.md](user-facing-summary.md) |
 | Streamer (go live) | [streaming-setup-guide.md](streaming-setup-guide.md) § **6. Pre-stream checklist** |
 | Collaborator (code) | [CONTRIBUTING.md](../CONTRIBUTING.md), [project-structure.md](project-structure.md) |
+| Upstream / SPD 4.0 merge | [custom-surface-inventory.md](custom-surface-inventory.md) |
 | Economy tuning | [Chat Command Economy v1.md](Chat%20Command%20Economy%20v1.md), [economy-v11-apply.md](economy-v11-apply.md) |
 | Release binaries | [RELEASE.md](RELEASE.md) |
 
@@ -70,6 +71,7 @@ Import bundle: `Lastest UI/streamerbot/shatter-the-streamer-export-0.2.0` (no `.
 
 | Doc | Notes |
 |-----|-------|
+| [custom-surface-inventory.md](custom-surface-inventory.md) | Java QoL/streaming hooks for upstream merge (WS, buffs, settings, assets) |
 | [streaming-system-rework-plan.md](streaming-system-rework-plan.md) | Master plan; phases 0–6 complete |
 | [setpiece-commands-brainstorm.md](setpiece-commands-brainstorm.md) | Draft high-cost setpiece spends (`!mimic`, `!pedestal`, `!trial`, `!ambush`, `!greed`) |
 | [phase-0-action-inventory.md](phase-0-action-inventory.md) | Old → new action mapping |
@@ -86,3 +88,5 @@ Pre–HTTP-gateway Streamer.bot (~40 actions, `spawn_result.txt`, per-command C#
 ## Upstream SPD (vanilla)
 
 Android / desktop / iOS build guides: [getting-started-android.md](getting-started-android.md), [getting-started-desktop.md](getting-started-desktop.md), [getting-started-ios.md](getting-started-ios.md), [recommended-changes.md](recommended-changes.md).
+
+For merging a new SPD version into this fork, start with [custom-surface-inventory.md](custom-surface-inventory.md) before re-discovering WebSocket and QoL hooks.

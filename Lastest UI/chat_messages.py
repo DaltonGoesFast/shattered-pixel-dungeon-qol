@@ -58,6 +58,14 @@ def spend_success(command: str, user: str, pts: int, extra: str = "", detail: st
     return f"{u} used !{command}!{tail}"
 
 
+def spend_bestiary_xp(xp: int) -> str:
+    """Suffix for paid-command success when co-op Bestiary bar XP was granted."""
+    n = int(xp or 0)
+    if n <= 0:
+        return ""
+    return f" (+{n} Bestiary XP)"
+
+
 # --- Spend / system errors (points_command.py) ---
 
 SPEND_DISABLED = "Spending is currently disabled by the streamer."
@@ -78,7 +86,7 @@ USAGE = {
     "help": "Usage: !help or !help <command> - bare !help links to the full command list on GitHub.",
     "points": "Usage: !points - show your chat points, donor points, and Bestiary sprint/heat XP.",
     "economy": "Usage: !economy / !reminder - live chat-cap / earn / bank rules from current config.",
-    "bank": "Usage: !bank, !bank all, or !bank <amount> - convert chat pts to donor pts at 10%.",
+    "bank": "Usage: !bank / !bank all, or !bank <amount> - convert chat pts to donor pts at 10%.",
     "toppoints": "Usage: !toppoints / !leaderboard - top 3 by donor points.",
     "givepoints": "Usage: !givepoints <amount> <target> (example: !givepoints 50 @bob)",
     "fard": "Usage: !fard - once per stream: OBS flash + sound; extends global 2x (+3 min, +6 for subs/members).",
@@ -262,7 +270,7 @@ def bank_excess(user: str, chat_pts: int) -> str:
 
 def bank_invalid_amount(user: str) -> str:
     u = display_name(user) or user
-    return f"{u} - Invalid bank amount. Use !bank all or !bank <amount> (integer 1+)."
+    return f"{u} - Invalid bank amount. Use !bank, !bank all, or !bank <amount> (integer 1+)."
 
 
 def bank_no_chat(user: str) -> str:
@@ -445,6 +453,37 @@ def bestiary_level_up(winner: str, from_zone: str, to_zone: str, donor: int) -> 
             "No eligible sprint winner (prior winners are locked out until next stream)."
         )
     return f"Bestiary level-up! {from_zone} -> {to_zone}."
+
+
+def shatter_event_line(event: dict) -> str:
+    """Announce a Shatter Event free window from a summon_bestiary event dict."""
+    if not isinstance(event, dict):
+        return ""
+    monster = str(event.get("monster") or "").strip().lower() or "?"
+    duration = int(event.get("duration_sec") or 60)
+    sidecar = event.get("sidecar_label") or event.get("sidecar_cost_key")
+    reason = str(event.get("reason") or "pip")
+    prefix = "Shatter Event!"
+    if reason == "level_up":
+        prefix = "Shatter Event (level-up)!"
+    elif reason == "halls_loop":
+        prefix = "Shatter Event (Halls)!"
+    if sidecar:
+        return f"{prefix} !spawn {monster} + {sidecar} FREE {duration}s"
+    return f"{prefix} !spawn {monster} FREE {duration}s"
+
+
+def shatter_events_suffix(events) -> str:
+    if not events:
+        return ""
+    parts = []
+    for ev in events:
+        line = shatter_event_line(ev if isinstance(ev, dict) else {})
+        if line:
+            parts.append(line)
+    if not parts:
+        return ""
+    return " " + " ".join(parts)
 
 
 def mysummons_line(user: str, count: int, sprint_xp: int, heat_xp: int) -> str:

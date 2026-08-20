@@ -119,6 +119,8 @@ var _best_sprint_color: ColorPickerButton
 var _best_heat_color: ColorPickerButton
 var _best_hall_color: ColorPickerButton
 var _best_banner_color: ColorPickerButton
+var _best_pip_claimed_color: ColorPickerButton
+var _best_pip_unclaimed_color: ColorPickerButton
 var _remote_on: CheckBox
 var _remote_url: LineEdit
 var _remote_poll: SpinBox
@@ -166,6 +168,15 @@ var _alert_icon_sz: SpinBox
 var _alert_chrome_style: OptionButton
 var _alert_chrome_scale: SpinBox
 var _mob_idle_fps: SpinBox
+var _custom_alerts_on: CheckBox
+var _custom_alerts_interval: SpinBox
+var _custom_alerts_hold: SpinBox
+var _custom_alerts_draft: Array = []
+var _custom_alerts_pick: OptionButton
+var _custom_alerts_editor_host: VBoxContainer
+var _custom_alerts_count_label: Label
+var _custom_alerts_selected_index: int = 0
+var _custom_alerts_editor: Dictionary = {}
 var _paid_on: CheckBox
 var _paid_qmax: SpinBox
 var _paid_ttl: SpinBox
@@ -235,6 +246,7 @@ var _vert_show_title: CheckBox
 var _vert_show_chrome: CheckBox
 var _vert_show_id: CheckBox
 var _vert_show_alerts: CheckBox
+var _vert_show_tips: CheckBox
 var _vert_show_paid: CheckBox
 var _vert_show_bestiary: CheckBox
 var _vert_show_march: CheckBox
@@ -700,6 +712,8 @@ func _build_ui() -> void:
 	_best_heat_color = _color_picker()
 	_best_hall_color = _color_picker()
 	_best_banner_color = _color_picker()
+	_best_pip_claimed_color = _color_picker()
+	_best_pip_unclaimed_color = _color_picker()
 	_add_section_header(best_sc, "Polling")
 	_add_rows(
 		best_sc,
@@ -742,6 +756,8 @@ func _build_ui() -> void:
 			["Show XP fraction text", _best_xp_text],
 			["XP fraction over exp bar", _best_xp_over],
 			["XP fraction font color", _best_xp_color],
+			["Shatter pip claimed color", _best_pip_claimed_color],
+			["Shatter pip unclaimed color", _best_pip_unclaimed_color],
 		]
 	)
 	_add_section_header(best_sc, "Labels & colors")
@@ -1036,6 +1052,49 @@ func _build_ui() -> void:
 		]
 	)
 
+	_custom_alerts_on = CheckBox.new()
+	_custom_alerts_interval = _spin_f(5.0, 600.0, 1.0)
+	_custom_alerts_hold = _spin_f(0.5, 30.0, 0.25)
+	_add_section_header(al_sc, "Custom tip toasts")
+	var tip_note := _section_note()
+	tip_note.text = (
+		"Rotating viewer tips in the alert zone (yields to command toasts). "
+		+ "Scene show/hide is under Scene gates → Tip toasts (separate from Alerts). "
+		+ "Also fire via Streamer.bot UDP: {\"ui\":\"tip\",\"title\":\"…\",\"message\":\"…\"}. "
+		+ ("Max %d tips." % CompanionConfig.CUSTOM_ALERTS_MAX)
+	)
+	tip_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	(al_sc.get_node("InnerVBox") as VBoxContainer).add_child(tip_note)
+	_add_rows(
+		al_sc,
+		[
+			["Enable custom tip toasts", _custom_alerts_on],
+			["Rotate interval (sec)", _custom_alerts_interval],
+			["Tip hold (sec)", _custom_alerts_hold],
+		]
+	)
+	_custom_alerts_count_label = Label.new()
+	(al_sc.get_node("InnerVBox") as VBoxContainer).add_child(_custom_alerts_count_label)
+	var tip_btns := HBoxContainer.new()
+	tip_btns.add_theme_constant_override("separation", 8)
+	var add_tip := Button.new()
+	add_tip.text = "Add tip"
+	add_tip.pressed.connect(_on_add_custom_alert)
+	tip_btns.add_child(add_tip)
+	var rem_tip := Button.new()
+	rem_tip.text = "Remove tip"
+	rem_tip.pressed.connect(_on_remove_custom_alert)
+	tip_btns.add_child(rem_tip)
+	(al_sc.get_node("InnerVBox") as VBoxContainer).add_child(tip_btns)
+	_custom_alerts_pick = OptionButton.new()
+	_custom_alerts_pick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_custom_alerts_pick.item_selected.connect(_on_custom_alert_picked)
+	(al_sc.get_node("InnerVBox") as VBoxContainer).add_child(_form_row("Edit tip", _custom_alerts_pick))
+	_custom_alerts_editor_host = VBoxContainer.new()
+	_custom_alerts_editor_host.add_theme_constant_override("separation", 8)
+	_custom_alerts_editor_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	(al_sc.get_node("InnerVBox") as VBoxContainer).add_child(_custom_alerts_editor_host)
+
 	var id_sc := _make_scroll_vbox()
 	_add_settings_page("ID overlay", id_sc)
 
@@ -1090,6 +1149,7 @@ func _build_ui() -> void:
 	_vert_show_chrome = CheckBox.new()
 	_vert_show_id = CheckBox.new()
 	_vert_show_alerts = CheckBox.new()
+	_vert_show_tips = CheckBox.new()
 	_vert_show_paid = CheckBox.new()
 	_vert_show_bestiary = CheckBox.new()
 	_vert_show_march = CheckBox.new()
@@ -1152,6 +1212,7 @@ func _build_ui() -> void:
 			["Chrome boxes", _vert_show_chrome],
 			["ID overlay", _vert_show_id],
 			["Alerts", _vert_show_alerts],
+			["Tip toasts", _vert_show_tips],
 			["Paid notices", _vert_show_paid],
 			["Bestiary", _vert_show_bestiary],
 			["Summon march", _vert_show_march],
@@ -1393,6 +1454,7 @@ func _apply_scene_gates_to_config() -> void:
 	VL.show_chrome_boxes = VL.allows_scene("chrome_boxes", CompanionConfig.SCENE_UNKNOWN)
 	VL.show_id_overlay = VL.allows_scene("id_overlay", CompanionConfig.SCENE_UNKNOWN)
 	VL.show_alerts = VL.allows_scene("alerts", CompanionConfig.SCENE_UNKNOWN)
+	VL.show_tip_toasts = VL.allows_scene("tip_toasts", CompanionConfig.SCENE_UNKNOWN)
 	VL.show_paid_notices = VL.allows_scene("paid_notices", CompanionConfig.SCENE_UNKNOWN)
 	VL.show_bestiary = VL.allows_scene("bestiary", CompanionConfig.SCENE_UNKNOWN)
 	VL.show_summon_march = VL.allows_scene("summon_march", CompanionConfig.SCENE_UNKNOWN)
@@ -1737,6 +1799,8 @@ func _sync_from_config() -> void:
 	_best_heat_color.color = CompanionConfig.bestiary_heat_font_color
 	_best_hall_color.color = CompanionConfig.bestiary_hall_font_color
 	_best_banner_color.color = CompanionConfig.bestiary_banner_font_color
+	_best_pip_claimed_color.color = CompanionConfig.bestiary_shatter_pip_claimed_color
+	_best_pip_unclaimed_color.color = CompanionConfig.bestiary_shatter_pip_unclaimed_color
 	_remote_on.button_pressed = CompanionConfig.remote_settings_enabled
 	_remote_url.text = CompanionConfig.remote_settings_base_url
 	_remote_poll.value = CompanionConfig.remote_settings_poll_sec
@@ -1785,6 +1849,13 @@ func _sync_from_config() -> void:
 	_alert_pad_v.value = CompanionConfig.alert_padding_v_px
 	_alert_icon_sz.value = CompanionConfig.alert_command_icon_size_px
 	_mob_idle_fps.value = CompanionConfig.alert_mob_idle_anim_fps
+
+	_custom_alerts_on.button_pressed = CompanionConfig.custom_alerts_enabled
+	_custom_alerts_interval.value = CompanionConfig.custom_alerts_interval_sec
+	_custom_alerts_hold.value = CompanionConfig.custom_alerts_hold_sec
+	_custom_alerts_draft = CompanionConfig.duplicate_custom_alerts()
+	_custom_alerts_selected_index = 0
+	_rebuild_custom_alerts_editor()
 
 	_paid_on.button_pressed = CompanionConfig.paid_notice_enabled
 	_paid_qmax.value = CompanionConfig.paid_notice_queue_max
@@ -1888,6 +1959,7 @@ func _sync_vertical_from_config() -> void:
 	_vert_show_chrome.button_pressed = L.show_chrome_boxes
 	_vert_show_id.button_pressed = L.show_id_overlay
 	_vert_show_alerts.button_pressed = L.show_alerts
+	_vert_show_tips.button_pressed = L.show_tip_toasts
 	_vert_show_paid.button_pressed = L.show_paid_notices
 	_vert_show_bestiary.button_pressed = L.show_bestiary
 	_vert_show_march.button_pressed = L.show_summon_march
@@ -1943,6 +2015,7 @@ func _apply_vertical_to_config() -> void:
 	L.show_chrome_boxes = _vert_show_chrome.button_pressed
 	L.show_id_overlay = _vert_show_id.button_pressed
 	L.show_alerts = _vert_show_alerts.button_pressed
+	L.show_tip_toasts = _vert_show_tips.button_pressed
 	L.show_paid_notices = _vert_show_paid.button_pressed
 	L.show_bestiary = _vert_show_bestiary.button_pressed
 	L.show_summon_march = _vert_show_march.button_pressed
@@ -2141,6 +2214,8 @@ func _on_apply_pressed() -> void:
 	CompanionConfig.bestiary_heat_font_color = _best_heat_color.color
 	CompanionConfig.bestiary_hall_font_color = _best_hall_color.color
 	CompanionConfig.bestiary_banner_font_color = _best_banner_color.color
+	CompanionConfig.bestiary_shatter_pip_claimed_color = _best_pip_claimed_color.color
+	CompanionConfig.bestiary_shatter_pip_unclaimed_color = _best_pip_unclaimed_color.color
 	CompanionConfig.remote_settings_enabled = _remote_on.button_pressed
 	CompanionConfig.remote_settings_base_url = _remote_url.text.strip_edges()
 	CompanionConfig.remote_settings_poll_sec = maxf(0.5, float(_remote_poll.value))
@@ -2194,6 +2269,12 @@ func _on_apply_pressed() -> void:
 	CompanionConfig.alert_padding_v_px = clampi(int(_alert_pad_v.value), 0, 64)
 	CompanionConfig.alert_command_icon_size_px = int(_alert_icon_sz.value)
 	CompanionConfig.alert_mob_idle_anim_fps = float(_mob_idle_fps.value)
+
+	_flush_custom_alerts_editor_into_draft()
+	CompanionConfig.custom_alerts_enabled = _custom_alerts_on.button_pressed
+	CompanionConfig.custom_alerts_interval_sec = maxf(5.0, float(_custom_alerts_interval.value))
+	CompanionConfig.custom_alerts_hold_sec = maxf(0.5, float(_custom_alerts_hold.value))
+	CompanionConfig.custom_alerts = _serialize_custom_alerts_draft()
 
 	CompanionConfig.paid_notice_enabled = _paid_on.button_pressed
 	CompanionConfig.paid_notice_queue_max = clampi(int(_paid_qmax.value), 1, 32)
@@ -2320,6 +2401,117 @@ func _on_add_chrome_box() -> void:
 	_rebuild_chrome_tabs()
 	if _ui_panels_nav_index >= 0:
 		_show_settings_page(_ui_panels_nav_index)
+
+
+func _on_add_custom_alert() -> void:
+	if _custom_alerts_draft.size() >= CompanionConfig.CUSTOM_ALERTS_MAX:
+		return
+	_flush_custom_alerts_editor_into_draft()
+	_custom_alerts_draft.append(CompanionConfig.default_custom_alert(_custom_alerts_draft.size() + 1))
+	_custom_alerts_selected_index = _custom_alerts_draft.size() - 1
+	_rebuild_custom_alerts_editor()
+
+
+func _on_remove_custom_alert() -> void:
+	if _custom_alerts_draft.is_empty():
+		return
+	_flush_custom_alerts_editor_into_draft()
+	_custom_alerts_draft.remove_at(_custom_alerts_selected_index)
+	_custom_alerts_selected_index = clampi(
+		_custom_alerts_selected_index, 0, maxi(_custom_alerts_draft.size() - 1, 0)
+	)
+	_rebuild_custom_alerts_editor()
+
+
+func _on_custom_alert_picked(index: int) -> void:
+	if index == _custom_alerts_selected_index:
+		return
+	_flush_custom_alerts_editor_into_draft()
+	_custom_alerts_selected_index = index
+	_rebuild_custom_alerts_editor()
+
+
+func _flush_custom_alerts_editor_into_draft() -> void:
+	if _custom_alerts_editor.is_empty():
+		return
+	var idx := int(_custom_alerts_editor.get("draft_index", _custom_alerts_selected_index))
+	if idx < 0 or idx >= _custom_alerts_draft.size():
+		return
+	var title_le: LineEdit = _custom_alerts_editor.get("title") as LineEdit
+	var sub_le: LineEdit = _custom_alerts_editor.get("subtitle") as LineEdit
+	var en_cb: CheckBox = _custom_alerts_editor.get("enabled") as CheckBox
+	_custom_alerts_draft[idx] = CompanionConfig.normalize_custom_alert(
+		{
+			"title": title_le.text if title_le else "",
+			"subtitle": sub_le.text if sub_le else "",
+			"enabled": en_cb.button_pressed if en_cb else true,
+		},
+		idx + 1
+	)
+
+
+func _serialize_custom_alerts_draft() -> Array:
+	_flush_custom_alerts_editor_into_draft()
+	var out: Array = []
+	var n := mini(_custom_alerts_draft.size(), CompanionConfig.CUSTOM_ALERTS_MAX)
+	for i in range(n):
+		out.append(CompanionConfig.normalize_custom_alert(_custom_alerts_draft[i], i + 1))
+	return out
+
+
+func _rebuild_custom_alerts_editor() -> void:
+	if _custom_alerts_count_label:
+		_custom_alerts_count_label.text = (
+			"Tips: %d / %d" % [_custom_alerts_draft.size(), CompanionConfig.CUSTOM_ALERTS_MAX]
+		)
+	if _custom_alerts_pick:
+		_custom_alerts_pick.clear()
+		for i in range(_custom_alerts_draft.size()):
+			var tip := CompanionConfig.normalize_custom_alert(_custom_alerts_draft[i], i + 1)
+			var label := str(tip.get("title", "Tip %d" % (i + 1)))
+			if not bool(tip.get("enabled", true)):
+				label += " (off)"
+			_custom_alerts_pick.add_item(label, i)
+		if _custom_alerts_draft.is_empty():
+			_custom_alerts_selected_index = 0
+		else:
+			_custom_alerts_selected_index = clampi(
+				_custom_alerts_selected_index, 0, _custom_alerts_draft.size() - 1
+			)
+			_custom_alerts_pick.select(_custom_alerts_selected_index)
+	if _custom_alerts_editor_host == null:
+		return
+	for child in _custom_alerts_editor_host.get_children():
+		child.queue_free()
+	_custom_alerts_editor.clear()
+	if _custom_alerts_draft.is_empty():
+		var empty := Label.new()
+		empty.text = "No tips yet. Click Add tip."
+		_custom_alerts_editor_host.add_child(empty)
+		return
+	var tip := CompanionConfig.normalize_custom_alert(
+		_custom_alerts_draft[_custom_alerts_selected_index], _custom_alerts_selected_index + 1
+	)
+	var enabled_cb := CheckBox.new()
+	enabled_cb.text = "Enabled"
+	enabled_cb.button_pressed = bool(tip.get("enabled", true))
+	_custom_alerts_editor_host.add_child(enabled_cb)
+	var title_le := LineEdit.new()
+	title_le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_le.text = str(tip.get("title", ""))
+	title_le.placeholder_text = "Title (e.g. remember to !fard)"
+	_custom_alerts_editor_host.add_child(_form_row("Title", title_le))
+	var sub_le := LineEdit.new()
+	sub_le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sub_le.text = str(tip.get("subtitle", ""))
+	sub_le.placeholder_text = "Subtitle (optional)"
+	_custom_alerts_editor_host.add_child(_form_row("Subtitle", sub_le))
+	_custom_alerts_editor = {
+		"draft_index": _custom_alerts_selected_index,
+		"enabled": enabled_cb,
+		"title": title_le,
+		"subtitle": sub_le,
+	}
 
 
 func _on_chrome_box_picked(index: int) -> void:

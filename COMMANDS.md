@@ -2,7 +2,7 @@
 
 **Shatter the Streamer** — Chat plays along with a live *Shattered Pixel Dungeon* run. Earn points by chatting and spend them on spawns, curses, scrolls, and more that hit the hero in real time. Free commands light up the stream overlay; paid commands change the dungeon.
 
-**Bestiary** — Free `!summon` marches monsters across the companion overlay and fills a **shared XP bar**. Unlock zones together (Sewers → Prison → Caves → City → Halls). Race the **Sprint** for each level (Hall of Fame + **100/200/300/400 donor pts** by zone; **one crown per viewer per stream**). Hold **Heat** (last 15 min of summon XP) for **personal 2×** point gains. Check `!bestiary`, `!heat`, `!sprint`, `!topsummoner`, `!summonhall`. Details: [docs/bestiary-summon-system.md](docs/bestiary-summon-system.md).
+**Bestiary** — Free `!summon` marches monsters across the companion overlay and fills a **shared XP bar**. Paid in-game commands (`!spawn`, `!heal`, etc.) also add **bar XP only** (`max(2, cost // 5)`; promo cost 0 → 0 XP) — not Sprint or Heat. Unlock zones together (Sewers → Prison → Caves → City → Halls). **Shatter Events** light up as mystery pips on the bar (and on zone clear / Halls loops): **60s** free `!spawn` of a zone mob (rarely eye/scorpio) plus usually one chaos sidecar — only while spending is enabled. Race the **Sprint** for each level (Hall of Fame + **100/200/300/400 donor pts** by zone; **one crown per viewer per stream**). Hold **Heat** (last 15 min of summon XP) for **personal 2×** point gains. Check `!bestiary`, `!heat`, `!sprint`, `!topsummoner`, `!summonhall`. Details: [docs/bestiary-summon-system.md](docs/bestiary-summon-system.md).
 
 **Economy v1.1:** Earn **2 pts per message** (20s cooldown). Chat cap / bank % come from live `points_config.json` (`chat_point_cap` — currently often **300**); use **`!bank`** to save **10%** into **donor points** (permanent). Chat resets when the stream ends; donor points never expire. Chat blurb: **`!economy`** / **`!reminder`** (or bare **`!help`**) always uses the live cap.
 
@@ -61,8 +61,7 @@ Setup: [docs/stream-info-commands.md](docs/stream-info-commands.md). C#: `Lastes
 | Command | Cost | Description |
 |---------|------|-------------|
 | **!points** | Free | **Chat points**, **donor points**, and **Bestiary** sprint/heat XP (e.g. `Chat: 120/500 \| Donor: 340 \| Bestiary: sprint 8 XP, heat 14 XP`) |
-| **!bank** | Free | Preview bank conversion (chat → donor at **10%**) |
-| **!bank all** | Free | Convert all current chat points to donor points |
+| **!bank** / **!bank all** | Free | Convert all current chat points to donor points (chat → donor at **10%**) |
 | **!bank** \<amount\> | Free | Convert exactly \<amount\> chat points to donor points |
 | **!toppoints** / **!leaderboard** | Free | Top 3 by **donor points** (all-time saved balance) |
 | **!givepoints** \<amount\> \<target\> | Free | Transfer points to another viewer. Works on YouTube without `@`: `!givepoints 50 bob` (Twitch also accepts `@bob`). Spends chat points first, then donor points if needed. |

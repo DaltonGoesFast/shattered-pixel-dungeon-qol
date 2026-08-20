@@ -15,6 +15,7 @@
 [ext_resource type="Script" path="res://scripts/placeable_chrome_boxes.gd" id="15_chrome"]
 [ext_resource type="Script" path="res://scripts/paid_notice_overlay.gd" id="16_paid"]
 [ext_resource type="Script" path="res://scripts/double_points_panel.gd" id="17_double_points"]
+[ext_resource type="Script" path="res://scripts/tip_toast_presenter.gd" id="18_tip"]
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_alert_toast"]
 texture = ExtResource("6_toast_chrome")
@@ -287,6 +288,19 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("16_paid")
+
+[node name="CanvasLayerTipToasts" type="CanvasLayer" parent="."]
+layer = 9
+
+[node name="TipToastPresenter" type="Control" parent="CanvasLayerTipToasts"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("18_tip")
 
 [node name="CanvasLayerAlerts" type="CanvasLayer" parent="."]
 layer = 10

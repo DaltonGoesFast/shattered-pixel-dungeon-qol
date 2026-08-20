@@ -12,6 +12,7 @@ var _exp_track: ColorRect
 var _exp_fill: TextureRect
 var _exp_fill_atlas: AtlasTexture
 var _exp_text: Label
+var _pip_layer: Control
 var _sprint_label: Label
 var _heat_label: Label
 var _hall_row: HBoxContainer
@@ -112,6 +113,11 @@ func _build() -> void:
 	_exp_fill.stretch_mode = TextureRect.STRETCH_SCALE
 	_SpdUi.apply_nearest(_exp_fill)
 	_bar_holder.add_child(_exp_fill)
+
+	_pip_layer = Control.new()
+	_pip_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pip_layer.z_index = 4
+	_bar_holder.add_child(_pip_layer)
 
 	_exp_text = Label.new()
 	_exp_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -350,9 +356,46 @@ func _layout_exp_bar(_unused: Variant = null) -> void:
 	_exp_fill.size = Vector2(fill_w, bar_h)
 	_exp_fill.visible = fill_w >= 0.5
 
+	_layout_shatter_pips(bar_w, bar_h, y_off)
+
 	if _exp_text and CompanionConfig.bestiary_xp_text_over_bar:
 		_exp_text.position = Vector2(0.0, 0.0)
 		_exp_text.size = Vector2(bar_w, holder_h)
+
+
+func _layout_shatter_pips(bar_w: float, bar_h: float, y_off: float) -> void:
+	if _pip_layer == null:
+		return
+	for c in _pip_layer.get_children():
+		c.queue_free()
+	var shatter: Variant = _last_payload.get("shatter", {})
+	if typeof(shatter) != TYPE_DICTIONARY:
+		return
+	if not bool(shatter.get("enabled", true)):
+		return
+	var fractions: Variant = shatter.get("pip_fractions", [])
+	if typeof(fractions) != TYPE_ARRAY or fractions.is_empty():
+		return
+	var claimed: Variant = shatter.get("claimed", [])
+	var claimed_set := {}
+	if typeof(claimed) == TYPE_ARRAY:
+		for v in claimed:
+			claimed_set[int(v)] = true
+	var pip_r := clampf(bar_h * 0.35, 3.5, 8.0)
+	var cy := y_off + bar_h * 0.5
+	var claimed_col := CompanionConfig.bestiary_shatter_pip_claimed_color
+	var unclaimed_col := CompanionConfig.bestiary_shatter_pip_unclaimed_color
+	for i in range(fractions.size()):
+		var frac := clampf(float(fractions[i]), 0.0, 1.0)
+		var idx := i + 1
+		var dot := ColorRect.new()
+		dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var filled := claimed_set.has(idx)
+		dot.color = claimed_col if filled else unclaimed_col
+		var cx := bar_w * frac
+		dot.position = Vector2(cx - pip_r, cy - pip_r)
+		dot.size = Vector2(pip_r * 2.0, pip_r * 2.0)
+		_pip_layer.add_child(dot)
 
 
 func _layout_banner(canvas: Vector2) -> void:

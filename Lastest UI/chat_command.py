@@ -652,6 +652,7 @@ def handle_summon(username: str, args: list[str]) -> ChatResult:
                 int(lu.get("donor_reward") or 0),
             )
         )
+    msg = msg + chat_messages.shatter_events_suffix(bestiary.get("shatter_events") or [])
 
     return ChatResult(
         ok=True,
@@ -665,6 +666,7 @@ def handle_summon(username: str, args: list[str]) -> ChatResult:
             "soft_floor": soft_floor,
             "bestiary_level": level,
             "leveled_up": bool(bestiary.get("leveled_up")),
+            "shatter_events": list(bestiary.get("shatter_events") or []),
             "march_queued": march_ok,
         },
     )

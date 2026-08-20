@@ -23,6 +23,8 @@ const _SpdUi := preload("res://scripts/spd_ui_art.gd")
 
 var _queue: Array[Dictionary] = []
 var _busy: bool = false
+## Emitted when command-toast busy state changes (tip toasts yield while true).
+signal busy_changed(busy: bool)
 ## { "request_id", "username", "headline_hint", "command", "monster_hint", "scroll_hint", "slot", "amount", "msec" }
 var _pending_tracker: Array[Dictionary] = []
 var _mob_idle_frames: Array[Texture2D] = []
@@ -87,6 +89,17 @@ func _on_settings_saved() -> void:
 	_apply_text_alignment()
 	_apply_alert_font_sizes()
 	_apply_command_icon_sizes()
+
+
+func is_busy() -> bool:
+	return _busy or not _queue.is_empty()
+
+
+func _set_busy(value: bool) -> void:
+	if _busy == value:
+		return
+	_busy = value
+	busy_changed.emit(_busy)
 
 
 func _process(delta: float) -> void:
@@ -796,14 +809,16 @@ func _enqueue(item: Dictionary) -> void:
 	_queue.append(item)
 	if not _busy:
 		_play_next()
+	else:
+		busy_changed.emit(true)
 
 
 func _play_next() -> void:
 	if _queue.is_empty():
-		_busy = false
+		_set_busy(false)
 		_hide_panel()
 		return
-	_busy = true
+	_set_busy(true)
 	var item: Dictionary = _queue.pop_front()
 	_apply_mob_frames_from_item(item)
 	_title.text = str(item.get("headline", ""))
@@ -883,12 +898,6 @@ func _hide_panel() -> void:
 	_subtitle.text = ""
 
 
-func _burst_fx(kind: String) -> void:
-	if kind == "confirm":
-		_particles.amount = 64
-	elif kind == "pending":
-		_particles.amount = 28
-	else:
-		_particles.amount = 16
-	_particles.restart()
-	_particles.emitting = true
+func _burst_fx(_kind: String) -> void:
+	# Particle burst on command toasts is disabled.
+	return

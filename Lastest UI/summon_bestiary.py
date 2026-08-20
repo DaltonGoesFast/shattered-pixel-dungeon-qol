@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Bestiary progression for !summon: co-op XP bar, level sprint, rolling heat.
+"""Bestiary progression for !summon and paid spends: co-op XP bar, level sprint, rolling heat.
 
 Authoritative session state for Godot HUD via GET /api/bestiary.
+Paid spends grant bar XP only via apply_bar_xp(); sprint/heat remain summon-only.
 """
 from __future__ import annotations
 
@@ -20,9 +21,67 @@ HEAT_LEADER_FILE = os.path.join(SCRIPT_DIR, "heat_leader.txt")
 TOP_SUMMONER_FILE = os.path.join(SCRIPT_DIR, "top_summoner.txt")
 TOTAL_SUMMONS_FILE = os.path.join(SCRIPT_DIR, "totalsummons.txt")
 SUMMON_COUNTS_FILE = os.path.join(SCRIPT_DIR, "summon_session_counts.json")
+FREE_UNTIL_FILE = os.path.join(SCRIPT_DIR, "free_until.json")
+SPEND_DISABLED_FILE = os.path.join(SCRIPT_DIR, "spend_disabled.txt")
 
 _lock = threading.Lock()
 _config_cache: Optional[dict] = None
+
+# Sidecar cost_key -> chat command label for Shatter Event announcements.
+_SIDECAR_CHAT_LABEL = {
+    "cost_per_plant": "!plant",
+    "cost_per_debuff": "!debuff",
+    "cost_per_corrupt_ally": "!corruptally",
+    "cost_per_trap": "!trap",
+    "cost_per_gas": "!gas",
+    "cost_per_bomb": "!bomb",
+    "cost_per_wand": "!wand",
+    "cost_per_hex": "!hex",
+    "cost_per_degrade": "!degrade",
+    "cost_per_sabotage": "!sabotage",
+    "cost_per_curse": "!curse",
+    "cost_per_scroll": "!scroll",
+    "cost_per_transmute": "!transmute",
+    "cost_per_dew": "!dew",
+    "cost_per_ally_bee": "!bee",
+    "cost_per_ward": "!ward",
+}
+
+_DEFAULT_HOSTILE_KEYS = [
+    "cost_per_plant",
+    "cost_per_debuff",
+    "cost_per_corrupt_ally",
+    "cost_per_trap",
+    "cost_per_gas",
+    "cost_per_bomb",
+    "cost_per_wand",
+    "cost_per_hex",
+    "cost_per_degrade",
+    "cost_per_sabotage",
+    "cost_per_curse",
+    "cost_per_scroll",
+    "cost_per_transmute",
+]
+_DEFAULT_HELPFUL_KEYS = [
+    "cost_per_dew",
+    "cost_per_ally_bee",
+    "cost_per_ward",
+]
+_DEFAULT_PIP_COUNTS = {1: 3, 2: 4, 3: 5, 4: 6, 5: 6}
+_DEFAULT_SIDECAR_CHANCE = {1: 0.80, 2: 0.88, 3: 0.94, 4: 0.98, 5: 1.0}
+
+
+def _default_shatter_event() -> dict:
+    return {
+        "enabled": True,
+        "duration_sec": 60,
+        "jackpot_chance": 0.01,
+        "sidecar_chance_by_level": dict(_DEFAULT_SIDECAR_CHANCE),
+        "rat_max_fraction": 0.25,
+        "helpful_max_fraction": 0.25,
+        "hostile_keys": list(_DEFAULT_HOSTILE_KEYS),
+        "helpful_keys": list(_DEFAULT_HELPFUL_KEYS),
+    }
 
 
 def _default_config() -> dict:
@@ -43,17 +102,18 @@ def _default_config() -> dict:
             "apply_to_sprint": True,
             "apply_to_heat": True,
         },
+        "shatter_event": _default_shatter_event(),
         # Zones match NATIVE_DEPTH chapter: (depth-1)//5 (see points_command / StreamingCommandHandler).
         "levels": [
-            {"level": 1, "zone": "Sewers", "bar_threshold": 1000,
+            {"level": 1, "zone": "Sewers", "bar_threshold": 1000, "pip_count": 3,
              "monsters": ["rat", "albino", "snake", "gnoll", "crab", "slime", "swarm", "thief"]},
-            {"level": 2, "zone": "Prison", "bar_threshold": 1500,
+            {"level": 2, "zone": "Prison", "bar_threshold": 1500, "pip_count": 4,
              "monsters": ["skeleton", "dm100", "guard", "necromancer"]},
-            {"level": 3, "zone": "Caves", "bar_threshold": 2000,
+            {"level": 3, "zone": "Caves", "bar_threshold": 2000, "pip_count": 5,
              "monsters": ["bat", "brute", "shaman", "spinner", "ghoul"]},
-            {"level": 4, "zone": "City", "bar_threshold": 2500,
+            {"level": 4, "zone": "City", "bar_threshold": 2500, "pip_count": 6,
              "monsters": ["elemental", "warlock", "monk", "golem", "succubus"]},
-            {"level": 5, "zone": "Halls", "bar_threshold": 0,
+            {"level": 5, "zone": "Halls", "bar_threshold": 2500, "pip_count": 6,
              "monsters": ["eye", "scorpio"]},
         ],
     }
@@ -129,6 +189,7 @@ def normalize_config(raw: dict) -> dict:
     except (TypeError, ValueError):
         cfg["per_user_bar_cap_fraction"] = 0.0
     cfg["repeat_mob_diminishing"] = bool(cfg.get("repeat_mob_diminishing", False))
+    cfg["shatter_event"] = _normalize_shatter_event(cfg.get("shatter_event"))
     sf = cfg.get("soft_floor") if isinstance(cfg.get("soft_floor"), dict) else {}
     sf["enabled"] = bool(sf.get("enabled", True))
     sf["top_n"] = max(1, int(sf.get("top_n", 3) or 3))
@@ -155,22 +216,356 @@ def normalize_config(raw: dict) -> dict:
                 continue
             base = dict(defaults_by_lvl.get(lvl) or {"level": lvl, "zone": f"Level {lvl}", "monsters": []})
             zone = str(entry.get("zone", base.get("zone", f"Level {lvl}"))).strip() or base.get("zone")
-            thr = int(entry.get("bar_threshold", base.get("bar_threshold", 0)) or 0)
-            if lvl >= 5:
-                thr = 0
-            else:
-                thr = max(0, thr)
+            thr = max(0, int(entry.get("bar_threshold", base.get("bar_threshold", 0)) or 0))
             monsters = entry.get("monsters", base.get("monsters") or [])
             if not isinstance(monsters, list):
                 monsters = list(base.get("monsters") or [])
             monsters = [str(m).strip().lower() for m in monsters if str(m).strip()]
+            pip_default = int(base.get("pip_count", _DEFAULT_PIP_COUNTS.get(lvl, 3)) or 0)
+            try:
+                pip_count = int(entry.get("pip_count", pip_default) or pip_default)
+            except (TypeError, ValueError):
+                pip_count = pip_default
+            pip_count = max(0, min(12, pip_count))
             out_levels.append(
-                {"level": lvl, "zone": zone, "bar_threshold": thr, "monsters": monsters}
+                {
+                    "level": lvl,
+                    "zone": zone,
+                    "bar_threshold": thr,
+                    "pip_count": pip_count,
+                    "monsters": monsters,
+                }
             )
         out_levels.sort(key=lambda e: int(e.get("level", 0)))
         if out_levels:
             cfg["levels"] = out_levels
+    else:
+        # Ensure default levels keep pip_count when no levels override
+        for entry in cfg.get("levels") or []:
+            if "pip_count" not in entry:
+                lvl = int(entry.get("level", 1) or 1)
+                entry["pip_count"] = int(_DEFAULT_PIP_COUNTS.get(lvl, 3))
     return cfg
+
+
+def _normalize_shatter_event(raw: Any) -> dict:
+    base = _default_shatter_event()
+    if not isinstance(raw, dict):
+        return base
+    out = dict(base)
+    out["enabled"] = bool(raw.get("enabled", True))
+    try:
+        out["duration_sec"] = max(5, min(600, int(raw.get("duration_sec", 60) or 60)))
+    except (TypeError, ValueError):
+        out["duration_sec"] = 60
+    try:
+        out["jackpot_chance"] = max(0.0, min(1.0, float(raw.get("jackpot_chance", 0.01) or 0.0)))
+    except (TypeError, ValueError):
+        out["jackpot_chance"] = 0.01
+    try:
+        out["rat_max_fraction"] = max(0.05, min(1.0, float(raw.get("rat_max_fraction", 0.25) or 0.25)))
+    except (TypeError, ValueError):
+        out["rat_max_fraction"] = 0.25
+    try:
+        out["helpful_max_fraction"] = max(
+            0.0, min(1.0, float(raw.get("helpful_max_fraction", 0.25) or 0.25))
+        )
+    except (TypeError, ValueError):
+        out["helpful_max_fraction"] = 0.25
+    chance_in = raw.get("sidecar_chance_by_level")
+    chances: dict[int, float] = dict(_DEFAULT_SIDECAR_CHANCE)
+    if isinstance(chance_in, dict):
+        for k, v in chance_in.items():
+            try:
+                lvl = int(k)
+                chances[lvl] = max(0.0, min(1.0, float(v)))
+            except (TypeError, ValueError):
+                continue
+    out["sidecar_chance_by_level"] = {str(k): float(chances[k]) for k in sorted(chances)}
+    for list_key, default in (
+        ("hostile_keys", _DEFAULT_HOSTILE_KEYS),
+        ("helpful_keys", _DEFAULT_HELPFUL_KEYS),
+    ):
+        raw_list = raw.get(list_key, default)
+        if not isinstance(raw_list, list) or not raw_list:
+            raw_list = default
+        out[list_key] = [str(x).strip() for x in raw_list if str(x).strip()]
+    return out
+
+
+def _shatter_cfg(cfg: Optional[dict] = None) -> dict:
+    cfg = cfg or load_config()
+    return _normalize_shatter_event(cfg.get("shatter_event"))
+
+
+def _sidecar_chance_for_level(level: int, cfg: Optional[dict] = None) -> float:
+    se = _shatter_cfg(cfg)
+    chances = se.get("sidecar_chance_by_level") or {}
+    if not isinstance(chances, dict):
+        return float(_DEFAULT_SIDECAR_CHANCE.get(level, 1.0))
+    if level in chances:
+        try:
+            return max(0.0, min(1.0, float(chances[level])))
+        except (TypeError, ValueError):
+            pass
+    if str(level) in chances:
+        try:
+            return max(0.0, min(1.0, float(chances[str(level)])))
+        except (TypeError, ValueError):
+            pass
+    return float(_DEFAULT_SIDECAR_CHANCE.get(level, 1.0))
+
+
+def _pip_count_for_level(level: int, cfg: Optional[dict] = None) -> int:
+    cfg = cfg or load_config()
+    for entry in cfg.get("levels") or []:
+        if int(entry.get("level", 0)) == level:
+            try:
+                return max(0, min(12, int(entry.get("pip_count", _DEFAULT_PIP_COUNTS.get(level, 3)) or 0)))
+            except (TypeError, ValueError):
+                return int(_DEFAULT_PIP_COUNTS.get(level, 3))
+    return int(_DEFAULT_PIP_COUNTS.get(level, 3))
+
+
+def _pip_fractions(pip_count: int) -> list[float]:
+    n = max(0, int(pip_count))
+    if n <= 0:
+        return []
+    return [float(i) / float(n + 1) for i in range(1, n + 1)]
+
+
+def _monsters_for_level(level: int, cfg: Optional[dict] = None) -> list[str]:
+    cfg = cfg or load_config()
+    for entry in cfg.get("levels") or []:
+        if int(entry.get("level", 0)) == level:
+            return [str(m).strip().lower() for m in (entry.get("monsters") or []) if str(m).strip()]
+    return []
+
+
+def _monster_point_cost(monster: str) -> int:
+    monster = (monster or "").strip().lower()
+    try:
+        from points_command import get_config
+        pcfg = get_config()
+        return int(
+            pcfg.get("cost_per_monster", {}).get(monster, pcfg.get("default_monster_cost", 100))
+        )
+    except Exception:
+        return 100
+
+
+def _cost_key_point_cost(cost_key: str) -> int:
+    try:
+        from points_command import get_config
+        pcfg = get_config()
+        if cost_key.startswith("cost_per_monster."):
+            return _monster_point_cost(cost_key.split(".", 1)[1])
+        if cost_key in pcfg:
+            return max(1, int(pcfg.get(cost_key) or 1))
+    except Exception:
+        pass
+    return 75
+
+
+def _weighted_pick(items: list[tuple[Any, float]]) -> Any:
+    cleaned = [(it, max(0.0, float(w))) for it, w in items if w and float(w) > 0]
+    if not cleaned:
+        return None
+    total = sum(w for _, w in cleaned)
+    r = random.random() * total
+    acc = 0.0
+    for it, w in cleaned:
+        acc += w
+        if r <= acc:
+            return it
+    return cleaned[-1][0]
+
+
+def _zone_monster_weights(level: int, cfg: Optional[dict] = None) -> list[tuple[str, float]]:
+    se = _shatter_cfg(cfg)
+    rat_cap = float(se.get("rat_max_fraction", 0.25) or 0.25)
+    monsters = _monsters_for_level(level, cfg)
+    weights: list[tuple[str, float]] = []
+    for m in monsters:
+        cost = max(1, _monster_point_cost(m))
+        weights.append((m, float(max(1, round(300.0 / cost)))))
+    if not weights:
+        return [("rat", 1.0)]
+    # Cap rat share
+    total = sum(w for _, w in weights)
+    rat_w = next((w for m, w in weights if m == "rat"), 0.0)
+    if rat_w > 0 and total > 0 and (rat_w / total) > rat_cap:
+        other = total - rat_w
+        # rat_w' / (other + rat_w') = rat_cap => rat_w' = rat_cap/(1-rat_cap) * other
+        if rat_cap >= 1.0:
+            pass
+        elif other <= 0:
+            weights = [(m, (rat_cap if m == "rat" else 0.0) or w) for m, w in weights]
+        else:
+            new_rat = (rat_cap / (1.0 - rat_cap)) * other
+            weights = [(m, new_rat if m == "rat" else w) for m, w in weights]
+    return weights
+
+
+def _roll_shatter_monster(level: int, cfg: Optional[dict] = None) -> str:
+    se = _shatter_cfg(cfg)
+    try:
+        jackpot = float(se.get("jackpot_chance", 0.01) or 0.0)
+    except (TypeError, ValueError):
+        jackpot = 0.01
+    if random.random() < jackpot:
+        return "eye" if random.random() < 0.5 else "scorpio"
+    picked = _weighted_pick(_zone_monster_weights(level, cfg))
+    return str(picked or "rat")
+
+
+def _sidecar_weight_table(cfg: Optional[dict] = None) -> list[tuple[str, float]]:
+    se = _shatter_cfg(cfg)
+    hostile_keys = list(se.get("hostile_keys") or _DEFAULT_HOSTILE_KEYS)
+    helpful_keys = list(se.get("helpful_keys") or _DEFAULT_HELPFUL_KEYS)
+    try:
+        helpful_frac = float(se.get("helpful_max_fraction", 0.25) or 0.25)
+    except (TypeError, ValueError):
+        helpful_frac = 0.25
+    hostile: list[tuple[str, float]] = []
+    for key in hostile_keys:
+        cost = max(1, _cost_key_point_cost(key))
+        hostile.append((key, float(max(1, round(300.0 / cost)))))
+    helpful: list[tuple[str, float]] = []
+    for key in helpful_keys:
+        cost = max(1, _cost_key_point_cost(key))
+        helpful.append((key, float(max(1, round(300.0 / cost)))))
+    x = sum(w for _, w in hostile)
+    h = sum(w for _, w in helpful)
+    if helpful and h > 0 and helpful_frac > 0 and helpful_frac < 1.0:
+        # H' <= helpful_frac * (X + H') => H' <= X * helpful_frac / (1 - helpful_frac)
+        max_h = x * helpful_frac / (1.0 - helpful_frac) if helpful_frac < 1.0 else h
+        if h > max_h and max_h > 0:
+            scale = max_h / h
+            helpful = [(k, w * scale) for k, w in helpful]
+    elif helpful_frac <= 0:
+        helpful = []
+    return hostile + helpful
+
+
+def _roll_shatter_sidecar(level: int, cfg: Optional[dict] = None) -> Optional[str]:
+    if random.random() >= _sidecar_chance_for_level(level, cfg):
+        return None
+    picked = _weighted_pick(_sidecar_weight_table(cfg))
+    return str(picked) if picked else None
+
+
+def _is_spend_disabled() -> bool:
+    return os.path.exists(SPEND_DISABLED_FILE)
+
+
+def extend_free_until(cost_keys: list[str], duration_sec: int) -> dict[str, int]:
+    """Extend free windows: new_end = max(now, existing_end) + duration_sec per key."""
+    now = int(time.time())
+    duration_sec = max(1, int(duration_sec or 60))
+    free: dict[str, Any] = {}
+    if os.path.exists(FREE_UNTIL_FILE):
+        try:
+            with open(FREE_UNTIL_FILE, encoding="utf-8") as f:
+                raw = json.load(f)
+            if isinstance(raw, dict):
+                free = raw
+        except (json.JSONDecodeError, OSError):
+            free = {}
+    ends: dict[str, int] = {}
+    for key in cost_keys:
+        k = str(key).strip()
+        if not k:
+            continue
+        try:
+            prev = int(free.get(k) or 0)
+        except (TypeError, ValueError):
+            prev = 0
+        new_end = max(now, prev) + duration_sec
+        free[k] = new_end
+        ends[k] = new_end
+    tmp = FREE_UNTIL_FILE + ".tmp"
+    payload = json.dumps(free, indent=2)
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(payload)
+        f.write("\n")
+    os.replace(tmp, FREE_UNTIL_FILE)
+    return ends
+
+
+def _grant_shatter_event(
+    state: dict,
+    cfg: dict,
+    level: int,
+    *,
+    reason: str,
+    pip_index: Optional[int] = None,
+) -> Optional[dict[str, Any]]:
+    """Roll + write free_until. Returns event dict or None if gated off."""
+    se = _shatter_cfg(cfg)
+    if not bool(se.get("enabled", True)):
+        return None
+    if _is_spend_disabled():
+        return None
+    duration = max(5, int(se.get("duration_sec", 60) or 60))
+    monster = _roll_shatter_monster(level, cfg)
+    monster_key = f"cost_per_monster.{monster}"
+    sidecar_key = _roll_shatter_sidecar(level, cfg)
+    keys = [monster_key]
+    if sidecar_key:
+        keys.append(sidecar_key)
+    extend_free_until(keys, duration)
+    event = {
+        "reason": reason,
+        "level": level,
+        "zone": _zone_for_level(level, cfg),
+        "monster": monster,
+        "monster_cost_key": monster_key,
+        "sidecar_cost_key": sidecar_key,
+        "sidecar_label": _SIDECAR_CHAT_LABEL.get(sidecar_key or "", sidecar_key),
+        "duration_sec": duration,
+        "pip_index": pip_index,
+        "cost_keys": keys,
+    }
+    return event
+
+
+def _claim_due_shatter_pips(
+    state: dict,
+    cfg: dict,
+    level: int,
+    progress_xp: int,
+    thresh: int,
+) -> list[dict[str, Any]]:
+    """Claim mid-bar pips whose XP threshold is <= progress_xp. Marks claimed only when granted."""
+    events: list[dict[str, Any]] = []
+    se = _shatter_cfg(cfg)
+    if not bool(se.get("enabled", True)):
+        return events
+    if thresh <= 0:
+        return events
+    pip_count = _pip_count_for_level(level, cfg)
+    fractions = _pip_fractions(pip_count)
+    if not fractions:
+        return events
+    claimed = [int(x) for x in (state.get("shatter_claimed_pips") or []) if str(x).strip()]
+    claimed_set = set(claimed)
+    # If spend disabled, leave unclaimed for catch-up later.
+    if _is_spend_disabled():
+        return events
+    for i, frac in enumerate(fractions, start=1):
+        if i in claimed_set:
+            continue
+        need = int(math.ceil(float(thresh) * frac))
+        if progress_xp < need:
+            continue
+        ev = _grant_shatter_event(state, cfg, level, reason="pip", pip_index=i)
+        if ev:
+            claimed.append(i)
+            claimed_set.add(i)
+            events.append(ev)
+    state["shatter_claimed_pips"] = sorted(claimed_set)
+    return events
 
 
 def _monster_level_map(cfg: Optional[dict] = None) -> dict[str, int]:
@@ -229,6 +624,7 @@ def _empty_state() -> dict:
         "last_level_up_ts": 0,
         "session_summon_counts": {},
         "last_monster_by_user": {},
+        "shatter_claimed_pips": [],
     }
 
 
@@ -262,6 +658,12 @@ def _load_state() -> dict:
             base["session_summon_counts"] = {}
         if not isinstance(base.get("last_monster_by_user"), dict):
             base["last_monster_by_user"] = {}
+        if not isinstance(base.get("shatter_claimed_pips"), list):
+            base["shatter_claimed_pips"] = []
+        else:
+            base["shatter_claimed_pips"] = [
+                int(x) for x in base["shatter_claimed_pips"] if str(x).strip().lstrip("-").isdigit()
+            ]
         base["level"] = max(1, int(base.get("level", 1) or 1))
         base["bar_xp"] = max(0, int(base.get("bar_xp", 0) or 0))
         return base
@@ -712,6 +1114,224 @@ def _grant_sprint_donor(username: str, amount: int) -> bool:
         return False
 
 
+def spend_xp_from_cost(cost: int) -> int:
+    """Bestiary bar XP from a paid command cost. Promo/zero cost → 0 (no summon floor)."""
+    c = int(cost or 0)
+    if c <= 0:
+        return 0
+    return max(2, c // 5)
+
+
+def _cap_bar_contrib(state: dict, key: str, bar_xp_add: int, cfg: dict) -> int:
+    """Apply optional per-user bar contribution cap; mutates state['bar_contrib']."""
+    cap_frac = float(cfg.get("per_user_bar_cap_fraction", 0) or 0)
+    if cap_frac <= 0:
+        return max(0, int(bar_xp_add))
+    level = int(state.get("level", 1))
+    thresh = _threshold_for_level(level, cfg)
+    if thresh <= 0:
+        return max(0, int(bar_xp_add))
+    contrib = dict(state.get("bar_contrib") or {})
+    already = int(contrib.get(key, 0) or 0)
+    cap = int(thresh * cap_frac)
+    room = max(0, cap - already)
+    bar_xp_add = min(max(0, int(bar_xp_add)), room)
+    contrib[key] = already + bar_xp_add
+    state["bar_contrib"] = contrib
+    return bar_xp_add
+
+
+def _add_bar_xp_and_level_up(
+    state: dict,
+    bar_xp_add: int,
+    cfg: dict,
+    now: int,
+) -> tuple[bool, Optional[dict], list[dict[str, Any]]]:
+    """Add co-op bar XP, Shatter Event pips, level-ups, and Halls loops.
+
+    Mutates state. Caller holds _lock.
+    Returns (leveled_up, level_up_info, shatter_events).
+    """
+    max_lvl = _max_level(cfg)
+    leveled_up = False
+    level_up_info: Optional[dict] = None
+    shatter_events: list[dict[str, Any]] = []
+    state["bar_xp"] = int(state.get("bar_xp", 0)) + max(0, int(bar_xp_add))
+
+    # Safety: avoid infinite Halls loops if overflow is huge
+    for _ in range(20):
+        cur = int(state.get("level", 1))
+        thresh = _threshold_for_level(cur, cfg)
+        if thresh <= 0:
+            # No bar on this level (legacy Halls thr=0): cosmetic complete
+            if cur >= max_lvl:
+                state["bar_xp"] = 0
+            break
+
+        progress = min(int(state.get("bar_xp", 0)), thresh)
+        shatter_events.extend(
+            _claim_due_shatter_pips(state, cfg, cur, progress, thresh)
+        )
+
+        if int(state.get("bar_xp", 0)) < thresh:
+            break
+
+        overflow = int(state.get("bar_xp", 0)) - thresh
+
+        if cur >= max_lvl:
+            # Halls repeatable loop — no sprint crown / donor
+            ev = _grant_shatter_event(state, cfg, cur, reason="halls_loop")
+            if ev:
+                shatter_events.append(ev)
+            state["shatter_claimed_pips"] = []
+            state["sprint_xp"] = {}
+            state["bar_contrib"] = {}
+            state["bar_xp"] = max(0, overflow)
+            state["last_level_up_ts"] = now
+            continue
+
+        # Zone level-up — crown highest eligible sprint XP
+        sprint_before = dict(state.get("sprint_xp") or {})
+        ineligible = _sprint_ineligible_keys(state)
+        winner_display, winner_xp, _gap = _pick_eligible_sprint_leader(
+            sprint_before, ineligible
+        )
+        winner_key = (winner_display or "").strip().lower()
+
+        old_level = cur
+        old_zone = _zone_for_level(old_level, cfg)
+        new_level = cur + 1
+        new_zone = _zone_for_level(new_level, cfg)
+        old_pool = set(unlocked_monsters(old_level, cfg))
+        new_pool = set(unlocked_monsters(new_level, cfg))
+        newly_unlocked = sorted(new_pool - old_pool)
+
+        hall = list(state.get("hall_of_fame") or [])
+        hall.append({
+            "level": old_level,
+            "zone": old_zone,
+            "user": winner_display,
+            "xp": winner_xp,
+            "ts": now,
+        })
+        state["hall_of_fame"] = hall
+        if winner_key:
+            winners = list(state.get("sprint_winners") or [])
+            if winner_key not in {str(w).lower() for w in winners}:
+                winners.append(winner_key)
+            state["sprint_winners"] = winners
+
+        # Level-up Shatter Event for the zone that just completed
+        ev = _grant_shatter_event(state, cfg, old_level, reason="level_up")
+        if ev:
+            shatter_events.append(ev)
+
+        state["level"] = new_level
+        state["bar_xp"] = max(0, overflow)
+        state["sprint_xp"] = {}
+        state["bar_contrib"] = {}
+        state["shatter_claimed_pips"] = []
+        state["last_level_up_ts"] = now
+        leveled_up = True
+        donor_reward = _sprint_donor_for_level(old_level, cfg) if winner_display else 0
+        level_up_info = {
+            "from_level": old_level,
+            "to_level": new_level,
+            "from_zone": old_zone,
+            "to_zone": new_zone,
+            "winner": winner_display,
+            "winner_xp": winner_xp,
+            "newly_unlocked": newly_unlocked,
+            "donor_reward": donor_reward,
+        }
+
+    return leveled_up, level_up_info, shatter_events
+
+
+def apply_bar_xp(username: str, xp: int) -> dict[str, Any]:
+    """Add XP to the shared co-op bar only (no sprint/heat). Used by paid spends.
+
+    Soft-floor apply_to_bar and per-user bar cap still apply. May level up and
+    crown the current summon sprint leader.
+    """
+    cfg = load_config()
+    display = (username or "").strip() or "Anonymous"
+    key = display.lower()
+    xp_base = max(0, int(xp or 0))
+    if xp_base <= 0:
+        with _lock:
+            state = _load_state()
+            level = int(state.get("level", 1))
+            return {
+                "ok": True,
+                "bar_xp_added": 0,
+                "xp_base": 0,
+                "xp_mult": 1.0,
+                "soft_floor": False,
+                "level": level,
+                "zone": _zone_for_level(level, cfg),
+                "bar_xp": int(state.get("bar_xp", 0)),
+                "bar_threshold": _threshold_for_level(level, cfg),
+                "leveled_up": False,
+                "level_up": None,
+                "shatter_events": [],
+            }
+
+    with _lock:
+        state = _load_state()
+        now = int(time.time())
+        bar_xp_add = xp_base
+
+        xp_mult, soft_floor_applied = soft_floor_multiplier(display, state, cfg)
+        sf = _soft_floor_cfg(cfg)
+        if soft_floor_applied and xp_mult > 1.0 and bool(sf.get("apply_to_bar", True)):
+            bar_xp_add = _apply_xp_mult(bar_xp_add, xp_mult)
+        else:
+            soft_floor_applied = False
+            xp_mult = 1.0
+
+        bar_xp_add = _cap_bar_contrib(state, key, bar_xp_add, cfg)
+        leveled_up, level_up_info, shatter_events = _add_bar_xp_and_level_up(
+            state, bar_xp_add, cfg, now
+        )
+
+        # Refresh heat leader file / totals (bar-only; counts unchanged)
+        window = int(cfg.get("heat_window_sec", 900))
+        events = _prune_heat(list(state.get("heat_events") or []), now, window)
+        heat_user, heat_xp = _leader_from_scores(
+            _heat_scores(events),
+            {str(e.get("user", "")).lower(): str(e.get("user", "")) for e in events if e.get("user")},
+        )
+        _write_heat_leader_file(heat_user, heat_xp)
+        _write_totals(state)
+        _save_state(state)
+
+        level = int(state.get("level", 1))
+        result = {
+            "ok": True,
+            "bar_xp_added": bar_xp_add,
+            "xp_base": xp_base,
+            "xp_mult": xp_mult,
+            "soft_floor": soft_floor_applied,
+            "level": level,
+            "zone": _zone_for_level(level, cfg),
+            "bar_xp": int(state.get("bar_xp", 0)),
+            "bar_threshold": _threshold_for_level(level, cfg),
+            "leveled_up": leveled_up,
+            "level_up": level_up_info,
+            "shatter_events": shatter_events,
+            "heat_leader": heat_user,
+            "heat_xp": heat_xp,
+        }
+
+    if leveled_up and level_up_info and level_up_info.get("winner"):
+        _grant_sprint_donor(
+            level_up_info["winner"], int(level_up_info.get("donor_reward") or 0)
+        )
+
+    return result
+
+
 def apply_summon(username: str, monster: str) -> dict[str, Any]:
     """Apply XP to bar/sprint/heat. May level up. Returns result dict for chat/API."""
     cfg = load_config()
@@ -720,8 +1340,6 @@ def apply_summon(username: str, monster: str) -> dict[str, Any]:
     key = display.lower()
     xp = monster_xp(monster)
     window = int(cfg.get("heat_window_sec", 900))
-    max_lvl = _max_level(cfg)
-    cap_frac = float(cfg.get("per_user_bar_cap_fraction", 0) or 0)
     diminish = bool(cfg.get("repeat_mob_diminishing", False))
 
     with _lock:
@@ -760,17 +1378,7 @@ def apply_summon(username: str, monster: str) -> dict[str, Any]:
             soft_floor_applied = False
             xp_mult = 1.0
 
-        # Per-user bar contribution cap for this level
-        if cap_frac > 0:
-            thresh = _threshold_for_level(level, cfg)
-            if thresh > 0:
-                contrib = dict(state.get("bar_contrib") or {})
-                already = int(contrib.get(key, 0) or 0)
-                cap = int(thresh * cap_frac)
-                room = max(0, cap - already)
-                bar_xp_add = min(bar_xp_add, room)
-                contrib[key] = already + bar_xp_add
-                state["bar_contrib"] = contrib
+        bar_xp_add = _cap_bar_contrib(state, key, bar_xp_add, cfg)
 
         # Sprint
         sprint = dict(state.get("sprint_xp") or {})
@@ -791,8 +1399,6 @@ def apply_summon(username: str, monster: str) -> dict[str, Any]:
         # Session counts
         counts = dict(state.get("session_summon_counts") or {})
         counts[display] = int(counts.get(display, 0) or 0) + 1
-        # also track lowercase for lookups
-        counts_lower_key = key
         # Prefer display casing as key; mysummons does case-insensitive lookup
         state["session_summon_counts"] = counts
 
@@ -800,76 +1406,9 @@ def apply_summon(username: str, monster: str) -> dict[str, Any]:
         last_mobs[key] = monster
         state["last_monster_by_user"] = last_mobs
 
-        # Co-op bar + level-ups
-        leveled_up = False
-        level_up_info: Optional[dict] = None
-        newly_unlocked: list[str] = []
-        state["bar_xp"] = int(state.get("bar_xp", 0)) + bar_xp_add
-
-        while True:
-            cur = int(state.get("level", 1))
-            if cur >= max_lvl:
-                # Cap bar at 0 progress on max level (cosmetic complete)
-                state["bar_xp"] = 0
-                break
-            thresh = _threshold_for_level(cur, cfg)
-            if thresh <= 0:
-                break
-            if int(state.get("bar_xp", 0)) < thresh:
-                break
-
-            # Level up — crown highest eligible sprint XP (prior winners blocked until next stream)
-            overflow = int(state.get("bar_xp", 0)) - thresh
-            sprint_before = dict(state.get("sprint_xp") or {})
-            ineligible = _sprint_ineligible_keys(state)
-            winner_display, winner_xp, _gap = _pick_eligible_sprint_leader(
-                sprint_before, ineligible
-            )
-            winner_key = (winner_display or "").strip().lower()
-
-            old_level = cur
-            old_zone = _zone_for_level(old_level, cfg)
-            new_level = cur + 1
-            new_zone = _zone_for_level(new_level, cfg)
-            old_pool = set(unlocked_monsters(old_level, cfg))
-            new_pool = set(unlocked_monsters(new_level, cfg))
-            newly_unlocked = sorted(new_pool - old_pool)
-
-            hall = list(state.get("hall_of_fame") or [])
-            hall.append({
-                "level": old_level,
-                "zone": old_zone,
-                "user": winner_display,
-                "xp": winner_xp,
-                "ts": now,
-            })
-            state["hall_of_fame"] = hall
-            if winner_key:
-                winners = list(state.get("sprint_winners") or [])
-                if winner_key not in {str(w).lower() for w in winners}:
-                    winners.append(winner_key)
-                state["sprint_winners"] = winners
-            state["level"] = new_level
-            state["bar_xp"] = max(0, overflow)
-            state["sprint_xp"] = {}
-            state["bar_contrib"] = {}
-            state["last_level_up_ts"] = now
-            leveled_up = True
-            donor_reward = _sprint_donor_for_level(old_level, cfg) if winner_display else 0
-            level_up_info = {
-                "from_level": old_level,
-                "to_level": new_level,
-                "from_zone": old_zone,
-                "to_zone": new_zone,
-                "winner": winner_display,
-                "winner_xp": winner_xp,
-                "newly_unlocked": newly_unlocked,
-                "donor_reward": donor_reward,
-            }
-            # Only one level-up per summon typically; loop allows multi if overflow huge
-            if winner_display and donor_reward > 0:
-                # Grant outside lock would be nicer, but keep call here after unlock
-                pass
+        leveled_up, level_up_info, shatter_events = _add_bar_xp_and_level_up(
+            state, bar_xp_add, cfg, now
+        )
 
         heat_user, heat_xp = _leader_from_scores(
             _heat_scores(events),
@@ -894,6 +1433,7 @@ def apply_summon(username: str, monster: str) -> dict[str, Any]:
             "bar_threshold": _threshold_for_level(int(state.get("level", 1)), cfg),
             "leveled_up": leveled_up,
             "level_up": level_up_info,
+            "shatter_events": shatter_events,
             "heat_leader": heat_user,
             "heat_xp": heat_xp,
         }
@@ -988,6 +1528,16 @@ def get_state_payload() -> dict[str, Any]:
                 cfg.get("sprint_donor_reward_per_level", cfg.get("sprint_donor_reward", 100))
             ),
             "next_sprint_donor_reward": _sprint_donor_for_level(level, cfg),
+            "shatter": {
+                "enabled": bool(_shatter_cfg(cfg).get("enabled", True)),
+                "pip_count": _pip_count_for_level(level, cfg),
+                "claimed": [
+                    int(x) for x in (state.get("shatter_claimed_pips") or [])
+                    if str(x).strip().lstrip("-").isdigit()
+                ],
+                "pip_fractions": _pip_fractions(_pip_count_for_level(level, cfg)),
+                "duration_sec": int(_shatter_cfg(cfg).get("duration_sec", 60) or 60),
+            },
         }
 
 

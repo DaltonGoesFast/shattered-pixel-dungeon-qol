@@ -121,6 +121,20 @@ Streamer.bot group **Companion Commands**: `C01 - Superchat`, `C02 - New Sub/Mem
 
 Optional fields: `username`, `message` / `text`, `amount`, `tier`, `months`, `count` / `gift_count`, `ttl_sec` (default from settings, often `6`).
 
+### Custom tip toasts (companion overlay only)
+
+Freeform reminder toasts in the **alert zone** (same chrome/fonts as command alerts). Separate from pending/confirm command toasts; **yields** while a command alert is playing or queued.
+
+Configure a rotating list in **Settings → Alerts → Custom tip toasts** (or `/points-config` Companion → Alerts). Keys: `custom_alerts_enabled`, `custom_alerts_interval_sec`, `custom_alerts_hold_sec`, `custom_alerts` (`title` / `subtitle` / `enabled`). **Scene gates** use element key `tip_toasts` (separate from `alerts`).
+
+Or fire on demand via Streamer.bot UDP (`ui` = `tip`, `custom_alert`, or `reminder`):
+
+```json
+{"ui":"tip","title":"remember to !fard","message":"2x points while active"}
+```
+
+Optional: `subtitle`, `ttl_sec` / `hold_sec` / `duration_sec`. Paid-notice kinds are unchanged — tip kinds are ignored by `PaidNoticeOverlay`.
+
 **Testing without Streamer.bot:** from PowerShell you can send a datagram (replace path/tools as needed):
 
 ```powershell
@@ -205,6 +219,11 @@ Created on first run. You can edit in a text editor, or use the in-app **Setting
 - `alert_fade_out_sec` (default `0.75`)
 - `show_ping_alerts` (default `false`) — show `ping_result` alerts
 - `show_failed_command_alerts` (default `false`) — show failed `*_result` with `error` text
+- `custom_alerts_enabled` (default `false`) — rotating tip toasts in the alert zone
+- `custom_alerts_interval_sec` (default `45`) — idle gap between auto tips
+- `custom_alerts_hold_sec` (default `3`) — tip hold duration
+- `custom_alerts` — array of `{ title, subtitle, enabled }` (max 16)
+- Scene gates key **`tip_toasts`** (F2 → Scene gates) — independent of **`alerts`**
 - **Alert zone** (viewport pixels from top-left):
   - `alert_zone_x_px`, `alert_zone_y_px`, `alert_zone_width_px`
   - `alert_zone_height_px` (default `0` = auto to bottom minus margin)

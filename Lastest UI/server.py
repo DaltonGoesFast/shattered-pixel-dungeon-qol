@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from spd_parser import SPDSaveParser
 import os
+import sys
 import json
 import logging
 import queue
@@ -10,6 +11,18 @@ import uuid
 import threading
 import time
 from datetime import datetime
+
+# Glance console by default; SPD_LOG_VERBOSE=1 or --verbose restores HTTP + game transport detail
+LOG_VERBOSE = (
+    os.environ.get("SPD_LOG_VERBOSE", "").strip().lower() in ("1", "true", "yes", "on")
+    or "--verbose" in sys.argv
+)
+
+
+def _vprint(*args, **kwargs):
+    """Print only in verbose mode (game send/result/OK transport chatter)."""
+    if LOG_VERBOSE:
+        print(*args, **kwargs)
 
 if os.name == "nt":
     import msvcrt
@@ -168,18 +181,40 @@ COMMAND_EVENTS_MAX = 100
 command_events_lock = threading.Lock()
 
 
-def _record_command_event(username, command, detail, success):
+def _record_command_event(username, command, detail, success, spend_id=None, cost=None):
     """Append a command event for the activity feed (overlay polls /api/activity-commands)."""
     with command_events_lock:
-        recent_command_events.append({
+        event = {
             "time": int(time.time() * 1000),
             "username": username or "",
             "command": command,
             "detail": detail or "",
             "success": bool(success),
-        })
+        }
+        if spend_id:
+            event["spend_id"] = spend_id
+        if cost is not None:
+            event["cost"] = cost
+        recent_command_events.append(event)
         while len(recent_command_events) > COMMAND_EVENTS_MAX:
             recent_command_events.pop(0)
+
+
+def _spend_event_kwargs(data):
+    """Optional spend_id/cost from points_command payload for Activity refund buttons."""
+    if not isinstance(data, dict):
+        return {}
+    out = {}
+    sid = (data.get("spend_id") or "").strip()
+    if sid:
+        out["spend_id"] = sid
+    cost = data.get("cost")
+    if cost is not None and str(cost).strip() != "":
+        try:
+            out["cost"] = int(cost)
+        except (TypeError, ValueError):
+            pass
+    return out
 
 
 SPAWN_RESULT_TIMEOUT = 9.0  # must match GAME_COMMAND_TIMEOUT in points_command.py (Streamer.bot waits 10s)
@@ -649,7 +684,7 @@ def _game_ws_on_message(ws, message):
                         if data.get('type') == 'streamer_debug_result' and data.get('error'):
                             pending_spawns[rid]['error'] = data.get('error')
                         pending_spawns[rid]['event'].set()
-            print(f"Game {data.get('type')}: request_id={rid} success={ok}")
+            _vprint(f"Game {data.get('type')}: request_id={rid} success={ok}")
             return
         if data.get('type') in ('hero_died', 'boss_slain') and data.get('source') == 'shattered-pixel-dungeon':
             _handle_score_event(data)
@@ -1414,6 +1449,25 @@ def viewer_points_undo_api():
         _release_viewer_points_lock()
 
 
+@app.route('/api/viewer-points/refund-action', methods=['POST', 'OPTIONS'])
+def viewer_points_refund_action_api():
+    """Refund a confirmed chat spend by spend ledger id. Body: { id }."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    body = request.get_json(force=True, silent=True) or {}
+    spend_id = (body.get('id') or body.get('spend_id') or '').strip()
+    if not spend_id:
+        return jsonify({"ok": False, "error": "Missing spend id"}), 400
+    try:
+        import points_command
+        result = points_command.refund_spend_action(spend_id)
+        if not result.get('ok'):
+            return jsonify(result), 400
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @app.route('/api/viewer-points/import', methods=['POST', 'OPTIONS'])
 def viewer_points_import():
     """Bulk import viewer points from JSON. Body: { users: [{username, points, donationPts?, last?, role?}, ...], merge: bool }."""
@@ -1453,7 +1507,8 @@ def viewer_points_import():
 @app.route('/api/viewer-points/prune', methods=['POST', 'OPTIONS'])
 def viewer_points_prune():
     """Remove users inactive N+ days with donor below minDonor; optionally also max chat-only pts (total − donor).
-    Body: { days: 2, minDonor: 101, maxChatPts?: number } — omit maxChatPts to ignore chat (legacy behavior)."""
+    Body: { days: 2, minDonor: 101, maxChatPts?: number, preview?: bool } — omit maxChatPts to ignore chat (legacy behavior).
+    preview=true returns {ok, count, users} without snapshot or write."""
     if request.method == 'OPTIONS':
         return '', 204
     body = request.get_json(force=True, silent=True) or {}
@@ -1476,7 +1531,6 @@ def viewer_points_prune():
     if not _acquire_viewer_points_lock():
         return jsonify({"error": "Points file busy, try again"}), 503
     try:
-        _snapshot_viewer_points_for_undo("prune")
         data = _read_viewer_points_raw()
         to_remove = []
         for k, v in data.items():
@@ -1490,6 +1544,10 @@ def viewer_points_prune():
                 if chat_only > max_chat_pts:
                     continue
             to_remove.append(k)
+        to_remove.sort()
+        if body.get("preview"):
+            return jsonify({"ok": True, "count": len(to_remove), "users": to_remove})
+        _snapshot_viewer_points_for_undo("prune")
         for k in to_remove:
             del data[k]
         _write_viewer_points_raw(data)
@@ -1873,7 +1931,7 @@ def spawn_command():
             payload = {'command': 'spawn', 'monster': monster, 'request_id': request_id}
             if username:
                 payload['username'] = username
-            print(f"Spawn send to game: {monster} request_id={request_id}")
+            _vprint(f"Spawn send to game: {monster} request_id={request_id}")
             _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
@@ -1893,8 +1951,8 @@ def spawn_command():
             return jsonify({'ok': False, 'error': err}), 504
         last_spawn_time = time.time()
         if success:
-            print(f"Spawn OK: {monster} for {username}")
-            _record_command_event(username, 'spawn', monster, True)
+            _vprint(f"Spawn OK: {monster} for {username}")
+            _record_command_event(username, 'spawn', monster, True, **_spend_event_kwargs(data))
             return jsonify({'ok': True, 'monster': monster})
         err = spawn_error or 'No space to spawn (hero surrounded or no valid tiles)'
         if err.startswith('Timeout or error:'):
@@ -1957,8 +2015,8 @@ def champion_command():
             return jsonify({'ok': False, 'error': 'Champion spawn timed out'}), 504
         last_spawn_time = time.time()
         if success:
-            print(f"Champion OK: {champion_monster} for {username}")
-            _record_command_event(username, 'champion', champion_monster, True)
+            _vprint(f"Champion OK: {champion_monster} for {username}")
+            _record_command_event(username, 'champion', champion_monster, True, **_spend_event_kwargs(data))
             return jsonify({'ok': True, 'monster': champion_monster})
         err = champion_error or 'No space to spawn (hero surrounded or no valid tiles)'
         _record_command_event(username, 'champion', monster, False)
@@ -1994,7 +2052,7 @@ def gold_command():
             payload = {'command': 'gold', 'amount': amount, 'request_id': request_id}
             if username:
                 payload['username'] = username
-            print(f"Gold send to game: amount={amount} request_id={request_id} (waiting up to {SPAWN_RESULT_TIMEOUT}s for response)")
+            _vprint(f"Gold send to game: amount={amount} request_id={request_id} (waiting up to {SPAWN_RESULT_TIMEOUT}s for response)")
             _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
@@ -2010,8 +2068,8 @@ def gold_command():
                 pending_spawns.pop(request_id, None)
             return jsonify({'ok': False, 'error': 'Gold drop timed out'}), 504
         if success:
-            print(f"Gold OK: {amount} for {username}")
-            _record_command_event(username, 'gold', str(amount), True)
+            _vprint(f"Gold OK: {amount} for {username}")
+            _record_command_event(username, 'gold', str(amount), True, **_spend_event_kwargs(data))
             return jsonify({'ok': True, 'amount': amount})
         err = gold_error or 'No space to drop gold (hero surrounded)'
         _record_command_event(username, 'gold', str(amount), False)
@@ -2041,7 +2099,7 @@ def gas_command():
             payload = {'command': 'gas', 'request_id': request_id}
             if username:
                 payload['username'] = username
-            print(f"Gas send to game: request_id={request_id}")
+            _vprint(f"Gas send to game: request_id={request_id}")
             _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
@@ -2058,8 +2116,8 @@ def gas_command():
                 pending_spawns.pop(request_id, None)
             return jsonify({'ok': False, 'error': 'Gas command timed out'}), 504
         if success:
-            print(f"Gas OK: {gas_name} for {username}")
-            _record_command_event(username, 'gas', gas_name or '', True)
+            _vprint(f"Gas OK: {gas_name} for {username}")
+            _record_command_event(username, 'gas', gas_name or '', True, **_spend_event_kwargs(data))
             return jsonify({'ok': True, 'gas_name': gas_name})
         err = gas_error or 'No valid cell to spawn gas (need visible tiles 2-6 from hero)'
         _record_command_event(username, 'gas', '', False)
@@ -2105,7 +2163,7 @@ def curse_command():
                 payload['slot'] = slot
             if username:
                 payload['username'] = username
-            print(f"Curse send to game: slot={slot or 'random'} request_id={request_id}")
+            _vprint(f"Curse send to game: slot={slot or 'random'} request_id={request_id}")
             _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
@@ -2124,8 +2182,8 @@ def curse_command():
                 pending_spawns.pop(request_id, None)
             return jsonify({'ok': False, 'error': 'Curse timed out'}), 504
         if success:
-            print(f"Curse OK: {slot or 'random'} ({item_name}) for {username}")
-            _record_command_event(username, 'curse', slot or 'random', True)
+            _vprint(f"Curse OK: {slot or 'random'} ({item_name}) for {username}")
+            _record_command_event(username, 'curse', slot or 'random', True, **_spend_event_kwargs(data))
             resp = {'ok': True, 'slot': slot or None, 'item_name': item_name}
             if curse_temporary:
                 resp['temporary'] = True
@@ -2159,7 +2217,7 @@ def scroll_command():
             payload = {'command': 'scroll', 'request_id': request_id}
             if username:
                 payload['username'] = username
-            print(f"Scroll send to game: request_id={request_id}")
+            _vprint(f"Scroll send to game: request_id={request_id}")
             _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
@@ -2176,8 +2234,8 @@ def scroll_command():
                 pending_spawns.pop(request_id, None)
             return jsonify({'ok': False, 'error': 'Scroll command timed out'}), 504
         if success:
-            print(f"Scroll OK: {scroll_name} for {username}")
-            _record_command_event(username, 'scroll', scroll_name or '', True)
+            _vprint(f"Scroll OK: {scroll_name} for {username}")
+            _record_command_event(username, 'scroll', scroll_name or '', True, **_spend_event_kwargs(data))
             return jsonify({'ok': True, 'scroll_name': scroll_name})
         err = scroll_error or 'Could not use random scroll'
         _record_command_event(username, 'scroll', '', False)
@@ -2207,7 +2265,7 @@ def ring_of_wealth_command():
             payload = {'command': 'ring_of_wealth', 'request_id': request_id}
             if username:
                 payload['username'] = username
-            print(f"Ring of wealth send to game: request_id={request_id}")
+            _vprint(f"Ring of wealth send to game: request_id={request_id}")
             _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
@@ -2224,8 +2282,8 @@ def ring_of_wealth_command():
                 pending_spawns.pop(request_id, None)
             return jsonify({'ok': False, 'error': 'Ring of wealth command timed out'}), 504
         if success:
-            print(f"Ring of wealth OK: {detail!r} for {username}")
-            _record_command_event(username, 'ring_of_wealth', detail or '', True)
+            _vprint(f"Ring of wealth OK: {detail!r} for {username}")
+            _record_command_event(username, 'ring_of_wealth', detail or '', True, **_spend_event_kwargs(data))
             return jsonify({'ok': True, 'detail': detail})
         err = row_error or 'Ring of wealth command failed'
         _record_command_event(username, 'ring_of_wealth', '', False)
@@ -2255,7 +2313,7 @@ def trap_command():
             payload = {'command': 'trap', 'request_id': request_id}
             if username:
                 payload['username'] = username
-            print(f"Trap send to game: request_id={request_id}")
+            _vprint(f"Trap send to game: request_id={request_id}")
             _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
@@ -2272,8 +2330,8 @@ def trap_command():
                 pending_spawns.pop(request_id, None)
             return jsonify({'ok': False, 'error': 'Trap command timed out'}), 504
         if success:
-            print(f"Trap OK: {trap_name} for {username}")
-            _record_command_event(username, 'trap', trap_name or '', True)
+            _vprint(f"Trap OK: {trap_name} for {username}")
+            _record_command_event(username, 'trap', trap_name or '', True, **_spend_event_kwargs(data))
             return jsonify({'ok': True, 'trap_name': trap_name})
         err = trap_error or 'No space to place trap'
         _record_command_event(username, 'trap', '', False)
@@ -2303,7 +2361,7 @@ def bomb_command():
             payload = {'command': 'bomb', 'request_id': request_id}
             if username:
                 payload['username'] = username
-            print(f"Bomb send to game: request_id={request_id}")
+            _vprint(f"Bomb send to game: request_id={request_id}")
             _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
@@ -2320,8 +2378,8 @@ def bomb_command():
                 pending_spawns.pop(request_id, None)
             return jsonify({'ok': False, 'error': 'Bomb command timed out'}), 504
         if success:
-            print(f"Bomb OK: {bomb_name} for {username}")
-            _record_command_event(username, 'bomb', bomb_name or '', True)
+            _vprint(f"Bomb OK: {bomb_name} for {username}")
+            _record_command_event(username, 'bomb', bomb_name or '', True, **_spend_event_kwargs(data))
             return jsonify({'ok': True, 'bomb_name': bomb_name})
         err = bomb_error or 'No space to drop bomb'
         _record_command_event(username, 'bomb', '', False)
@@ -2351,7 +2409,7 @@ def transmute_command():
             payload = {'command': 'transmute', 'request_id': request_id}
             if username:
                 payload['username'] = username
-            print(f"Transmute send to game: request_id={request_id}")
+            _vprint(f"Transmute send to game: request_id={request_id}")
             _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
@@ -2369,8 +2427,8 @@ def transmute_command():
                 pending_spawns.pop(request_id, None)
             return jsonify({'ok': False, 'error': 'Transmute command timed out'}), 504
         if success:
-            print(f"Transmute OK: {original_item_name!r} -> {item_name!r} for {username}")
-            _record_command_event(username, 'transmute', item_name or '', True)
+            _vprint(f"Transmute OK: {original_item_name!r} -> {item_name!r} for {username}")
+            _record_command_event(username, 'transmute', item_name or '', True, **_spend_event_kwargs(data))
             return jsonify({
                 'ok': True,
                 'item_name': item_name,
@@ -2404,7 +2462,7 @@ def ward_command():
             payload = {'command': 'ward', 'request_id': request_id}
             if username:
                 payload['username'] = username
-            print(f"Ward send to game: request_id={request_id}")
+            _vprint(f"Ward send to game: request_id={request_id}")
             _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
@@ -2421,8 +2479,8 @@ def ward_command():
                 pending_spawns.pop(request_id, None)
             return jsonify({'ok': False, 'error': 'Ward command timed out'}), 504
         if success:
-            print(f"Ward OK: {ward_name} for {username}")
-            _record_command_event(username, 'ward', ward_name or '', True)
+            _vprint(f"Ward OK: {ward_name} for {username}")
+            _record_command_event(username, 'ward', ward_name or '', True, **_spend_event_kwargs(data))
             return jsonify({'ok': True, 'ward_name': ward_name})
         err = ward_error or 'No space for ward'
         _record_command_event(username, 'ward', '', False)
@@ -2452,7 +2510,7 @@ def summon_bee_command():
             payload = {'command': 'summon_bee', 'request_id': request_id}
             if username:
                 payload['username'] = username
-            print(f"Summon bee send to game: request_id={request_id}")
+            _vprint(f"Summon bee send to game: request_id={request_id}")
             _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
@@ -2469,8 +2527,8 @@ def summon_bee_command():
                 pending_spawns.pop(request_id, None)
             return jsonify({'ok': False, 'error': 'Summon bee command timed out'}), 504
         if success:
-            print(f"Summon bee OK: {ally_name} for {username}")
-            _record_command_event(username, 'summon_bee', ally_name or '', True)
+            _vprint(f"Summon bee OK: {ally_name} for {username}")
+            _record_command_event(username, 'summon_bee', ally_name or '', True, **_spend_event_kwargs(data))
             return jsonify({'ok': True, 'ally_name': ally_name})
         err = summon_bee_error or 'No space for bee'
         _record_command_event(username, 'summon_bee', '', False)
@@ -2500,7 +2558,7 @@ def buff_command():
             payload = {'command': 'buff', 'request_id': request_id}
             if username:
                 payload['username'] = username
-            print(f"Buff send to game: request_id={request_id}")
+            _vprint(f"Buff send to game: request_id={request_id}")
             _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
@@ -2517,8 +2575,8 @@ def buff_command():
                 pending_spawns.pop(request_id, None)
             return jsonify({'ok': False, 'error': 'Buff command timed out'}), 504
         if success:
-            print(f"Buff OK: {buff_name} for {username}")
-            _record_command_event(username, 'buff', buff_name or '', True)
+            _vprint(f"Buff OK: {buff_name} for {username}")
+            _record_command_event(username, 'buff', buff_name or '', True, **_spend_event_kwargs(data))
             return jsonify({'ok': True, 'buff_name': buff_name})
         err = buff_error or 'Could not apply random buff'
         _record_command_event(username, 'buff', '', False)
@@ -2548,7 +2606,7 @@ def debuff_command():
             payload = {'command': 'debuff', 'request_id': request_id}
             if username:
                 payload['username'] = username
-            print(f"Debuff send to game: request_id={request_id}")
+            _vprint(f"Debuff send to game: request_id={request_id}")
             _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
@@ -2565,8 +2623,8 @@ def debuff_command():
                 pending_spawns.pop(request_id, None)
             return jsonify({'ok': False, 'error': 'Debuff command timed out'}), 504
         if success:
-            print(f"Debuff OK: {debuff_name} for {username}")
-            _record_command_event(username, 'debuff', debuff_name or '', True)
+            _vprint(f"Debuff OK: {debuff_name} for {username}")
+            _record_command_event(username, 'debuff', debuff_name or '', True, **_spend_event_kwargs(data))
             return jsonify({'ok': True, 'debuff_name': debuff_name})
         err = debuff_error or 'Could not apply random debuff'
         _record_command_event(username, 'debuff', '', False)
@@ -2595,7 +2653,7 @@ def _forward_chat_command(cmd, result_key, default_err):
             payload = {'command': cmd, 'request_id': request_id}
             if username:
                 payload['username'] = username
-            print(f"{cmd} send to game: request_id={request_id}")
+            _vprint(f"{cmd} send to game: request_id={request_id}")
             _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
@@ -2612,8 +2670,8 @@ def _forward_chat_command(cmd, result_key, default_err):
                 pending_spawns.pop(request_id, None)
             return jsonify({'ok': False, 'error': f'{cmd} command timed out'}), 504
         if success:
-            print(f"{cmd} OK: {result_val} for {username}")
-            _record_command_event(username, cmd, result_val or '', True)
+            _vprint(f"{cmd} OK: {result_val} for {username}")
+            _record_command_event(username, cmd, result_val or '', True, **_spend_event_kwargs(data))
             return jsonify({'ok': True, result_key: result_val})
         err = err_val or default_err
         _record_command_event(username, cmd, '', False)
@@ -2638,7 +2696,7 @@ def _forward_streamer_debug(ws_cmd, default_err='Command failed', extra_payload=
             payload = {'command': ws_cmd, 'request_id': request_id}
             if extra_payload:
                 payload.update(extra_payload)
-            print(f"streamer debug send to game: {ws_cmd} request_id={request_id}")
+            _vprint(f"streamer debug send to game: {ws_cmd} request_id={request_id}")
             _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
@@ -2655,7 +2713,7 @@ def _forward_streamer_debug(ws_cmd, default_err='Command failed', extra_payload=
                 pending_spawns.pop(request_id, None)
             return jsonify({'ok': False, 'error': f'{ws_cmd} timed out'}), 504
         if success:
-            print(f"streamer debug OK: {detail}")
+            _vprint(f"streamer debug OK: {detail}")
             return jsonify({'ok': True, 'detail': detail})
         err = err_val or default_err
         return jsonify({'ok': False, 'error': err}), 200
@@ -2845,7 +2903,7 @@ def wand_command():
             if username:
                 payload['username'] = username
             payload['tier'] = int(tier) if tier is not None else -1
-            print(f"Wand send to game: request_id={request_id} tier={tier}")
+            _vprint(f"Wand send to game: request_id={request_id} tier={tier}")
             _send_to_game(payload)
         except Exception as e:
             with spawn_lock:
@@ -2863,8 +2921,8 @@ def wand_command():
                 pending_spawns.pop(request_id, None)
             return jsonify({'ok': False, 'error': 'Wand command timed out'}), 504
         if success:
-            print(f"Wand OK: {effect_name} (rarity={rarity}) for {username}")
-            _record_command_event(username, 'wand', effect_name or '', True)
+            _vprint(f"Wand OK: {effect_name} (rarity={rarity}) for {username}")
+            _record_command_event(username, 'wand', effect_name or '', True, **_spend_event_kwargs(data))
             return jsonify({'ok': True, 'effect_name': effect_name, 'rarity': rarity})
         err = wand_error or 'Could not trigger cursed wand effect'
         _record_command_event(username, 'wand', '', False)
@@ -2874,7 +2932,7 @@ def wand_command():
         return jsonify({'ok': False, 'error': str(e)}), 400
 
 
-def _donation_json_response(result_msg):
+def _donation_json_response(result_msg, kind="donation", username=""):
     """Parse points_command donation result (ok|N, skip|0, invalid|0) into JSON."""
     parts = (result_msg or "").split("|", 1)
     status = parts[0].strip().lower() if parts else "error"
@@ -2885,6 +2943,8 @@ def _donation_json_response(result_msg):
         except ValueError:
             added = 0
     if status == "ok":
+        user = (username or "?").strip() or "?"
+        print(f"Donate {kind}: {user} +{added} pts")
         return jsonify({"ok": True, "pointsAdded": added, "result": result_msg})
     if status == "skip":
         return jsonify({"ok": False, "skipped": True, "reason": "anonymous or empty username", "result": result_msg})
@@ -2901,16 +2961,17 @@ def donation_superchat_api():
     try:
         from points_command import cmd_superchat
         body = request.get_json(force=True, silent=True) or {}
+        username = str(body.get('username') or body.get('userName') or '')
         args = [
             str(body.get('microAmount') or body.get('micro_amount') or ''),
             str(body.get('currencyCode') or body.get('currency') or 'USD'),
-            str(body.get('username') or body.get('userName') or ''),
+            username,
         ]
         for key in ('isSubscribed', 'is_subscribed', 'userIsSponsor', 'user_is_sponsor', 'topFarder', 'top_farder'):
             if key in body:
                 args.append(str(body[key]))
         _, msg = cmd_superchat(args)
-        return _donation_json_response(msg)
+        return _donation_json_response(msg, kind="superchat", username=username)
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
@@ -2923,15 +2984,16 @@ def donation_cheer_api():
     try:
         from points_command import cmd_cheer
         body = request.get_json(force=True, silent=True) or {}
+        username = str(body.get('username') or body.get('userName') or '')
         args = [
             str(body.get('bits') or body.get('amount') or 0),
-            str(body.get('username') or body.get('userName') or ''),
+            username,
         ]
         for key in ('isSubscribed', 'is_subscribed', 'userIsSponsor', 'user_is_sponsor', 'topFarder', 'top_farder'):
             if key in body:
                 args.append(str(body[key]))
         _, msg = cmd_cheer(args)
-        return _donation_json_response(msg)
+        return _donation_json_response(msg, kind="cheer", username=username)
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
@@ -2944,14 +3006,15 @@ def donation_gift_membership_api():
     try:
         from points_command import cmd_giftmembership
         body = request.get_json(force=True, silent=True) or {}
-        args = [str(body.get('username') or body.get('userName') or '')]
+        username = str(body.get('username') or body.get('userName') or '')
+        args = [username]
         if body.get('tier'):
             args.append(str(body['tier']))
         for key in ('isSubscribed', 'is_subscribed', 'userIsSponsor', 'user_is_sponsor', 'topFarder', 'top_farder'):
             if key in body:
                 args.append(str(body[key]))
         _, msg = cmd_giftmembership(args)
-        return _donation_json_response(msg)
+        return _donation_json_response(msg, kind="gift-membership", username=username)
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
@@ -3185,7 +3248,7 @@ def summon_march():
                 'crowned': bool(badge) or bool(data.get('crowned')),
             }
             _append_summon_march_event(event)
-            _record_command_event(username, 'summon_march', monster, True)
+            _record_command_event(username, 'summon_march', monster, True, **_spend_event_kwargs(data))
             tag = f" [{badge}]" if badge else ""
             print(f"Summon march queued: {monster} for {username or '?'} ({event_id}){tag}")
             return jsonify({'ok': True, 'id': event_id, 'event': event})
@@ -3530,11 +3593,21 @@ def chat_command_api():
         result = dispatch_chat_command(body)
         raw = (body.get("rawMessage") or body.get("message") or "").strip()
         req_type = (body.get("type") or "").strip()
-        # Bang-commands and failures: one useful line instead of opaque werkzeug POST logs
+        # Bang-commands and failures: one glanceable line (HTTP access muted in glance mode)
         if raw.startswith("!") or (not result.ok and result.message):
             user = body.get("username") or body.get("userName") or "?"
             status = "OK" if result.ok else "FAIL"
-            detail = (result.message or raw or req_type or "?")[:140]
+            tokens = raw.split() if raw.startswith("!") else []
+            cmd_part = " ".join(tokens[:2]) if tokens else ""
+            reply = (result.message or raw or req_type or "?").strip()
+            if len(reply) > 100:
+                reply = reply[:100]
+            if cmd_part and reply not in (raw, cmd_part):
+                detail = f"{cmd_part} — {reply}"
+            elif cmd_part:
+                detail = cmd_part
+            else:
+                detail = reply
             print(f"Chat [{status}] {user}: {detail}")
         return jsonify(result.to_api_dict())
     except Exception as e:
@@ -3707,20 +3780,20 @@ if __name__ == '__main__':
     print("="*50)
     print(f"Save Directory: {SAVE_DIRECTORY}")
     print(f"Server URL: http://localhost:5000")
-    print(f"Vertical HUD overlay: http://localhost:5000/overlay-vertical (1080×1920 Browser Source)")
-    print(f"Add this URL as a Browser Source in OBS")
+    print("Overlays: /overlay  |  /overlay-vertical (1080x1920)")
     if USE_GAME_WEBSOCKET and websocket:
-        print(f"Game WebSocket: {GAME_WS_URL} (live data → /api/game-data, game_summary.txt/json)")
+        print(f"Game WebSocket: {GAME_WS_URL}")
     if obs_inv_config.get('enabled', True) and websocket:
-        print(f"OBS Inv Layout: {obs_inv_config.get('obs_ws_url')} (dynamic Crop/Pad via obs_inv_layout.json)")
-    print(f"Chat spawn: POST /api/spawn-command {{\"monster\": \"rat\"}} (cooldown: {SPAWN_COOLDOWN_SEC}s)")
-    print(f"Summon march: POST/GET /api/summon-march (Godot companion; queue: {len(summon_march_events)} events)")
-    print(f"Top summoner: GET /api/top-summoner ({TOP_SUMMONER_FILE})")
-    print(f"Connection test: GET /api/game-ping (returns version if game connected)")
-    print(f"Streamer vs Chat: {STREAMER_CHAT_SCORE_TXT} (OBS Read from file)")
+        print(f"OBS Inv Layout: {obs_inv_config.get('obs_ws_url')}")
+    print(f"Summon march queue: {len(summon_march_events)} events")
+    print(f"Streamer vs Chat: {STREAMER_CHAT_SCORE_TXT}")
+    if LOG_VERBOSE:
+        print("Console: verbose (HTTP access + game transport detail)")
+    else:
+        print("Console: glance (set SPD_LOG_VERBOSE=1 or --verbose for HTTP + game transport detail)")
     print("="*50 + "\n")
 
-    # Suppress request logs for high-frequency polling endpoints (easier to see commands)
+    # Glance: mute successful HTTP access lines. Verbose: keep today's poll-path mute only.
     _QUIET_PATHS = (
         '/game_summary',
         '/api/double-points-remaining',
@@ -3740,19 +3813,27 @@ if __name__ == '__main__':
         '/api/spawn-costs',
     )
 
-    class _QuietPollFilter(logging.Filter):
+    class _QuietAccessFilter(logging.Filter):
         def filter(self, record):
             msg = record.getMessage()
-            # Keep non-200 / errors visible even on poll paths
+            # Keep non-200 / errors visible
             if ' 200 ' not in msg and ' 204 ' not in msg:
                 return True
-            return not any(p in msg for p in _QUIET_PATHS)
+            if LOG_VERBOSE:
+                return not any(p in msg for p in _QUIET_PATHS)
+            return False
 
-    logging.getLogger('werkzeug').addFilter(_QuietPollFilter())
-    print(
-        "Request log: polling GETs muted (bestiary/summon-march/points-config/…). "
-        "Chat bang-commands print as: Chat [OK|FAIL] user: …\n"
-    )
+    logging.getLogger('werkzeug').addFilter(_QuietAccessFilter())
+    if LOG_VERBOSE:
+        print(
+            "Request log: polling GETs muted (bestiary/summon-march/points-config/…). "
+            "Chat bang-commands print as: Chat [OK|FAIL] user: …\n"
+        )
+    else:
+        print(
+            "Request log: successful HTTP muted. "
+            "Chat bang-commands print as: Chat [OK|FAIL] user: !cmd — …\n"
+        )
 
     # Run Flask server
     app.run(host='127.0.0.1', port=5000, debug=False, threaded=True)

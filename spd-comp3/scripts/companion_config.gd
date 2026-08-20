@@ -142,6 +142,16 @@ var alert_command_icon_size_px: int = 72
 ## Frames per second for monster idle animation in alerts (static scroll art ignores this).
 var alert_mob_idle_anim_fps: float = 3.0
 
+## Custom tip toasts (viewer reminders); reuse alert zone/chrome. Separate from command alerts.
+const CUSTOM_ALERTS_MAX := 16
+var custom_alerts_enabled: bool = false
+## Idle seconds between auto-rotated tips (when command alerts are not busy).
+var custom_alerts_interval_sec: float = 45.0
+## Hold duration for tip toasts (fade in/out reuse alert fade timings).
+var custom_alerts_hold_sec: float = 3.0
+## Array of { title, subtitle, enabled }.
+var custom_alerts: Array = []
+
 ## Streamer.bot UDP paid/highlight notices (superchat, gifted membership, sub, highlight).
 var paid_notice_enabled: bool = true
 var paid_notice_queue_max: int = 8
@@ -319,6 +329,9 @@ var bestiary_sprint_font_color: Color = Color(1.0, 1.0, 1.0, 1.0)
 var bestiary_heat_font_color: Color = Color(1.0, 1.0, 1.0, 1.0)
 var bestiary_hall_font_color: Color = Color(1.0, 1.0, 1.0, 1.0)
 var bestiary_banner_font_color: Color = Color(1.0, 1.0, 1.0, 1.0)
+## Shatter Event mystery pips on the exp bar (claimed vs still locked).
+var bestiary_shatter_pip_claimed_color: Color = Color(1.0, 0.85, 0.2, 1.0)
+var bestiary_shatter_pip_unclaimed_color: Color = Color(0.95, 0.95, 1.0, 0.92)
 
 ## Poll Flask [code]/api/companion-settings[/code] and apply layout/UI when revision increases.
 var remote_settings_enabled: bool = false
@@ -697,7 +710,23 @@ func load_settings() -> void:
 	bestiary_banner_font_color = _read_color_cfg(
 		cfg, "ui", "bestiary_banner_font_color", bestiary_banner_font_color
 	)
+	bestiary_shatter_pip_claimed_color = _read_color_cfg(
+		cfg, "ui", "bestiary_shatter_pip_claimed_color", bestiary_shatter_pip_claimed_color
+	)
+	bestiary_shatter_pip_unclaimed_color = _read_color_cfg(
+		cfg, "ui", "bestiary_shatter_pip_unclaimed_color", bestiary_shatter_pip_unclaimed_color
+	)
 	chrome_boxes = _read_chrome_boxes_cfg(cfg, "ui")
+	custom_alerts_enabled = bool(
+		cfg.get_value("ui", "custom_alerts_enabled", custom_alerts_enabled)
+	)
+	custom_alerts_interval_sec = maxf(
+		5.0, float(cfg.get_value("ui", "custom_alerts_interval_sec", custom_alerts_interval_sec))
+	)
+	custom_alerts_hold_sec = maxf(
+		0.5, float(cfg.get_value("ui", "custom_alerts_hold_sec", custom_alerts_hold_sec))
+	)
+	custom_alerts = _read_custom_alerts_cfg(cfg)
 	show_pending_udp_alerts = bool(
 		cfg.get_value("ui", "show_pending_udp_alerts", show_pending_udp_alerts)
 	)
@@ -1101,6 +1130,7 @@ func _main_layout_snapshot() -> UiLayoutData:
 	L.show_chrome_boxes = true
 	L.show_id_overlay = id_overlay_enabled
 	L.show_alerts = true
+	L.show_tip_toasts = custom_alerts_enabled
 	L.show_paid_notices = paid_notice_enabled
 	L.show_bestiary = bestiary_hud_enabled
 	L.show_summon_march = summon_march_enabled
@@ -1141,6 +1171,10 @@ func element_enabled(node: Node, key: String) -> bool:
 			return L.show_id_overlay and (id_overlay_enabled if not is_vertical_layout(node) else true)
 		"alerts":
 			return L.show_alerts
+		"tip_toasts":
+			return L.show_tip_toasts and (
+				custom_alerts_enabled if not is_vertical_layout(node) else true
+			)
 		"paid_notices":
 			return L.show_paid_notices and (paid_notice_enabled if not is_vertical_layout(node) else true)
 		"bestiary":
@@ -1319,6 +1353,7 @@ func _load_vertical_layout(cfg: ConfigFile) -> void:
 	L.show_chrome_boxes = bool(cfg.get_value(sec, "show_chrome_boxes", true))
 	L.show_id_overlay = bool(cfg.get_value(sec, "show_id_overlay", true))
 	L.show_alerts = bool(cfg.get_value(sec, "show_alerts", true))
+	L.show_tip_toasts = bool(cfg.get_value(sec, "show_tip_toasts", true))
 	L.show_paid_notices = bool(cfg.get_value(sec, "show_paid_notices", true))
 	L.show_bestiary = bool(cfg.get_value(sec, "show_bestiary", true))
 	L.show_summon_march = bool(cfg.get_value(sec, "show_summon_march", true))
@@ -1347,6 +1382,7 @@ func _seed_vertical_scene_show_from_toggles(L: UiLayoutData) -> void:
 		"chrome_boxes": L.show_chrome_boxes,
 		"id_overlay": L.show_id_overlay,
 		"alerts": L.show_alerts,
+		"tip_toasts": L.show_tip_toasts,
 		"paid_notices": L.show_paid_notices,
 		"bestiary": L.show_bestiary,
 		"summon_march": L.show_summon_march,
@@ -1404,6 +1440,7 @@ func _save_vertical_layout(cfg: ConfigFile) -> void:
 	cfg.set_value(sec, "show_chrome_boxes", L.show_chrome_boxes)
 	cfg.set_value(sec, "show_id_overlay", L.show_id_overlay)
 	cfg.set_value(sec, "show_alerts", L.show_alerts)
+	cfg.set_value(sec, "show_tip_toasts", L.show_tip_toasts)
 	cfg.set_value(sec, "show_paid_notices", L.show_paid_notices)
 	cfg.set_value(sec, "show_bestiary", L.show_bestiary)
 	cfg.set_value(sec, "show_summon_march", L.show_summon_march)
@@ -1667,6 +1704,57 @@ func _serialize_chrome_boxes_list(boxes: Array) -> Array:
 	return out
 
 
+func default_custom_alert(index: int = 1) -> Dictionary:
+	return {
+		"title": "Tip %d" % index,
+		"subtitle": "",
+		"enabled": true,
+	}
+
+
+func normalize_custom_alert(raw: Variant, fallback_index: int = 1) -> Dictionary:
+	var base := default_custom_alert(fallback_index)
+	if typeof(raw) != TYPE_DICTIONARY:
+		return base
+	var d: Dictionary = raw
+	var title := str(d.get("title", base["title"])).strip_edges()
+	if title.is_empty():
+		title = str(base["title"])
+	return {
+		"title": title,
+		"subtitle": str(d.get("subtitle", "")),
+		"enabled": bool(d.get("enabled", true)),
+	}
+
+
+func duplicate_custom_alerts() -> Array:
+	var out: Array = []
+	for i in range(custom_alerts.size()):
+		out.append(normalize_custom_alert(custom_alerts[i], i + 1).duplicate(true))
+	return out
+
+
+func _serialize_custom_alerts() -> Array:
+	return _serialize_custom_alerts_list(custom_alerts)
+
+
+func _serialize_custom_alerts_list(tips: Array) -> Array:
+	var out: Array = []
+	var n := mini(tips.size(), CUSTOM_ALERTS_MAX)
+	for i in range(n):
+		out.append(normalize_custom_alert(tips[i], i + 1))
+	return out
+
+
+func _read_custom_alerts_cfg(cfg: ConfigFile) -> Array:
+	if not cfg.has_section_key("ui", "custom_alerts"):
+		return []
+	var raw: Variant = cfg.get_value("ui", "custom_alerts", [])
+	if typeof(raw) != TYPE_ARRAY:
+		return []
+	return _serialize_custom_alerts_list(raw as Array)
+
+
 func _read_chrome_boxes_cfg(cfg: ConfigFile, section: String = "ui") -> Array:
 	if not cfg.has_section_key(section, "chrome_boxes"):
 		return []
@@ -1797,7 +1885,13 @@ func save_settings() -> void:
 	cfg.set_value("ui", "bestiary_heat_font_color", bestiary_heat_font_color)
 	cfg.set_value("ui", "bestiary_hall_font_color", bestiary_hall_font_color)
 	cfg.set_value("ui", "bestiary_banner_font_color", bestiary_banner_font_color)
+	cfg.set_value("ui", "bestiary_shatter_pip_claimed_color", bestiary_shatter_pip_claimed_color)
+	cfg.set_value("ui", "bestiary_shatter_pip_unclaimed_color", bestiary_shatter_pip_unclaimed_color)
 	cfg.set_value("ui", "chrome_boxes", _serialize_chrome_boxes())
+	cfg.set_value("ui", "custom_alerts_enabled", custom_alerts_enabled)
+	cfg.set_value("ui", "custom_alerts_interval_sec", custom_alerts_interval_sec)
+	cfg.set_value("ui", "custom_alerts_hold_sec", custom_alerts_hold_sec)
+	cfg.set_value("ui", "custom_alerts", _serialize_custom_alerts())
 	cfg.set_value("ui", "show_pending_udp_alerts", show_pending_udp_alerts)
 	cfg.set_value("ui", "hud_status_panel_visible", hud_status_panel_visible)
 	cfg.set_value("ui", "settings_window_width_px", settings_window_width_px)
@@ -1950,6 +2044,7 @@ const REMOTE_UI_KEYS: Array[String] = [
 	"show_pending_udp_alerts", "alert_queue_max", "alert_hold_sec", "alert_fade_in_sec", "alert_fade_out_sec",
 	"alert_hold_sec_when_free", "alert_fade_in_sec_when_free", "alert_fade_out_sec_when_free",
 	"show_ping_alerts", "show_failed_command_alerts", "hud_status_panel_visible",
+	"custom_alerts_enabled", "custom_alerts_interval_sec", "custom_alerts_hold_sec",
 	"alert_zone_x_px", "alert_zone_y_px", "alert_zone_width_px", "alert_zone_height_px", "alert_zone_bottom_margin_px",
 	"id_zone_x_px", "id_zone_y_px", "id_zone_width_px", "id_zone_height_px", "id_zone_bottom_margin_px",
 	"live_water_bottom_bar_px", "live_water_left_strip_px", "live_water_left_strip_top_px",
@@ -2001,6 +2096,7 @@ const REMOTE_UI_KEYS: Array[String] = [
 	"bestiary_level_up_banner_sec", "bestiary_level_up_banner_scale", "bestiary_level_up_banner_font_size_px",
 	"bestiary_zone_font_color", "bestiary_xp_font_color", "bestiary_sprint_font_color",
 	"bestiary_heat_font_color", "bestiary_hall_font_color", "bestiary_banner_font_color",
+	"bestiary_shatter_pip_claimed_color", "bestiary_shatter_pip_unclaimed_color",
 ]
 
 
@@ -2039,6 +2135,7 @@ func to_remote_dict() -> Dictionary:
 	ensure_main_scene_show()
 	ui["main_scene_show"] = main_scene_show.duplicate(true)
 	ui["chrome_boxes"] = _chrome_boxes_to_remote(chrome_boxes)
+	ui["custom_alerts"] = _serialize_custom_alerts()
 	var vert := vertical_layout.to_remote_dict() if vertical_layout != null else {}
 	if typeof(vert.get("chrome_boxes", null)) == TYPE_ARRAY:
 		vert["chrome_boxes"] = _chrome_boxes_to_remote(vert["chrome_boxes"])
@@ -2114,6 +2211,9 @@ func apply_remote_dict(payload: Dictionary) -> int:
 			touched += 1
 		if ui.has("chrome_boxes") and typeof(ui["chrome_boxes"]) == TYPE_ARRAY:
 			chrome_boxes = _serialize_chrome_boxes_list(ui["chrome_boxes"])
+			touched += 1
+		if ui.has("custom_alerts") and typeof(ui["custom_alerts"]) == TYPE_ARRAY:
+			custom_alerts = _serialize_custom_alerts_list(ui["custom_alerts"])
 			touched += 1
 	var vert_raw: Variant = payload.get("ui_vertical", {})
 	if typeof(vert_raw) == TYPE_DICTIONARY:

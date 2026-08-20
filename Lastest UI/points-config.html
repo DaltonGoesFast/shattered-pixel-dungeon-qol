@@ -42,7 +42,7 @@
     body {
       font-family: system-ui, -apple-system, sans-serif;
       max-width: min(1920px, 98vw);
-      margin: 2rem auto;
+      margin: 0 auto 2rem;
       padding: 0 0.5rem;
       background: var(--spd-bg);
       color: var(--spd-text-on-bg);
@@ -360,6 +360,12 @@
     }
     .vp-actions label { display: flex; align-items: center; gap: 0.35rem; }
     .vp-actions input[type="number"] { width: 72px; padding: 0.35rem 0.5rem; }
+    .vp-more-tools {
+      width: 100%; margin-top: 2px; border: 1px solid var(--spd-border); border-radius: 6px;
+      padding: 0.35rem 0.6rem; background: var(--spd-surface-dark);
+    }
+    .vp-more-tools > summary { font-size: 0.85rem; color: var(--spd-muted-on-surface); }
+    .vp-more-tools[open] > summary { margin-bottom: 0.4rem; }
     .ws-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
     .ws-status { color: var(--spd-muted-on-bg); font-size: 0.9rem; }
     .ws-status.connected { color: var(--spd-success); }
@@ -373,7 +379,7 @@
     .null { color: #666; }
     summary { cursor: pointer; }
     .overall-config-modal {
-      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 101;
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 200;
       align-items: center; justify-content: center;
     }
     .overall-config-modal.open { display: flex; }
@@ -386,7 +392,10 @@
     .overall-config-panel .config-row { margin-bottom: 0.75rem; }
     .overall-config-panel .config-row label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
     .overall-config-panel input[type="checkbox"] { width: 18px; height: 18px; }
-    .overall-config-panel .col-options { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .overall-config-panel input[type="text"] { width: 100%; padding: 0.35rem 0.5rem; box-sizing: border-box; }
+    .overall-config-panel .btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 0.75rem; }
+    .overall-config-panel .btns button { margin-top: 0; }
+    .vp-modal-note { font-size: 0.85rem; color: var(--spd-muted-on-surface); margin: 0 0 0.75rem 0; white-space: pre-wrap; }
     .overall-config-panel .col-options { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
     .overall-config-panel .col-options label { display: flex; align-items: center; gap: 0.35rem; cursor: pointer; }
     .game-status { font-size: 0.85rem; color: var(--spd-muted-on-bg); }
@@ -407,6 +416,54 @@
     .live-badge.btnlike:hover { border-color: var(--spd-accent); }
     .unsaved-hint { color: var(--spd-accent); font-size: 0.85rem; margin-left: 6px; display: none; }
     .unsaved-hint.show { display: inline; }
+    .hud-bar {
+      position: sticky; top: 0; z-index: 100;
+      background: var(--spd-bg);
+      padding: 0.55rem 0 0.5rem;
+      margin-bottom: 0.75rem;
+      border-bottom: 1px solid var(--spd-border);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.28);
+    }
+    .hud-bar h1 {
+      font-size: 1.05rem; margin: 0 0.35rem 0 0; white-space: nowrap; line-height: 1.2;
+    }
+    .hud-live-row {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px;
+    }
+    .hud-bar .live-status { margin-left: 0; }
+    .hud-bar .game-status { margin-left: 0; }
+    .hud-bar button { padding: 0.3rem 0.65rem; font-size: 0.85rem; margin: 0; }
+    .hud-bar .msg { margin-top: 0; padding: 0.2rem 0.5rem; }
+    .hud-chip {
+      display: none; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem;
+      background: var(--spd-surface-dark); color: var(--spd-accent);
+      border: 1px solid var(--spd-accent); white-space: nowrap;
+    }
+    .hud-chip.show { display: inline-block; }
+    .hud-more { position: relative; margin-left: auto; }
+    .hud-more-panel {
+      display: none; position: absolute; right: 0; top: calc(100% + 4px);
+      background: var(--spd-surface); color: var(--spd-text-on-surface);
+      border: 1px solid var(--spd-border); border-radius: 8px;
+      padding: 10px 12px; z-index: 120; min-width: 300px; max-width: min(440px, 92vw);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    }
+    .hud-more.open .hud-more-panel { display: block; }
+    .hud-more-row {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px;
+    }
+    .hud-more-row:last-child { margin-bottom: 0; }
+    .hud-2x-wrap { position: relative; display: inline-flex; }
+    .hud-2x-pop {
+      display: none; position: absolute; left: 0; top: calc(100% + 4px);
+      background: var(--spd-surface); color: var(--spd-text-on-surface);
+      border: 1px solid var(--spd-border); border-radius: 8px;
+      padding: 8px 10px; z-index: 130; min-width: 200px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    }
+    .hud-2x-wrap.open .hud-2x-pop { display: block; }
+    .hud-2x-hint { font-size: 0.8rem; color: var(--spd-muted-on-surface); margin-bottom: 6px; }
+    #streamModeBtn.stream-on { background: var(--spd-accent) !important; color: var(--spd-text-on-accent); }
     .free-promos-strip {
       margin: 0 0 0.75rem 0; padding: 0.5rem 0.65rem; border: 1px solid var(--spd-border);
       border-radius: 6px; background: var(--spd-surface-dark); font-size: 0.85rem;
@@ -426,11 +483,23 @@
     .monster-eff.diff { color: var(--spd-accent); }
     .monsters .monster-eff { margin-left: 0; }
     .activity-failed { color: var(--spd-error) !important; }
+    .activity-refund-btn {
+      margin-left: 8px; padding: 1px 8px; font-size: 0.75rem;
+      background: var(--spd-btn-secondary); color: inherit; border: 1px solid var(--spd-border);
+      border-radius: 3px; cursor: pointer; vertical-align: middle;
+    }
+    .activity-refund-btn:disabled { opacity: 0.5; cursor: default; }
+    .activity-refunded { opacity: 0.75; }
     .session-user-lists { font-size: 0.85rem; color: var(--spd-muted-on-surface); max-height: 90px; overflow-y: auto; margin: 0.25rem 0 0.5rem 0; }
     #viewer_points_list table { width: 100%; border-collapse: collapse; background: var(--spd-viewer-list); color: var(--spd-text-on-viewer-list); }
     #viewer_points_list th, #viewer_points_list td { padding: 4px 8px; background: var(--spd-viewer-list); color: var(--spd-text-on-viewer-list); border-bottom: 1px solid var(--spd-border); }
     #viewer_points_list th { text-align: left; }
+    #viewer_points_list th.vp-sort { cursor: pointer; user-select: none; white-space: nowrap; }
+    #viewer_points_list th.vp-sort:hover { color: var(--spd-accent); }
+    #viewer_points_list th.vp-sort.sorted { color: var(--spd-accent); }
+    #viewer_points_list td.vp-last { white-space: nowrap; font-size: 0.85rem; color: var(--spd-muted-on-viewer-list); }
     #viewer_points_list tbody tr:hover { background: var(--spd-surface); }
+    #viewer_points_list tbody tr.vp-row-dirty td { box-shadow: inset 0 0 0 1px var(--spd-accent); }
     #viewer_points_list input[type="number"], #viewer_points_list input[type="text"] { background: var(--spd-viewer-list); color: var(--spd-text-on-viewer-list); border-color: var(--spd-border); }
     #activityList { background: var(--spd-activity-list); color: var(--spd-text-on-activity-list); border-radius: 4px; }
     #activityList > div { padding: 2px 0; border-bottom: 1px solid var(--spd-border); color: var(--spd-muted-on-activity-list); }
@@ -447,57 +516,81 @@
   </style>
 </head>
 <body>
-  <h1>SPD Overlay Control</h1>
-  <p class="sub">Edit costs, viewer points, and inspect game data.
-    <a href="/double-points-countdown" target="_blank" style="color:var(--spd-text-on-bg);text-decoration:underline;">2x countdown</a>
-    <button id="overallConfigBtn" style="margin-left:8px;padding:4px 10px;font-size:0.85rem;background:var(--spd-btn-secondary);">Layout & sections</button>
-    <span id="themeControl" style="margin-left:8px;">
-      <span style="color:var(--spd-muted-on-bg);font-size:0.9rem;">Theme:</span>
-      <button type="button" id="themeDark" class="theme-toggle" style="margin-left:4px;padding:2px 8px;font-size:0.85rem;">Dark</button>
-      <button type="button" id="themeLight" class="theme-toggle" style="margin-left:2px;padding:2px 8px;font-size:0.85rem;">Light</button>
-      <button type="button" id="themeCustom" class="theme-toggle" style="margin-left:2px;padding:2px 8px;font-size:0.85rem;">Custom</button>
-      <button type="button" id="themeCustomizeBtn" style="margin-left:4px;padding:2px 8px;font-size:0.85rem;background:var(--spd-btn-secondary);">Customize</button>
-    </span>
-    <div id="themeCustomizePanel" style="display:none;margin-top:8px;padding:10px 12px;background:var(--spd-surface);color:var(--spd-text-on-surface);border-radius:6px;border:1px solid var(--spd-border);max-width:320px;">
-      <p style="margin:0 0 8px 0;font-size:0.85rem;color:var(--spd-muted-on-surface);">Click a swatch to change that color (used when Custom theme is selected).</p>
-      <p style="margin:0 0 6px 0;font-size:0.85rem;color:var(--spd-muted-on-surface);">Presets:</p>
-      <div id="themePresetBtns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;"></div>
-      <div class="theme-color-rows">
-        <div class="theme-color-row"><label for="themeAccent">Accent</label><input type="color" id="themeAccent" data-var="accent" class="theme-color-input" title="Buttons, links"></div>
-        <div class="theme-color-row"><label for="themeSurface">Surface</label><input type="color" id="themeSurface" data-var="surface" class="theme-color-input" title="Section panels"></div>
-        <div class="theme-color-row"><label for="themeBg">Background</label><input type="color" id="themeBg" data-var="bg" class="theme-color-input" title="Page background"></div>
-        <div class="theme-color-row"><label for="themeSuccess">Success</label><input type="color" id="themeSuccess" data-var="success" class="theme-color-input" title="Success text"></div>
-        <div class="theme-color-row"><label for="themeError">Error</label><input type="color" id="themeError" data-var="error" class="theme-color-input" title="Error text"></div>
-        <div class="theme-color-row"><label for="themeBorder">Border</label><input type="color" id="themeBorder" data-var="border" class="theme-color-input" title="Borders"></div>
-        <div class="theme-color-row"><label for="themeViewerList">Viewer list</label><input type="color" id="themeViewerList" data-var="viewer-list" class="theme-color-input" title="Viewer points table background"></div>
-        <div class="theme-color-row"><label for="themeActivityList">Activity list</label><input type="color" id="themeActivityList" data-var="activity-list" class="theme-color-input" title="Activity log rows background"></div>
+  <div class="hud-bar" id="hudBar">
+    <div class="hud-live-row">
+      <h1>SPD Overlay Control</h1>
+      <div id="liveStatus" class="live-status" title="Live stream status">
+        <span id="badgeSpend" class="live-badge btnlike" title="Click to toggle spend kill switch">Spend: …</span>
+        <div id="hud2xWrap" class="hud-2x-wrap">
+          <span id="badge2x" class="live-badge btnlike off" title="Click to start, extend, or stop 2x points">2x: off</span>
+          <div id="hud2xPop" class="hud-2x-pop" role="dialog" aria-label="2x points">
+            <div class="hud-2x-hint" id="hud2xHint">Uses minutes from Score (5).</div>
+            <div class="hud-more-row" style="margin-bottom:0;">
+              <button type="button" id="hud2xStart">Start</button>
+              <button type="button" id="hud2xExtend" style="background:var(--spd-btn-secondary);">Extend</button>
+              <button type="button" id="hud2xStop" style="background:var(--spd-danger);">Stop</button>
+            </div>
+          </div>
+        </div>
+        <span id="badgeDeath" class="live-badge">Death: …</span>
+        <span id="badgeBestiary" class="live-badge">Bestiary: …</span>
       </div>
-      <button type="button" id="themeResetCustom" style="margin-top:10px;font-size:0.85rem;background:var(--spd-btn-secondary);">Reset to dark defaults</button>
+      <span id="gameStatus" class="game-status" title="Game WebSocket (port 5001)">—</span>
+      <button type="button" id="save">Save costs</button>
+      <span id="unsavedHint" class="hud-chip" title="Cost fields changed since last save">Costs unsaved</span>
+      <span id="unsavedBestiary" class="hud-chip" title="Bestiary config changed since last save">Bestiary unsaved</span>
+      <span id="unsavedCompanion" class="hud-chip" title="Companion settings changed since last save">Companion unsaved</span>
+      <button type="button" id="refresh" style="background:var(--spd-btn-secondary);">Refresh</button>
+      <button type="button" id="streamModeBtn" style="background:var(--spd-btn-secondary);" title="Hide game, companion, and bestiary while streaming">Stream</button>
+      <span id="msg"></span>
+      <div class="hud-more" id="hudMore">
+        <button type="button" id="hudMoreBtn" style="background:var(--spd-btn-secondary);">More</button>
+        <div class="hud-more-panel" id="hudMorePanel">
+          <div class="hud-more-row">
+            <button type="button" id="overallConfigBtn" style="background:var(--spd-btn-secondary);">Layout & sections</button>
+            <a href="/double-points-countdown" target="_blank" style="color:var(--spd-text-on-surface);text-decoration:underline;font-size:0.85rem;">2x countdown</a>
+          </div>
+          <div class="hud-more-row" id="themeControl">
+            <span style="color:var(--spd-muted-on-surface);font-size:0.9rem;">Theme:</span>
+            <button type="button" id="themeDark" class="theme-toggle">Dark</button>
+            <button type="button" id="themeLight" class="theme-toggle">Light</button>
+            <button type="button" id="themeCustom" class="theme-toggle">Custom</button>
+            <button type="button" id="themeCustomizeBtn" style="background:var(--spd-btn-secondary);">Customize</button>
+          </div>
+          <div id="themeCustomizePanel" style="display:none;margin:0 0 8px 0;padding:10px 12px;background:var(--spd-surface-dark);color:var(--spd-text-on-surface-dark);border-radius:6px;border:1px solid var(--spd-border);">
+            <p style="margin:0 0 8px 0;font-size:0.85rem;color:var(--spd-muted-on-surface);">Click a swatch to change that color (used when Custom theme is selected).</p>
+            <p style="margin:0 0 6px 0;font-size:0.85rem;color:var(--spd-muted-on-surface);">Presets:</p>
+            <div id="themePresetBtns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;"></div>
+            <div class="theme-color-rows">
+              <div class="theme-color-row"><label for="themeAccent">Accent</label><input type="color" id="themeAccent" data-var="accent" class="theme-color-input" title="Buttons, links"></div>
+              <div class="theme-color-row"><label for="themeSurface">Surface</label><input type="color" id="themeSurface" data-var="surface" class="theme-color-input" title="Section panels"></div>
+              <div class="theme-color-row"><label for="themeBg">Background</label><input type="color" id="themeBg" data-var="bg" class="theme-color-input" title="Page background"></div>
+              <div class="theme-color-row"><label for="themeSuccess">Success</label><input type="color" id="themeSuccess" data-var="success" class="theme-color-input" title="Success text"></div>
+              <div class="theme-color-row"><label for="themeError">Error</label><input type="color" id="themeError" data-var="error" class="theme-color-input" title="Error text"></div>
+              <div class="theme-color-row"><label for="themeBorder">Border</label><input type="color" id="themeBorder" data-var="border" class="theme-color-input" title="Borders"></div>
+              <div class="theme-color-row"><label for="themeViewerList">Viewer list</label><input type="color" id="themeViewerList" data-var="viewer-list" class="theme-color-input" title="Viewer points table background"></div>
+              <div class="theme-color-row"><label for="themeActivityList">Activity list</label><input type="color" id="themeActivityList" data-var="activity-list" class="theme-color-input" title="Activity log rows background"></div>
+            </div>
+            <button type="button" id="themeResetCustom" style="margin-top:10px;font-size:0.85rem;background:var(--spd-btn-secondary);">Reset to dark defaults</button>
+          </div>
+          <div class="hud-more-row" id="presetsControl">
+            <span style="color:var(--spd-muted-on-surface);font-size:0.9rem;">Presets:</span>
+            <select id="presetsSelect" style="padding:2px 6px;font-size:0.9rem;background:var(--spd-surface-dark);color:var(--spd-text-on-surface-dark);border:1px solid var(--spd-border);border-radius:4px;">
+              <option value="">—</option>
+            </select>
+            <button type="button" id="presetSaveAs" style="background:var(--spd-btn-secondary);">Save current as…</button>
+            <button type="button" id="presetApply" style="background:var(--spd-btn-secondary);">Apply</button>
+            <button type="button" id="presetDelete" style="background:var(--spd-danger);">Delete</button>
+          </div>
+          <div class="hud-more-row">
+            <button type="button" id="exportConfig" style="background:var(--spd-btn-secondary);" title="Download current config (costs + optional layout)">Export</button>
+            <button type="button" id="importConfig" style="background:var(--spd-btn-secondary);" title="Load config from a JSON file">Import</button>
+            <input type="file" id="importConfigFile" accept=".json" style="display:none;">
+          </div>
+        </div>
+      </div>
     </div>
-    <button id="save">Save costs</button>
-    <span id="unsavedHint" class="unsaved-hint" title="Cost fields changed since last save">Unsaved</span>
-    <button id="exportConfig" style="margin-left:4px;background:var(--spd-btn-secondary);" title="Download current config (costs + optional layout)">Export</button>
-    <button id="importConfig" style="margin-left:4px;background:var(--spd-btn-secondary);" title="Load config from a JSON file">Import</button>
-    <input type="file" id="importConfigFile" accept=".json" style="display:none;">
-    <button id="refresh" style="margin-left:4px;background:var(--spd-btn-secondary);">Refresh</button>
-    <span id="presetsControl" style="margin-left:12px;">
-      <span style="color:var(--spd-muted-on-bg);font-size:0.9rem;">Presets:</span>
-      <select id="presetsSelect" style="margin-left:4px;padding:2px 6px;font-size:0.9rem;background:var(--spd-surface-dark);color:var(--spd-text-on-surface-dark);border:1px solid var(--spd-border);border-radius:4px;">
-        <option value="">—</option>
-      </select>
-      <button type="button" id="presetSaveAs" style="margin-left:4px;padding:2px 8px;font-size:0.85rem;background:var(--spd-btn-secondary);">Save current as…</button>
-      <button type="button" id="presetApply" style="margin-left:2px;padding:2px 8px;font-size:0.85rem;background:var(--spd-btn-secondary);">Apply</button>
-      <button type="button" id="presetDelete" style="margin-left:2px;padding:2px 8px;font-size:0.85rem;background:var(--spd-danger);">Delete</button>
-    </span>
-    <span id="gameStatus" class="game-status" style="margin-left:12px;" title="Game WebSocket (port 5001)">—</span>
-    <span id="liveStatus" class="live-status" title="Live stream status">
-      <span id="badgeSpend" class="live-badge btnlike" title="Click to toggle spend kill switch">Spend: …</span>
-      <span id="badge2x" class="live-badge off" style="display:none;">2x: —</span>
-      <span id="badgeDeath" class="live-badge">Death: …</span>
-      <span id="badgeBestiary" class="live-badge">Bestiary: …</span>
-    </span>
-    <span id="msg" style="margin-left:8px;"></span>
-  </p>
+  </div>
 
   <div class="main-grid col-default" id="mainGrid">
   <div class="col-left" id="colLeft">
@@ -721,26 +814,31 @@
       <button id="set_points">Set</button>
       <label title="Percent of chat-only points to move to donor">Chat→Donor % <input type="number" id="chatToDonorPercent" min="0" max="100" value="100" style="width:52px;padding:2px 4px;"></label>
       <button id="chatToDonor" style="background:var(--spd-btn-secondary);" title="Convert a percentage of selected users' chat points to donor points">Chat → Donor</button>
-      <button id="clearNonDonor" style="background:var(--spd-btn-secondary);" title="Wipe chat-only points; donors keep their donor balance">Clear chat points</button>
-      <button id="clearAll" style="background:var(--spd-danger);" title="Remove donor points; chat-only balance is kept">Clear donor points</button>
       <button id="vpUndo" style="background:var(--spd-btn-secondary);" disabled title="Restore viewer points from before the last bulk change">Undo</button>
-      <button id="exportViewerCsv" style="background:var(--spd-btn-secondary);" title="Download viewer points as CSV">Export CSV</button>
-      <button id="importViewerCsv" style="background:var(--spd-btn-secondary);" title="Import viewer points from CSV">Import CSV</button>
-      <input type="file" id="importViewerCsvFile" accept=".csv" style="display:none;">
-      <span style="display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:4px;width:100%;" title="Manual Channel Points → donor (when Twitch reward misfires)">
-        <span style="color:var(--spd-muted-on-surface);font-size:0.85rem;">CPR convert:</span>
-        <input type="text" id="cprUsername" placeholder="username" style="width:120px;padding:2px 4px;">
-        <label style="font-size:0.85rem;">CP <input type="number" id="cprChannelPoints" min="0" value="0" style="width:72px;padding:2px 4px;"></label>
-        <label style="font-size:0.85rem;">Donor <input type="number" id="cprDonorPoints" min="0" value="0" style="width:64px;padding:2px 4px;" title="0 = channel/20"></label>
-        <button type="button" id="cprConvert" style="background:var(--spd-btn-secondary);">Convert</button>
-      </span>
-      <span style="display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:4px;" title="Remove viewers who match all conditions">
-        <span style="color:var(--spd-muted-on-surface);font-size:0.85rem;">Prune:</span>
-        <label style="font-size:0.85rem;">inactive ≥ <input type="number" id="pruneDays" min="1" max="3650" value="2" style="width:44px;padding:2px 4px;"> d</label>
-        <label style="font-size:0.85rem;">donor &lt; <input type="number" id="pruneDonorBelow" min="0" value="101" style="width:52px;padding:2px 4px;"></label>
-        <label style="font-size:0.85rem;">chat-only ≤ <input type="number" id="pruneMaxChat" min="0" placeholder="any" style="width:52px;padding:2px 4px;" title="Leave empty: ignore chat-only points. Otherwise total pts − donor must be ≤ this."></label>
-        <button id="pruneInactive" style="background:var(--spd-btn-secondary);">Prune inactive</button>
-      </span>
+      <details class="vp-more-tools" id="vpMoreTools">
+        <summary>More viewer tools</summary>
+        <div class="vp-actions" style="margin-bottom:0;">
+          <button id="clearNonDonor" style="background:var(--spd-btn-secondary);" title="Wipe chat-only points; donors keep their donor balance">Clear chat points</button>
+          <button id="clearAll" style="background:var(--spd-danger);" title="Remove donor points; chat-only balance is kept">Clear donor points</button>
+          <button id="exportViewerCsv" style="background:var(--spd-btn-secondary);" title="Download viewer points as CSV">Export CSV</button>
+          <button id="importViewerCsv" style="background:var(--spd-btn-secondary);" title="Import viewer points from CSV">Import CSV</button>
+          <input type="file" id="importViewerCsvFile" accept=".csv" style="display:none;">
+          <span style="display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:4px;width:100%;" title="Manual Channel Points → donor (when Twitch reward misfires)">
+            <span style="color:var(--spd-muted-on-surface);font-size:0.85rem;">CPR convert:</span>
+            <input type="text" id="cprUsername" placeholder="username" style="width:120px;padding:2px 4px;">
+            <label style="font-size:0.85rem;">CP <input type="number" id="cprChannelPoints" min="0" value="0" style="width:72px;padding:2px 4px;"></label>
+            <label style="font-size:0.85rem;">Donor <input type="number" id="cprDonorPoints" min="0" value="0" style="width:64px;padding:2px 4px;" title="0 = channel/20"></label>
+            <button type="button" id="cprConvert" style="background:var(--spd-btn-secondary);">Convert</button>
+          </span>
+          <span style="display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:4px;" title="Remove viewers who match all conditions">
+            <span style="color:var(--spd-muted-on-surface);font-size:0.85rem;">Prune:</span>
+            <label style="font-size:0.85rem;">inactive ≥ <input type="number" id="pruneDays" min="1" max="3650" value="2" style="width:44px;padding:2px 4px;"> d</label>
+            <label style="font-size:0.85rem;">donor &lt; <input type="number" id="pruneDonorBelow" min="0" value="101" style="width:52px;padding:2px 4px;"></label>
+            <label style="font-size:0.85rem;">chat-only ≤ <input type="number" id="pruneMaxChat" min="0" placeholder="any" style="width:52px;padding:2px 4px;" title="Leave empty: ignore chat-only points. Otherwise total pts − donor must be ≤ this."></label>
+            <button id="pruneInactive" style="background:var(--spd-btn-secondary);">Prune inactive</button>
+          </span>
+        </div>
+      </details>
     </div>
     <div class="vp-list-wrapper" style="position:relative;">
       <div id="viewer_points_list" style="height: 420px; max-height: 70vh; overflow-y: auto;"></div>
@@ -852,7 +950,19 @@
     <div class="row"><label><input type="checkbox" id="bestiary_sf_bar" checked> Apply to bar</label></div>
     <div class="row"><label><input type="checkbox" id="bestiary_sf_sprint" checked> Apply to sprint</label></div>
     <div class="row"><label><input type="checkbox" id="bestiary_sf_heat" checked> Apply to heat</label></div>
-    <p class="sub" style="margin:0.65rem 0 0.35rem;">Zone XP thresholds (Halls stays 0 = maxed)</p>
+    <p class="sub" style="margin:0.65rem 0 0.35rem;">Shatter Event (bar pips → timed free commands)</p>
+    <div class="row"><label><input type="checkbox" id="bestiary_shatter_enabled" checked> Shatter Event enabled</label></div>
+    <div class="row"><label for="bestiary_shatter_duration" title="Free window length">Duration (sec):</label><input type="number" id="bestiary_shatter_duration" min="5" max="600" value="60"></div>
+    <div class="row"><label for="bestiary_shatter_jackpot" title="Chance of eye/scorpio instead of zone mob">Jackpot %:</label><input type="number" id="bestiary_shatter_jackpot" min="0" max="100" step="0.1" value="1"></div>
+    <div class="row"><label for="bestiary_shatter_rat_cap" title="Max rat weight share in zone table">Rat max %:</label><input type="number" id="bestiary_shatter_rat_cap" min="5" max="100" step="1" value="25"></div>
+    <div class="row"><label for="bestiary_shatter_sidecar_l1">Sidecar % L1–L5:</label>
+      <input type="number" id="bestiary_shatter_sidecar_l1" min="0" max="100" step="1" value="80" style="width:52px;" title="Sewers">
+      <input type="number" id="bestiary_shatter_sidecar_l2" min="0" max="100" step="1" value="88" style="width:52px;" title="Prison">
+      <input type="number" id="bestiary_shatter_sidecar_l3" min="0" max="100" step="1" value="94" style="width:52px;" title="Caves">
+      <input type="number" id="bestiary_shatter_sidecar_l4" min="0" max="100" step="1" value="98" style="width:52px;" title="Metro/City">
+      <input type="number" id="bestiary_shatter_sidecar_l5" min="0" max="100" step="1" value="100" style="width:52px;" title="Halls">
+    </div>
+    <p class="sub" style="margin:0.65rem 0 0.35rem;">Zones (threshold / pip count / monsters). Halls threshold &gt; 0 loops Shatter Events.</p>
     <div id="bestiaryLevelsEditor"></div>
     <div class="row" style="margin-top:0.5rem;gap:0.5rem;flex-wrap:wrap;">
       <button type="button" id="bestiaryConfigSave">Save bestiary config</button>
@@ -927,6 +1037,37 @@
     </div>
   </div>
 
+  <div id="vpCsvModal" class="overall-config-modal">
+    <div class="overall-config-panel" style="min-width:320px;max-width:480px;">
+      <h3>Import viewer CSV</h3>
+      <p id="vpCsvSummary" class="vp-modal-note"></p>
+      <div class="config-row">
+        <label for="vpCsvReplaceConfirm" style="display:block;margin-bottom:4px;">To Replace (wipe names not in the file), type REPLACE:</label>
+        <input type="text" id="vpCsvReplaceConfirm" autocomplete="off" placeholder="REPLACE">
+      </div>
+      <div class="btns">
+        <button type="button" id="vpCsvMerge">Merge</button>
+        <button type="button" id="vpCsvReplace" style="background:var(--spd-danger);">Replace</button>
+        <button type="button" id="vpCsvCancel" style="background:var(--spd-btn-secondary);">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="vpDangerModal" class="overall-config-modal">
+    <div class="overall-config-panel" style="min-width:320px;max-width:520px;">
+      <h3 id="vpDangerTitle">Confirm</h3>
+      <p id="vpDangerSummary" class="vp-modal-note"></p>
+      <div class="config-row" id="vpDangerTypeRow" style="display:none;">
+        <label for="vpDangerTypeInput" style="display:block;margin-bottom:4px;">Type <strong id="vpDangerTypeWord"></strong> to confirm</label>
+        <input type="text" id="vpDangerTypeInput" autocomplete="off">
+      </div>
+      <div class="btns">
+        <button type="button" id="vpDangerConfirm" style="background:var(--spd-danger);">Confirm</button>
+        <button type="button" id="vpDangerCancel" style="background:var(--spd-btn-secondary);">Cancel</button>
+      </div>
+    </div>
+  </div>
+
 
   <script src="/companion_settings_panel.js"></script>
   <script>
@@ -954,14 +1095,32 @@
       const el = document.getElementById('msg');
       el.textContent = text;
       el.className = 'msg ' + (ok ? 'ok' : 'err');
-      el.style.display = 'block';
+      el.style.display = 'inline-block';
     }
 
     let costsDirty = false;
+    let bestiaryDirty = false;
+    function companionIsDirty() {
+      return !!(window.CompanionSettingsPanel && CompanionSettingsPanel.isDirty());
+    }
+    function anyDirty() {
+      return costsDirty || bestiaryDirty || companionIsDirty();
+    }
+    function updateDirtyChips() {
+      const costs = document.getElementById('unsavedHint');
+      const best = document.getElementById('unsavedBestiary');
+      const comp = document.getElementById('unsavedCompanion');
+      if (costs) costs.classList.toggle('show', costsDirty);
+      if (best) best.classList.toggle('show', bestiaryDirty);
+      if (comp) comp.classList.toggle('show', companionIsDirty());
+    }
     function setCostsDirty(dirty) {
       costsDirty = !!dirty;
-      const hint = document.getElementById('unsavedHint');
-      if (hint) hint.classList.toggle('show', costsDirty);
+      updateDirtyChips();
+    }
+    function setBestiaryDirty(dirty) {
+      bestiaryDirty = !!dirty;
+      updateDirtyChips();
     }
 
     function formatTs(sec) {
@@ -1047,16 +1206,18 @@
         const thr = entry.bar_threshold ?? 0;
         const zone = entry.zone || ('Level ' + lvl);
         const monsters = Array.isArray(entry.monsters) ? entry.monsters.join(', ') : '';
+        const pipDefault = ({1:3,2:4,3:5,4:6,5:6})[lvl] || 3;
+        const pipCount = entry.pip_count != null ? entry.pip_count : pipDefault;
         const div = document.createElement('div');
         div.className = 'row';
         div.style.flexWrap = 'wrap';
         div.style.alignItems = 'flex-start';
         div.dataset.bestiaryLevel = String(lvl);
-        const thrDisabled = lvl >= 5 ? ' disabled title="Halls has no bar"' : '';
         div.innerHTML =
           `<label style="min-width:4.5rem;">L${lvl}</label>` +
           `<input type="text" data-bf="zone" value="${String(zone).replace(/"/g, '&quot;')}" style="width:88px;" title="Zone name">` +
-          `<input type="number" data-bf="thr" min="0" value="${thr}"${thrDisabled} style="width:72px;" title="Bar XP threshold">` +
+          `<input type="number" data-bf="thr" min="0" value="${thr}" style="width:72px;" title="Bar XP threshold (Halls loops when full)">` +
+          `<input type="number" data-bf="pips" min="0" max="12" value="${pipCount}" style="width:52px;" title="Shatter Event pip count">` +
           `<input type="text" data-bf="monsters" value="${String(monsters).replace(/"/g, '&quot;')}" style="flex:1;min-width:140px;width:auto;" title="Monsters (comma-separated)">`;
         host.appendChild(div);
       });
@@ -1081,6 +1242,23 @@
       setC('bestiary_sf_bar', sf.apply_to_bar !== false);
       setC('bestiary_sf_sprint', sf.apply_to_sprint !== false);
       setC('bestiary_sf_heat', sf.apply_to_heat !== false);
+      const se = cfg.shatter_event || {};
+      setC('bestiary_shatter_enabled', se.enabled !== false);
+      setN('bestiary_shatter_duration', se.duration_sec, 60);
+      const jackpotPct = Math.round((Number(se.jackpot_chance != null ? se.jackpot_chance : 0.01) || 0) * 1000) / 10;
+      setN('bestiary_shatter_jackpot', jackpotPct, 1);
+      const ratPct = Math.round((Number(se.rat_max_fraction != null ? se.rat_max_fraction : 0.25) || 0.25) * 100);
+      setN('bestiary_shatter_rat_cap', ratPct, 25);
+      const sc = se.sidecar_chance_by_level || {};
+      const scVal = (k, d) => {
+        const v = sc[k] != null ? sc[k] : sc[String(k)];
+        return Math.round((Number(v != null ? v : d) || d) * 100);
+      };
+      setN('bestiary_shatter_sidecar_l1', scVal(1, 0.8), 80);
+      setN('bestiary_shatter_sidecar_l2', scVal(2, 0.88), 88);
+      setN('bestiary_shatter_sidecar_l3', scVal(3, 0.94), 94);
+      setN('bestiary_shatter_sidecar_l4', scVal(4, 0.98), 98);
+      setN('bestiary_shatter_sidecar_l5', scVal(5, 1), 100);
       fillBestiaryLevelsEditor(cfg.levels || []);
     }
 
@@ -1091,18 +1269,27 @@
         const lvl = parseInt(row.dataset.bestiaryLevel, 10) || 0;
         const zoneEl = row.querySelector('[data-bf="zone"]');
         const thrEl = row.querySelector('[data-bf="thr"]');
+        const pipEl = row.querySelector('[data-bf="pips"]');
         const monEl = row.querySelector('[data-bf="monsters"]');
         const monsters = (monEl?.value || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+        const pipDefault = ({1:3,2:4,3:5,4:6,5:6})[lvl] || 3;
         levels.push({
           level: lvl,
           zone: (zoneEl?.value || '').trim() || ('Level ' + lvl),
-          bar_threshold: lvl >= 5 ? 0 : Math.max(0, parseInt(thrEl?.value, 10) || 0),
+          bar_threshold: Math.max(0, parseInt(thrEl?.value, 10) || 0),
+          pip_count: Math.max(0, Math.min(12, parseInt(pipEl?.value, 10) || pipDefault)),
           monsters,
         });
       });
       const exclude = (document.getElementById('bestiary_sf_exclude')?.value || '')
         .split(',').map(s => s.trim()).filter(Boolean);
       const prevSf = (base.soft_floor && typeof base.soft_floor === 'object') ? base.soft_floor : {};
+      const prevSe = (base.shatter_event && typeof base.shatter_event === 'object') ? base.shatter_event : {};
+      const pct01 = (id, d) => {
+        const n = parseFloat(document.getElementById(id)?.value);
+        if (!Number.isFinite(n)) return d;
+        return Math.max(0, Math.min(1, n / 100));
+      };
       return {
         ...base,
         heat_window_sec: Math.max(60, parseInt(document.getElementById('bestiary_heat_window_sec')?.value, 10) || 900),
@@ -1110,6 +1297,20 @@
         sprint_donor_reward_per_level: Math.max(0, parseInt(document.getElementById('bestiary_sprint_donor_reward_per_level')?.value, 10) || 0),
         per_user_bar_cap_fraction: Math.max(0, Math.min(1, parseFloat(document.getElementById('bestiary_per_user_bar_cap')?.value) || 0)),
         repeat_mob_diminishing: !!document.getElementById('bestiary_repeat_mob_diminishing')?.checked,
+        shatter_event: {
+          ...prevSe,
+          enabled: !!document.getElementById('bestiary_shatter_enabled')?.checked,
+          duration_sec: Math.max(5, Math.min(600, parseInt(document.getElementById('bestiary_shatter_duration')?.value, 10) || 60)),
+          jackpot_chance: pct01('bestiary_shatter_jackpot', 0.01),
+          rat_max_fraction: pct01('bestiary_shatter_rat_cap', 0.25),
+          sidecar_chance_by_level: {
+            '1': pct01('bestiary_shatter_sidecar_l1', 0.8),
+            '2': pct01('bestiary_shatter_sidecar_l2', 0.88),
+            '3': pct01('bestiary_shatter_sidecar_l3', 0.94),
+            '4': pct01('bestiary_shatter_sidecar_l4', 0.98),
+            '5': pct01('bestiary_shatter_sidecar_l5', 1.0),
+          },
+        },
         soft_floor: {
           ...prevSf,
           enabled: !!document.getElementById('bestiary_sf_enabled')?.checked,
@@ -1133,6 +1334,7 @@
         .then(data => {
           if (data && data.error) throw new Error(data.error);
           applyBestiaryConfigForm(data);
+          setBestiaryDirty(false);
           return data;
         })
         .catch(e => { console.warn('bestiary-config load', e); });
@@ -1140,7 +1342,7 @@
 
     function saveBestiaryConfig() {
       const payload = collectBestiaryConfigPayload();
-      fetch('/api/bestiary-config', {
+      return fetch('/api/bestiary-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -1149,11 +1351,13 @@
         .then(data => {
           if (data.error) throw new Error(data.error);
           if (data.config) applyBestiaryConfigForm(data.config);
+          setBestiaryDirty(false);
           showMsg('Bestiary config saved', true);
           logActivity('Bestiary config saved');
           refreshLiveStatus();
+          return true;
         })
-        .catch(e => showMsg('Bestiary save failed: ' + e.message, false));
+        .catch(e => { showMsg('Bestiary save failed: ' + e.message, false); return false; });
     }
 
     function updateBestiaryGlance(bestiary) {
@@ -1305,12 +1509,12 @@
         const countdownEl = document.getElementById('doublePointsCountdown');
         if (twox && badge2x) {
           if (twox.active && twox.display) {
-            badge2x.style.display = '';
-            badge2x.className = 'live-badge warn';
+            badge2x.className = 'live-badge btnlike warn';
             badge2x.textContent = '2x: ' + twox.display;
             if (countdownEl) countdownEl.textContent = '2x: ' + twox.display;
           } else {
-            badge2x.style.display = 'none';
+            badge2x.className = 'live-badge btnlike off';
+            badge2x.textContent = '2x: off';
             if (countdownEl) countdownEl.textContent = '—';
           }
         }
@@ -1363,10 +1567,15 @@
           events.sort((a, b) => (a.time || 0) - (b.time || 0));
           let maxTs = since;
           events.forEach(ev => {
-            logActivity(formatCommandActivityMessage(ev), {
+            const meta = {
               success: ev.success !== false,
               command: ev.command || '',
-            });
+              username: ev.username || '',
+            };
+            if (ev.spend_id) meta.spend_id = ev.spend_id;
+            if (ev.cost != null && ev.cost !== '') meta.cost = Number(ev.cost) || 0;
+            if (typeof ev.time === 'number') meta.time = ev.time;
+            logActivity(formatCommandActivityMessage(ev), meta);
             if (ev.time > maxTs) maxTs = ev.time;
           });
           setLastCommandTs(maxTs);
@@ -1388,16 +1597,56 @@
     }
     function logActivity(text, meta) {
       const arr = getActivityLog();
-      const entry = { time: Date.now(), text };
+      const entry = { time: (meta && meta.time) || Date.now(), text };
       if (meta) {
         if (meta.success === false) entry.success = false;
         else if (meta.success === true) entry.success = true;
         if (meta.command) entry.command = meta.command;
+        if (meta.username) entry.username = meta.username;
+        if (meta.spend_id) entry.spend_id = meta.spend_id;
+        if (meta.cost != null && !Number.isNaN(Number(meta.cost))) entry.cost = Number(meta.cost);
+        if (meta.refunded) entry.refunded = true;
       }
       arr.unshift(entry);
       if (arr.length > ACTIVITY_MAX) arr.length = ACTIVITY_MAX;
       saveActivityLog(arr);
       renderActivityList();
+    }
+    function markActivityRefunded(spendId) {
+      const arr = getActivityLog();
+      let changed = false;
+      arr.forEach(e => {
+        if (e.spend_id && e.spend_id === spendId) {
+          e.refunded = true;
+          changed = true;
+        }
+      });
+      if (changed) {
+        saveActivityLog(arr);
+        renderActivityList();
+      }
+    }
+    function refundActivitySpend(spendId, cost, username) {
+      const pts = Number(cost) || 0;
+      const who = username || 'viewer';
+      if (!spendId) return;
+      if (!confirm('Refund ' + pts + ' pts to ' + who + '? (In-game effect is not undone.)')) return;
+      fetch('/api/viewer-points/refund-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: spendId }),
+      })
+        .then(r => r.json().then(d => ({ status: r.status, d })))
+        .then(({ status, d }) => {
+          if (!d || !d.ok) throw new Error((d && d.error) || ('HTTP ' + status));
+          markActivityRefunded(spendId);
+          const refundedCost = d.cost != null ? d.cost : pts;
+          const uname = d.username || who;
+          showMsg('Refunded ' + refundedCost + ' pts to ' + uname, true);
+          logActivity('Refunded ' + refundedCost + ' pts to ' + uname + (d.command ? ' (!' + String(d.command).replace(/_/g, ' ') + ')' : ''));
+          if (typeof loadViewerPoints === 'function') loadViewerPoints(true);
+        })
+        .catch(e => showMsg('Refund failed: ' + (e.message || e), false));
     }
     function renderActivityList() {
       const el = document.getElementById('activityList');
@@ -1433,8 +1682,22 @@
         const d = new Date(entry.time);
         const t = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         const failed = entry.success === false || /\(failed\)$/i.test(entry.text || '');
-        return '<div class="' + (failed ? 'activity-failed' : '') + '" style="margin-bottom:4px;">' + t + ' — ' + escapeHtml(entry.text) + '</div>';
+        const canRefund = !failed && entry.spend_id && !entry.refunded && (Number(entry.cost) || 0) > 0;
+        const refundedLabel = entry.refunded ? ' <span style="opacity:0.8;">(refunded)</span>' : '';
+        let btn = '';
+        if (canRefund) {
+          btn = ' <button type="button" class="activity-refund-btn" data-spend-id="' + escapeHtml(entry.spend_id) +
+            '" data-cost="' + escapeHtml(String(entry.cost || 0)) +
+            '" data-username="' + escapeHtml(entry.username || '') + '">Refund</button>';
+        }
+        const cls = (failed ? 'activity-failed' : '') + (entry.refunded ? ' activity-refunded' : '');
+        return '<div class="' + cls.trim() + '" style="margin-bottom:4px;">' + t + ' — ' + escapeHtml(entry.text) + refundedLabel + btn + '</div>';
       }).join('');
+      el.querySelectorAll('.activity-refund-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          refundActivitySpend(btn.getAttribute('data-spend-id'), btn.getAttribute('data-cost'), btn.getAttribute('data-username'));
+        });
+      });
     }
 
     function formatCountdown(sec) {
@@ -1608,7 +1871,7 @@
         death_cost_inflation_enabled: !!document.getElementById('death_cost_inflation_enabled')?.checked,
         command_allowed_roles: collectCommandAllowedRoles(),
       };
-      fetch('/api/points-config', {
+      return fetch('/api/points-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -1620,8 +1883,9 @@
           showMsg('Saved!', true);
           logActivity('Costs saved');
           refreshLiveStatus();
+          return true;
         })
-        .catch(e => showMsg('Save failed: ' + e.message, false));
+        .catch(e => { showMsg('Save failed: ' + e.message, false); return false; });
     }
 
     function exportConfig() {
@@ -1754,21 +2018,7 @@
             users.push({ username, points: Math.max(0, pts || 0), donationPts: Math.max(0, donor || 0), last: isNaN(last) ? 0 : last, role });
           }
           if (users.length === 0) { showMsg('No valid rows to import', false); return; }
-          // OK = replace all live points with CSV; Cancel = merge (update/add only, keep others).
-          const merge = !confirm(
-            'Import ' + users.length + ' users from CSV.\n\n' +
-            'OK = REPLACE all viewer points with this CSV\n' +
-            'Cancel = MERGE (update matching names, keep everyone else)'
-          );
-          fetch('/api/viewer-points/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ users, merge: merge }) })
-            .then(r => r.json())
-            .then(d => {
-              if (d.error) throw new Error(d.error);
-              showMsg((merge ? 'Merged ' : 'Replaced with ') + (d.count || users.length) + ' users', true);
-              loadViewerPoints(true);
-              logActivity('VP: ' + (merge ? 'merged ' : 'replaced ') + (d.count || users.length) + ' CSV');
-            })
-            .catch(err => showMsg('Import failed: ' + err.message, false));
+          openVpCsvModal(users);
         } catch (err) { showMsg('Import failed: ' + err.message, false); }
       };
       reader.readAsText(file, 'UTF-8');
@@ -1864,7 +2114,35 @@
     const VP_LIST_HEIGHT_DEFAULT = 420;
     const VP_REFRESH_STORAGE = 'vp_refresh_sec';
     const VP_REFRESH_DEFAULT = 10;
+    const VP_SORT_STORAGE = 'vp_sort';
+    const VP_MORE_TOOLS_STORAGE = 'vp_more_tools_open';
     const OVERALL_CONFIG_STORAGE = 'overlay_layout_config';
+    const STREAM_MODE_STORAGE = 'overlay_stream_mode';
+    let streamMode = false;
+    try { streamMode = localStorage.getItem(STREAM_MODE_STORAGE) === '1'; } catch (_) {}
+    function applyStreamSectionOverlay() {
+      if (!streamMode) return;
+      ['game', 'companion', 'bestiary'].forEach(id => {
+        const el = document.getElementById('section-' + id);
+        if (el) el.style.display = 'none';
+      });
+    }
+    function updateStreamModeBtn() {
+      const btn = document.getElementById('streamModeBtn');
+      if (!btn) return;
+      btn.textContent = streamMode ? 'Stream: ON' : 'Stream';
+      btn.classList.toggle('stream-on', streamMode);
+      document.body.classList.toggle('stream-mode', streamMode);
+      btn.title = streamMode
+        ? 'Show game, companion, and bestiary sections again'
+        : 'Hide game, companion, and bestiary while streaming';
+    }
+    function setStreamMode(on) {
+      streamMode = !!on;
+      try { localStorage.setItem(STREAM_MODE_STORAGE, streamMode ? '1' : '0'); } catch (_) {}
+      updateStreamModeBtn();
+      applyOverallConfig();
+    }
     const OVERALL_CONFIG_DEFAULT = { columns: 3, sections: { general: true, monsters: true, viewer: true, game: true, score: true, session: true, bestiary: true, companion: true, activity: true }, order: ['general', 'monsters', 'viewer', 'companion', 'game', 'score', 'session', 'bestiary'], columnCounts: [2, 2, 4], monsterColumns: 2, monsterSectionWidth: 540 };
     function getOverallConfig() {
       try {
@@ -1948,6 +2226,7 @@
         const el = document.getElementById('section-' + id);
         if (el) el.style.display = (cfg.sections[id] !== false) ? '' : 'none';
       });
+      applyStreamSectionOverlay();
       const order = cfg.order || ['general', 'monsters', 'viewer', 'companion', 'game', 'score', 'session', 'bestiary'];
       const orderFiltered = order.filter(id => id !== 'activity');
       let counts = cfg.columnCounts || [2, 1, 4];
@@ -2148,6 +2427,9 @@
     }
 
     let viewerPointsData = [];
+    let viewerPointsRaw = {};
+    let pendingCsvUsers = null;
+    let vpDangerOnConfirm = null;
     function refreshVpUndoStatus() {
       const btn = document.getElementById('vpUndo');
       if (!btn) return;
@@ -2173,64 +2455,218 @@
         tr.style.display = (!q || user.includes(q)) ? '' : 'none';
       });
     }
-    function loadViewerPoints(forceRefresh) {
+    function vpDonationPts(d) {
+      return (d && d.donationPts != null) ? d.donationPts : 0;
+    }
+    function vpChatPts(d) {
+      return Math.max(0, ((d && d.points) || 0) - vpDonationPts(d));
+    }
+    function getVpSort() {
+      try {
+        const s = localStorage.getItem(VP_SORT_STORAGE);
+        if (s) {
+          const o = JSON.parse(s);
+          if (o && ['user', 'points', 'donor', 'last', 'total'].indexOf(o.key) >= 0 && (o.dir === 'asc' || o.dir === 'desc')) return o;
+        }
+      } catch (_) {}
+      return { key: 'total', dir: 'desc' };
+    }
+    function saveVpSort(sort) {
+      try { localStorage.setItem(VP_SORT_STORAGE, JSON.stringify(sort)); } catch (_) {}
+    }
+    function sortViewerEntries(entries) {
+      const sort = getVpSort();
+      const mul = sort.dir === 'asc' ? 1 : -1;
+      return entries.slice().sort((a, b) => {
+        const ua = a[0], da = a[1], ub = b[0], db = b[1];
+        let cmp = 0;
+        if (sort.key === 'user') cmp = ua.localeCompare(ub);
+        else if (sort.key === 'points') cmp = vpChatPts(da) - vpChatPts(db);
+        else if (sort.key === 'donor') cmp = vpDonationPts(da) - vpDonationPts(db);
+        else if (sort.key === 'last') cmp = (da.last || 0) - (db.last || 0);
+        else cmp = (da.points || 0) - (db.points || 0);
+        if (cmp === 0) cmp = ua.localeCompare(ub);
+        return cmp * mul;
+      });
+    }
+    function formatLastSeen(last) {
+      const ts = parseInt(last, 10) || 0;
+      if (ts <= 0) return { text: 'never', title: 'never' };
+      const date = new Date(ts * 1000);
+      const title = date.toLocaleString();
+      const sec = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+      let text;
+      if (sec < 60) text = 'just now';
+      else if (sec < 3600) text = Math.floor(sec / 60) + 'm ago';
+      else if (sec < 86400) text = Math.floor(sec / 3600) + 'h ago';
+      else text = Math.floor(sec / 86400) + 'd ago';
+      return { text, title };
+    }
+    function isVpModalOpen() {
+      return !!(document.getElementById('vpCsvModal')?.classList.contains('open')
+        || document.getElementById('vpDangerModal')?.classList.contains('open'));
+    }
+    function isVpPollBlocked() {
+      if (isVpModalOpen()) return true;
       const active = document.activeElement;
       const vpSection = document.getElementById('section-viewer');
-      if (!forceRefresh && active && vpSection && vpSection.contains(active) && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+      return !!(active && vpSection && vpSection.contains(active) && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA'));
+    }
+    function snapshotVpUi() {
+      const container = document.getElementById('viewer_points_list');
+      const checked = [];
+      const dirty = {};
+      if (!container) return { checked, dirty, scrollTop: 0 };
+      container.querySelectorAll('tbody tr').forEach(tr => {
+        const user = tr.dataset.user;
+        if (!user) return;
+        if (tr.querySelector('.vp-row-select')?.checked) checked.push(user);
+        const ptsEl = tr.querySelector('.edit-pts');
+        const donorEl = tr.querySelector('.edit-donor');
+        if (!ptsEl || !donorEl) return;
+        if (ptsEl.value !== String(tr.dataset.loadedChat) || donorEl.value !== String(tr.dataset.loadedDonor)) {
+          dirty[user] = { chat: ptsEl.value, donor: donorEl.value };
+        }
+      });
+      return { checked, dirty, scrollTop: container.scrollTop || 0 };
+    }
+    function updateVpRowDirty(tr) {
+      if (!tr) return;
+      const ptsEl = tr.querySelector('.edit-pts');
+      const donorEl = tr.querySelector('.edit-donor');
+      const dirty = !!(ptsEl && donorEl && (ptsEl.value !== String(tr.dataset.loadedChat) || donorEl.value !== String(tr.dataset.loadedDonor)));
+      tr.classList.toggle('vp-row-dirty', dirty);
+    }
+    function restoreVpUi(snap) {
+      const container = document.getElementById('viewer_points_list');
+      if (!container || !snap) return;
+      const checked = new Set(snap.checked || []);
+      const dirty = snap.dirty || {};
+      container.querySelectorAll('tbody tr').forEach(tr => {
+        const user = tr.dataset.user;
+        const cb = tr.querySelector('.vp-row-select');
+        if (cb && checked.has(user)) cb.checked = true;
+        const edit = dirty[user];
+        if (edit) {
+          const ptsEl = tr.querySelector('.edit-pts');
+          const donorEl = tr.querySelector('.edit-donor');
+          if (ptsEl) ptsEl.value = edit.chat;
+          if (donorEl) donorEl.value = edit.donor;
+        }
+        updateVpRowDirty(tr);
+      });
+      filterViewerPoints();
+      const visible = Array.from(container.querySelectorAll('tbody tr')).filter(tr => tr.style.display !== 'none');
+      const selectAllEl = document.getElementById('vpSelectAll');
+      if (selectAllEl) {
+        selectAllEl.checked = visible.length > 0 && visible.every(tr => tr.querySelector('.vp-row-select')?.checked);
+      }
+      container.scrollTop = snap.scrollTop || 0;
+    }
+    function vpSortHeader(key, label, extraStyle) {
+      const sort = getVpSort();
+      const active = sort.key === key;
+      const mark = active ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : '';
+      const style = extraStyle ? ' style="' + extraStyle + '"' : '';
+      return '<th class="vp-sort' + (active ? ' sorted' : '') + '" data-sort="' + key + '"' + style + '>' + label + mark + '</th>';
+    }
+    function bindViewerPointsTable(container) {
+      const selectAllEl = document.getElementById('vpSelectAll');
+      if (selectAllEl) {
+        selectAllEl.addEventListener('change', function() {
+          container.querySelectorAll('tbody tr').forEach(tr => {
+            if (tr.style.display !== 'none') {
+              const cb = tr.querySelector('.vp-row-select');
+              if (cb) cb.checked = this.checked;
+            }
+          });
+        });
+      }
+      container.querySelectorAll('th.vp-sort').forEach(th => {
+        th.addEventListener('click', () => {
+          const key = th.dataset.sort;
+          const current = getVpSort();
+          const dir = current.key === key
+            ? (current.dir === 'asc' ? 'desc' : 'asc')
+            : (key === 'user' ? 'asc' : 'desc');
+          saveVpSort({ key, dir });
+          renderViewerPointsTable();
+        });
+      });
+      container.querySelectorAll('tbody tr').forEach(tr => {
+        tr.querySelectorAll('.edit-pts, .edit-donor').forEach(inp => {
+          inp.addEventListener('input', () => updateVpRowDirty(tr));
+        });
+      });
+      container.querySelectorAll('.save-row').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const tr = btn.closest('tr');
+          const user = tr.dataset.user;
+          const chat = parseInt(tr.querySelector('.edit-pts').value, 10);
+          const donor = parseInt(tr.querySelector('.edit-donor').value, 10);
+          if (isNaN(chat) || chat < 0) { showMsg('Invalid points', false); return; }
+          if (isNaN(donor) || donor < 0) { showMsg('Invalid donor points', false); return; }
+          const totalPoints = chat + donor;
+          const payload = { username: user, points: totalPoints, donationPts: donor };
+          fetch('/api/viewer-points', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+            .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg(user + ' updated', true); loadViewerPoints(true); logActivity('VP: updated ' + user); })
+            .catch(e => showMsg('Failed: ' + e.message, false));
+        });
+      });
+      container.querySelectorAll('.del-row').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const user = btn.closest('tr').dataset.user;
+          if (!confirm('Remove ' + user + '?')) return;
+          fetch('/api/viewer-points/' + encodeURIComponent(user), { method: 'DELETE' })
+            .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg(user + ' removed', true); loadViewerPoints(true); logActivity('VP: removed ' + user); })
+            .catch(e => showMsg('Failed: ' + e.message, false));
+        });
+      });
+    }
+    function renderViewerPointsTable() {
+      const container = document.getElementById('viewer_points_list');
+      if (!container) return;
+      const snap = snapshotVpUi();
+      viewerPointsData = sortViewerEntries(Object.entries(viewerPointsRaw || {}));
+      if (viewerPointsData.length === 0) {
+        container.innerHTML = '<p style="color:var(--spd-muted-on-viewer-list);font-size:0.9rem;">No viewers yet. Type a username above and click Add or Set.</p>';
+        refreshVpUndoStatus();
         return;
       }
+      container.innerHTML = '<table style="width:100%;border-collapse:collapse;"><thead><tr><th style="width:36px;"><input type="checkbox" id="vpSelectAll" title="Select all visible"></th>'
+        + vpSortHeader('user', 'User')
+        + vpSortHeader('points', 'Points', 'text-align:right')
+        + vpSortHeader('donor', 'Donor', 'text-align:right')
+        + vpSortHeader('last', 'Last')
+        + '<th></th></tr></thead><tbody>'
+        + viewerPointsData.map(([u, d]) => {
+          const chat = vpChatPts(d);
+          const donor = vpDonationPts(d);
+          const last = formatLastSeen(d.last);
+          return '<tr data-user="' + escapeHtml(u) + '" data-loaded-chat="' + chat + '" data-loaded-donor="' + donor + '">'
+            + '<td style="padding:4px 8px;"><input type="checkbox" class="vp-row-select"></td>'
+            + '<td style="padding:4px 8px;overflow:hidden;text-overflow:ellipsis;" title="' + escapeHtml(u) + '">' + escapeHtml(u) + '</td>'
+            + '<td style="padding:4px 8px;"><input type="number" class="edit-pts" value="' + chat + '" min="0" style="width:90px;min-width:50px;padding:2px 4px;box-sizing:border-box;"></td>'
+            + '<td style="padding:4px 8px;"><input type="number" class="edit-donor" value="' + donor + '" min="0" style="width:90px;min-width:50px;padding:2px 4px;box-sizing:border-box;"></td>'
+            + '<td class="vp-last" title="' + escapeHtml(last.title) + '">' + escapeHtml(last.text) + '</td>'
+            + '<td style="padding:4px 8px;"><button class="save-row" style="padding:2px 8px;font-size:0.85rem;">Save</button> <button class="del-row" style="padding:2px 8px;font-size:0.85rem;background:var(--spd-danger);">Del</button></td>'
+            + '</tr>';
+        }).join('')
+        + '</tbody></table>';
+      bindViewerPointsTable(container);
+      restoreVpUi(snap);
+      refreshVpUndoStatus();
+    }
+    function loadViewerPoints(forceRefresh) {
+      if (!forceRefresh && isVpPollBlocked()) return;
       fetch('/api/viewer-points' + (forceRefresh ? '?t=' + Date.now() : ''), forceRefresh ? { cache: 'no-store' } : {})
         .then(r => r.json())
         .then(data => {
-          viewerPointsData = Object.entries(data).sort((a, b) => b[1].points - a[1].points);
-          const container = document.getElementById('viewer_points_list');
+          viewerPointsRaw = data || {};
           const updatedEl = document.getElementById('vpUpdated');
           if (updatedEl) { updatedEl.textContent = '(updated just now)'; }
           vpLastUpdate = Date.now();
-          if (viewerPointsData.length === 0) {
-            container.innerHTML = '<p style="color:var(--spd-muted-on-viewer-list);font-size:0.9rem;">No viewers yet. Type a username above and click Add or Set.</p>';
-            refreshVpUndoStatus();
-            return;
-          }
-          const donationPts = (d) => (d.donationPts != null ? d.donationPts : 0);
-          const chatPts = (d) => Math.max(0, (d.points || 0) - donationPts(d));
-          container.innerHTML = '<table style="width:100%;border-collapse:collapse;"><thead><tr><th style="width:36px;"><input type="checkbox" id="vpSelectAll" title="Select all visible"></th><th style="text-align:left;padding:4px 8px;">User</th><th style="text-align:right;padding:4px 8px;">Points</th><th style="text-align:right;padding:4px 8px;">Donor</th><th></th></tr></thead><tbody>' +
-            viewerPointsData.map(([u, d]) => `<tr data-user="${escapeHtml(u)}"><td style="padding:4px 8px;"><input type="checkbox" class="vp-row-select"></td><td style="padding:4px 8px;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(u)}">${escapeHtml(u)}</td><td style="padding:4px 8px;"><input type="number" class="edit-pts" value="${chatPts(d)}" min="0" style="width:90px;min-width:50px;padding:2px 4px;box-sizing:border-box;"></td><td style="padding:4px 8px;"><input type="number" class="edit-donor" value="${donationPts(d)}" min="0" style="width:90px;min-width:50px;padding:2px 4px;box-sizing:border-box;"></td><td style="padding:4px 8px;"><button class="save-row" style="padding:2px 8px;font-size:0.85rem;">Save</button> <button class="del-row" style="padding:2px 8px;font-size:0.85rem;background:var(--spd-danger);">Del</button></td></tr>`).join('') +
-            '</tbody></table>';
-          filterViewerPoints();
-          const selectAllEl = document.getElementById('vpSelectAll');
-          if (selectAllEl) {
-            selectAllEl.addEventListener('change', function() {
-              container.querySelectorAll('tbody tr').forEach(tr => {
-                if (tr.style.display !== 'none') tr.querySelector('.vp-row-select').checked = this.checked;
-              });
-            });
-          }
-          refreshVpUndoStatus();
-          container.querySelectorAll('.save-row').forEach(btn => {
-            btn.addEventListener('click', () => {
-              const tr = btn.closest('tr');
-              const user = tr.dataset.user;
-              const chat = parseInt(tr.querySelector('.edit-pts').value, 10);
-              const donor = parseInt(tr.querySelector('.edit-donor').value, 10);
-              if (isNaN(chat) || chat < 0) { showMsg('Invalid points', false); return; }
-              if (isNaN(donor) || donor < 0) { showMsg('Invalid donor points', false); return; }
-              const totalPoints = chat + donor;
-              const payload = { username: user, points: totalPoints, donationPts: donor };
-              fetch('/api/viewer-points', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-                .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg(user + ' updated', true); loadViewerPoints(true); logActivity('VP: updated ' + user); })
-                .catch(e => showMsg('Failed: ' + e.message, false));
-            });
-          });
-          container.querySelectorAll('.del-row').forEach(btn => {
-            btn.addEventListener('click', () => {
-              const user = btn.closest('tr').dataset.user;
-              if (!confirm('Remove ' + user + '?')) return;
-              fetch('/api/viewer-points/' + encodeURIComponent(user), { method: 'DELETE' })
-                .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg(user + ' removed', true); loadViewerPoints(true); logActivity('VP: removed ' + user); })
-                .catch(e => showMsg('Failed: ' + e.message, false));
-            });
-          });
+          renderViewerPointsTable();
         })
         .catch(e => {
           document.getElementById('viewer_points_list').innerHTML = '<p style="color:var(--spd-error);">Failed to load: ' + escapeHtml(e.message) + '</p>';
@@ -2359,18 +2795,52 @@
       sec.addEventListener('input', () => setCostsDirty(true));
       sec.addEventListener('change', () => setCostsDirty(true));
     });
+    const bestiarySec = document.getElementById('section-bestiary');
+    if (bestiarySec) {
+      bestiarySec.addEventListener('input', () => setBestiaryDirty(true));
+      bestiarySec.addEventListener('change', () => setBestiaryDirty(true));
+    }
     refreshPresetsSelect();
     document.getElementById('presetSaveAs').addEventListener('click', saveCurrentAsPreset);
     document.getElementById('presetApply').addEventListener('click', applyPreset);
     document.getElementById('presetDelete').addEventListener('click', deletePreset);
-    document.getElementById('refresh').addEventListener('click', () => { load(); loadBestiaryConfig(); if (window.CompanionSettingsPanel) CompanionSettingsPanel.load(); loadViewerPoints(); loadScoreData(); refreshLiveStatus(); showMsg('Refreshed', true); logActivity('Refreshed'); });
+    document.getElementById('refresh').addEventListener('click', () => {
+      if (anyDirty() && !confirm('You have unsaved changes (costs, bestiary, and/or companion). Refresh anyway and lose them?')) return;
+      load(); loadBestiaryConfig(); if (window.CompanionSettingsPanel) CompanionSettingsPanel.load(); loadViewerPoints(); loadScoreData(); refreshLiveStatus(); showMsg('Refreshed', true); logActivity('Refreshed');
+    });
     renderActivityList();
     const activityHideGameLoadedEl = document.getElementById('activityHideGameLoaded');
     if (activityHideGameLoadedEl) {
       activityHideGameLoadedEl.checked = getHideGameLoadedSetting();
       activityHideGameLoadedEl.addEventListener('change', () => setHideGameLoadedSetting(activityHideGameLoadedEl.checked));
     }
-    document.addEventListener('keydown', (e) => { if (e.ctrlKey && e.key === 's') { e.preventDefault(); save(); } });
+    function saveAllDirty() {
+      const jobs = [];
+      if (costsDirty) jobs.push(Promise.resolve(save()));
+      if (bestiaryDirty) jobs.push(Promise.resolve(saveBestiaryConfig()));
+      if (companionIsDirty()) jobs.push(Promise.resolve(CompanionSettingsPanel.save()));
+      if (!jobs.length) {
+        save();
+        return;
+      }
+      Promise.all(jobs);
+    }
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        saveAllDirty();
+      }
+      if (e.key === 'Escape') {
+        closeHudPopovers();
+        closeVpCsvModal();
+        closeVpDangerModal();
+      }
+    });
+    window.addEventListener('beforeunload', (e) => {
+      if (!anyDirty()) return;
+      e.preventDefault();
+      e.returnValue = '';
+    });
     document.getElementById('add_points').addEventListener('click', () => {
       const selected = Array.from(document.querySelectorAll('.vp-row-select:checked')).map(cb => cb.closest('tr').dataset.user);
       const username = document.getElementById('vp_search').value.trim();
@@ -2445,17 +2915,120 @@
         .then(d => { if (d.error) throw new Error(d.error); showMsg(`Converted ${pct}% chat→donor for ${d.count} users`, true); loadViewerPoints(true); refreshVpUndoStatus(); logActivity('VP: Chat→Donor ' + pct + '% ' + (d.count || 0) + ' users'); })
         .catch(e => showMsg('Failed: ' + e.message, false));
     });
+    function openVpCsvModal(users) {
+      pendingCsvUsers = users;
+      const liveNames = new Set(Object.keys(viewerPointsRaw || {}).map(k => k.toLowerCase()));
+      const fileNames = new Set(users.map(u => (u.username || '').toLowerCase()).filter(Boolean));
+      let updateCount = 0, newCount = 0, missingCount = 0;
+      fileNames.forEach(n => { if (liveNames.has(n)) updateCount++; else newCount++; });
+      liveNames.forEach(n => { if (!fileNames.has(n)) missingCount++; });
+      const summary = document.getElementById('vpCsvSummary');
+      if (summary) {
+        summary.textContent =
+          users.length + ' rows in file.\n' +
+          updateCount + ' names already live (will update).\n' +
+          newCount + ' new names.\n' +
+          missingCount + ' live names not in the file (removed only if you Replace).\n\n' +
+          'Merge updates matching names and adds new ones. Replace writes this CSV as the full live list.';
+      }
+      const typed = document.getElementById('vpCsvReplaceConfirm');
+      if (typed) typed.value = '';
+      document.getElementById('vpCsvModal')?.classList.add('open');
+    }
+    function closeVpCsvModal() {
+      document.getElementById('vpCsvModal')?.classList.remove('open');
+      pendingCsvUsers = null;
+    }
+    function submitVpCsvImport(merge) {
+      const users = pendingCsvUsers;
+      if (!users || !users.length) { closeVpCsvModal(); return; }
+      fetch('/api/viewer-points/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ users, merge }) })
+        .then(r => r.json())
+        .then(d => {
+          if (d.error) throw new Error(d.error);
+          showMsg((merge ? 'Merged ' : 'Replaced with ') + (d.count || users.length) + ' users', true);
+          closeVpCsvModal();
+          loadViewerPoints(true);
+          refreshVpUndoStatus();
+          logActivity('VP: ' + (merge ? 'merged ' : 'replaced ') + (d.count || users.length) + ' CSV');
+        })
+        .catch(err => showMsg('Import failed: ' + err.message, false));
+    }
+    function openVpDangerModal(opts) {
+      vpDangerOnConfirm = opts && opts.onConfirm;
+      const titleEl = document.getElementById('vpDangerTitle');
+      const summaryEl = document.getElementById('vpDangerSummary');
+      const typeRow = document.getElementById('vpDangerTypeRow');
+      const typeWordEl = document.getElementById('vpDangerTypeWord');
+      const typeInput = document.getElementById('vpDangerTypeInput');
+      if (titleEl) titleEl.textContent = (opts && opts.title) || 'Confirm';
+      if (summaryEl) summaryEl.textContent = (opts && opts.summary) || '';
+      const word = (opts && opts.typeWord) || '';
+      if (typeRow) typeRow.style.display = word ? '' : 'none';
+      if (typeWordEl) typeWordEl.textContent = word;
+      if (typeInput) { typeInput.value = ''; typeInput.dataset.required = word; }
+      document.getElementById('vpDangerModal')?.classList.add('open');
+      if (word && typeInput) setTimeout(() => typeInput.focus(), 0);
+    }
+    function closeVpDangerModal() {
+      document.getElementById('vpDangerModal')?.classList.remove('open');
+      vpDangerOnConfirm = null;
+    }
+    function countLoadedChatUsers() {
+      return Object.values(viewerPointsRaw || {}).filter(d => vpChatPts(d) > 0).length;
+    }
+    function countLoadedDonorUsers() {
+      return Object.values(viewerPointsRaw || {}).filter(d => vpDonationPts(d) > 0).length;
+    }
+    function readPruneBody() {
+      const days = parseInt(document.getElementById('pruneDays').value, 10);
+      const minDonor = parseInt(document.getElementById('pruneDonorBelow').value, 10);
+      if (isNaN(days) || days < 1) {
+        showMsg('Prune: inactive days must be at least 1', false);
+        return null;
+      }
+      if (isNaN(minDonor) || minDonor < 0) {
+        showMsg('Prune: donor threshold must be a number ≥ 0', false);
+        return null;
+      }
+      const chatRaw = document.getElementById('pruneMaxChat').value.trim();
+      let maxChatPts = null;
+      if (chatRaw !== '') {
+        maxChatPts = parseInt(chatRaw, 10);
+        if (isNaN(maxChatPts) || maxChatPts < 0) {
+          showMsg('Prune: chat-only max must be empty (any) or a number ≥ 0', false);
+          return null;
+        }
+      }
+      const body = { days, minDonor };
+      if (maxChatPts !== null) body.maxChatPts = maxChatPts;
+      return body;
+    }
     document.getElementById('clearNonDonor').addEventListener('click', () => {
-      if (!confirm('Clear all chat-only points? Donors keep their donor balance.')) return;
-      fetch('/api/viewer-points/clear-non-donor', { method: 'POST' })
-        .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('Chat points cleared', true); loadViewerPoints(true); refreshVpUndoStatus(); logActivity('VP: cleared chat points'); })
-        .catch(e => showMsg('Failed: ' + e.message, false));
+      const n = countLoadedChatUsers();
+      openVpDangerModal({
+        title: 'Clear chat points',
+        summary: 'Wipe chat-only points for ' + n + ' loaded user' + (n === 1 ? '' : 's') + '. Donors keep their donor balance.',
+        typeWord: 'CLEAR',
+        onConfirm: () => {
+          fetch('/api/viewer-points/clear-non-donor', { method: 'POST' })
+            .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('Chat points cleared', true); loadViewerPoints(true); refreshVpUndoStatus(); logActivity('VP: cleared chat points'); })
+            .catch(e => showMsg('Failed: ' + e.message, false));
+        }
+      });
     });
     document.getElementById('clearAll').addEventListener('click', () => {
-      if (!confirm('Remove all donor points? Chat points will be kept.')) return;
-      fetch('/api/viewer-points/bulk/clear-donor', { method: 'POST' })
-        .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('Donor points cleared', true); loadViewerPoints(true); refreshVpUndoStatus(); logActivity('VP: cleared donor'); })
-        .catch(e => showMsg('Failed: ' + e.message, false));
+      const n = countLoadedDonorUsers();
+      openVpDangerModal({
+        title: 'Clear donor points',
+        summary: 'Remove donor points for ' + n + ' loaded user' + (n === 1 ? '' : 's') + '. Chat points will be kept.',
+        typeWord: 'CLEAR',
+        onConfirm: () => {
+          fetch('/api/viewer-points/bulk/clear-donor', { method: 'POST' })
+            .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('Donor points cleared', true); loadViewerPoints(true); refreshVpUndoStatus(); logActivity('VP: cleared donor'); })
+            .catch(e => showMsg('Failed: ' + e.message, false));
+        }
+      });
     });
     document.getElementById('vpUndo').addEventListener('click', () => {
       fetch('/api/viewer-points/undo', { method: 'POST' })
@@ -2472,38 +3045,60 @@
     document.getElementById('exportViewerCsv').addEventListener('click', exportViewerCsv);
     document.getElementById('importViewerCsv').addEventListener('click', importViewerCsv);
     document.getElementById('importViewerCsvFile').addEventListener('change', handleImportViewerCsvFile);
+    document.getElementById('vpCsvMerge').addEventListener('click', () => submitVpCsvImport(true));
+    document.getElementById('vpCsvReplace').addEventListener('click', () => {
+      const typed = (document.getElementById('vpCsvReplaceConfirm')?.value || '').trim();
+      if (typed !== 'REPLACE') { showMsg('Type REPLACE to replace everyone', false); return; }
+      submitVpCsvImport(false);
+    });
+    document.getElementById('vpCsvCancel').addEventListener('click', closeVpCsvModal);
+    document.getElementById('vpCsvModal').addEventListener('click', (e) => {
+      if (e.target.id === 'vpCsvModal') closeVpCsvModal();
+    });
+    document.getElementById('vpDangerConfirm').addEventListener('click', () => {
+      const required = document.getElementById('vpDangerTypeInput')?.dataset.required || '';
+      if (required) {
+        const typed = (document.getElementById('vpDangerTypeInput')?.value || '').trim();
+        if (typed !== required) { showMsg('Type ' + required + ' to confirm', false); return; }
+      }
+      const fn = vpDangerOnConfirm;
+      closeVpDangerModal();
+      if (typeof fn === 'function') fn();
+    });
+    document.getElementById('vpDangerCancel').addEventListener('click', closeVpDangerModal);
+    document.getElementById('vpDangerModal').addEventListener('click', (e) => {
+      if (e.target.id === 'vpDangerModal') closeVpDangerModal();
+    });
     document.getElementById('pruneInactive').addEventListener('click', () => {
-      const days = parseInt(document.getElementById('pruneDays').value, 10);
-      const minDonor = parseInt(document.getElementById('pruneDonorBelow').value, 10);
-      if (isNaN(days) || days < 1) {
-        showMsg('Prune: inactive days must be at least 1', false);
-        return;
-      }
-      if (isNaN(minDonor) || minDonor < 0) {
-        showMsg('Prune: donor threshold must be a number ≥ 0', false);
-        return;
-      }
-      const chatRaw = document.getElementById('pruneMaxChat').value.trim();
-      let maxChatPts = null;
-      if (chatRaw !== '') {
-        maxChatPts = parseInt(chatRaw, 10);
-        if (isNaN(maxChatPts) || maxChatPts < 0) {
-          showMsg('Prune: chat-only max must be empty (any) or a number ≥ 0', false);
-          return;
-        }
-      }
-      const chatDesc = maxChatPts === null ? 'any chat-only' : ('chat-only ≤ ' + maxChatPts);
-      if (!confirm('Remove users inactive ≥ ' + days + ' days, donor pts < ' + minDonor + ', and ' + chatDesc + '?')) return;
-      const body = { days, minDonor };
-      if (maxChatPts !== null) body.maxChatPts = maxChatPts;
-      fetch('/api/viewer-points/prune', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const body = readPruneBody();
+      if (!body) return;
+      const previewBody = Object.assign({}, body, { preview: true });
+      fetch('/api/viewer-points/prune', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(previewBody) })
         .then(r => r.json())
         .then(d => {
           if (d.error) throw new Error(d.error);
-          showMsg('Pruned ' + (d.count || 0) + ' users', true);
-          loadViewerPoints(true);
-          refreshVpUndoStatus();
-          logActivity('VP: pruned ' + (d.count || 0) + ' (≥' + days + 'd, donor<' + minDonor + (maxChatPts !== null ? ', chat≤' + maxChatPts : '') + ')');
+          const count = d.count || 0;
+          const names = Array.isArray(d.users) ? d.users : [];
+          if (count === 0) { showMsg('No users match prune filters', true); return; }
+          const shown = names.slice(0, 15);
+          const extra = count > shown.length ? '\n…and ' + (count - shown.length) + ' more' : '';
+          const chatDesc = body.maxChatPts == null ? 'any chat-only' : ('chat-only ≤ ' + body.maxChatPts);
+          openVpDangerModal({
+            title: 'Prune inactive',
+            summary: 'Remove ' + count + ' user' + (count === 1 ? '' : 's') + ' inactive ≥ ' + body.days + ' days, donor pts < ' + body.minDonor + ', and ' + chatDesc + '.\n\n' + shown.join(', ') + extra,
+            onConfirm: () => {
+              fetch('/api/viewer-points/prune', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+                .then(r2 => r2.json())
+                .then(d2 => {
+                  if (d2.error) throw new Error(d2.error);
+                  showMsg('Pruned ' + (d2.count || 0) + ' users', true);
+                  loadViewerPoints(true);
+                  refreshVpUndoStatus();
+                  logActivity('VP: pruned ' + (d2.count || 0) + ' (≥' + body.days + 'd, donor<' + body.minDonor + (body.maxChatPts != null ? ', chat≤' + body.maxChatPts : '') + ')');
+                })
+                .catch(e => showMsg('Prune failed: ' + e.message, false));
+            }
+          });
         })
         .catch(e => showMsg('Prune failed: ' + e.message, false));
     });
@@ -2582,35 +3177,82 @@
         .catch(e => showMsg('Failed: ' + e.message, false));
     });
     document.getElementById('sessionForceEnd').addEventListener('click', () => {
-      if (!confirm('FORCE stream end now? This auto-banks chat points and wipes chat balances immediately.')) return;
-      fetch('/api/session/end', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ force: true }) })
-        .then(r => r.json()).then(d => {
-          if (d.error || d.ok === false) throw new Error(d.error || 'force end failed');
-          const n = d.users_affected != null ? d.users_affected : '?';
-          const donor = d.donor_pts_awarded != null ? d.donor_pts_awarded : '?';
-          showMsg('Force end: ' + n + ' users, +' + donor + ' donor', true);
-          logActivity('Session force end (' + n + ' users)');
-          loadViewerPoints(true);
-          refreshLiveStatus();
-        })
-        .catch(e => showMsg('Failed: ' + e.message, false));
+      const n = countLoadedChatUsers();
+      openVpDangerModal({
+        title: 'Force stream end',
+        summary: 'Immediately auto-bank chat points and wipe chat balances. About ' + n + ' loaded user' + (n === 1 ? '' : 's') + ' currently have chat points.',
+        typeWord: 'END',
+        onConfirm: () => {
+          fetch('/api/session/end', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ force: true }) })
+            .then(r => r.json()).then(d => {
+              if (d.error || d.ok === false) throw new Error(d.error || 'force end failed');
+              const affected = d.users_affected != null ? d.users_affected : '?';
+              const donor = d.donor_pts_awarded != null ? d.donor_pts_awarded : '?';
+              showMsg('Force end: ' + affected + ' users, +' + donor + ' donor', true);
+              logActivity('Session force end (' + affected + ' users)');
+              loadViewerPoints(true);
+              refreshLiveStatus();
+            })
+            .catch(e => showMsg('Failed: ' + e.message, false));
+        }
+      });
     });
-    document.getElementById('doublePointsStart').addEventListener('click', () => {
-      const mins = Math.max(1, Math.min(1440, parseInt(document.getElementById('doublePointsMins').value, 10) || 5));
-      fetch('/api/double-points-start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ minutes: mins }) })
-        .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('2x points started for ' + mins + ' min', true); logActivity('2x points started'); refreshLiveStatus(); })
+    function doublePointsMinutes() {
+      return Math.max(1, Math.min(1440, parseInt(document.getElementById('doublePointsMins')?.value, 10) || 5));
+    }
+    function updateHud2xHint() {
+      const hint = document.getElementById('hud2xHint');
+      if (hint) hint.textContent = 'Uses minutes from Score (' + doublePointsMinutes() + ').';
+    }
+    function startDoublePoints() {
+      const mins = doublePointsMinutes();
+      return fetch('/api/double-points-start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ minutes: mins }) })
+        .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('2x points started for ' + mins + ' min', true); logActivity('2x points started'); refreshLiveStatus(); closeHudPopovers(); })
         .catch(e => showMsg('Failed: ' + e.message, false));
+    }
+    function extendDoublePoints() {
+      const mins = doublePointsMinutes();
+      return fetch('/api/double-points-extend', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ minutes: mins }) })
+        .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('2x extended +' + mins + ' min', true); logActivity('2x points extended'); refreshLiveStatus(); closeHudPopovers(); })
+        .catch(e => showMsg('Failed: ' + e.message, false));
+    }
+    function stopDoublePoints() {
+      return fetch('/api/double-points-stop', { method: 'POST' })
+        .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('2x points stopped', true); logActivity('2x points stopped'); refreshLiveStatus(); closeHudPopovers(); })
+        .catch(e => showMsg('Failed: ' + e.message, false));
+    }
+    function closeHudPopovers(except) {
+      if (except !== '2x') document.getElementById('hud2xWrap')?.classList.remove('open');
+      if (except !== 'more') document.getElementById('hudMore')?.classList.remove('open');
+    }
+    document.getElementById('doublePointsStart').addEventListener('click', startDoublePoints);
+    document.getElementById('doublePointsExtend').addEventListener('click', extendDoublePoints);
+    document.getElementById('doublePointsStop').addEventListener('click', stopDoublePoints);
+    document.getElementById('hud2xStart')?.addEventListener('click', (e) => { e.stopPropagation(); startDoublePoints(); });
+    document.getElementById('hud2xExtend')?.addEventListener('click', (e) => { e.stopPropagation(); extendDoublePoints(); });
+    document.getElementById('hud2xStop')?.addEventListener('click', (e) => { e.stopPropagation(); stopDoublePoints(); });
+    document.getElementById('badge2x')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const wrap = document.getElementById('hud2xWrap');
+      const willOpen = wrap && !wrap.classList.contains('open');
+      closeHudPopovers();
+      if (willOpen) {
+        updateHud2xHint();
+        wrap.classList.add('open');
+      }
     });
-    document.getElementById('doublePointsExtend').addEventListener('click', () => {
-      const mins = Math.max(1, Math.min(1440, parseInt(document.getElementById('doublePointsMins').value, 10) || 5));
-      fetch('/api/double-points-extend', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ minutes: mins }) })
-        .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('2x extended +' + mins + ' min', true); logActivity('2x points extended'); refreshLiveStatus(); })
-        .catch(e => showMsg('Failed: ' + e.message, false));
+    document.getElementById('hudMoreBtn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const more = document.getElementById('hudMore');
+      const willOpen = more && !more.classList.contains('open');
+      closeHudPopovers();
+      if (willOpen) more.classList.add('open');
     });
-    document.getElementById('doublePointsStop').addEventListener('click', () => {
-      fetch('/api/double-points-stop', { method: 'POST' })
-        .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); showMsg('2x points stopped', true); logActivity('2x points stopped'); refreshLiveStatus(); })
-        .catch(e => showMsg('Failed: ' + e.message, false));
+    document.getElementById('streamModeBtn')?.addEventListener('click', () => setStreamMode(!streamMode));
+    document.addEventListener('click', (e) => {
+      const t = e.target;
+      if (t && t.closest && (t.closest('#hud2xWrap') || t.closest('#hudMore'))) return;
+      closeHudPopovers();
     });
     function sessionClearUser(kinds) {
       const username = (document.getElementById('sessionClearUser')?.value || '').trim();
@@ -2665,6 +3307,7 @@
       setInterval(tick, 2000);
     })();
     document.getElementById('overallConfigBtn').addEventListener('click', () => {
+      closeHudPopovers();
       const cfg = getOverallConfig();
       document.querySelector('input[name="overallCols"][value="' + cfg.columns + '"]').checked = true;
       document.querySelector('input[name="monsterCols"][value="' + (cfg.monsterColumns === 'auto' ? 'auto' : String(cfg.monsterColumns || 2)) + '"]').checked = true;
@@ -2738,6 +3381,7 @@
       document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') addViewerUser(); });
     });
     applyOverallConfig();
+    updateStreamModeBtn();
     applyColumnWidths();
     load();
     loadBestiaryConfig();
@@ -2747,11 +3391,9 @@
     });
     (function initCompanionPanel() {
       const root = document.getElementById('companionPanelRoot');
-      const section = document.getElementById('section-companion');
-      if (section) section.style.display = '';
       if (window.CompanionSettingsPanel) {
         try {
-          CompanionSettingsPanel.init({ showMsg, logActivity });
+          CompanionSettingsPanel.init({ showMsg, logActivity, onDirty: updateDirtyChips });
         } catch (e) {
           console.error(e);
           if (root) root.innerHTML = '<p class="sub" style="color:var(--spd-error);">Companion panel failed to init: ' + (e && e.message ? e.message : e) + '</p>';
@@ -2951,6 +3593,14 @@
       [colLeft, colCenter, colRight].filter(Boolean).forEach(col => observer.observe(col, { childList: true, subtree: true }));
     })();
     loadViewerPoints();
+    (function initVpMoreTools() {
+      const details = document.getElementById('vpMoreTools');
+      if (!details) return;
+      try { if (localStorage.getItem(VP_MORE_TOOLS_STORAGE) === '1') details.open = true; } catch (_) {}
+      details.addEventListener('toggle', () => {
+        try { localStorage.setItem(VP_MORE_TOOLS_STORAGE, details.open ? '1' : '0'); } catch (_) {}
+      });
+    })();
     (function initVpRefresh() {
       try {
         const s = localStorage.getItem(VP_REFRESH_STORAGE);

@@ -18,11 +18,46 @@
     "apply_to_sprint": true,
     "apply_to_heat": true
   },
+  "shatter_event": {
+    "enabled": true,
+    "duration_sec": 60,
+    "jackpot_chance": 0.01,
+    "sidecar_chance_by_level": {
+      "1": 0.8,
+      "2": 0.88,
+      "3": 0.94,
+      "4": 0.98,
+      "5": 1.0
+    },
+    "rat_max_fraction": 0.25,
+    "helpful_max_fraction": 0.25,
+    "hostile_keys": [
+      "cost_per_plant",
+      "cost_per_debuff",
+      "cost_per_corrupt_ally",
+      "cost_per_trap",
+      "cost_per_gas",
+      "cost_per_bomb",
+      "cost_per_wand",
+      "cost_per_hex",
+      "cost_per_degrade",
+      "cost_per_sabotage",
+      "cost_per_curse",
+      "cost_per_scroll",
+      "cost_per_transmute"
+    ],
+    "helpful_keys": [
+      "cost_per_dew",
+      "cost_per_ally_bee",
+      "cost_per_ward"
+    ]
+  },
   "levels": [
     {
       "level": 1,
       "zone": "Sewers",
-      "bar_threshold": 500,
+      "bar_threshold": 200,
+      "pip_count": 3,
       "monsters": [
         "rat",
         "albino",
@@ -36,7 +71,8 @@
     {
       "level": 2,
       "zone": "Prison",
-      "bar_threshold": 1000,
+      "bar_threshold": 500,
+      "pip_count": 4,
       "monsters": [
         "skeleton",
         "dm100",
@@ -48,7 +84,8 @@
     {
       "level": 3,
       "zone": "Caves",
-      "bar_threshold": 1500,
+      "bar_threshold": 800,
+      "pip_count": 5,
       "monsters": [
         "bat",
         "brute",
@@ -59,7 +96,8 @@
     {
       "level": 4,
       "zone": "Metro",
-      "bar_threshold": 2000,
+      "bar_threshold": 1100,
+      "pip_count": 6,
       "monsters": [
         "ghoul",
         "elemental",
@@ -71,7 +109,8 @@
     {
       "level": 5,
       "zone": "Halls",
-      "bar_threshold": 0,
+      "bar_threshold": 3000,
+      "pip_count": 6,
       "monsters": [
         "eye",
         "scorpio",

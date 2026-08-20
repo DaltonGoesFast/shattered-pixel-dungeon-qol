@@ -193,7 +193,10 @@ func _update_root_visibility() -> void:
 		and url_ok
 		and not _active.is_empty()
 	)
+	if _list:
+		_list.visible = not _active.is_empty()
 	if not visible:
+		_fit_to_content()
 		_schedule_reposition()
 
 
@@ -327,6 +330,7 @@ func _fit_name_column_widths() -> void:
 			continue
 		var ms: Vector2 = name_lab.get_minimum_size()
 		name_lab.custom_minimum_size.x = maxf(ms.x, 1.0)
+	_fit_to_content()
 
 
 func _refresh_time_labels() -> void:
@@ -396,15 +400,36 @@ func _schedule_reposition() -> void:
 	call_deferred("_reposition_to_corner")
 
 
+func _fit_to_content() -> void:
+	if _list:
+		_list.reset_size()
+	if _outer_vbox:
+		_outer_vbox.reset_size()
+	if _margin:
+		_margin.reset_size()
+	custom_minimum_size = Vector2.ZERO
+	reset_size()
+	if not visible or _active.is_empty():
+		size = Vector2.ZERO
+		return
+	var sz: Vector2 = get_combined_minimum_size()
+	if sz.x < 2.0 or sz.y < 2.0:
+		return
+	size = sz
+
+
 func _reposition_to_corner() -> void:
 	if not visible:
 		return
+	_fit_to_content()
 	var r: Rect2 = get_viewport().get_visible_rect()
 	var L := CompanionConfig.layout_data_for(self)
 	var mx: int = L.free_promos_margin_x
 	var my: int = L.free_promos_margin_y
 	var corner: int = clampi(L.free_promos_corner, 0, 3)
-	var sz: Vector2 = get_rect().size
+	var sz: Vector2 = size
+	if sz.x < 2.0 or sz.y < 2.0:
+		sz = get_combined_minimum_size()
 	if sz.x < 2.0 or sz.y < 2.0:
 		return
 	var x: float = 0.0
@@ -423,3 +448,4 @@ func _reposition_to_corner() -> void:
 			x = r.size.x - float(mx) - sz.x
 			y = r.size.y - float(my) - sz.y
 	position = Vector2(x, y)
+	size = sz

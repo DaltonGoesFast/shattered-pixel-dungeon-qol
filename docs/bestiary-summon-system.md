@@ -49,6 +49,12 @@ xp = max(2, cost // 5)   # rat(5)→2, scorpio(80)→16
 
 Implemented in [`summon_bestiary.monster_xp()`](../Lastest%20UI/summon_bestiary.py).
 
+**Paid in-game commands** (`!spawn`, `!heal`, `!gold`, …) also grant **co-op bar XP only** after the game confirms the spend, using the same formula on the **actual points deducted** (`spend_xp_from_cost` / `apply_bar_xp`). Promo / zero cost → **0 XP** (no floor of 2). Sprint, Heat, session summon counts, and overlay marches stay `!summon`-only. A spend that fills the bar still triggers the normal level-up (crowns the current **summon** sprint leader).
+
+### Shatter Event
+
+Mystery **pips** on the co-op bar (counts scale by zone: 3→6) plus a reward on **zone level-up** and **Halls bar loops**. Each event grants a timed free window via `free_until.json` (default **60s**): always a zone `!spawn` (1% jackpot → 50/50 eye/scorpio), usually plus one cost-weighted sidecar (hostile pool + dew/bee/ward, helpful capped). Overlapping events **extend** existing free timers. Grants are skipped while `spend_disabled.txt` exists (catch-up on the next bar XP grant after spend is re-enabled). Free promo / Shatter cost-0 spends grant **0** bar XP, so free spam cannot chain new events. Config: `bestiary_config.json` → `shatter_event` + per-level `pip_count` (also `/points-config` → Bestiary). Companion HUD draws claimed/unclaimed pip dots from `GET /api/bestiary` → `shatter`.
+
 ---
 
 ## Chat commands

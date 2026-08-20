@@ -6,7 +6,7 @@
   'use strict';
 
   const SCENE_KEYS = [
-    'title', 'live_water', 'chrome_boxes', 'id_overlay', 'alerts', 'paid_notices',
+    'title', 'live_water', 'chrome_boxes', 'id_overlay', 'alerts', 'tip_toasts', 'paid_notices',
     'bestiary', 'summon_march', 'spend_indicator', 'free_promos', 'double_points',
   ];
   const CHROME_STYLES = [
@@ -68,6 +68,9 @@
       { key: 'show_failed_command_alerts', type: 'bool', label: 'Show failed commands' },
       { key: 'show_ping_alerts', type: 'bool', label: 'Show ping alerts' },
       { key: 'hud_status_panel_visible', type: 'bool', label: 'HUD status panel' },
+      { key: 'custom_alerts_enabled', type: 'bool', label: 'Enable tip toasts' },
+      { key: 'custom_alerts_interval_sec', type: 'float', label: 'Tip rotate interval', min: 5, max: 600, step: 1 },
+      { key: 'custom_alerts_hold_sec', type: 'float', label: 'Tip hold (sec)', min: 0.5, max: 30, step: 0.25 },
     ]),
     paid: uiFields('ui.', [
       { key: 'paid_notice_enabled', type: 'bool', label: 'Enabled' },
@@ -128,6 +131,8 @@
       { key: 'bestiary_heat_font_color', type: 'color', label: 'Heat color' },
       { key: 'bestiary_hall_font_color', type: 'color', label: 'Hall color' },
       { key: 'bestiary_banner_font_color', type: 'color', label: 'Banner color' },
+      { key: 'bestiary_shatter_pip_claimed_color', type: 'color', label: 'Shatter pip claimed' },
+      { key: 'bestiary_shatter_pip_unclaimed_color', type: 'color', label: 'Shatter pip unclaimed' },
       { key: 'bestiary_level_up_banner_sec', type: 'float', label: 'Banner duration', min: 0.5, max: 30, step: 0.25 },
       { key: 'bestiary_level_up_banner_scale', type: 'float', label: 'Banner scale', min: 0.25, max: 8, step: 0.05 },
       { key: 'bestiary_level_up_banner_font_size_px', type: 'int', label: 'Banner font', min: 8, max: 96 },
@@ -204,6 +209,7 @@
       { key: 'show_chrome_boxes', type: 'bool', label: 'Show chrome boxes' },
       { key: 'show_id_overlay', type: 'bool', label: 'Show ID' },
       { key: 'show_alerts', type: 'bool', label: 'Show alerts' },
+      { key: 'show_tip_toasts', type: 'bool', label: 'Show tip toasts' },
       { key: 'show_paid_notices', type: 'bool', label: 'Show paid' },
       { key: 'show_bestiary', type: 'bool', label: 'Show bestiary' },
       { key: 'show_summon_march', type: 'bool', label: 'Show summon march' },
@@ -290,9 +296,11 @@
   let _activeTab = 'status';
   let _chromeProfile = 'main'; // main | vertical
   let _chromeIndex = 0;
+  let _tipIndex = 0;
   let _suppressDirty = false;
   let _msg = null;
   let _log = null;
+  let _onDirty = null;
 
   function pathGet(obj, path) {
     const parts = path.split('.');
@@ -339,6 +347,9 @@
     const revEl = _root?.querySelector('[data-comp-rev]');
     if (dirtyEl) dirtyEl.textContent = _dirty ? 'Unsaved changes' : 'Saved';
     if (dirtyEl) dirtyEl.classList.toggle('companion-dirty', _dirty);
+    if (_onDirty) {
+      try { _onDirty(_dirty); } catch (_) {}
+    }
     if (revEl) {
       const src = _doc.source ? ' · ' + _doc.source : '';
       let when = '';
@@ -512,6 +523,69 @@
       padding_v_px: 10,
       line_separation_px: 6,
     };
+  }
+
+  function customAlertsArr() {
+    if (!_settings.ui) _settings.ui = {};
+    if (!Array.isArray(_settings.ui.custom_alerts)) _settings.ui.custom_alerts = [];
+    return _settings.ui.custom_alerts;
+  }
+
+  function defaultCustomAlert(i) {
+    return {
+      title: 'Tip ' + i,
+      subtitle: '',
+      enabled: true,
+    };
+  }
+
+  function refreshTipEditor() {
+    const tips = customAlertsArr();
+    const pick = document.getElementById('comp_tip_pick');
+    const editor = document.getElementById('comp_tip_editor');
+    if (!pick || !editor) return;
+    pick.innerHTML = '';
+    tips.forEach((t, i) => {
+      const o = document.createElement('option');
+      o.value = String(i);
+      o.textContent = (t.title || ('Tip ' + (i + 1))) + (t.enabled === false ? ' (off)' : '');
+      pick.appendChild(o);
+    });
+    if (!tips.length) {
+      editor.innerHTML = '<p class="sub">No tips. Click Add.</p>';
+      return;
+    }
+    if (_tipIndex >= tips.length) _tipIndex = tips.length - 1;
+    pick.value = String(_tipIndex);
+    const t = Object.assign(defaultCustomAlert(_tipIndex + 1), tips[_tipIndex] || {});
+    editor.innerHTML = '';
+    [
+      ['enabled', 'bool', 'Enabled'],
+      ['title', 'text', 'Title'],
+      ['subtitle', 'text', 'Subtitle'],
+    ].forEach(([key, type, label]) => {
+      const fake = { path: 'tip.' + key, type, label };
+      const el = renderField(fake);
+      const inp = el.querySelector('input, select, textarea');
+      if (!inp) return;
+      if (type === 'bool') inp.checked = !!t[key];
+      else       inp.value = t[key] == null ? '' : String(t[key]);
+      editor.appendChild(el);
+    });
+  }
+
+  function commitTipEditor() {
+    const tips = customAlertsArr();
+    if (!tips.length || _tipIndex < 0 || _tipIndex >= tips.length) return;
+    const t = Object.assign(defaultCustomAlert(_tipIndex + 1), tips[_tipIndex]);
+    document.querySelectorAll('#comp_tip_editor [data-comp-path]').forEach((el) => {
+      const path = el.getAttribute('data-comp-path') || '';
+      const key = path.replace(/^tip\./, '');
+      if (!key) return;
+      if (el.type === 'checkbox') t[key] = !!el.checked;
+      else t[key] = el.value;
+    });
+    tips[_tipIndex] = t;
   }
 
   function refreshChromeEditor() {
@@ -725,6 +799,46 @@
       });
       return;
     }
+    if (id === 'alerts') {
+      page.innerHTML = `
+        <h3 class="companion-page-title">Alerts</h3>
+        <div class="companion-fields" data-fields="alerts"></div>
+        <h4 style="margin-top:1rem;">Custom tip toasts</h4>
+        <p class="sub">Rotating tips in the alert zone (yield to command toasts). Scene gates: Tip toasts. UDP: {"ui":"tip","title":"…","message":"…"}</p>
+        <div class="row" style="gap:0.5rem;flex-wrap:wrap;">
+          <select id="comp_tip_pick" style="min-width:160px;"></select>
+          <button type="button" id="comp_tip_add">Add</button>
+          <button type="button" id="comp_tip_remove">Remove</button>
+        </div>
+        <div id="comp_tip_editor"></div>
+      `;
+      const host = page.querySelector('.companion-fields');
+      (FIELD_GROUPS.alerts || []).forEach((f) => host.appendChild(renderField(f)));
+      page.querySelector('#comp_tip_pick').addEventListener('change', (e) => {
+        commitTipEditor();
+        _tipIndex = parseInt(e.target.value, 10) || 0;
+        refreshTipEditor();
+      });
+      page.querySelector('#comp_tip_add').addEventListener('click', () => {
+        commitTipEditor();
+        const tips = customAlertsArr();
+        if (tips.length >= 16) { if (_msg) _msg('Max 16 tips', false); return; }
+        tips.push(defaultCustomAlert(tips.length + 1));
+        _tipIndex = tips.length - 1;
+        refreshTipEditor();
+        markDirty();
+      });
+      page.querySelector('#comp_tip_remove').addEventListener('click', () => {
+        commitTipEditor();
+        const tips = customAlertsArr();
+        if (!tips.length) return;
+        tips.splice(_tipIndex, 1);
+        _tipIndex = Math.max(0, _tipIndex - 1);
+        refreshTipEditor();
+        markDirty();
+      });
+      return;
+    }
     if (id === 'advanced') {
       page.innerHTML = `
         <h3 class="companion-page-title">Advanced JSON</h3>
@@ -753,6 +867,7 @@
 
   function showTab(id) {
     if (_activeTab === 'chrome') commitChromeEditor();
+    if (_activeTab === 'alerts') commitTipEditor();
     _activeTab = id;
     _root.querySelectorAll('.companion-nav-btn').forEach((b) => {
       b.classList.toggle('active', b.dataset.tab === id);
@@ -765,6 +880,7 @@
 
   function collectAll() {
     if (_activeTab === 'chrome') commitChromeEditor();
+    if (_activeTab === 'alerts') commitTipEditor();
     Object.keys(FIELD_GROUPS).forEach((gk) => {
       FIELD_GROUPS[gk].forEach(collectField);
     });
@@ -811,6 +927,7 @@
     const prof = document.getElementById('comp_chrome_profile');
     if (prof) prof.value = _chromeProfile;
     refreshChromeEditor();
+    refreshTipEditor();
     _suppressDirty = false;
     clearDirty();
     updateFooter();
@@ -838,10 +955,10 @@
     const errs = validate();
     if (errs.length) {
       if (_msg) _msg('Companion: ' + errs[0], false);
-      return;
+      return Promise.resolve(false);
     }
     collectAll();
-    fetch('/api/companion-settings', {
+    return fetch('/api/companion-settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ settings: _settings, source: 'html' }),
@@ -852,8 +969,9 @@
         applyDoc(data);
         if (_msg) _msg('Companion settings saved (rev ' + (data.revision || '?') + ')', true);
         if (_log) _log('Companion settings saved');
+        return true;
       })
-      .catch((e) => { if (_msg) _msg('Companion save failed: ' + e.message, false); });
+      .catch((e) => { if (_msg) _msg('Companion save failed: ' + e.message, false); return false; });
   }
 
   function applyDoc(doc) {
@@ -976,6 +1094,7 @@
     if (!_root) return;
     _msg = opts.showMsg || null;
     _log = opts.logActivity || null;
+    _onDirty = typeof opts.onDirty === 'function' ? opts.onDirty : null;
     buildShell();
     load();
   }

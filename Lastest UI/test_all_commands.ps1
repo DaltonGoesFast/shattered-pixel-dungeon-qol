@@ -6,11 +6,14 @@
 #   Game optional - spends may fail without a live run; response shape still asserted
 #   StreamerBot mode: HTTP server on 7474, R1 enabled, legacy Command actions DISABLED
 #
-# Usage:
+# Usage (from PowerShell, or use test_all_commands.cmd from cmd/Explorer):
 #   cd "Lastest UI"
-#   .\test_all_commands.ps1                          # API full matrix (default)
+#   .\test_all_commands.cmd -Mode Api -Section Free   # preferred if .ps1 opens Notepad
+#   powershell -NoProfile -ExecutionPolicy Bypass -File .\test_all_commands.ps1 -Mode Api -Section Free
+#   .\test_all_commands.ps1                          # API full matrix (default; PowerShell only)
 #   .\test_all_commands.ps1 -Mode Both               # API then R1 (watch for double charge)
 #   .\test_all_commands.ps1 -Mode StreamerBot        # R1 only (live chat / OBS)
+#   .\test_all_commands.ps1 -Section Free            # bestiary/heat/help/economy included
 #   .\test_all_commands.ps1 -Section Spend           # one section
 #   .\test_all_commands.ps1 -DiagnoseDoubleFire      # seed + !dew once; assert single cost
 #   .\test_all_commands.ps1 -ListSections
@@ -254,13 +257,13 @@ function Assert-ChatShape {
 function Get-SectionCatalog {
     return @(
         @{ Name = "Earn";       Desc = "Plain chat message earn path" }
-        @{ Name = "Free";       Desc = "!fard !summon !topsummoner !mysummons" }
+        @{ Name = "Free";       Desc = "!fard !summon !bestiary !sprint !heat !summonhall !mysummons !topsummoner !economy !help" }
         @{ Name = "StreamInfo"; Desc = "!kesha !mimic !tooth !seed !challenge (API; R1 skips)" }
         @{ Name = "Query";      Desc = "!points !bank !toppoints !leaderboard !givepoints" }
         @{ Name = "Spend";      Desc = "Main spend table from COMMANDS.md" }
         @{ Name = "ExtraSpend"; Desc = "!heal !cleanse !dew !corruptally !hex !degrade !sabotage !plant" }
         @{ Name = "Meta";       Desc = "!doublepoints (broadcaster)" }
-        @{ Name = "Aliases";    Desc = "!2x alias, !leaderboard alias" }
+        @{ Name = "Aliases";    Desc = "!2x !summonlevel !hot !reminder !commands (+ Query !leaderboard)" }
         @{ Name = "Errors";     Desc = "Usage errors + unknown command" }
         @{ Name = "Donations";  Desc = "cheer / superchat / gift-membership HTTP" }
         @{ Name = "All";        Desc = "Every section above" }
@@ -305,11 +308,24 @@ function Get-CommandCases {
     }
 
     if (& $want "Free") {
+        # Full free surface from COMMANDS.md (aliases covered in Aliases section).
         $all.Add((New-ChatCase "Free" "!fard" "!fard"))
         $all.Add((New-ChatCase "Free" "!fard" "!fard (repeat / already used)"))
-        $all.Add((New-ChatCase "Free" "!summon rat" "!summon rat"))
+        # Summon is 60s/user silent cooldown — fresh users so a prior Free run cannot poison All.
+        $summonA = "{0}_s{1}" -f $User, (Get-Random -Maximum 999999)
+        $summonB = "{0}_s{1}" -f $User, (Get-Random -Maximum 999999)
+        $all.Add((New-ChatCase "Free" "!summon" "!summon (random unlocked)" @{ Username = $summonA }))
+        $all.Add((New-ChatCase "Free" "!summon rat" "!summon rat" @{ Username = $summonB }))
+        $all.Add((New-ChatCase "Free" "!summon" "!summon (cooldown silent)" @{ Username = $summonA; SilentOk = $true }))
+        $all.Add((New-ChatCase "Free" "!bestiary" "!bestiary"))
         $all.Add((New-ChatCase "Free" "!topsummoner" "!topsummoner"))
+        $all.Add((New-ChatCase "Free" "!sprint" "!sprint"))
+        $all.Add((New-ChatCase "Free" "!heat" "!heat"))
+        $all.Add((New-ChatCase "Free" "!summonhall" "!summonhall"))
         $all.Add((New-ChatCase "Free" "!mysummons" "!mysummons"))
+        $all.Add((New-ChatCase "Free" "!economy" "!economy"))
+        $all.Add((New-ChatCase "Free" "!help" "!help"))
+        $all.Add((New-ChatCase "Free" "!help spawn" "!help spawn"))
     }
 
     if (& $want "StreamInfo") {
@@ -324,7 +340,7 @@ function Get-CommandCases {
 
     if (& $want "Query") {
         $all.Add((New-ChatCase "Query" "!points" "!points"))
-        $all.Add((New-ChatCase "Query" "!bank" "!bank (preview)"))
+        $all.Add((New-ChatCase "Query" "!bank" "!bank (all shorthand)" @{ TrackBalance = $true }))
         $all.Add((New-ChatCase "Query" "!bank 50" "!bank 50" @{ TrackBalance = $true }))
         $all.Add((New-ChatCase "Query" "!bank all" "!bank all" @{ TrackBalance = $true }))
         $all.Add((New-ChatCase "Query" "!toppoints" "!toppoints"))
@@ -355,12 +371,19 @@ function Get-CommandCases {
 
     if (& $want "Aliases") {
         $all.Add((New-ChatCase "Aliases" "!2x 1" "!2x alias" @{ IsBroadcaster = $true }))
+        $all.Add((New-ChatCase "Aliases" "!summonlevel" "!summonlevel alias (!bestiary)"))
+        $all.Add((New-ChatCase "Aliases" "!hot" "!hot alias (!heat)"))
+        $all.Add((New-ChatCase "Aliases" "!reminder" "!reminder alias (!economy)"))
+        $all.Add((New-ChatCase "Aliases" "!commands" "!commands alias (!help)"))
     }
 
     if (& $want "Errors") {
         $all.Add((New-ChatCase "Errors" "!spawn" "!spawn (missing arg)"))
         $all.Add((New-ChatCase "Errors" "!gold" "!gold (missing arg)"))
         $all.Add((New-ChatCase "Errors" "!givepoints" "!givepoints (usage)"))
+        $all.Add((New-ChatCase "Errors" "!doublepoints" "!doublepoints (missing minutes)"))
+        $all.Add((New-ChatCase "Errors" "!bank -1" "!bank (bad amount)"))
+        $all.Add((New-ChatCase "Errors" "!help nosuchcmd" "!help (unknown topic)"))
         $all.Add((New-ChatCase "Errors" "!notacommand" "!notacommand"))
     }
 
@@ -405,7 +428,8 @@ function Show-DoubleFireHelp {
     Write-Line '!spawn !champion !gold !curse !gas !scroll !row !trap !bomb !transmute' "Cyan"
     Write-Line '!bee !ward !buff !debuff !wand !points !toppoints !doublepoints !heal' "Cyan"
     Write-Line '!cleanse !dew !plant !corruptally !hex !degrade !sabotage !fard !summon' "Cyan"
-    Write-Line '!topsummoner !mysummons !givepoints !bank - keep only R1 + stream-info Commands.' "Cyan"
+    Write-Line '!bestiary !sprint !heat !summonhall !mysummons !topsummoner !economy !help' "Cyan"
+    Write-Line '!givepoints !bank - keep only R1 + stream-info Commands.' "Cyan"
     Write-Line ""
     Write-Line 'Also check: two Message Received triggers on R1 (Twitch+YouTube both matching),' "Gray"
     Write-Line 'or -Mode Both in this script (API + R1 = intentional double hit on server).' "Gray"

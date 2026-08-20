@@ -55,6 +55,7 @@ var show_chrome_boxes: bool = true
 var show_id_overlay: bool = true
 var show_alerts: bool = true
 var show_paid_notices: bool = true
+var show_tip_toasts: bool = true
 var show_bestiary: bool = true
 var show_summon_march: bool = true
 var show_spend_indicator: bool = true
@@ -76,6 +77,7 @@ static func element_keys() -> PackedStringArray:
 			"chrome_boxes",
 			"id_overlay",
 			"alerts",
+			"tip_toasts",
 			"paid_notices",
 			"bestiary",
 			"summon_march",
@@ -98,6 +100,8 @@ static func element_label(key: String) -> String:
 			return "ID overlay"
 		"alerts":
 			return "Alerts"
+		"tip_toasts":
+			return "Tip toasts"
 		"paid_notices":
 			return "Paid notices"
 		"bestiary":
@@ -271,6 +275,7 @@ func copy_from(other: UiLayoutData) -> void:
 	show_id_overlay = other.show_id_overlay
 	show_alerts = other.show_alerts
 	show_paid_notices = other.show_paid_notices
+	show_tip_toasts = other.show_tip_toasts
 	show_bestiary = other.show_bestiary
 	show_summon_march = other.show_summon_march
 	show_spend_indicator = other.show_spend_indicator
@@ -337,6 +342,7 @@ func to_remote_dict() -> Dictionary:
 		"show_id_overlay": show_id_overlay,
 		"show_alerts": show_alerts,
 		"show_paid_notices": show_paid_notices,
+		"show_tip_toasts": show_tip_toasts,
 		"show_bestiary": show_bestiary,
 		"show_summon_march": show_summon_march,
 		"show_spend_indicator": show_spend_indicator,
@@ -434,6 +440,8 @@ func apply_remote_dict(raw: Dictionary) -> void:
 		show_alerts = bool(raw["show_alerts"])
 	if raw.has("show_paid_notices"):
 		show_paid_notices = bool(raw["show_paid_notices"])
+	if raw.has("show_tip_toasts"):
+		show_tip_toasts = bool(raw["show_tip_toasts"])
 	if raw.has("show_bestiary"):
 		show_bestiary = bool(raw["show_bestiary"])
 	if raw.has("show_summon_march"):

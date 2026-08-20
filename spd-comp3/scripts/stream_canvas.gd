@@ -18,6 +18,7 @@ const _LIVE_FILL_CHROMA_DEBUG := Color(1.0, 8.0 / 255.0, 147.0 / 255.0, 1.0)
 @onready var _double_points_layer: CanvasLayer = $CanvasLayerDoublePoints
 @onready var _paid_layer: CanvasLayer = $CanvasLayerPaidNotices
 @onready var _alerts_layer: CanvasLayer = $CanvasLayerAlerts
+@onready var _tip_toasts_layer: CanvasLayer = $CanvasLayerTipToasts
 @onready var _id_overlay: Control = $CanvasLayerID/IdentificationOverlay
 
 var _obs: Node
@@ -109,6 +110,7 @@ func _apply_obs_visibility() -> void:
 	var show_march := CompanionConfig.element_visible_on_scene(self, "summon_march", kind)
 	var show_chrome := CompanionConfig.element_visible_on_scene(self, "chrome_boxes", kind)
 	var show_alerts := CompanionConfig.element_visible_on_scene(self, "alerts", kind)
+	var show_tips := CompanionConfig.element_visible_on_scene(self, "tip_toasts", kind)
 	var show_paid := CompanionConfig.element_visible_on_scene(self, "paid_notices", kind)
 	var show_spend := CompanionConfig.element_visible_on_scene(self, "spend_indicator", kind)
 	var show_free := CompanionConfig.element_visible_on_scene(self, "free_promos", kind)
@@ -122,6 +124,7 @@ func _apply_obs_visibility() -> void:
 		show_march = CompanionConfig.element_enabled(self, "summon_march")
 		show_chrome = CompanionConfig.element_enabled(self, "chrome_boxes")
 		show_alerts = CompanionConfig.element_enabled(self, "alerts")
+		show_tips = CompanionConfig.element_enabled(self, "tip_toasts")
 		show_paid = CompanionConfig.element_enabled(self, "paid_notices")
 		show_spend = CompanionConfig.element_enabled(self, "spend_indicator")
 		show_free = CompanionConfig.element_enabled(self, "free_promos")
@@ -135,6 +138,7 @@ func _apply_obs_visibility() -> void:
 	_summon_march_layer.visible = show_march
 	_chrome_layer.visible = show_chrome
 	_alerts_layer.visible = show_alerts
+	_tip_toasts_layer.visible = show_tips
 	_paid_layer.visible = show_paid
 	_spend_layer.visible = show_spend
 	_free_layer.visible = show_free

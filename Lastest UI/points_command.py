@@ -35,6 +35,7 @@ import os
 import time
 import random
 import datetime
+import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, Optional
@@ -70,8 +71,13 @@ DEATH_COST_EXEMPT_COMMANDS = frozenset({
     "corrupt_ally", "corruptally", "buff", "cleanse",
 })
 DEATH_COST_FACTOR = 1.5
+SPEND_ACTIONS_FILE = os.path.join(SCRIPT_DIR, "spend_actions.jsonl")
+SPEND_ACTIONS_MAX = 200
 
 BOT_USER = "daltongoesslow"
+
+# Last confirmed-spend Bestiary bar grant (serialized by spend_command_lock).
+_last_spend_bestiary: Optional[dict[str, Any]] = None
 
 
 def is_spend_disabled():
@@ -916,13 +922,13 @@ def cmd_balance(args):
 
 
 def cmd_bank(args):
-    """CLI: bank <username> [all|<amount>] — preview if amount omitted."""
+    """CLI: bank <username> [all|<amount>] — all chat pts if amount omitted."""
     if len(args) < 1:
         return BALANCE_RESULT_FILE, "Usage: bank <username> [all|<amount>]"
     username = args[0].strip()
     if not username:
         return BALANCE_RESULT_FILE, "Usage: bank <username> [all|<amount>]"
-    amount_arg = args[1].strip().lower() if len(args) > 1 else None
+    amount_arg = args[1].strip().lower() if len(args) > 1 else "all"
     try:
         with points_lock():
             data = read_points()
@@ -931,9 +937,6 @@ def cmd_bank(args):
             cfg = get_config()
             ratio = float(cfg.get("bank_ratio_manual", 0.10))
             c = chat_pts(pts, donation_pts)
-            if amount_arg is None:
-                gain = int(c * ratio)
-                return BALANCE_RESULT_FILE, f"preview|{c}|{gain}|{int(ratio * 100)}"
             if amount_arg == "all":
                 amount = c
             else:
@@ -971,6 +974,133 @@ def refund_points(res):
         pass
 
 
+def _read_spend_actions():
+    """Load spend ledger entries (newest last). Missing/corrupt file → []."""
+    if not os.path.exists(SPEND_ACTIONS_FILE):
+        return []
+    out = []
+    try:
+        with open(SPEND_ACTIONS_FILE, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    out.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+    except OSError:
+        return []
+    return out
+
+
+def _write_spend_actions(entries):
+    """Rewrite ledger, keeping at most SPEND_ACTIONS_MAX entries."""
+    trimmed = entries[-SPEND_ACTIONS_MAX:] if len(entries) > SPEND_ACTIONS_MAX else entries
+    tmp = SPEND_ACTIONS_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        for e in trimmed:
+            f.write(json.dumps(e, ensure_ascii=False) + "\n")
+    os.replace(tmp, SPEND_ACTIONS_FILE)
+
+
+def record_confirmed_spend(spend_id, res, command, detail=""):
+    """Append a confirmed (non-refunded) spend for Activity undo. Returns spend_id."""
+    if not spend_id or not res:
+        return spend_id
+    entry = {
+        "id": spend_id,
+        "ts": int(time.time() * 1000),
+        "user": res.get("key") or "",
+        "command": command or "",
+        "detail": detail or "",
+        "cost": int(res.get("cost") or 0),
+        "donation_used": int(res.get("donation_used") or 0),
+        "refunded": False,
+    }
+    try:
+        with points_lock():
+            entries = _read_spend_actions()
+            entries.append(entry)
+            _write_spend_actions(entries)
+    except (TimeoutError, OSError):
+        pass
+    return spend_id
+
+
+def refund_spend_action(spend_id):
+    """Refund a confirmed spend by ledger id. Returns dict with ok/error fields."""
+    sid = (spend_id or "").strip()
+    if not sid:
+        return {"ok": False, "error": "Missing spend id"}
+    try:
+        with points_lock():
+            entries = _read_spend_actions()
+            idx = None
+            entry = None
+            for i, e in enumerate(entries):
+                if e.get("id") == sid:
+                    idx = i
+                    entry = e
+                    break
+            if entry is None:
+                return {"ok": False, "error": "Spend action not found"}
+            if entry.get("refunded"):
+                return {"ok": False, "error": "Already refunded"}
+            cost = int(entry.get("cost") or 0)
+            donation_used = int(entry.get("donation_used") or 0)
+            if cost <= 0 and donation_used <= 0:
+                return {"ok": False, "error": "Nothing to refund"}
+            key = (entry.get("user") or "").strip().lower()
+            if not key:
+                return {"ok": False, "error": "Missing username on spend action"}
+            data = read_points()
+            pts, last, donation_pts, role = _get_user_data(data, key)
+            data[key] = (pts + cost, last, donation_pts + donation_used, role)
+            write_points(data)
+            entry = dict(entry)
+            entry["refunded"] = True
+            entry["refunded_at"] = int(time.time() * 1000)
+            entries[idx] = entry
+            _write_spend_actions(entries)
+            return {
+                "ok": True,
+                "username": key,
+                "cost": cost,
+                "donation_used": donation_used,
+                "command": entry.get("command") or "",
+                "detail": entry.get("detail") or "",
+            }
+    except TimeoutError:
+        return {"ok": False, "error": "Points file busy. Please try again in a moment."}
+    except OSError as e:
+        return {"ok": False, "error": str(e)}
+
+
+def _mark_spend_action_refunded(spend_id):
+    """Mark ledger entry refunded without changing balances (e.g. after auto-refund)."""
+    sid = (spend_id or "").strip()
+    if not sid:
+        return
+    try:
+        with points_lock():
+            entries = _read_spend_actions()
+            changed = False
+            for i, e in enumerate(entries):
+                if e.get("id") == sid and not e.get("refunded"):
+                    e = dict(e)
+                    e["refunded"] = True
+                    e["refunded_at"] = int(time.time() * 1000)
+                    e["auto_refund"] = True
+                    entries[i] = e
+                    changed = True
+                    break
+            if changed:
+                _write_spend_actions(entries)
+    except (TimeoutError, OSError):
+        pass
+
+
 def _post_game_command(endpoint, payload, fail_prefix, timeout_msg):
     """POST a command to the overlay server. Returns (body, None) on success or (None, error_msg)."""
     url = "http://127.0.0.1:5000" + endpoint
@@ -997,6 +1127,91 @@ def _post_game_command(endpoint, payload, fail_prefix, timeout_msg):
         return None, f"{fail_prefix}. " + (msg if msg else "Check overlay server and try again.")
 
 
+def _post_spend_command(endpoint, res, command, detail, payload, fail_prefix, timeout_msg):
+    """POST a spend with spend_id/cost; ledger before game call; refund+mark on failure.
+
+    Returns (body, None) on success or (None, error_msg) on failure.
+    On success, grants co-op Bestiary bar XP from the deducted cost (sprint/heat untouched).
+    """
+    global _last_spend_bestiary
+    _last_spend_bestiary = None
+    spend_id = str(uuid.uuid4())
+    enriched = dict(payload or {})
+    enriched["spend_id"] = spend_id
+    enriched["cost"] = int((res or {}).get("cost") or 0)
+    # Record before game round-trip so Activity Refund never races a missing ledger row.
+    record_confirmed_spend(spend_id, res, command, detail)
+    body, err = _post_game_command(endpoint, enriched, fail_prefix, timeout_msg)
+    if err:
+        refund_points(res)
+        _mark_spend_action_refunded(spend_id)
+        return None, err
+    # Game confirmed — grant bar XP. Never refund the spend if bestiary fails.
+    try:
+        from summon_bestiary import apply_bar_xp, spend_xp_from_cost
+        cost = int((res or {}).get("cost") or 0)
+        xp = spend_xp_from_cost(cost)
+        user_key = (res or {}).get("key") or ""
+        if xp > 0 and user_key:
+            _last_spend_bestiary = apply_bar_xp(user_key, xp)
+        else:
+            _last_spend_bestiary = {
+                "ok": True,
+                "bar_xp_added": 0,
+                "leveled_up": False,
+                "level_up": None,
+            }
+    except Exception as e:
+        print(f"[points] bestiary bar XP after spend failed: {e}")
+        _last_spend_bestiary = None
+    return body, None
+
+
+def _take_spend_bestiary() -> Optional[dict[str, Any]]:
+    """Consume the last spend's Bestiary grant for chat formatting."""
+    global _last_spend_bestiary
+    out = _last_spend_bestiary
+    _last_spend_bestiary = None
+    return out
+
+
+def _with_spend_bestiary_chat(result: "ChatResult") -> "ChatResult":
+    """Append +N Bestiary XP / level-up to a successful spend ChatResult."""
+    if not result.ok or not result.message:
+        _take_spend_bestiary()
+        return result
+    bestiary = _take_spend_bestiary()
+    if not bestiary:
+        return result
+    import chat_messages
+    added = int(bestiary.get("bar_xp_added") or 0)
+    if added > 0:
+        result.message = result.message + chat_messages.spend_bestiary_xp(added)
+    if bestiary.get("leveled_up") and bestiary.get("level_up"):
+        lu = bestiary["level_up"]
+        result.message = (
+            result.message
+            + " "
+            + chat_messages.bestiary_level_up(
+                lu.get("winner") or "",
+                lu.get("from_zone") or "",
+                lu.get("to_zone") or "",
+                int(lu.get("donor_reward") or 0),
+            )
+        )
+    result.message = result.message + chat_messages.shatter_events_suffix(
+        bestiary.get("shatter_events") or []
+    )
+    extra = dict(result.extra or {})
+    extra["bestiary_xp"] = added
+    extra["bestiary_leveled_up"] = bool(bestiary.get("leveled_up"))
+    extra["shatter_events"] = list(bestiary.get("shatter_events") or [])
+    if bestiary.get("level") is not None:
+        extra["bestiary_level"] = int(bestiary.get("level") or 1)
+    result.extra = extra
+    return result
+
+
 def cmd_spawn(args):
     if is_spend_disabled():
         return SPAWN_RESULT_FILE, "Spending is currently disabled by the streamer."
@@ -1012,12 +1227,12 @@ def cmd_spawn(args):
     if err:
         return SPAWN_RESULT_FILE, err
 
-    body, err = _post_game_command(
-        "/api/spawn-command", {"monster": monster, "username": username},
+    body, err = _post_spend_command(
+        "/api/spawn-command", res, "spawn", monster,
+        {"monster": monster, "username": username},
         "Spawn failed", "Spawn timed out. Is the game running and in an active run (not title screen)?"
     )
     if err:
-        refund_points(res)
         return SPAWN_RESULT_FILE, err
     return SPAWN_RESULT_FILE, f"ok|{res['new_pts']}"
 
@@ -1037,12 +1252,12 @@ def cmd_champion(args):
     if err:
         return SPAWN_RESULT_FILE, err
 
-    body, err = _post_game_command(
-        "/api/champion-command", {"monster": monster, "username": username},
+    body, err = _post_spend_command(
+        "/api/champion-command", res, "champion", monster,
+        {"monster": monster, "username": username},
         "Champion spawn failed", "Champion spawn timed out. Is the game running and in an active run?"
     )
     if err:
-        refund_points(res)
         return SPAWN_RESULT_FILE, err
     return SPAWN_RESULT_FILE, "ok|" + body.get("monster", monster) + f"|{res['new_pts']}"
 
@@ -1065,12 +1280,12 @@ def cmd_gold(args):
     if err:
         return SPAWN_RESULT_FILE, err
 
-    body, err = _post_game_command(
-        "/api/gold-command", {"amount": amount, "username": username},
+    body, err = _post_spend_command(
+        "/api/gold-command", res, "gold", str(amount),
+        {"amount": amount, "username": username},
         "Gold drop failed", "Gold drop timed out. Is the game running and in an active run (not title screen)?"
     )
     if err:
-        refund_points(res)
         return SPAWN_RESULT_FILE, err
     return SPAWN_RESULT_FILE, f"ok|{amount}|{res['new_pts']}"
 
@@ -1088,8 +1303,8 @@ def cmd_curse(args):
     if err:
         return SPAWN_RESULT_FILE, err
 
-    body, err = _post_game_command(
-        "/api/curse-command",
+    body, err = _post_spend_command(
+        "/api/curse-command", res, "curse", "",
         {
             "username": username,
             "class_kit_curse_duration_turns": get_config()["curse_class_kit_duration_turns"],
@@ -1097,7 +1312,6 @@ def cmd_curse(args):
         "Curse failed", "Curse timed out. Is the game running and in an active run?"
     )
     if err:
-        refund_points(res)
         return SPAWN_RESULT_FILE, err
     item_name = body.get("item_name", "item")
     if body.get("temporary"):
@@ -1118,12 +1332,12 @@ def cmd_gas(args):
     if err:
         return SPAWN_RESULT_FILE, err
 
-    body, err = _post_game_command(
-        "/api/gas-command", {"username": username},
+    body, err = _post_spend_command(
+        "/api/gas-command", res, "gas", "",
+        {"username": username},
         "Gas spawn failed", "Gas command timed out. Is the game running and in an active run?"
     )
     if err:
-        refund_points(res)
         return SPAWN_RESULT_FILE, err
     gas_name = body.get("gas_name", "gas")
     return SPAWN_RESULT_FILE, f"ok|{gas_name}|{res['new_pts']}"
@@ -1141,12 +1355,12 @@ def cmd_scroll(args):
     if err:
         return SPAWN_RESULT_FILE, err
 
-    body, err = _post_game_command(
-        "/api/scroll-command", {"username": username},
+    body, err = _post_spend_command(
+        "/api/scroll-command", res, "scroll", "",
+        {"username": username},
         "Scroll command failed", "Scroll command timed out. Is the game running and in an active run?"
     )
     if err:
-        refund_points(res)
         return SPAWN_RESULT_FILE, err
     scroll_name = body.get("scroll_name", "scroll")
     return SPAWN_RESULT_FILE, f"ok|{scroll_name}|{res['new_pts']}"
@@ -1164,12 +1378,12 @@ def cmd_row(args):
     if err:
         return SPAWN_RESULT_FILE, err
 
-    body, err = _post_game_command(
-        "/api/ring-of-wealth-command", {"username": username},
+    body, err = _post_spend_command(
+        "/api/ring-of-wealth-command", res, "ring_of_wealth", "",
+        {"username": username},
         "Ring of wealth command failed", "Ring of wealth command timed out. Is the game running and in an active run?"
     )
     if err:
-        refund_points(res)
         return SPAWN_RESULT_FILE, err
     detail = body.get("detail", "loot")
     return SPAWN_RESULT_FILE, f"ok|{detail}|{res['new_pts']}"
@@ -1187,12 +1401,12 @@ def cmd_trap(args):
     if err:
         return SPAWN_RESULT_FILE, err
 
-    body, err = _post_game_command(
-        "/api/trap-command", {"username": username},
+    body, err = _post_spend_command(
+        "/api/trap-command", res, "trap", "",
+        {"username": username},
         "Trap command failed", "Trap command timed out. Is the game running and in an active run?"
     )
     if err:
-        refund_points(res)
         return SPAWN_RESULT_FILE, err
     trap_name = body.get("trap_name", "trap")
     return SPAWN_RESULT_FILE, f"ok|{trap_name}|{res['new_pts']}"
@@ -1210,12 +1424,12 @@ def cmd_bomb(args):
     if err:
         return SPAWN_RESULT_FILE, err
 
-    body, err = _post_game_command(
-        "/api/bomb-command", {"username": username},
+    body, err = _post_spend_command(
+        "/api/bomb-command", res, "bomb", "",
+        {"username": username},
         "Bomb command failed", "Bomb command timed out. Is the game running and in an active run?"
     )
     if err:
-        refund_points(res)
         return SPAWN_RESULT_FILE, err
     bomb_name = body.get("bomb_name", "bomb")
     return SPAWN_RESULT_FILE, f"ok|{bomb_name}|{res['new_pts']}"
@@ -1233,12 +1447,12 @@ def cmd_transmute(args):
     if err:
         return SPAWN_RESULT_FILE, err
 
-    body, err = _post_game_command(
-        "/api/transmute-command", {"username": username},
+    body, err = _post_spend_command(
+        "/api/transmute-command", res, "transmute", "",
+        {"username": username},
         "Transmute command failed", "Transmute command timed out. Is the game running and in an active run?"
     )
     if err:
-        refund_points(res)
         return SPAWN_RESULT_FILE, err
     # Transmute: echo both item names for Streamer.bot/Twitch (matches in-game GLog when game sends original_item_name).
     item_name = (body.get("item_name") or "item").strip()
@@ -1258,12 +1472,12 @@ def cmd_ally_bee(args):
     if err:
         return SPAWN_RESULT_FILE, err
 
-    body, err = _post_game_command(
-        "/api/summon-bee-command", {"username": username},
+    body, err = _post_spend_command(
+        "/api/summon-bee-command", res, "summon_bee", "",
+        {"username": username},
         "Summon bee failed", "Summon bee timed out. Is the game running and in an active run?"
     )
     if err:
-        refund_points(res)
         return SPAWN_RESULT_FILE, err
     ally_name = body.get("ally_name", "Bee")
     return SPAWN_RESULT_FILE, f"ok|{ally_name}|{res['new_pts']}"
@@ -1281,12 +1495,12 @@ def cmd_ward(args):
     if err:
         return SPAWN_RESULT_FILE, err
 
-    body, err = _post_game_command(
-        "/api/ward-command", {"username": username},
+    body, err = _post_spend_command(
+        "/api/ward-command", res, "ward", "",
+        {"username": username},
         "Summon ward failed", "Summon ward timed out. Is the game running and in an active run?"
     )
     if err:
-        refund_points(res)
         return SPAWN_RESULT_FILE, err
     ward_name = body.get("ward_name", "Ward")
     return SPAWN_RESULT_FILE, f"ok|{ward_name}|{res['new_pts']}"
@@ -1304,12 +1518,12 @@ def cmd_buff(args):
     if err:
         return SPAWN_RESULT_FILE, err
 
-    body, err = _post_game_command(
-        "/api/buff-command", {"username": username},
+    body, err = _post_spend_command(
+        "/api/buff-command", res, "buff", "",
+        {"username": username},
         "Buff command failed", "Buff command timed out. Is the game running and in an active run?"
     )
     if err:
-        refund_points(res)
         return SPAWN_RESULT_FILE, err
     buff_name = body.get("buff_name", "buff")
     return SPAWN_RESULT_FILE, f"ok|{buff_name}|{res['new_pts']}"
@@ -1327,12 +1541,12 @@ def cmd_debuff(args):
     if err:
         return SPAWN_RESULT_FILE, err
 
-    body, err = _post_game_command(
-        "/api/debuff-command", {"username": username},
+    body, err = _post_spend_command(
+        "/api/debuff-command", res, "debuff", "",
+        {"username": username},
         "Debuff command failed", "Debuff command timed out. Is the game running and in an active run?"
     )
     if err:
-        refund_points(res)
         return SPAWN_RESULT_FILE, err
     debuff_name = body.get("debuff_name", "debuff")
     return SPAWN_RESULT_FILE, f"ok|{debuff_name}|{res['new_pts']}"
@@ -1357,12 +1571,12 @@ def cmd_wand(args):
     if err:
         return SPAWN_RESULT_FILE, err
 
-    body, err = _post_game_command(
-        "/api/wand-command", {"username": username},
+    body, err = _post_spend_command(
+        "/api/wand-command", res, "wand", "",
+        {"username": username},
         "Wand command failed", "Wand command timed out. Is the game running and in an active run?"
     )
     if err:
-        refund_points(res)
         return SPAWN_RESULT_FILE, err
     effect_name = body.get("effect_name", "effect")
     return SPAWN_RESULT_FILE, f"ok|{effect_name}|{res['new_pts']}"
@@ -1444,12 +1658,12 @@ def cmd_heal(args):
     if err:
         return SPAWN_RESULT_FILE, err
 
-    body, err = _post_game_command(
-        "/api/heal-command", {"username": username},
+    body, err = _post_spend_command(
+        "/api/heal-command", res, "heal", "",
+        {"username": username},
         "Heal failed", "Heal timed out. Is the game running?"
     )
     if err:
-        refund_points(res)
         return SPAWN_RESULT_FILE, err
     return SPAWN_RESULT_FILE, f"ok|Healing|{res['new_pts']}"
 
@@ -1465,12 +1679,12 @@ def cmd_cleanse(args):
     if err:
         return SPAWN_RESULT_FILE, err
 
-    body, err = _post_game_command(
-        "/api/cleanse-command", {"username": username},
+    body, err = _post_spend_command(
+        "/api/cleanse-command", res, "cleanse", "",
+        {"username": username},
         "Cleanse failed", "Cleanse timed out. Is the game running?"
     )
     if err:
-        refund_points(res)
         return SPAWN_RESULT_FILE, err
     buff_name = body.get("buff_name", "debuff")
     return SPAWN_RESULT_FILE, f"ok|{buff_name}|{res['new_pts']}"
@@ -1487,12 +1701,12 @@ def cmd_dew(args):
     if err:
         return SPAWN_RESULT_FILE, err
 
-    body, err = _post_game_command(
-        "/api/dew-command", {"username": username},
+    body, err = _post_spend_command(
+        "/api/dew-command", res, "dew", "",
+        {"username": username},
         "Dew failed", "Dew timed out. Is the game running?"
     )
     if err:
-        refund_points(res)
         return SPAWN_RESULT_FILE, err
     return SPAWN_RESULT_FILE, f"ok|Dewdrop|{res['new_pts']}"
 
@@ -1508,12 +1722,12 @@ def cmd_plant(args):
     if err:
         return SPAWN_RESULT_FILE, err
 
-    body, err = _post_game_command(
-        "/api/plant-command", {"username": username},
+    body, err = _post_spend_command(
+        "/api/plant-command", res, "plant", "",
+        {"username": username},
         "Plant failed", "Plant timed out. Is the game running?"
     )
     if err:
-        refund_points(res)
         return SPAWN_RESULT_FILE, err
     plant_name = body.get("plant_name", "plant")
     return SPAWN_RESULT_FILE, f"ok|{plant_name}|{res['new_pts']}"
@@ -1530,12 +1744,12 @@ def cmd_corrupt_ally(args):
     if err:
         return SPAWN_RESULT_FILE, err
 
-    body, err = _post_game_command(
-        "/api/corrupt-ally-command", {"username": username},
+    body, err = _post_spend_command(
+        "/api/corrupt-ally-command", res, "corrupt_ally", "",
+        {"username": username},
         "Corrupt ally failed", "Corrupt ally timed out. Is the game running?"
     )
     if err:
-        refund_points(res)
         return SPAWN_RESULT_FILE, err
     mob_name = body.get("mob_name", "ally")
     return SPAWN_RESULT_FILE, f"ok|{mob_name}|{res['new_pts']}"
@@ -1552,12 +1766,12 @@ def cmd_hex(args):
     if err:
         return SPAWN_RESULT_FILE, err
 
-    body, err = _post_game_command(
-        "/api/hex-command", {"username": username},
+    body, err = _post_spend_command(
+        "/api/hex-command", res, "hex", "",
+        {"username": username},
         "Hex failed", "Hex timed out. Is the game running?"
     )
     if err:
-        refund_points(res)
         return SPAWN_RESULT_FILE, err
     return SPAWN_RESULT_FILE, f"ok|Hex|{res['new_pts']}"
 
@@ -1573,12 +1787,12 @@ def cmd_degrade(args):
     if err:
         return SPAWN_RESULT_FILE, err
 
-    body, err = _post_game_command(
-        "/api/degrade-command", {"username": username},
+    body, err = _post_spend_command(
+        "/api/degrade-command", res, "degrade", "",
+        {"username": username},
         "Degrade failed", "Degrade timed out. Is the game running?"
     )
     if err:
-        refund_points(res)
         return SPAWN_RESULT_FILE, err
     return SPAWN_RESULT_FILE, f"ok|Degrade|{res['new_pts']}"
 
@@ -1594,12 +1808,12 @@ def cmd_sabotage(args):
     if err:
         return SPAWN_RESULT_FILE, err
 
-    body, err = _post_game_command(
-        "/api/sabotage-command", {"username": username},
+    body, err = _post_spend_command(
+        "/api/sabotage-command", res, "sabotage", "",
+        {"username": username},
         "Sabotage failed", "Sabotage timed out. Is the game running?"
     )
     if err:
-        refund_points(res)
         return SPAWN_RESULT_FILE, err
     buff_name = body.get("buff_name", "buff")
     return SPAWN_RESULT_FILE, f"ok|{buff_name}|{res['new_pts']}"
@@ -1848,6 +2062,7 @@ def legacy_to_chat_result(cmd: str, msg: str, username: str, cmd_args: list) -> 
 
 def run_points_command(cmd: str, cmd_args: list, username: str = "") -> ChatResult:
     """Run a points_command handler and return structured ChatResult."""
+    global _last_spend_bestiary
     cmd = cmd.lower()
     if cmd not in COMMANDS:
         import chat_messages
@@ -1857,11 +2072,18 @@ def run_points_command(cmd: str, cmd_args: list, username: str = "") -> ChatResu
     try:
         if cmd in SPEND_PIPELINE_COMMANDS:
             with spend_command_lock():
+                _last_spend_bestiary = None
                 result_file, msg = COMMANDS[cmd](cmd_args)
-        else:
-            result_file, msg = COMMANDS[cmd](cmd_args)
+                result = legacy_to_chat_result(cmd, msg, user, cmd_args)
+                if cmd not in ("transfer", "givepoints"):
+                    result = _with_spend_bestiary_chat(result)
+                else:
+                    _take_spend_bestiary()
+                return result
+        result_file, msg = COMMANDS[cmd](cmd_args)
     except TimeoutError:
         import chat_messages
+        _last_spend_bestiary = None
         return ChatResult(ok=False, message=chat_messages.COMMAND_IN_PROGRESS)
 
     return legacy_to_chat_result(cmd, msg, user, cmd_args)

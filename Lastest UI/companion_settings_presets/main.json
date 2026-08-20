@@ -45,8 +45,10 @@
       "bestiary_hud_scale": 1,
       "bestiary_level_up_banner_font_size_px": 22,
       "bestiary_level_up_banner_scale": 4,
-      "bestiary_level_up_banner_sec": 3,
+      "bestiary_level_up_banner_sec": 10,
       "bestiary_panel_pad_px": 22,
+      "bestiary_shatter_pip_claimed_color": "#ffffff",
+      "bestiary_shatter_pip_unclaimed_color": "#ffffff",
       "bestiary_show_hall": true,
       "bestiary_show_heat_chip": true,
       "bestiary_show_sprint_chip": true,
@@ -65,12 +67,12 @@
       "bestiary_zone_y_px": 870,
       "chrome_boxes": [
         {
-          "body_font_color": "f2ebd9ff",
+          "body_font_color": "#f2ebd9",
           "body_font_size_px": 16,
           "body_text": "",
           "chrome_scale": 4,
           "enabled": true,
-          "header_font_color": "ffff45ff",
+          "header_font_color": "#ffff45",
           "header_font_size_px": 34,
           "header_text": "Chat",
           "id": "cb_10577548_69247",
@@ -80,7 +82,7 @@
           "padding_v_px": 0,
           "show_on_main": true,
           "show_on_other": true,
-          "show_on_pause": false,
+          "show_on_pause": true,
           "style": "window",
           "text_align": "center",
           "text_shadow": true,
@@ -91,6 +93,26 @@
           "zone_y_px": 0
         }
       ],
+      "custom_alerts": [
+        {
+          "enabled": true,
+          "subtitle": "2x points for everyone",
+          "title": "!fard"
+        },
+        {
+          "enabled": true,
+          "subtitle": "When Spending is ON",
+          "title": "!spawn <monster> to summon"
+        },
+        {
+          "enabled": true,
+          "subtitle": "Fill XP for rewards!",
+          "title": "!summon"
+        }
+      ],
+      "custom_alerts_enabled": true,
+      "custom_alerts_hold_sec": 3,
+      "custom_alerts_interval_sec": 300,
       "double_points_chrome_scale": 1,
       "double_points_chrome_style": "blank",
       "double_points_corner": "0",
@@ -157,13 +179,18 @@
           "main": true,
           "other": true
         },
+        "tip_toasts": {
+          "pause": true,
+          "main": true,
+          "other": true
+        },
         "paid_notices": {
           "pause": true,
           "main": true,
           "other": true
         },
         "bestiary": {
-          "pause": false,
+          "pause": true,
           "main": true,
           "other": true
         },
@@ -314,7 +341,7 @@
           "other": true
         },
         "chrome_boxes": {
-          "pause": false,
+          "pause": true,
           "main": false,
           "other": false
         },
@@ -328,13 +355,18 @@
           "main": true,
           "other": true
         },
+        "tip_toasts": {
+          "pause": true,
+          "main": true,
+          "other": true
+        },
         "paid_notices": {
           "pause": true,
           "main": true,
           "other": true
         },
         "bestiary": {
-          "pause": false,
+          "pause": true,
           "main": false,
           "other": false
         },
@@ -360,7 +392,7 @@
         }
       },
       "show_alerts": true,
-      "show_bestiary": false,
+      "show_bestiary": true,
       "show_chrome_boxes": false,
       "show_double_points": true,
       "show_free_promos": true,
@@ -369,6 +401,7 @@
       "show_paid_notices": true,
       "show_spend_indicator": true,
       "show_summon_march": true,
+      "show_tip_toasts": true,
       "show_title": true,
       "spend_indicator_corner": "0",
       "spend_indicator_margin_x": 65,
@@ -376,5 +409,5 @@
       "vertical_window_enabled": true
     }
   },
-  "saved_at": 1786203864.0869527
+  "saved_at": 1787101441.5231593
 }

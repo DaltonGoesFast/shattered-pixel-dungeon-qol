@@ -54,7 +54,7 @@
   "cooldown_bypass_users": [
     "DaltonGoesFast"
   ],
-  "first_words_bonus": 100,
+  "first_words_bonus": 50,
   "chat_point_cap": 300,
   "bank_ratio_manual": 0.1,
   "bank_ratio_auto": 0.05,
