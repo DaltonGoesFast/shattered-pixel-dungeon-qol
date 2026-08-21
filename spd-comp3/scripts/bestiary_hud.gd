@@ -560,7 +560,7 @@ func _rebuild_hall(payload: Dictionary) -> void:
 	for entry in hall:
 		if typeof(entry) == TYPE_DICTIONARY:
 			entries.append(entry)
-	# Current zone has no frozen hall entry until the next level-up (Halls never levels up).
+	# Current zone has no frozen hall entry until the next level-up / Halls loop.
 	# Show live sprint leader for the active zone when missing.
 	var cur_level := int(payload.get("level", 1))
 	var cur_zone := str(payload.get("zone", ""))
@@ -623,9 +623,16 @@ func _on_level_up(payload: Dictionary) -> void:
 		var last = hall[hall.size() - 1]
 		if typeof(last) == TYPE_DICTIONARY:
 			winner = str(last.get("user", ""))
-	var msg := "%s unlocked!" % zone
-	if winner != "":
-		msg += "  Sprint: %s" % _short_name(winner, CompanionConfig.bestiary_chip_name_max_chars)
+	var reason := str(payload.get("last_crown_reason", "")).strip_edges().to_lower()
+	var msg := ""
+	if reason == "halls_loop":
+		msg = "Halls sprint!"
+		if winner != "":
+			msg += "  %s" % _short_name(winner, CompanionConfig.bestiary_chip_name_max_chars)
+	else:
+		msg = "%s unlocked!" % zone
+		if winner != "":
+			msg += "  Sprint: %s" % _short_name(winner, CompanionConfig.bestiary_chip_name_max_chars)
 	_show_banner(msg)
 
 

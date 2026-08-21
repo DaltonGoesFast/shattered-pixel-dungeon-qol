@@ -40,6 +40,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Burning;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ChampionEnemy;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Charm;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ChatSpawned;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Chill;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Corrosion;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Corruption;
@@ -499,6 +500,13 @@ public abstract class Char extends Actor {
 			//do not trigger on-hit logic if defenseProc returned a negative value
 			if (effectiveDamage >= 0) {
 				effectiveDamage = Math.max(effectiveDamage - dr, 0);
+				if (enemy == Dungeon.hero && buff(ChatSpawned.class) != null) {
+					if (Dungeon.depth >= 6) {
+						effectiveDamage = Math.max(1, effectiveDamage);
+					} else if (buff(SpawnScaled.class) != null) {
+						effectiveDamage = Math.min(effectiveDamage, 1);
+					}
+				}
 
 				if (enemy.buff(Viscosity.ViscosityTracker.class) != null) {
 					effectiveDamage = enemy.buff(Viscosity.ViscosityTracker.class).deferDamage(effectiveDamage);

@@ -11,7 +11,7 @@ Hybrid progression for free `!summon` marches on the Godot companion overlay.
 | System | Behavior | Reward |
 |--------|----------|--------|
 | **Co-op Bestiary bar** | All summons add XP; bar fills → unlock next zone | Shared unlock pool |
-| **Level sprint** | XP since current level started; resets on level-up. **One crown per user per stream** (session reset clears) | Hall of Fame + donor pts **100 / 200 / 300 / 400** by zone |
+| **Level sprint** | XP since current level started; resets on level-up **and Halls loops**. **One crown per user per stream** (session reset clears) | Hall of Fame + donor pts **100 / 200 / 300 / 400** by zone; Halls loops badge + lockout, **no donor** |
 | **Rolling heat** | XP in last **15 minutes** | **Personal 2×** on chat/passive/donations |
 | **Soft floor (catch-up)** | After **10 unique summoners**, anyone outside top **3 eligible sprint** gets **×1.25** XP | Same mult on sprint + heat + co-op bar; chat notes `catch-up XP multiplier` |
 
@@ -35,7 +35,7 @@ Zones follow SPD **native depth / chapter** (`NATIVE_DEPTH` in `points_command.p
 
 Config: [`Lastest UI/bestiary_config.json`](../Lastest%20UI/bestiary_config.json).
 
-Default bar thresholds to leave each level: **4000 → 7000 → 10000 → 14000** (~35k XP to Halls; tuned so a hot 30–50 chatter chat takes **>~2 hours**; level 5 has no further bar).
+Default bar thresholds to leave each level: **1000 → 2000 → 3000 → 4000** then Halls **5555** (live `bestiary_config.json`). Filling Halls loops the bar in place: crowns the eligible sprint leader (Halls badge + lockout, no donor pts) and starts a new sprint.
 
 ---
 
@@ -112,8 +112,8 @@ Session reset (`POST /api/session/reset` / Stream Started) clears bestiary state
 ## Points integration
 
 - [`is_top_summoner()`](../Lastest%20UI/points_command.py) → heat leader
-- Sprint winner → `grant_sprint_donor_reward` scaled by completed level: **100 + 100×(level−1)** (Sewers 100 → City 400). Flat donor pts, no earn multipliers.
-- After crowning, that user is in `sprint_winners` and cannot win another sprint until `POST /api/session/reset` / Stream Started. `!topsummoner` / HUD show the next eligible leader. The level-up banner / Hall strip names the winner — **no permanent march crown** for past winners.
+- Sprint winner → `grant_sprint_donor_reward` scaled by completed level: **100 + 100×(level−1)** (Sewers 100 → Metro 400). Flat donor pts, no earn multipliers. **Halls loops do not pay donor pts.**
+- After crowning, that user is in `sprint_winners` and cannot win another sprint until `POST /api/session/reset` / Stream Started. `!topsummoner` / HUD show the next eligible leader. The level-up / Halls-loop banner / Hall strip names the winner — **no permanent march crown** for past winners. Later Halls loops overwrite the Halls Hall of Fame slot with the new winner.
 - **Active competition** marches get crowns via `/api/summon-march` fields `badge` / `sprint_rank` / `heat_leader`:
   - `heat` → `crown_heat.png` (current heat leader)
   - `gold` / `silver` / `bronze` → sprint ranks 1–3 (`crown.png`, `crown_silver.png`, `crown_bronze.png`)

@@ -13,7 +13,9 @@ var _http: HTTPRequest
 var _timer: Timer
 var _was_connected: bool = true
 var _poll_in_flight: bool = false
+var _have_payload: bool = false
 var _last_level: int = -1
+var _last_level_up_ts: int = -1
 
 
 func _ready() -> void:
@@ -86,9 +88,15 @@ func _on_request_completed(
 		return
 	var payload: Dictionary = data
 	var lvl := int(payload.get("level", 1))
-	if _last_level >= 1 and lvl > _last_level:
-		level_up.emit(payload)
+	var ts := int(payload.get("last_level_up_ts", 0))
+	if _have_payload:
+		if lvl > _last_level:
+			level_up.emit(payload)
+		elif lvl == _last_level and ts > _last_level_up_ts:
+			level_up.emit(payload)
 	_last_level = lvl
+	_last_level_up_ts = ts
+	_have_payload = true
 	last_payload = payload.duplicate(true)
 	state_updated.emit(payload)
 

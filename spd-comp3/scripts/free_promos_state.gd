@@ -29,6 +29,15 @@ const COMMAND_TO_COST: Dictionary = {
 
 ## Each entry: [code]{ "key": String, "end": int }[/code] unix seconds.
 var _active: Array = []
+var _clock_paused: bool = false
+
+
+func set_clock_paused(paused: bool) -> void:
+	_clock_paused = paused
+
+
+func is_clock_paused() -> bool:
+	return _clock_paused
 
 
 func set_active(rows: Array) -> void:
@@ -78,6 +87,8 @@ func _command_from_result_type(type_name: String) -> String:
 
 
 func _prune_expired() -> void:
+	if _clock_paused:
+		return
 	var now: int = int(Time.get_unix_time_from_system())
 	var keep: Array = []
 	for item in _active:

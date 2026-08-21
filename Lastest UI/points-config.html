@@ -1089,6 +1089,7 @@
     const SPEND_CMD_IDS = new Set(SPEND_COMMANDS.map(([id]) => id));
 
     let freeUntilData = {};
+    let freeUntilPaused = false;
     let spawnCostPreview = { depth: null, base: {}, costs: {} };
 
     function showMsg(text, ok) {
@@ -1470,7 +1471,7 @@
       const list = document.getElementById('freePromosList');
       if (!strip || !list) return;
       const now = Math.floor(Date.now() / 1000);
-      const entries = Object.entries(freeUntilData || {}).filter(([, ts]) => ts > now);
+      const entries = Object.entries(freeUntilData || {}).filter(([, ts]) => Number(ts) > now);
       if (!entries.length) {
         strip.classList.add('empty');
         list.innerHTML = '';
@@ -1480,8 +1481,9 @@
       list.innerHTML = entries.map(([key, ts]) => {
         const sec = ts - now;
         const label = key.replace(/^cost_per_monster\./, 'spawn ').replace(/^cost_per_/, '');
+        const suffix = freeUntilPaused ? ' paused' : '';
         return '<span class="free-promo-chip" data-cost-key="' + escapeHtml(key) + '">' +
-          escapeHtml(label) + ' ' + formatCountdown(sec) +
+          escapeHtml(label) + ' ' + formatCountdown(sec) + suffix +
           ' <button type="button" class="cancel-free-btn free-promo-cancel" style="display:inline;padding:0 4px;font-size:0.75rem;">×</button></span>';
       }).join('');
     }
@@ -1494,7 +1496,8 @@
         fetch('/api/double-points-remaining').then(r => r.json()).catch(() => null),
         fetch('/api/bestiary').then(r => r.json()).catch(() => null),
         fetch('/api/session').then(r => r.json()).catch(() => null),
-      ]).then(([spend, death, twox, bestiary, session]) => {
+        fetch('/api/cost-free').then(r => r.json()).catch(() => null),
+      ]).then(([spend, death, twox, bestiary, session, costFree]) => {
         const spendBadge = document.getElementById('badgeSpend');
         if (spend && spendBadge) {
           _spendDisabled = !!spend.disabled;
@@ -1530,6 +1533,13 @@
           updateBestiaryGlance(bestiary);
         }
         if (session) updateSessionPanel(session);
+        if (costFree && !costFree.error) {
+          if (costFree.free_until && typeof costFree.free_until === 'object') {
+            freeUntilData = costFree.free_until;
+          }
+          freeUntilPaused = !!costFree.paused;
+          updateFreeCountdowns();
+        }
       });
       refreshSpawnCosts();
     }
@@ -1723,7 +1733,7 @@
         const sec = endTs - now;
         if (countdownEl) {
           countdownEl.style.display = '';
-          countdownEl.textContent = formatCountdown(sec);
+          countdownEl.textContent = formatCountdown(sec) + (freeUntilPaused ? ' paused' : '');
         }
         if (cancelEl) cancelEl.style.display = '';
       });
@@ -1786,6 +1796,7 @@
             container.appendChild(div);
           });
           freeUntilData = data.free_until || {};
+          freeUntilPaused = !!data.free_until_paused;
           updateFreeCountdowns();
           setCostsDirty(false);
           refreshLiveStatus();
@@ -3631,7 +3642,7 @@
       setInterval(update, 10000);
     })();
     setInterval(updateVpUpdatedLabel, 1000);
-    setInterval(updateFreeCountdowns, 1000);
+    setInterval(() => { if (!freeUntilPaused) updateFreeCountdowns(); }, 1000);
     pollActivityCommands();
     setInterval(pollActivityCommands, 5000);
 

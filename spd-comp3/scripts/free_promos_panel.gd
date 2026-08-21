@@ -39,6 +39,7 @@ var _poll_accum: float = 999.0
 var _tick_accum: float = 0.0
 ## Each entry: [code]{ "key": String, "end": int }[/code] unix seconds.
 var _active: Array = []
+var _clock_paused: bool = false
 
 
 func _ready() -> void:
@@ -77,6 +78,7 @@ func _on_free_state_changed() -> void:
 
 
 func _pull_from_shared_state() -> void:
+	_clock_paused = FreePromosState.is_clock_paused()
 	_active = FreePromosState.get_active()
 	_rebuild_list()
 	_update_root_visibility()
@@ -145,7 +147,8 @@ func _physics_process(delta: float) -> void:
 		if _tick_accum >= 1.0:
 			_tick_accum = 0.0
 			_pull_from_shared_state()
-			_refresh_time_labels()
+			if not _clock_paused:
+				_refresh_time_labels()
 		return
 	if not _should_run():
 		return
@@ -157,11 +160,14 @@ func _physics_process(delta: float) -> void:
 	_tick_accum += delta
 	if _tick_accum >= 1.0:
 		_tick_accum = 0.0
-		_prune_expired()
-		_refresh_time_labels()
+		if not _clock_paused:
+			_prune_expired()
+			_refresh_time_labels()
 
 
 func _prune_expired() -> void:
+	if _clock_paused:
+		return
 	var now: int = int(Time.get_unix_time_from_system())
 	var keep: Array = []
 	for item in _active:
@@ -227,6 +233,8 @@ func _on_http_done(_result: int, response_code: int, _headers: PackedStringArray
 
 
 func _apply_free_until_payload(data: Dictionary) -> void:
+	_clock_paused = bool(data.get("free_until_paused", false))
+	FreePromosState.set_clock_paused(_clock_paused)
 	var fu: Variant = data.get("free_until")
 	if fu is Dictionary:
 		_parse_free_until(fu as Dictionary)
@@ -350,9 +358,10 @@ func _format_remain(end_ts: int) -> String:
 	var h: int = int(s / 3600.0)
 	var m: int = int((s % 3600) / 60.0)
 	var sec: int = s % 60
+	var suffix := "paused" if _clock_paused else "left"
 	if h > 0:
-		return "%d:%02d:%02d left" % [h, m, sec]
-	return "%d:%02d left" % [m, sec]
+		return "%d:%02d:%02d %s" % [h, m, sec, suffix]
+	return "%d:%02d %s" % [m, sec, suffix]
 
 
 func _apply_fonts() -> void:

@@ -21,6 +21,7 @@
 
 package com.shatteredpixel.shatteredpixeldungeon.actors.buffs;
 
+import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.ui.BuffIndicator;
 import com.watabou.utils.Bundle;
 
@@ -65,9 +66,12 @@ public class SpawnScaled extends Buff {
 		return BuffIndicator.NONE;
 	}
 
-	/** Multiplier for damage dealt by this mob (scaled back more than HP). */
+	/** Multiplier for damage dealt by this mob. Sewers use a lower ratio so city/halls summons don't delete floor 1. */
 	public float damageFactor() {
-		return Math.max(0.15f, scale * DAMAGE_DR_MULT);
+		if (Dungeon.depth <= 5) {
+			return Math.max(0.05f, scale * 0.25f);
+		}
+		return Math.max(0.15f, scale);
 	}
 
 	/** Multiplier for armor (DR) when this mob is defending (scaled back more than HP). */

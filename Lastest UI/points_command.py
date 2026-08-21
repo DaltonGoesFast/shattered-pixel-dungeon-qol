@@ -36,6 +36,7 @@ import time
 import random
 import datetime
 import uuid
+import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, Optional
@@ -61,6 +62,9 @@ BALANCE_RESULT_FILE = os.path.join(SCRIPT_DIR, "points_balance_result.txt")
 CONFIG_FILE = os.path.join(SCRIPT_DIR, "points_config.json")
 FREE_UNTIL_FILE = os.path.join(SCRIPT_DIR, "free_until.json")
 SPEND_DISABLED_FILE = os.path.join(SCRIPT_DIR, "spend_disabled.txt")
+_free_until_lock = threading.Lock()
+_free_clock_last_sec: Optional[int] = None
+_free_clock_paused: bool = False
 GAME_DATA_URL = "http://127.0.0.1:5000/api/game-data"
 DOUBLE_POINTS_END_FILE = os.path.join(SCRIPT_DIR, "double_points_end.txt")
 TOP_SUMMONER_FILE = os.path.join(SCRIPT_DIR, "top_summoner.txt")
@@ -420,19 +424,124 @@ def ignores_command_cooldowns(username: str) -> bool:
     return False
 
 
-def is_cost_free(cost_key):
-    """True if cost_key is free until a future timestamp (from free_until.json)."""
+def _parse_free_until_end(raw: Any) -> Optional[int]:
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _load_free_until_unlocked() -> dict[str, int]:
     if not os.path.exists(FREE_UNTIL_FILE):
-        return False
+        return {}
     try:
         with open(FREE_UNTIL_FILE, encoding="utf-8") as f:
-            free_until = json.load(f)
-        end_ts = free_until.get(cost_key)
-        if end_ts is None:
-            return False
-        return int(time.time()) < int(end_ts)
-    except (json.JSONDecodeError, OSError, TypeError, ValueError):
+            raw = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return {}
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, int] = {}
+    for k, v in raw.items():
+        key = str(k).strip()
+        if not key or key.startswith("_"):
+            continue
+        end = _parse_free_until_end(v)
+        if end is None:
+            continue
+        out[key] = end
+    return out
+
+
+def _save_free_until_unlocked(free: dict[str, int]) -> None:
+    tmp = FREE_UNTIL_FILE + ".tmp"
+    payload = json.dumps(free, indent=2)
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(payload)
+        f.write("\n")
+    os.replace(tmp, FREE_UNTIL_FILE)
+
+
+def load_free_until() -> dict[str, int]:
+    """Copy of cost_key -> unix end timestamp."""
+    with _free_until_lock:
+        return dict(_load_free_until_unlocked())
+
+
+def save_free_until(free: dict[str, int]) -> None:
+    cleaned: dict[str, int] = {}
+    for k, v in (free or {}).items():
+        key = str(k).strip()
+        if not key or key.startswith("_"):
+            continue
+        end = _parse_free_until_end(v)
+        if end is None:
+            continue
+        cleaned[key] = end
+    with _free_until_lock:
+        _save_free_until_unlocked(cleaned)
+
+
+def is_free_until_clock_paused() -> bool:
+    return bool(_free_clock_paused)
+
+
+def tick_free_until_clock(paused: bool) -> int:
+    """Shift active free windows forward while commands cannot run. Returns keys shifted."""
+    global _free_clock_last_sec, _free_clock_paused
+    now_sec = int(time.time())
+    with _free_until_lock:
+        was_paused = _free_clock_paused
+        last = _free_clock_last_sec
+        _free_clock_paused = bool(paused)
+        _free_clock_last_sec = now_sec
+        if last is None or not paused or not was_paused:
+            return 0
+        delta = now_sec - last
+        if delta <= 0:
+            return 0
+        free = _load_free_until_unlocked()
+        shifted = 0
+        for key, end in list(free.items()):
+            if end > last:
+                free[key] = end + delta
+                shifted += 1
+        if shifted:
+            _save_free_until_unlocked(free)
+        return shifted
+
+
+def extend_free_until_keys(cost_keys, duration_sec: int) -> dict[str, int]:
+    """Add duration to each key: new_end = max(now, existing) + duration_sec."""
+    now = int(time.time())
+    duration_sec = max(1, int(duration_sec or 60))
+    ends: dict[str, int] = {}
+    with _free_until_lock:
+        free = _load_free_until_unlocked()
+        for key in cost_keys or []:
+            k = str(key).strip()
+            if not k:
+                continue
+            prev = _parse_free_until_end(free.get(k)) or 0
+            new_end = max(now, prev) + duration_sec
+            free[k] = new_end
+            ends[k] = new_end
+        if ends:
+            _save_free_until_unlocked(free)
+    return ends
+
+
+def is_cost_free(cost_key):
+    """True if cost_key is free until a future timestamp (from free_until.json)."""
+    key = str(cost_key or "").strip()
+    if not key:
         return False
+    with _free_until_lock:
+        free = _load_free_until_unlocked()
+    end_ts = free.get(key)
+    if end_ts is None:
+        return False
+    return int(time.time()) < int(end_ts)
 
 
 def effective_cost(cost_key, base_cost):
@@ -1187,24 +1296,16 @@ def _with_spend_bestiary_chat(result: "ChatResult") -> "ChatResult":
     added = int(bestiary.get("bar_xp_added") or 0)
     if added > 0:
         result.message = result.message + chat_messages.spend_bestiary_xp(added)
-    if bestiary.get("leveled_up") and bestiary.get("level_up"):
-        lu = bestiary["level_up"]
-        result.message = (
-            result.message
-            + " "
-            + chat_messages.bestiary_level_up(
-                lu.get("winner") or "",
-                lu.get("from_zone") or "",
-                lu.get("to_zone") or "",
-                int(lu.get("donor_reward") or 0),
-            )
-        )
+    progress = chat_messages.bestiary_progress_line(bestiary)
+    if progress:
+        result.message = result.message + " " + progress
     result.message = result.message + chat_messages.shatter_events_suffix(
         bestiary.get("shatter_events") or []
     )
     extra = dict(result.extra or {})
     extra["bestiary_xp"] = added
     extra["bestiary_leveled_up"] = bool(bestiary.get("leveled_up"))
+    extra["bestiary_halls_looped"] = bool(bestiary.get("halls_looped"))
     extra["shatter_events"] = list(bestiary.get("shatter_events") or [])
     if bestiary.get("level") is not None:
         extra["bestiary_level"] = int(bestiary.get("level") or 1)
@@ -1823,7 +1924,7 @@ def cmd_transfer(args):
     """Transfer points from one viewer to another.
 
     Deduction order: chat-earned points first, then donation-backed points if needed.
-    Recipient donation points do not increase.
+    Recipient receives chat points, clipped to remaining room under chat_point_cap.
     """
     if len(args) != 3:
         return SPAWN_RESULT_FILE, "Usage: !givepoints <amount> <target> (example: !givepoints 50 @bob)"
@@ -1868,21 +1969,31 @@ def cmd_transfer(args):
             if from_total < amount:
                 return SPAWN_RESULT_FILE, f"{from_display}, not enough points. You have {from_total}."
 
-            # Spend chat points first, then donation points.
-            from_chat_only = max(0, from_pts - from_donation_pts)
-            take_from_chat = min(amount, from_chat_only)
-            take_from_donor = amount - take_from_chat
-            new_from_pts = from_pts - amount
-            new_from_donation = max(0, from_donation_pts - take_from_donor)
+            import chat_messages
+            cap = int(get_config().get("chat_point_cap", 500))
+            to_chat = chat_pts(to_pts, to_donation_pts)
+            room = max(0, cap - to_chat)
+            if room <= 0:
+                return SPAWN_RESULT_FILE, chat_messages.givepoints_at_cap(to_display, cap)
 
-            new_to_pts = to_pts + amount
-            new_to_donation = min(to_donation_pts, new_to_pts)
+            credit = min(amount, room)
+            deducted = deduct_points(from_pts, from_donation_pts, credit)
+            if deducted is None:
+                return SPAWN_RESULT_FILE, f"{from_display}, not enough points. You have {from_total}."
+            new_from_pts, new_from_donation = deducted
+
+            to_total = effective_total(to_pts, to_donation_pts)
+            new_to_pts = to_total + credit
+            new_to_donation = to_donation_pts
 
             data[from_key] = (new_from_pts, from_last, new_from_donation, from_role)
             data[to_key] = (new_to_pts, to_last, new_to_donation, to_role)
             write_points(data)
 
-            return SPAWN_RESULT_FILE, f"{from_display} gave {amount} points to {to_display}. {from_display} now has {new_from_pts}."
+            from_remaining = effective_total(new_from_pts, new_from_donation)
+            return SPAWN_RESULT_FILE, chat_messages.givepoints_success(
+                from_display, credit, to_display, from_remaining, capped=credit < amount
+            )
     except TimeoutError:
         return SPAWN_RESULT_FILE, "Points file busy. Please try again in a moment."
 

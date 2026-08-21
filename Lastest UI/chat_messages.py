@@ -9,6 +9,71 @@ Ported in Phase 0 from:
 
 chat_command.py formats final `message` strings for API responses.
 """
+from contextvars import ContextVar
+import re
+
+
+# YouTube live chat rejects bot replies over this length (Twitch allows 500).
+YOUTUBE_CHAT_LIMIT = 150
+_platform_var: ContextVar[str] = ContextVar("chat_reply_platform", default="")
+_URL_RE = re.compile(r"https?://\S+")
+
+
+def set_reply_platform(platform: str | None) -> None:
+    """Record the current chat platform so formatters can keep YouTube under 150 chars."""
+    _platform_var.set((platform or "").strip())
+
+
+def current_reply_platform() -> str:
+    return _platform_var.get() or ""
+
+
+def is_youtube_platform(platform: str | None = None) -> bool:
+    p = (platform if platform is not None else current_reply_platform()).strip().lower()
+    return "youtube" in p or p == "yt"
+
+
+def _ellipsize(text: str, limit: int) -> str:
+    if len(text) <= limit:
+        return text
+    if limit <= 3:
+        return text[:limit]
+    cut = text[: limit - 3]
+    sp = cut.rfind(" ")
+    if sp >= max(8, limit // 2):
+        cut = cut[:sp]
+    return cut.rstrip(" .,;:-") + "..."
+
+
+def clamp_youtube_chat(text: str, limit: int = YOUTUBE_CHAT_LIMIT) -> str:
+    """Fit a chat reply into YouTube's limit, preferring to keep a URL if one is present."""
+    if not text:
+        return text
+    text = " ".join(text.split())
+    if len(text) <= limit:
+        return text
+    match = _URL_RE.search(text)
+    if match:
+        url = match.group(0).rstrip(").,;")
+        if len(url) <= limit:
+            head = (text[: match.start()] + " " + text[match.end() :]).strip()
+            room = limit - len(url) - 1
+            if room >= 4 and head:
+                candidate = f"{_ellipsize(head, room)} {url}".strip()
+                if len(candidate) <= limit:
+                    return candidate
+            return url
+        return url[:limit]
+    return _ellipsize(text, limit)
+
+
+def clamp_for_platform(message: str | None, platform: str | None = "") -> str | None:
+    if message is None:
+        return None
+    plat = platform or current_reply_platform()
+    if is_youtube_platform(plat):
+        return clamp_youtube_chat(message)
+    return message
 
 
 def display_name(username: str) -> str:
@@ -24,7 +89,7 @@ def display_name(username: str) -> str:
 def spend_success(command: str, user: str, pts: int, extra: str = "", detail: str = "") -> str:
     """Format a spend-command success line. `extra` is command-specific detail."""
     u = display_name(user) or user
-    tail = f" You have {pts} points left."
+    tail = f" ({pts} left)" if is_youtube_platform() else f" You have {pts} points left."
     templates = {
         "spawn": f"{u} spawned a {extra}!{tail}",
         "champion": f"{u} spawned a champion {extra}!{tail}",
@@ -63,6 +128,8 @@ def spend_bestiary_xp(xp: int) -> str:
     n = int(xp or 0)
     if n <= 0:
         return ""
+    if is_youtube_platform():
+        return f" (+{n} XP)"
     return f" (+{n} Bestiary XP)"
 
 
@@ -152,9 +219,14 @@ def unknown_command(name: str) -> str:
 
 
 def help_link(url: str, economy_line: str = "") -> str:
-    link = f"Full command list & prices: {url}"
+    link = (url or "").strip()
+    if is_youtube_platform():
+        # URL first so YouTube's 150-char cap cannot drop the command list.
+        msg = f"Commands: {link}  !help <cmd> for usage." if link else "Commands in the video description. !help <cmd> for usage."
+        return clamp_youtube_chat(msg)
+    listed = f"Full command list & prices: {link}" if link else "Full command list: type !help <command>."
     eco = (economy_line or "").strip()
-    return f"{eco} {link}" if eco else link
+    return f"{eco} {listed}" if eco else listed
 
 
 def economy_reminder(
@@ -168,6 +240,11 @@ def economy_reminder(
     pts = max(1, int(pts_per_message))
     cd = max(0, int(chat_cooldown_sec))
     pct = int(round(max(0.0, float(bank_ratio_manual)) * 100))
+    if is_youtube_platform():
+        return clamp_youtube_chat(
+            f"Earn {cap} chat pts/stream ({pts}/msg, {cd}s CD). "
+            f"!bank {pct}% to donor pts. Chat resets; donor pts stay."
+        )
     return (
         f"Earn up to {cap} chat points per stream ({pts} pts/msg, {cd}s cooldown). "
         f"!bank saves {pct}% as permanent donor pts. Chat resets at stream end; donor pts never expire."
@@ -195,7 +272,8 @@ def game_seed(seed: str) -> str:
 
 
 def active_challenges(text: str) -> str:
-    return f"Current Active Challenges: {text}"
+    msg = f"Current Active Challenges: {text}"
+    return clamp_youtube_chat(msg) if is_youtube_platform() else msg
 
 
 # --- Query (current economy — Phase 1–5) ---
@@ -216,7 +294,8 @@ def toppoints_leaderboard(entries: list[tuple[str, int]]) -> str:
     parts = []
     for i, (name, pts) in enumerate(entries[:3], 1):
         parts.append(f"{i}. {name} ({pts} donor pts)")
-    return " | ".join(parts)
+    line = " | ".join(parts)
+    return clamp_youtube_chat(line) if is_youtube_platform() else line
 
 
 # --- Query (economy v1.1 — Phase 6) ---
@@ -230,6 +309,15 @@ def points_balance_v11(
     heat_xp: int = 0,
 ) -> str:
     u = display_name(user) or user
+    if is_youtube_platform():
+        base = (
+            f"{u} Chat {chat_pts}/{chat_cap} | Donor {donor_pts}"
+            f" | Sprint {sprint_xp} / heat {heat_xp} XP"
+        )
+        cap_note = " Cap! !bank"
+        if chat_pts >= chat_cap and len(base) + len(cap_note) <= YOUTUBE_CHAT_LIMIT:
+            base += cap_note
+        return clamp_youtube_chat(base)
     base = (
         f"{u} - Chat points: {chat_pts}/{chat_cap} | Donor points: {donor_pts}"
         f" | Bestiary: sprint {sprint_xp} XP, heat {heat_xp} XP"
@@ -348,6 +436,28 @@ def bestiary_status(
         bar = f"{bar_xp}/{bar_threshold} XP"
     else:
         bar = "MAX"
+    if is_youtube_platform():
+        head = f"Bestiary Lv {level} {zone} {bar}"
+        personal = ""
+        if user:
+            u = display_name(user) or user
+            personal = f" | {u} {sprint_xp}/{heat_xp} XP"
+        names: list[str] = []
+        extra = ""
+        unlocked = list(unlocked or [])
+        for i, name in enumerate(unlocked):
+            nxt = ", ".join(names + [str(name)])
+            remain = len(unlocked) - (i + 1)
+            extra_try = f" +{remain}" if remain > 0 else ""
+            body = f". {nxt}{extra_try}"
+            if len(head) + len(body) + len(personal) > YOUTUBE_CHAT_LIMIT:
+                remain_now = len(unlocked) - len(names)
+                extra = f" +{remain_now}" if names and remain_now > 0 else ""
+                break
+            names.append(str(name))
+            extra = extra_try
+        body = f". {', '.join(names)}{extra}" if names else ""
+        return clamp_youtube_chat(head + body + personal)
     sample = ", ".join(unlocked[:8])
     more = f" (+{len(unlocked) - 8} more)" if len(unlocked) > 8 else ""
     # ASCII only - Streamer.bot ParseChatResponse strips \ from JSON \uXXXX escapes.
@@ -359,21 +469,25 @@ def bestiary_status(
 
 
 def sprint_leader_line(user: str, xp: int, gap: int) -> str:
+    yt = is_youtube_platform()
     if not user:
-        return (
-            "No eligible sprint leader this Bestiary level yet - !summon to take the lead! "
-            "(Past sprint winners can't crown again until next stream.)"
+        msg = (
+            "No sprint leader yet - !summon to lead!"
+            if yt
+            else (
+                "No eligible sprint leader this Bestiary level yet - !summon to take the lead! "
+                "(Past sprint winners can't crown again until next stream.)"
+            )
         )
+        return clamp_youtube_chat(msg) if yt else msg
     u = display_name(user) or user
     if gap > 0:
-        return (
-            f"Sprint leader: {u} with {xp} XP (leads by {gap}). "
-            "Resets on level-up; winners can't crown again this stream."
-        )
-    return (
-        f"Sprint leader: {u} with {xp} XP. "
-        "Resets on level-up; winners can't crown again this stream."
-    )
+        core = f"Sprint leader: {u} with {xp} XP (leads by {gap})."
+    else:
+        core = f"Sprint leader: {u} with {xp} XP."
+    if yt:
+        return clamp_youtube_chat(core)
+    return f"{core} Resets on level-up; winners can't crown again this stream."
 
 
 def sprint_standing_line(
@@ -386,10 +500,15 @@ def sprint_standing_line(
     crowned: bool = False,
 ) -> str:
     """Leader + caller's place for !sprint."""
+    yt = is_youtube_platform()
     if not leader:
         base = (
-            "No eligible sprint leader this Bestiary level yet - !summon to take the lead! "
-            "(Past sprint winners can't crown again until next stream.)"
+            "No sprint leader yet - !summon to lead!"
+            if yt
+            else (
+                "No eligible sprint leader this Bestiary level yet - !summon to take the lead! "
+                "(Past sprint winners can't crown again until next stream.)"
+            )
         )
     else:
         u_lead = display_name(leader) or leader
@@ -398,16 +517,23 @@ def sprint_standing_line(
         else:
             base = f"Sprint leader: {u_lead} with {leader_xp} XP."
     if not user:
-        return base if not leader else f"{base} Resets on level-up."
+        msg = base if (yt or not leader) else f"{base} Resets on level-up."
+        return clamp_youtube_chat(msg) if yt else msg
     u = display_name(user) or user
     if crowned:
-        return f"{base} {u}: already crowned this stream (can't win again)."
-    if rank == 1:
-        return f"{base} {u}: you're #1!"
-    if rank is not None:
+        msg = (
+            f"{base} {u}: already crowned this stream."
+            if yt
+            else f"{base} {u}: already crowned this stream (can't win again)."
+        )
+    elif rank == 1:
+        msg = f"{base} {u}: you're #1!"
+    elif rank is not None:
         behind = max(0, int(leader_xp) - int(your_xp))
-        return f"{base} {u}: #{rank} with {your_xp} XP ({behind} behind)."
-    return f"{base} {u}: not on the board - !summon to race!"
+        msg = f"{base} {u}: #{rank} with {your_xp} XP ({behind} behind)."
+    else:
+        msg = f"{base} {u}: not on the board - !summon to race!"
+    return clamp_youtube_chat(msg) if yt else msg
 
 
 def heat_leader_line(
@@ -422,25 +548,45 @@ def heat_leader_line(
     yours = f" {req} has {your_xp} heat XP." if req else ""
     if not user:
         empty = f"No heat leader in the last {mins} min - !summon to claim personal 2x!"
-        return f"{empty}{yours}" if yours else empty
+        msg = f"{empty}{yours}" if yours else empty
+        return clamp_youtube_chat(msg) if is_youtube_platform() else msg
     u = display_name(user) or user
-    return f"Heat leader ({mins}m): {u} with {xp} XP - personal 2x active.{yours}"
+    msg = f"Heat leader ({mins}m): {u} with {xp} XP - personal 2x active.{yours}"
+    return clamp_youtube_chat(msg) if is_youtube_platform() else msg
 
 
 def summon_hall_line(hall: list) -> str:
     if not hall:
-        return "Hall of Fame is empty - fill the Bestiary bar to crown a sprint winner!"
+        msg = "Hall of Fame is empty - fill the Bestiary bar to crown a sprint winner!"
+        return clamp_youtube_chat(msg) if is_youtube_platform() else msg
     parts = []
     for entry in hall[-5:]:
         zone = entry.get("zone") or f"Lv{entry.get('level', '?')}"
         user = entry.get("user") or "(none)"
         xp = entry.get("xp", 0)
         parts.append(f"{zone}: {user} ({xp} XP)")
-    return "Summon Hall: " + " | ".join(parts)
+    if not is_youtube_platform():
+        return "Summon Hall: " + " | ".join(parts)
+    kept: list[str] = []
+    for part in reversed(parts):
+        trial = [part] + kept
+        line = "Hall: " + " | ".join(trial)
+        if kept and len(line) > YOUTUBE_CHAT_LIMIT:
+            break
+        kept = trial
+    return clamp_youtube_chat("Hall: " + " | ".join(kept) if kept else "Hall of Fame is empty.")
 
 
 def bestiary_level_up(winner: str, from_zone: str, to_zone: str, donor: int) -> str:
     w = display_name(winner) or winner or "Nobody"
+    if is_youtube_platform():
+        if winner and donor > 0:
+            msg = f"Bestiary up! {from_zone} -> {to_zone}. Sprint winner {w} +{donor} donor pts."
+        elif not winner:
+            msg = f"Bestiary up! {from_zone} -> {to_zone}. No eligible sprint winner."
+        else:
+            msg = f"Bestiary up! {from_zone} -> {to_zone}."
+        return clamp_youtube_chat(msg)
     if winner and donor > 0:
         return (
             f"Bestiary level-up! {from_zone} -> {to_zone}. "
@@ -453,6 +599,48 @@ def bestiary_level_up(winner: str, from_zone: str, to_zone: str, donor: int) -> 
             "No eligible sprint winner (prior winners are locked out until next stream)."
         )
     return f"Bestiary level-up! {from_zone} -> {to_zone}."
+
+
+def bestiary_halls_loop(winner: str, winner_xp: int = 0) -> str:
+    w = display_name(winner) or winner or "Nobody"
+    if is_youtube_platform():
+        if winner:
+            msg = f"Halls sprint! {w} takes the badge."
+        else:
+            msg = "Halls sprint loop! No eligible winner."
+        return clamp_youtube_chat(msg)
+    if winner:
+        xp_bit = f" ({int(winner_xp)} XP)" if int(winner_xp or 0) > 0 else ""
+        return (
+            f"Halls sprint loop! {w} takes the Halls badge{xp_bit}. "
+            f"(Can't win another sprint crown this stream.)"
+        )
+    return (
+        "Halls sprint loop! No eligible sprint winner "
+        "(prior winners are locked out until next stream)."
+    )
+
+
+def bestiary_progress_line(bestiary: dict) -> str:
+    """Level-up or Halls sprint-loop chat line, or empty."""
+    if not isinstance(bestiary, dict):
+        return ""
+    lu = bestiary.get("level_up") or {}
+    if not isinstance(lu, dict):
+        lu = {}
+    if bestiary.get("leveled_up"):
+        return bestiary_level_up(
+            lu.get("winner") or "",
+            lu.get("from_zone") or "",
+            lu.get("to_zone") or "",
+            int(lu.get("donor_reward") or 0),
+        )
+    if bestiary.get("halls_looped") or str(lu.get("reason") or "") == "halls_loop":
+        return bestiary_halls_loop(
+            lu.get("winner") or "",
+            int(lu.get("winner_xp") or 0),
+        )
+    return ""
 
 
 def shatter_event_line(event: dict) -> str:
@@ -494,7 +682,15 @@ def mysummons_line(user: str, count: int, sprint_xp: int, heat_xp: int) -> str:
     )
 
 
-def givepoints_success(from_user: str, amount: int, to_user: str, from_remaining: int) -> str:
+def givepoints_success(
+    from_user: str, amount: int, to_user: str, from_remaining: int, capped: bool = False
+) -> str:
     f = display_name(from_user) or from_user
     t = display_name(to_user) or to_user
-    return f"{f} gave {amount} points to {t}. {f} now has {from_remaining}."
+    cap_note = " (chat cap)" if capped else ""
+    return f"{f} gave {amount} points to {t}{cap_note}. {f} now has {from_remaining}."
+
+
+def givepoints_at_cap(to_user: str, cap: int) -> str:
+    t = display_name(to_user) or to_user
+    return f"{t} is at the chat cap ({cap}/{cap}) and can't receive more."

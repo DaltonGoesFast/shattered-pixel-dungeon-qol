@@ -640,18 +640,9 @@ def handle_summon(username: str, args: list[str]) -> ChatResult:
     )
     if not march_ok:
         msg += " (overlay server offline - XP counted, march not queued)"
-    if bestiary.get("leveled_up") and bestiary.get("level_up"):
-        lu = bestiary["level_up"]
-        msg = (
-            msg
-            + " "
-            + chat_messages.bestiary_level_up(
-                lu.get("winner") or "",
-                lu.get("from_zone") or "",
-                lu.get("to_zone") or "",
-                int(lu.get("donor_reward") or 0),
-            )
-        )
+    progress = chat_messages.bestiary_progress_line(bestiary)
+    if progress:
+        msg = msg + " " + progress
     msg = msg + chat_messages.shatter_events_suffix(bestiary.get("shatter_events") or [])
 
     return ChatResult(
@@ -666,6 +657,7 @@ def handle_summon(username: str, args: list[str]) -> ChatResult:
             "soft_floor": soft_floor,
             "bestiary_level": level,
             "leveled_up": bool(bestiary.get("leveled_up")),
+            "halls_looped": bool(bestiary.get("halls_looped")),
             "shatter_events": list(bestiary.get("shatter_events") or []),
             "march_queued": march_ok,
         },
@@ -927,6 +919,15 @@ def _audit_chat_command(body: dict, result: ChatResult, deduped: bool = False) -
         pass
 
 
+def _limit_chat_result(result: ChatResult, platform: str) -> ChatResult:
+    """Keep viewer-facing replies inside YouTube's 150-character chat cap."""
+    result.message = chat_messages.clamp_for_platform(result.message, platform)
+    pres = result.presentation
+    if isinstance(pres, dict) and isinstance(pres.get("chat"), str):
+        pres["chat"] = chat_messages.clamp_for_platform(pres["chat"], platform)
+    return result
+
+
 def dispatch_typed(body: dict) -> ChatResult:
     """Handle typed requests (passive earn, donations via type field)."""
     req_type = (body.get("type") or "").strip().lower()
@@ -944,6 +945,17 @@ def dispatch_typed(body: dict) -> ChatResult:
 
 def dispatch_chat_command(body: dict) -> ChatResult:
     """Main entry: rawMessage router or typed body."""
+    platform = str(body.get("platform") or "")
+    chat_messages.set_reply_platform(platform)
+    try:
+        result = _dispatch_chat_command_inner(body)
+        return _limit_chat_result(result, platform)
+    finally:
+        chat_messages.set_reply_platform("")
+
+
+def _dispatch_chat_command_inner(body: dict) -> ChatResult:
+    """Unclamped router; dispatch_chat_command applies the YouTube length cap."""
     if body.get("type"):
         return dispatch_typed(body)
 

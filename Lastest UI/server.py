@@ -148,6 +148,32 @@ parser = SPDSaveParser(SAVE_DIRECTORY)
 data_lock = threading.Lock()
 
 last_ws_update_time = 0.0   # when we last got data from game WS; parser skips overwrite if recent
+FREE_CLOCK_STALE_SEC = 3.0
+
+
+def _free_clock_unavailable_reason():
+    """Why chat commands cannot run right now, or None if the dungeon is accepting them."""
+    if os.path.exists(SPEND_DISABLED_FILE):
+        return "spend off"
+    now = time.time()
+    if last_ws_update_time <= 0 or (now - last_ws_update_time) > FREE_CLOCK_STALE_SEC:
+        return "no live game"
+    with data_lock:
+        data = current_game_data or {}
+    ui = data.get("ui") if isinstance(data.get("ui"), dict) else {}
+    scene = str(ui.get("scene") or "unknown").strip().lower() or "unknown"
+    if scene != "game":
+        return f"scene={scene}"
+    hero = data.get("hero")
+    if not isinstance(hero, dict):
+        return "no hero"
+    try:
+        hp = int(hero.get("hp", 0) or 0)
+    except (TypeError, ValueError):
+        hp = 0
+    if hp <= 0:
+        return "hero dead"
+    return None
 
 # OBS inventory crop relay (direct filter control)
 obs_layout_queue = queue.Queue()
@@ -743,6 +769,26 @@ def double_points_countdown_thread():
         time.sleep(1.0)
 
 
+def free_until_freeze_thread():
+    """Hold Shatter / Stream Deck free windows still while the dungeon cannot accept commands."""
+    from points_command import tick_free_until_clock
+    last_reason = None
+    while True:
+        try:
+            reason = _free_clock_unavailable_reason()
+            paused = reason is not None
+            tick_free_until_clock(paused)
+            if reason != last_reason:
+                if paused:
+                    print(f"Free-until clock paused ({reason})")
+                else:
+                    print("Free-until clock running")
+                last_reason = reason
+        except Exception as e:
+            print(f"Free-until freeze error: {e}")
+        time.sleep(0.25)
+
+
 def _obs_ws_send(ws, request_type, request_data, wait_response=False):
     """Send one OBS WebSocket v5 request. Layout updates skip waiting for faster swaps."""
     req_id = f'spd-{uuid.uuid4()}'
@@ -1026,14 +1072,13 @@ def points_config_api():
                     "curse_class_kit_duration_turns": 100,
                     "death_cost_inflation_enabled": True,
                 }
-            free_until = {}
-            if os.path.exists(FREE_UNTIL_FILE):
-                try:
-                    with open(FREE_UNTIL_FILE, encoding='utf-8') as f:
-                        free_until = json.load(f)
-                except Exception:
-                    pass
+            try:
+                from points_command import load_free_until
+                free_until = load_free_until()
+            except Exception:
+                free_until = {}
             data["free_until"] = free_until
+            data["free_until_paused"] = bool(_free_clock_unavailable_reason())
             return jsonify(data)
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -1194,13 +1239,21 @@ def spend_disabled_api():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/api/cost-free', methods=['POST', 'DELETE', 'OPTIONS'])
+@app.route('/api/cost-free', methods=['GET', 'POST', 'DELETE', 'OPTIONS'])
 def cost_free_api():
     """Set a cost as free for N minutes, or cancel. costKey: e.g. cost_per_gold, cost_per_monster.rat.
     Cancel all: DELETE with no costKey, or POST { cancelAll: true }."""
     if request.method == 'OPTIONS':
         return '', 204
     try:
+        from points_command import load_free_until, save_free_until
+        if request.method == 'GET':
+            reason = _free_clock_unavailable_reason()
+            return jsonify({
+                "free_until": load_free_until(),
+                "paused": bool(reason),
+                "reason": reason or "",
+            })
         body = request.get_json(force=True, silent=True) if request.method == 'POST' else {}
         body = body or {}
         cost_key = ''
@@ -1213,29 +1266,20 @@ def cost_free_api():
             request.method == 'DELETE' and not cost_key
         )
         if cancel_all:
-            with open(FREE_UNTIL_FILE, 'w', encoding='utf-8') as f:
-                json.dump({}, f, indent=2)
+            save_free_until({})
             return jsonify({"ok": True, "cancelledAll": True})
 
         if not cost_key:
             return jsonify({"error": "costKey required"}), 400
-        free_until = {}
-        if os.path.exists(FREE_UNTIL_FILE):
-            try:
-                with open(FREE_UNTIL_FILE, encoding='utf-8') as f:
-                    free_until = json.load(f)
-            except Exception:
-                pass
+        free_until = load_free_until()
         if request.method == 'DELETE' or body.get('cancel'):
             free_until.pop(cost_key, None)
-            with open(FREE_UNTIL_FILE, 'w', encoding='utf-8') as f:
-                json.dump(free_until, f, indent=2)
+            save_free_until(free_until)
             return jsonify({"ok": True, "costKey": cost_key, "cancelled": True})
         minutes = max(0, min(1440, int(body.get('minutes', body.get('mins', 5)))))
         end_ts = int(time.time()) + minutes * 60
         free_until[cost_key] = end_ts
-        with open(FREE_UNTIL_FILE, 'w', encoding='utf-8') as f:
-            json.dump(free_until, f, indent=2)
+        save_free_until(free_until)
         return jsonify({"ok": True, "costKey": cost_key, "freeUntil": end_ts})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -3756,6 +3800,7 @@ if __name__ == '__main__':
         threading.Thread(target=obs_relay_thread, daemon=True).start()
     # Double points countdown for OBS (writes to double_points_countdown.txt every second)
     threading.Thread(target=double_points_countdown_thread, daemon=True).start()
+    threading.Thread(target=free_until_freeze_thread, daemon=True).start()
     threading.Thread(target=stream_end_debounce_thread, daemon=True).start()
     
     # Load initial data

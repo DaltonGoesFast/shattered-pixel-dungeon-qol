@@ -21,7 +21,6 @@ HEAT_LEADER_FILE = os.path.join(SCRIPT_DIR, "heat_leader.txt")
 TOP_SUMMONER_FILE = os.path.join(SCRIPT_DIR, "top_summoner.txt")
 TOTAL_SUMMONS_FILE = os.path.join(SCRIPT_DIR, "totalsummons.txt")
 SUMMON_COUNTS_FILE = os.path.join(SCRIPT_DIR, "summon_session_counts.json")
-FREE_UNTIL_FILE = os.path.join(SCRIPT_DIR, "free_until.json")
 SPEND_DISABLED_FILE = os.path.join(SCRIPT_DIR, "spend_disabled.txt")
 
 _lock = threading.Lock()
@@ -461,36 +460,8 @@ def _is_spend_disabled() -> bool:
 
 def extend_free_until(cost_keys: list[str], duration_sec: int) -> dict[str, int]:
     """Extend free windows: new_end = max(now, existing_end) + duration_sec per key."""
-    now = int(time.time())
-    duration_sec = max(1, int(duration_sec or 60))
-    free: dict[str, Any] = {}
-    if os.path.exists(FREE_UNTIL_FILE):
-        try:
-            with open(FREE_UNTIL_FILE, encoding="utf-8") as f:
-                raw = json.load(f)
-            if isinstance(raw, dict):
-                free = raw
-        except (json.JSONDecodeError, OSError):
-            free = {}
-    ends: dict[str, int] = {}
-    for key in cost_keys:
-        k = str(key).strip()
-        if not k:
-            continue
-        try:
-            prev = int(free.get(k) or 0)
-        except (TypeError, ValueError):
-            prev = 0
-        new_end = max(now, prev) + duration_sec
-        free[k] = new_end
-        ends[k] = new_end
-    tmp = FREE_UNTIL_FILE + ".tmp"
-    payload = json.dumps(free, indent=2)
-    with open(tmp, "w", encoding="utf-8") as f:
-        f.write(payload)
-        f.write("\n")
-    os.replace(tmp, FREE_UNTIL_FILE)
-    return ends
+    from points_command import extend_free_until_keys
+    return extend_free_until_keys(cost_keys, duration_sec)
 
 
 def _grant_shatter_event(
@@ -1090,6 +1061,44 @@ def _write_totals(state: dict) -> None:
         pass
 
 
+def _lock_sprint_winner(state: dict, winner_key: str) -> None:
+    """Record a one-crown-per-stream lock. No-op if empty or already listed."""
+    key = (winner_key or "").strip().lower()
+    if not key:
+        return
+    winners = list(state.get("sprint_winners") or [])
+    if key not in {str(w).lower() for w in winners}:
+        winners.append(key)
+    state["sprint_winners"] = winners
+
+
+def _upsert_hall_entry(
+    state: dict,
+    level: int,
+    zone: str,
+    user: str,
+    xp: int,
+    now: int,
+) -> None:
+    """Replace the Hall of Fame row for this level, or append if missing."""
+    hall = list(state.get("hall_of_fame") or [])
+    entry = {
+        "level": int(level),
+        "zone": zone,
+        "user": user,
+        "xp": int(xp or 0),
+        "ts": int(now),
+    }
+    lvl = int(level)
+    for i, existing in enumerate(hall):
+        if int((existing or {}).get("level", -1)) == lvl:
+            hall[i] = entry
+            state["hall_of_fame"] = hall
+            return
+    hall.append(entry)
+    state["hall_of_fame"] = hall
+
+
 def _sprint_donor_for_level(completed_level: int, cfg: Optional[dict] = None) -> int:
     """Donor pts for crowning the sprint when leaving this level: base + (level-1)*step.
 
@@ -1150,10 +1159,11 @@ def _add_bar_xp_and_level_up(
     """Add co-op bar XP, Shatter Event pips, level-ups, and Halls loops.
 
     Mutates state. Caller holds _lock.
-    Returns (leveled_up, level_up_info, shatter_events).
+    Returns (leveled_up, level_up_info, shatter_events, halls_looped).
     """
     max_lvl = _max_level(cfg)
     leveled_up = False
+    halls_looped = False
     level_up_info: Optional[dict] = None
     shatter_events: list[dict[str, Any]] = []
     state["bar_xp"] = int(state.get("bar_xp", 0)) + max(0, int(bar_xp_add))
@@ -1179,7 +1189,19 @@ def _add_bar_xp_and_level_up(
         overflow = int(state.get("bar_xp", 0)) - thresh
 
         if cur >= max_lvl:
-            # Halls repeatable loop — no sprint crown / donor
+            # Halls repeatable sprint loop — crown, lock, freeze badge, no donor
+            sprint_before = dict(state.get("sprint_xp") or {})
+            ineligible = _sprint_ineligible_keys(state)
+            winner_display, winner_xp, _gap = _pick_eligible_sprint_leader(
+                sprint_before, ineligible
+            )
+            winner_key = (winner_display or "").strip().lower()
+            zone = _zone_for_level(cur, cfg)
+            if winner_key:
+                _upsert_hall_entry(
+                    state, cur, zone, winner_display, winner_xp, now
+                )
+                _lock_sprint_winner(state, winner_key)
             ev = _grant_shatter_event(state, cfg, cur, reason="halls_loop")
             if ev:
                 shatter_events.append(ev)
@@ -1188,6 +1210,21 @@ def _add_bar_xp_and_level_up(
             state["bar_contrib"] = {}
             state["bar_xp"] = max(0, overflow)
             state["last_level_up_ts"] = now
+            halls_looped = True
+            loop_info = {
+                "reason": "halls_loop",
+                "from_level": cur,
+                "to_level": cur,
+                "from_zone": zone,
+                "to_zone": zone,
+                "winner": winner_display,
+                "winner_xp": winner_xp,
+                "newly_unlocked": [],
+                "donor_reward": 0,
+            }
+            if not leveled_up:
+                state["last_crown_reason"] = "halls_loop"
+                level_up_info = loop_info
             continue
 
         # Zone level-up — crown highest eligible sprint XP
@@ -1216,10 +1253,7 @@ def _add_bar_xp_and_level_up(
         })
         state["hall_of_fame"] = hall
         if winner_key:
-            winners = list(state.get("sprint_winners") or [])
-            if winner_key not in {str(w).lower() for w in winners}:
-                winners.append(winner_key)
-            state["sprint_winners"] = winners
+            _lock_sprint_winner(state, winner_key)
 
         # Level-up Shatter Event for the zone that just completed
         ev = _grant_shatter_event(state, cfg, old_level, reason="level_up")
@@ -1233,8 +1267,10 @@ def _add_bar_xp_and_level_up(
         state["shatter_claimed_pips"] = []
         state["last_level_up_ts"] = now
         leveled_up = True
+        state["last_crown_reason"] = "level_up"
         donor_reward = _sprint_donor_for_level(old_level, cfg) if winner_display else 0
         level_up_info = {
+            "reason": "level_up",
             "from_level": old_level,
             "to_level": new_level,
             "from_zone": old_zone,
@@ -1245,14 +1281,14 @@ def _add_bar_xp_and_level_up(
             "donor_reward": donor_reward,
         }
 
-    return leveled_up, level_up_info, shatter_events
+    return leveled_up, level_up_info, shatter_events, halls_looped
 
 
 def apply_bar_xp(username: str, xp: int) -> dict[str, Any]:
     """Add XP to the shared co-op bar only (no sprint/heat). Used by paid spends.
 
     Soft-floor apply_to_bar and per-user bar cap still apply. May level up and
-    crown the current summon sprint leader.
+    crown the current summon sprint leader, including Halls sprint loops.
     """
     cfg = load_config()
     display = (username or "").strip() or "Anonymous"
@@ -1274,6 +1310,7 @@ def apply_bar_xp(username: str, xp: int) -> dict[str, Any]:
                 "bar_threshold": _threshold_for_level(level, cfg),
                 "leveled_up": False,
                 "level_up": None,
+                "halls_looped": False,
                 "shatter_events": [],
             }
 
@@ -1291,7 +1328,7 @@ def apply_bar_xp(username: str, xp: int) -> dict[str, Any]:
             xp_mult = 1.0
 
         bar_xp_add = _cap_bar_contrib(state, key, bar_xp_add, cfg)
-        leveled_up, level_up_info, shatter_events = _add_bar_xp_and_level_up(
+        leveled_up, level_up_info, shatter_events, halls_looped = _add_bar_xp_and_level_up(
             state, bar_xp_add, cfg, now
         )
 
@@ -1319,6 +1356,7 @@ def apply_bar_xp(username: str, xp: int) -> dict[str, Any]:
             "bar_threshold": _threshold_for_level(level, cfg),
             "leveled_up": leveled_up,
             "level_up": level_up_info,
+            "halls_looped": halls_looped,
             "shatter_events": shatter_events,
             "heat_leader": heat_user,
             "heat_xp": heat_xp,
@@ -1406,7 +1444,7 @@ def apply_summon(username: str, monster: str) -> dict[str, Any]:
         last_mobs[key] = monster
         state["last_monster_by_user"] = last_mobs
 
-        leveled_up, level_up_info, shatter_events = _add_bar_xp_and_level_up(
+        leveled_up, level_up_info, shatter_events, halls_looped = _add_bar_xp_and_level_up(
             state, bar_xp_add, cfg, now
         )
 
@@ -1433,6 +1471,7 @@ def apply_summon(username: str, monster: str) -> dict[str, Any]:
             "bar_threshold": _threshold_for_level(int(state.get("level", 1)), cfg),
             "leveled_up": leveled_up,
             "level_up": level_up_info,
+            "halls_looped": halls_looped,
             "shatter_events": shatter_events,
             "heat_leader": heat_user,
             "heat_xp": heat_xp,
@@ -1521,6 +1560,7 @@ def get_state_payload() -> dict[str, Any]:
             "hall_of_fame": list(state.get("hall_of_fame") or []),
             "sprint_winners": sprint_winners,
             "last_level_up_ts": int(state.get("last_level_up_ts", 0) or 0),
+            "last_crown_reason": str(state.get("last_crown_reason") or ""),
             "session_summon_counts": dict(state.get("session_summon_counts") or {}),
             "heat_window_sec": window,
             "sprint_donor_reward": int(cfg.get("sprint_donor_reward", 100)),
