@@ -129,6 +129,24 @@ public class StreamingServer extends WebSocketServer {
 					addChatter(resp, usernameFinal);
 					broadcast(resp.toString());
 				}
+			} else if ("spawn_scale_config".equals(cmd)) {
+				Gdx.app.postRunnable(() -> {
+					String err = null;
+					try {
+						err = StreamingCommandHandler.handleSpawnScaleConfig(obj);
+					} catch (Throwable t) {
+						err = (t.getMessage() != null) ? t.getMessage() : "Unknown error";
+					}
+					boolean ok = (err == null);
+					JsonObject resp = new JsonObject();
+					resp.addProperty("type", "spawn_scale_config_result");
+					if (requestId != null && !requestId.isEmpty()) {
+						resp.addProperty("request_id", requestId);
+					}
+					resp.addProperty("success", ok);
+					if (err != null) resp.addProperty("error", err);
+					broadcast(resp.toString());
+				});
 			} else if ("spawn".equals(cmd)) {
 				String monster = obj.has("monster") ? obj.get("monster").getAsString() : null;
 				if (monster == null || monster.isEmpty()) return;

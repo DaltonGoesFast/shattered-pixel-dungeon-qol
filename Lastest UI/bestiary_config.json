@@ -56,7 +56,7 @@
     {
       "level": 1,
       "zone": "Sewers",
-      "bar_threshold": 1000,
+      "bar_threshold": 500,
       "pip_count": 3,
       "monsters": [
         "rat",
@@ -71,8 +71,8 @@
     {
       "level": 2,
       "zone": "Prison",
-      "bar_threshold": 2000,
-      "pip_count": 4,
+      "bar_threshold": 700,
+      "pip_count": 5,
       "monsters": [
         "skeleton",
         "dm100",
@@ -84,7 +84,7 @@
     {
       "level": 3,
       "zone": "Caves",
-      "bar_threshold": 3000,
+      "bar_threshold": 1000,
       "pip_count": 5,
       "monsters": [
         "bat",
@@ -96,7 +96,7 @@
     {
       "level": 4,
       "zone": "Metro",
-      "bar_threshold": 4000,
+      "bar_threshold": 1200,
       "pip_count": 6,
       "monsters": [
         "ghoul",
@@ -109,8 +109,8 @@
     {
       "level": 5,
       "zone": "Halls",
-      "bar_threshold": 5555,
-      "pip_count": 6,
+      "bar_threshold": 2222,
+      "pip_count": 10,
       "monsters": [
         "eye",
         "scorpio",

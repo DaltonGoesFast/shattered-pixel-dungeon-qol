@@ -62,5 +62,32 @@
   "donation_multiplier_cap": 4,
   "reset_debounce_hours": 4.0,
   "curse_class_kit_duration_turns": 100,
-  "death_cost_inflation_enabled": false
+  "death_cost_inflation_enabled": false,
+  "spawn_scale": {
+    "overall_power": 0.9,
+    "early_hp_min": 0.25,
+    "late_hp_min": 0.25,
+    "scorpio_hp_min": 0.15,
+    "early_sewers_dmg_mult": 0.25,
+    "late_sewers_dmg_mult": 0.25,
+    "early_sewers_dmg_floor": 0.05,
+    "late_sewers_dmg_floor": 0.05,
+    "prison_plus_dmg_floor": 0.15,
+    "early_dr_mult": 0.7,
+    "late_dr_mult": 0.7,
+    "dr_floor": 0.15,
+    "min_one_damage_vs_hero": true,
+    "sewers_one_damage_cap": true,
+    "eye_gaze_hero_ht_frac": 0.75,
+    "paralysis_enabled": true,
+    "paralysis_turns_gap_1": 0,
+    "paralysis_turns_gap_2": 1,
+    "paralysis_turns_gap_3": 2,
+    "paralysis_turns_gap_4": 3,
+    "xp_sewers": 2,
+    "xp_prison": 5,
+    "xp_caves": 8,
+    "xp_city": 11,
+    "xp_halls": 12
+  }
 }

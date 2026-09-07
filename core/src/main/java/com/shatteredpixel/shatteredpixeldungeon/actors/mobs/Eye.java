@@ -207,7 +207,7 @@ public class Eye extends Mob {
 
 				if (buff(SpawnScaled.class) != null) {
 					if (ch == Dungeon.hero) {
-						dmg = Math.round(Dungeon.hero.HT * 0.75f);
+						dmg = Math.round(Dungeon.hero.HT * com.shatteredpixel.shatteredpixeldungeon.utils.SpawnScaleConfig.eyeGazeHeroHtFrac);
 					} else {
 						dmg = Math.round(dmg * buff(SpawnScaled.class).damageFactor());
 					}

@@ -121,6 +121,10 @@ var _best_hall_color: ColorPickerButton
 var _best_banner_color: ColorPickerButton
 var _best_pip_claimed_color: ColorPickerButton
 var _best_pip_unclaimed_color: ColorPickerButton
+var _audio_device: OptionButton
+var _audio_volume: SpinBox
+var _audio_mute: CheckBox
+var _shatter_sfx_on: CheckBox
 var _remote_on: CheckBox
 var _remote_url: LineEdit
 var _remote_poll: SpinBox
@@ -786,6 +790,42 @@ func _build_ui() -> void:
 			["Level-up banner text color", _best_banner_color],
 		]
 	)
+
+	# --- Audio (device local; volume/mute remote) ---
+	var audio_sc := _make_scroll_vbox()
+	_add_settings_page("Audio", audio_sc)
+	_audio_device = OptionButton.new()
+	_audio_device.custom_minimum_size = Vector2(280, 0)
+	_audio_volume = _spin_f(0.0, 1.5, 0.05)
+	_audio_mute = CheckBox.new()
+	_shatter_sfx_on = CheckBox.new()
+	_add_section_header(audio_sc, "Output")
+	var audio_note := _section_note()
+	audio_note.text = (
+		"Pick the Windows playback device that matches your stream SFX bus (interface 3/4). "
+		+ "Device stays on this PC only; volume/mute sync via /points-config Companion."
+	)
+	(audio_sc.get_node("InnerVBox") as VBoxContainer).add_child(audio_note)
+	_add_rows(
+		audio_sc,
+		[
+			["Playback device", _audio_device],
+			["Master volume (0–1.5)", _audio_volume],
+			["Mute", _audio_mute],
+			["Shatter Event SFX", _shatter_sfx_on],
+		]
+	)
+	var audio_btns := HBoxContainer.new()
+	audio_btns.add_theme_constant_override("separation", 8)
+	var refresh_dev := Button.new()
+	refresh_dev.text = "Refresh devices"
+	refresh_dev.pressed.connect(_refresh_audio_devices)
+	var test_sfx := Button.new()
+	test_sfx.text = "Test shatter SFX"
+	test_sfx.pressed.connect(_on_test_shatter_sfx)
+	audio_btns.add_child(refresh_dev)
+	audio_btns.add_child(test_sfx)
+	(audio_sc.get_node("InnerVBox") as VBoxContainer).add_child(audio_btns)
 
 	# --- Remote settings (Flask /points-config companion section) ---
 	var remote_sc := _make_scroll_vbox()
@@ -1801,6 +1841,10 @@ func _sync_from_config() -> void:
 	_best_banner_color.color = CompanionConfig.bestiary_banner_font_color
 	_best_pip_claimed_color.color = CompanionConfig.bestiary_shatter_pip_claimed_color
 	_best_pip_unclaimed_color.color = CompanionConfig.bestiary_shatter_pip_unclaimed_color
+	_refresh_audio_devices()
+	_audio_volume.value = CompanionConfig.audio_volume
+	_audio_mute.button_pressed = CompanionConfig.audio_mute
+	_shatter_sfx_on.button_pressed = CompanionConfig.shatter_sfx_enabled
 	_remote_on.button_pressed = CompanionConfig.remote_settings_enabled
 	_remote_url.text = CompanionConfig.remote_settings_base_url
 	_remote_poll.value = CompanionConfig.remote_settings_poll_sec
@@ -2216,6 +2260,10 @@ func _on_apply_pressed() -> void:
 	CompanionConfig.bestiary_banner_font_color = _best_banner_color.color
 	CompanionConfig.bestiary_shatter_pip_claimed_color = _best_pip_claimed_color.color
 	CompanionConfig.bestiary_shatter_pip_unclaimed_color = _best_pip_unclaimed_color.color
+	CompanionConfig.audio_output_device = _selected_audio_device()
+	CompanionConfig.audio_volume = clampf(float(_audio_volume.value), 0.0, 1.5)
+	CompanionConfig.audio_mute = _audio_mute.button_pressed
+	CompanionConfig.shatter_sfx_enabled = _shatter_sfx_on.button_pressed
 	CompanionConfig.remote_settings_enabled = _remote_on.button_pressed
 	CompanionConfig.remote_settings_base_url = _remote_url.text.strip_edges()
 	CompanionConfig.remote_settings_poll_sec = maxf(0.5, float(_remote_poll.value))
@@ -2336,6 +2384,41 @@ func _on_apply_pressed() -> void:
 	_chrome_draft = CompanionConfig.duplicate_chrome_boxes_for_profile(_chrome_profile_name())
 	_rebuild_chrome_tabs()
 	_refresh_remote_status()
+
+
+
+func _refresh_audio_devices() -> void:
+	if _audio_device == null:
+		return
+	var previous := ""
+	if _audio_device.selected >= 0:
+		previous = _audio_device.get_item_text(_audio_device.selected)
+	if previous.is_empty():
+		previous = CompanionConfig.audio_output_device
+	_audio_device.clear()
+	var devices := CompanionAudio.list_output_devices()
+	var pick := 0
+	for i in range(devices.size()):
+		var name := str(devices[i])
+		_audio_device.add_item(name)
+		if name == previous:
+			pick = i
+	if _audio_device.item_count > 0:
+		_audio_device.select(pick)
+
+
+func _selected_audio_device() -> String:
+	if _audio_device == null or _audio_device.selected < 0:
+		return CompanionConfig.audio_output_device
+	var name := _audio_device.get_item_text(_audio_device.selected).strip_edges()
+	return name if not name.is_empty() else "Default"
+
+
+func _on_test_shatter_sfx() -> void:
+	# Preview uses current UI values without requiring Apply first.
+	CompanionAudio.apply_output_device(_selected_audio_device())
+	CompanionAudio.apply_volume(float(_audio_volume.value), _audio_mute.button_pressed)
+	CompanionAudio.play_shatter(true)
 
 
 func _refresh_remote_status() -> void:

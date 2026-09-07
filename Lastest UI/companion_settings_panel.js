@@ -26,6 +26,7 @@
     { id: 'alerts', label: 'Alerts' },
     { id: 'paid', label: 'Paid notices' },
     { id: 'bestiary_hud', label: 'Bestiary HUD' },
+    { id: 'audio', label: 'Audio' },
     { id: 'id', label: 'ID overlay' },
     { id: 'corners', label: 'Corners' },
     { id: 'live_water', label: 'Live water' },
@@ -36,18 +37,30 @@
     { id: 'advanced', label: 'Advanced' },
   ];
 
-  /** @type {{ path: string, type: string, label: string, min?: number, max?: number, step?: number, options?: string[][] }[]} */
+  /** @type {{ path: string, type: string, label: string, min?: number, max?: number, step?: number, options?: string[][], group?: string }[]} */
+  function applySectionMarkers(defs) {
+    let group = '';
+    const out = [];
+    (defs || []).forEach((d) => {
+      if (d && d.section != null) { group = d.section; return; }
+      out.push(Object.assign({}, d, { group }));
+    });
+    return out;
+  }
+
   function uiFields(prefix, defs) {
-    return defs.map((d) => Object.assign({}, d, { path: prefix + d.key }));
+    return applySectionMarkers(defs).map((d) => Object.assign({}, d, { path: prefix + d.key }));
   }
 
   const FIELD_GROUPS = {
     alerts: uiFields('ui.', [
+      { section: 'Zone' },
       { key: 'alert_zone_x_px', type: 'int', label: 'Zone X' },
       { key: 'alert_zone_y_px', type: 'int', label: 'Zone Y' },
       { key: 'alert_zone_width_px', type: 'int', label: 'Zone width' },
       { key: 'alert_zone_height_px', type: 'int', label: 'Zone height (0=fill)' },
       { key: 'alert_zone_bottom_margin_px', type: 'int', label: 'Bottom margin' },
+      { section: 'Look' },
       { key: 'alert_title_font_size_px', type: 'int', label: 'Title font', min: 8, max: 96 },
       { key: 'alert_subtitle_font_size_px', type: 'int', label: 'Subtitle font', min: 8, max: 96 },
       { key: 'alert_chrome_style', type: 'chrome', label: 'Chrome style' },
@@ -57,6 +70,7 @@
       { key: 'alert_command_icon_size_px', type: 'int', label: 'Icon size', min: 8, max: 256 },
       { key: 'alert_mob_idle_anim_fps', type: 'float', label: 'Mob anim FPS', min: 0.5, max: 30, step: 0.5 },
       { key: 'alert_text_align', type: 'select', label: 'Text align', options: ALIGNS },
+      { section: 'Timing' },
       { key: 'alert_queue_max', type: 'int', label: 'Queue max', min: 1, max: 32 },
       { key: 'alert_hold_sec', type: 'float', label: 'Hold (sec)', min: 0.1, max: 30, step: 0.05 },
       { key: 'alert_fade_in_sec', type: 'float', label: 'Fade in', min: 0.05, max: 5, step: 0.05 },
@@ -64,27 +78,32 @@
       { key: 'alert_hold_sec_when_free', type: 'float', label: 'Hold when free', min: 0.05, max: 10, step: 0.05 },
       { key: 'alert_fade_in_sec_when_free', type: 'float', label: 'Fade in when free', min: 0.05, max: 5, step: 0.05 },
       { key: 'alert_fade_out_sec_when_free', type: 'float', label: 'Fade out when free', min: 0.05, max: 5, step: 0.05 },
+      { section: 'Show' },
       { key: 'show_pending_udp_alerts', type: 'bool', label: 'Show pending UDP' },
       { key: 'show_failed_command_alerts', type: 'bool', label: 'Show failed commands' },
       { key: 'show_ping_alerts', type: 'bool', label: 'Show ping alerts' },
       { key: 'hud_status_panel_visible', type: 'bool', label: 'HUD status panel' },
+      { section: 'Tips' },
       { key: 'custom_alerts_enabled', type: 'bool', label: 'Enable tip toasts' },
       { key: 'custom_alerts_interval_sec', type: 'float', label: 'Tip rotate interval', min: 5, max: 600, step: 1 },
       { key: 'custom_alerts_hold_sec', type: 'float', label: 'Tip hold (sec)', min: 0.5, max: 30, step: 0.25 },
     ]),
     paid: uiFields('ui.', [
+      { section: 'Zone' },
       { key: 'paid_notice_enabled', type: 'bool', label: 'Enabled' },
       { key: 'paid_notice_zone_x_px', type: 'int', label: 'Zone X' },
       { key: 'paid_notice_zone_y_px', type: 'int', label: 'Zone Y' },
       { key: 'paid_notice_zone_width_px', type: 'int', label: 'Zone width' },
       { key: 'paid_notice_zone_height_px', type: 'int', label: 'Zone height' },
       { key: 'paid_notice_zone_bottom_margin_px', type: 'int', label: 'Bottom margin' },
+      { section: 'Type' },
       { key: 'paid_notice_kind_font_size_px', type: 'int', label: 'Kind font', min: 8, max: 96 },
       { key: 'paid_notice_title_font_size_px', type: 'int', label: 'Title font', min: 8, max: 96 },
       { key: 'paid_notice_body_font_size_px', type: 'int', label: 'Body font', min: 8, max: 96 },
       { key: 'paid_notice_kind_font_color', type: 'color', label: 'Kind color' },
       { key: 'paid_notice_title_font_color', type: 'color', label: 'Title color' },
       { key: 'paid_notice_body_font_color', type: 'color', label: 'Body color' },
+      { section: 'Chrome' },
       { key: 'paid_notice_chrome_style', type: 'chrome', label: 'Chrome style' },
       { key: 'paid_notice_chrome_scale', type: 'float', label: 'Chrome scale', min: 0.5, max: 4, step: 0.05 },
       { key: 'paid_notice_padding_h_px', type: 'int', label: 'Pad H' },
@@ -93,38 +112,45 @@
       { key: 'paid_notice_text_align', type: 'select', label: 'Align', options: ALIGNS },
       { key: 'paid_notice_text_shadow', type: 'bool', label: 'Text shadow' },
       { key: 'paid_notice_pop_scale', type: 'bool', label: 'Pop scale' },
+      { section: 'Timing' },
       { key: 'paid_notice_queue_max', type: 'int', label: 'Queue max', min: 1, max: 32 },
       { key: 'paid_notice_default_ttl_sec', type: 'float', label: 'Hold (sec)', min: 0.5, max: 60, step: 0.25 },
       { key: 'paid_notice_fade_in_sec', type: 'float', label: 'Fade in', min: 0.05, max: 5, step: 0.05 },
       { key: 'paid_notice_fade_out_sec', type: 'float', label: 'Fade out', min: 0.05, max: 5, step: 0.05 },
+      { section: 'Events' },
       { key: 'paid_notice_enable_superchat', type: 'bool', label: 'Superchat' },
       { key: 'paid_notice_enable_gifted_membership', type: 'bool', label: 'Gifted membership' },
       { key: 'paid_notice_enable_sub', type: 'bool', label: 'Sub' },
       { key: 'paid_notice_enable_highlight', type: 'bool', label: 'Highlight' },
     ]),
     bestiary_hud: uiFields('ui.', [
+      { section: 'Zone' },
       { key: 'bestiary_zone_x_px', type: 'int', label: 'Zone X' },
       { key: 'bestiary_zone_y_px', type: 'int', label: 'Zone Y' },
       { key: 'bestiary_zone_width_px', type: 'int', label: 'Zone width' },
       { key: 'bestiary_zone_height_px', type: 'int', label: 'Zone height (0=fit)' },
       { key: 'bestiary_zone_bottom_margin_px', type: 'int', label: 'Bottom margin' },
       { key: 'bestiary_panel_pad_px', type: 'int', label: 'Panel pad', min: 0, max: 64 },
+      { section: 'Scale' },
       { key: 'bestiary_hud_scale', type: 'float', label: 'HUD scale', min: 0.5, max: 4, step: 0.05 },
       { key: 'bestiary_chrome_scale', type: 'float', label: 'Chrome scale', min: 0.5, max: 4, step: 0.05 },
       { key: 'bestiary_exp_bar_width_px', type: 'int', label: 'Exp bar width', min: 64, max: 1600 },
       { key: 'bestiary_exp_bar_height_scale', type: 'float', label: 'Exp bar height scale', min: 0.5, max: 4, step: 0.05 },
       { key: 'bestiary_use_compact_exp_bar', type: 'bool', label: 'Compact exp bar' },
+      { section: 'Text' },
       { key: 'bestiary_header_format', type: 'text', label: 'Header format' },
       { key: 'bestiary_zone_font_size_px', type: 'int', label: 'Zone font', min: 8, max: 96 },
       { key: 'bestiary_chip_font_size_px', type: 'int', label: 'Chip font', min: 8, max: 96 },
       { key: 'bestiary_chip_name_max_chars', type: 'int', label: 'Chip name max', min: 0, max: 32 },
       { key: 'bestiary_hall_name_max_chars', type: 'int', label: 'Hall name max', min: 0, max: 32 },
       { key: 'bestiary_truncate_names', type: 'bool', label: 'Truncate names' },
+      { section: 'Chips' },
       { key: 'bestiary_show_xp_text', type: 'bool', label: 'Show XP text' },
       { key: 'bestiary_xp_text_over_bar', type: 'bool', label: 'XP text over bar' },
       { key: 'bestiary_show_sprint_chip', type: 'bool', label: 'Sprint chip' },
       { key: 'bestiary_show_heat_chip', type: 'bool', label: 'Heat chip' },
       { key: 'bestiary_show_hall', type: 'bool', label: 'Hall of fame' },
+      { section: 'Colors' },
       { key: 'bestiary_zone_font_color', type: 'color', label: 'Zone color' },
       { key: 'bestiary_xp_font_color', type: 'color', label: 'XP color' },
       { key: 'bestiary_sprint_font_color', type: 'color', label: 'Sprint color' },
@@ -133,17 +159,25 @@
       { key: 'bestiary_banner_font_color', type: 'color', label: 'Banner color' },
       { key: 'bestiary_shatter_pip_claimed_color', type: 'color', label: 'Shatter pip claimed' },
       { key: 'bestiary_shatter_pip_unclaimed_color', type: 'color', label: 'Shatter pip unclaimed' },
+      { section: 'Banner' },
       { key: 'bestiary_level_up_banner_sec', type: 'float', label: 'Banner duration', min: 0.5, max: 30, step: 0.25 },
       { key: 'bestiary_level_up_banner_scale', type: 'float', label: 'Banner scale', min: 0.25, max: 8, step: 0.05 },
       { key: 'bestiary_level_up_banner_font_size_px', type: 'int', label: 'Banner font', min: 8, max: 96 },
     ]),
+    audio: uiFields('ui.', [
+      { key: 'audio_volume', type: 'float', label: 'Master volume (0–1.5)', min: 0, max: 1.5, step: 0.05 },
+      { key: 'audio_mute', type: 'bool', label: 'Mute' },
+      { key: 'shatter_sfx_enabled', type: 'bool', label: 'Shatter Event SFX' },
+    ]),
     id: uiFields('ui.', [
+      { section: 'Zone' },
       { key: 'id_overlay_enabled', type: 'bool', label: 'Enabled' },
       { key: 'id_zone_x_px', type: 'int', label: 'Zone X' },
       { key: 'id_zone_y_px', type: 'int', label: 'Zone Y' },
       { key: 'id_zone_width_px', type: 'int', label: 'Zone width' },
       { key: 'id_zone_height_px', type: 'int', label: 'Zone height' },
       { key: 'id_zone_bottom_margin_px', type: 'int', label: 'Bottom margin' },
+      { section: 'Cells' },
       { key: 'id_cell_width_px', type: 'int', label: 'Cell width' },
       { key: 'id_cell_height_px', type: 'int', label: 'Cell height' },
       { key: 'id_cell_padding_px', type: 'int', label: 'Cell padding' },
@@ -153,6 +187,7 @@
       { key: 'icon_cell_background_color', type: 'color', label: 'Cell background' },
     ]),
     corners: uiFields('ui.', [
+      { section: 'Spend' },
       { key: 'spend_indicator_visible', type: 'bool', label: 'Spend visible' },
       { key: 'spend_indicator_corner', type: 'select', label: 'Spend corner', options: CORNERS },
       { key: 'spend_indicator_margin_x', type: 'int', label: 'Spend margin X' },
@@ -162,6 +197,7 @@
       { key: 'spend_indicator_font_size_px', type: 'int', label: 'Spend font', min: 8, max: 48 },
       { key: 'spend_indicator_chrome_style', type: 'chrome', label: 'Spend chrome' },
       { key: 'spend_indicator_chrome_scale', type: 'float', label: 'Spend chrome scale', min: 0.5, max: 4, step: 0.05 },
+      { section: 'Free promos' },
       { key: 'free_promos_panel_visible', type: 'bool', label: 'Free promos visible' },
       { key: 'free_promos_corner', type: 'select', label: 'Free corner', options: CORNERS },
       { key: 'free_promos_margin_x', type: 'int', label: 'Free margin X' },
@@ -172,6 +208,7 @@
       { key: 'free_promos_max_width_px', type: 'int', label: 'Free max width', min: 160, max: 1600 },
       { key: 'free_promos_chrome_style', type: 'chrome', label: 'Free chrome' },
       { key: 'free_promos_chrome_scale', type: 'float', label: 'Free chrome scale', min: 0.5, max: 4, step: 0.05 },
+      { section: '2×' },
       { key: 'double_points_panel_visible', type: 'bool', label: '2× visible' },
       { key: 'double_points_corner', type: 'select', label: '2× corner', options: CORNERS },
       { key: 'double_points_margin_x', type: 'int', label: '2× margin X' },
@@ -184,25 +221,31 @@
       { key: 'double_points_chrome_scale', type: 'float', label: '2× chrome scale', min: 0.5, max: 4, step: 0.05 },
     ]),
     live_water: uiFields('ui.', [
+      { section: 'Size' },
       { key: 'live_water_bottom_bar_px', type: 'int', label: 'Bottom bar height' },
       { key: 'live_water_left_strip_px', type: 'int', label: 'Left strip width' },
       { key: 'live_water_left_strip_top_px', type: 'int', label: 'Left strip top inset' },
+      { section: 'Fade' },
       { key: 'live_water_gradient_fade_start', type: 'float', label: 'Fade start Y', min: 0, max: 1, step: 0.01 },
       { key: 'live_water_gradient_fade_end', type: 'float', label: 'Fade end Y', min: 0, max: 1, step: 0.01 },
       { key: 'live_water_edge_feather_v_px', type: 'int', label: 'Edge feather V', min: 0, max: 512 },
+      { section: 'Window' },
       { key: 'window_per_pixel_transparency_enabled', type: 'bool', label: 'Transparent window' },
       { key: 'render_max_fps', type: 'int', label: 'Max FPS (0=uncapped)', min: 0, max: 240 },
     ]),
-    safe_network: [
+    safe_network: applySectionMarkers([
+      { section: 'OBS' },
       { path: 'network.obs_scene_sync_enabled', type: 'bool', label: 'OBS scene sync' },
       { path: 'network.obs_pause_scene_name', type: 'text', label: 'PAUSE if name contains' },
       { path: 'network.obs_main_scene_name', type: 'text', label: 'MAIN if name contains' },
       { path: 'network.obs_log_program_scene', type: 'bool', label: 'Log program scene' },
+      { section: 'Features' },
       { path: 'network.summon_march_enabled', type: 'bool', label: 'Summon march enabled' },
       { path: 'network.summon_march_skip_backlog', type: 'bool', label: 'Skip march backlog' },
       { path: 'network.bestiary_hud_enabled', type: 'bool', label: 'Bestiary HUD enabled' },
-    ],
+    ]),
     vertical_zones: uiFields('ui_vertical.', [
+      { section: 'Visible' },
       { key: 'vertical_window_enabled', type: 'bool', label: 'Vertical window enabled' },
       { key: 'show_live_water', type: 'bool', label: 'Show live water' },
       { key: 'show_title', type: 'bool', label: 'Show title' },
@@ -217,32 +260,38 @@
       { key: 'show_free_promos', type: 'bool', label: 'Show free promos' },
       { key: 'show_double_points', type: 'bool', label: 'Show 2×' },
       { key: 'hide_spend_when_off', type: 'bool', label: 'Hide spend when off' },
+      { section: 'Alert zone' },
       { key: 'alert_zone_x_px', type: 'int', label: 'Alert X' },
       { key: 'alert_zone_y_px', type: 'int', label: 'Alert Y' },
       { key: 'alert_zone_width_px', type: 'int', label: 'Alert W' },
       { key: 'alert_zone_height_px', type: 'int', label: 'Alert H' },
       { key: 'alert_zone_bottom_margin_px', type: 'int', label: 'Alert bottom margin' },
+      { section: 'ID zone' },
       { key: 'id_zone_x_px', type: 'int', label: 'ID X' },
       { key: 'id_zone_y_px', type: 'int', label: 'ID Y' },
       { key: 'id_zone_width_px', type: 'int', label: 'ID W' },
       { key: 'id_zone_height_px', type: 'int', label: 'ID H' },
       { key: 'id_zone_bottom_margin_px', type: 'int', label: 'ID bottom margin' },
+      { section: 'Bestiary zone' },
       { key: 'bestiary_zone_x_px', type: 'int', label: 'Bestiary X' },
       { key: 'bestiary_zone_y_px', type: 'int', label: 'Bestiary Y' },
       { key: 'bestiary_zone_width_px', type: 'int', label: 'Bestiary W' },
       { key: 'bestiary_zone_height_px', type: 'int', label: 'Bestiary H' },
       { key: 'bestiary_zone_bottom_margin_px', type: 'int', label: 'Bestiary bottom margin' },
+      { section: 'Paid zone' },
       { key: 'paid_notice_zone_x_px', type: 'int', label: 'Paid X' },
       { key: 'paid_notice_zone_y_px', type: 'int', label: 'Paid Y' },
       { key: 'paid_notice_zone_width_px', type: 'int', label: 'Paid W' },
       { key: 'paid_notice_zone_height_px', type: 'int', label: 'Paid H' },
       { key: 'paid_notice_zone_bottom_margin_px', type: 'int', label: 'Paid bottom margin' },
+      { section: 'Water' },
       { key: 'live_water_bottom_bar_px', type: 'int', label: 'Water bottom bar' },
       { key: 'live_water_left_strip_px', type: 'int', label: 'Water left strip' },
       { key: 'live_water_left_strip_top_px', type: 'int', label: 'Water left top' },
       { key: 'live_water_gradient_fade_start', type: 'float', label: 'Water fade start', min: 0, max: 1, step: 0.01 },
       { key: 'live_water_gradient_fade_end', type: 'float', label: 'Water fade end', min: 0, max: 1, step: 0.01 },
       { key: 'live_water_edge_feather_v_px', type: 'int', label: 'Water feather' },
+      { section: 'Corners' },
       { key: 'spend_indicator_corner', type: 'select', label: 'Spend corner', options: CORNERS },
       { key: 'spend_indicator_margin_x', type: 'int', label: 'Spend margin X' },
       { key: 'spend_indicator_margin_y', type: 'int', label: 'Spend margin Y' },
@@ -254,6 +303,7 @@
       { key: 'double_points_margin_y', type: 'int', label: '2× margin Y' },
     ]),
     summon: uiFields('ui.', [
+      { section: 'March' },
       { key: 'summon_march_duration_sec', type: 'float', label: 'Duration (sec)', min: 1, max: 60, step: 0.5 },
       { key: 'summon_march_max_concurrent', type: 'int', label: 'Max concurrent', min: 1, max: 32 },
       { key: 'summon_march_lane_y_min_fraction', type: 'float', label: 'Lane Y min', min: 0.05, max: 0.95, step: 0.01 },
@@ -262,6 +312,7 @@
       { key: 'summon_march_edge_margin_px', type: 'int', label: 'Edge margin' },
       { key: 'summon_march_mob_fps', type: 'float', label: 'Mob FPS', min: 1, max: 24, step: 0.5 },
       { key: 'summon_march_sprite_size_px', type: 'int', label: 'Sprite size', min: 16, max: 256 },
+      { section: 'Labels' },
       { key: 'summon_march_show_username', type: 'bool', label: 'Show username' },
       { key: 'summon_march_username_centered', type: 'bool', label: 'Username centered' },
       { key: 'summon_march_show_monster_name', type: 'bool', label: 'Show monster name' },
@@ -273,6 +324,7 @@
       { key: 'summon_march_username_offset_y', type: 'int', label: 'Username offset Y' },
       { key: 'summon_march_monster_offset_x', type: 'int', label: 'Monster offset X' },
       { key: 'summon_march_monster_offset_y', type: 'int', label: 'Monster offset Y' },
+      { section: 'Crowned' },
       { key: 'summon_crowned_sprite_scale', type: 'float', label: 'Crowned scale', min: 0.5, max: 3, step: 0.01 },
       { key: 'summon_crowned_mob_modulate', type: 'color', label: 'Crowned modulate' },
       { key: 'summon_crowned_show_glow', type: 'bool', label: 'Show glow' },
@@ -367,11 +419,10 @@
   function renderField(f) {
     const id = fieldId(f.path);
     const row = document.createElement('div');
-    row.className = 'row companion-field-row';
+    row.className = 'row companion-field-row companion-field-' + f.type;
     const lab = document.createElement('label');
     lab.htmlFor = id;
     lab.textContent = f.label;
-    row.appendChild(lab);
     let input;
     if (f.type === 'bool') {
       input = document.createElement('input');
@@ -395,7 +446,6 @@
       input = document.createElement('input');
       input.type = 'text';
       input.id = id;
-      input.style.width = 'min(100%, 280px)';
     } else {
       input = document.createElement('input');
       input.type = 'number';
@@ -409,8 +459,49 @@
     input.dataset.compType = f.type;
     input.addEventListener('input', markDirty);
     input.addEventListener('change', markDirty);
-    row.appendChild(input);
+    if (f.type === 'bool') {
+      lab.textContent = '';
+      lab.appendChild(input);
+      lab.appendChild(document.createTextNode(' ' + f.label));
+      row.appendChild(lab);
+    } else {
+      row.appendChild(lab);
+      row.appendChild(input);
+    }
     return row;
+  }
+
+  function appendFields(host, fields) {
+    const list = fields || [];
+    let i = 0;
+    while (i < list.length) {
+      const g = list[i].group || '';
+      const chunk = [];
+      while (i < list.length && (list[i].group || '') === g) chunk.push(list[i++]);
+      const wrap = document.createElement('div');
+      wrap.className = 'companion-group';
+      if (g) {
+        const h = document.createElement('h4');
+        h.className = 'companion-group-title';
+        h.textContent = g;
+        wrap.appendChild(h);
+      }
+      const nums = chunk.filter((f) => f.type !== 'bool');
+      const bools = chunk.filter((f) => f.type === 'bool');
+      if (nums.length) {
+        const grid = document.createElement('div');
+        grid.className = 'companion-fields';
+        nums.forEach((f) => grid.appendChild(renderField(f)));
+        wrap.appendChild(grid);
+      }
+      if (bools.length) {
+        const checks = document.createElement('div');
+        checks.className = 'companion-checks';
+        bools.forEach((f) => checks.appendChild(renderField(f)));
+        wrap.appendChild(checks);
+      }
+      host.appendChild(wrap);
+    }
   }
 
   function fillField(f) {
@@ -459,10 +550,10 @@
     SCENE_KEYS.forEach((key) => {
       const e = ss[key] || { pause: true, main: true, other: true };
       const row = document.createElement('div');
-      row.className = 'row';
+      row.className = 'row companion-gate-row';
       row.dataset.sgKey = key;
       row.innerHTML =
-        '<label style="min-width:7rem;">' + key + '</label>' +
+        '<label class="companion-gate-name">' + key + '</label>' +
         '<label><input type="checkbox" data-sg="pause"' + (e.pause ? ' checked' : '') + '> pause</label>' +
         '<label><input type="checkbox" data-sg="main"' + (e.main ? ' checked' : '') + '> main</label>' +
         '<label><input type="checkbox" data-sg="other"' + (e.other ? ' checked' : '') + '> other</label>';
@@ -766,7 +857,7 @@
           <button type="button" id="comp_chrome_add">Add</button>
           <button type="button" id="comp_chrome_remove">Remove</button>
         </div>
-        <div id="comp_chrome_editor"></div>
+        <div id="comp_chrome_editor" class="companion-fields"></div>
       `;
       page.querySelector('#comp_chrome_profile').addEventListener('change', (e) => {
         commitChromeEditor();
@@ -802,18 +893,17 @@
     if (id === 'alerts') {
       page.innerHTML = `
         <h3 class="companion-page-title">Alerts</h3>
-        <div class="companion-fields" data-fields="alerts"></div>
-        <h4 style="margin-top:1rem;">Custom tip toasts</h4>
+        <div class="companion-page-body"></div>
+        <h4>Custom tip toasts</h4>
         <p class="sub">Rotating tips in the alert zone (yield to command toasts). Scene gates: Tip toasts. UDP: {"ui":"tip","title":"…","message":"…"}</p>
         <div class="row" style="gap:0.5rem;flex-wrap:wrap;">
           <select id="comp_tip_pick" style="min-width:160px;"></select>
           <button type="button" id="comp_tip_add">Add</button>
           <button type="button" id="comp_tip_remove">Remove</button>
         </div>
-        <div id="comp_tip_editor"></div>
+        <div id="comp_tip_editor" class="companion-fields"></div>
       `;
-      const host = page.querySelector('.companion-fields');
-      (FIELD_GROUPS.alerts || []).forEach((f) => host.appendChild(renderField(f)));
+      appendFields(page.querySelector('.companion-page-body'), FIELD_GROUPS.alerts || []);
       page.querySelector('#comp_tip_pick').addEventListener('change', (e) => {
         commitTipEditor();
         _tipIndex = parseInt(e.target.value, 10) || 0;
@@ -858,11 +948,10 @@
       return;
     }
     const title = TABS.find((t) => t.id === id)?.label || id;
-    page.innerHTML = `<h3 class="companion-page-title">${title}</h3><div class="companion-fields" data-fields="${id}"></div>`;
-    const host = page.querySelector('.companion-fields');
+    page.innerHTML = `<h3 class="companion-page-title">${title}</h3><div class="companion-page-body"></div>`;
     const groupKey = id === 'vertical' ? 'vertical_zones' : id === 'bestiary_hud' ? 'bestiary_hud' : id;
     const fields = FIELD_GROUPS[groupKey] || FIELD_GROUPS[id] || [];
-    fields.forEach((f) => host.appendChild(renderField(f)));
+    appendFields(page.querySelector('.companion-page-body'), fields);
   }
 
   function showTab(id) {

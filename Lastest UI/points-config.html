@@ -196,30 +196,31 @@
     input[type="number"] { width: 80px; }
     .companion-layout {
       display: flex;
-      gap: 0.75rem;
+      gap: 0.55rem;
       align-items: stretch;
-      min-height: 320px;
-      margin-top: 0.35rem;
+      min-height: 0;
+      margin-top: 0.25rem;
     }
     .companion-nav {
-      flex: 0 0 168px;
+      flex: 0 0 132px;
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 1px;
       max-height: 520px;
       overflow-y: auto;
       border-right: 1px solid var(--spd-border);
-      padding-right: 0.5rem;
+      padding-right: 0.4rem;
     }
     .companion-nav-btn {
       text-align: left;
       background: transparent;
       color: var(--spd-muted-on-surface);
       border: 1px solid transparent;
-      padding: 0.4rem 0.55rem;
+      padding: 0.22rem 0.4rem;
       border-radius: 4px;
       cursor: pointer;
-      font-size: 0.85rem;
+      font-size: 0.78rem;
+      margin-top: 0;
     }
     .companion-nav-btn:hover { color: var(--spd-text); background: var(--spd-surface-dark); }
     .companion-nav-btn.active {
@@ -228,17 +229,39 @@
       border-color: var(--spd-accent);
     }
     .companion-pages { flex: 1; min-width: 0; max-height: 520px; overflow-y: auto; }
-    .companion-page-title { margin: 0 0 0.5rem; font-size: 1rem; }
+    .companion-page-title { margin: 0 0 0.25rem; font-size: 0.82rem; color: var(--spd-muted-on-surface); letter-spacing: 0.03em; text-transform: uppercase; }
+    .companion-page h4 { margin: 0.45rem 0 0.2rem; font-size: 0.78rem; color: var(--spd-muted-on-surface); }
+    .companion-group {
+      margin-top: 0.4rem;
+      padding-top: 0.3rem;
+      border-top: 1px solid var(--spd-border);
+    }
+    .companion-group:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+    .companion-group-title {
+      margin: 0 0 0.12rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--spd-muted-on-surface);
+    }
+    .companion-page .sub { margin-bottom: 0.3rem; font-size: 0.78rem; }
     .companion-footer {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 0.5rem 0.75rem;
-      margin-top: 0.75rem;
-      padding-top: 0.65rem;
+      gap: 0.35rem 0.6rem;
+      margin-top: 0.5rem;
+      padding-top: 0.45rem;
       border-top: 1px solid var(--spd-border);
     }
-    .companion-rev, .companion-dirty-label { font-size: 0.85rem; color: var(--spd-muted-on-surface); }
+    .companion-footer button,
+    .companion-page button {
+      margin-top: 0;
+      padding: 0.22rem 0.55rem;
+      font-size: 0.78rem;
+    }
+    .companion-rev, .companion-dirty-label { font-size: 0.8rem; color: var(--spd-muted-on-surface); }
     .companion-dirty-label.companion-dirty { color: var(--spd-accent); }
     .companion-json {
       width: 100%; box-sizing: border-box;
@@ -246,12 +269,60 @@
       background: var(--spd-surface-dark); color: var(--spd-text);
       border: 1px solid var(--spd-border); border-radius: 4px; padding: 0.4rem;
     }
-    .companion-gates { font-size: 0.8rem; }
-    .companion-field-row label { min-width: 160px; }
-    .companion-lead { margin-bottom: 0.5rem; }
+    .companion-fields {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(188px, 1fr));
+      gap: 1px 10px;
+    }
+    .companion-field-row {
+      margin-bottom: 0;
+      gap: 6px;
+      min-width: 0;
+      min-height: 1.5rem;
+    }
+    .companion-field-row label {
+      min-width: 0;
+      flex: 1 1 auto;
+      font-size: 0.78rem;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .companion-field-row input[type="number"] {
+      width: 58px; padding: 0.12rem 0.28rem; font-size: 0.8rem; flex: 0 0 58px;
+    }
+    .companion-field-row input[type="text"] {
+      width: auto; min-width: 0; flex: 1 1 80px; padding: 0.12rem 0.28rem; font-size: 0.8rem;
+    }
+    .companion-field-row select {
+      min-width: 0; flex: 1 1 90px; max-width: 100%; padding: 0.12rem 0.25rem; font-size: 0.78rem;
+    }
+    .companion-field-row input[type="color"] {
+      width: 36px; height: 22px; padding: 1px; flex: 0 0 36px;
+    }
+    .companion-checks {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; margin-top: 0.25rem;
+    }
+    .companion-checks .companion-field-row { margin: 0; }
+    .companion-field-bool label { min-width: 0; display: inline-flex; align-items: center; gap: 4px; }
+    .companion-gates {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 1px 10px;
+      font-size: 0.78rem;
+    }
+    .companion-gate-row {
+      margin-bottom: 0;
+      gap: 0.4rem;
+      min-height: 1.4rem;
+    }
+    .companion-gate-row label { min-width: 0; font-size: 0.78rem; }
+    .companion-gate-name { flex: 1 1 5.5rem; min-width: 5.5rem; overflow: hidden; text-overflow: ellipsis; }
+    .companion-lead { margin-bottom: 0.3rem; font-size: 0.8rem; }
     @media (max-width: 720px) {
       .companion-layout { flex-direction: column; }
-      .companion-nav { flex: none; flex-direction: row; flex-wrap: wrap; max-height: none; border-right: none; border-bottom: 1px solid var(--spd-border); padding-bottom: 0.5rem; }
+      .companion-nav { flex: none; flex-direction: row; flex-wrap: wrap; max-height: none; border-right: none; border-bottom: 1px solid var(--spd-border); padding-bottom: 0.4rem; }
     }
     .monsters {
       display: grid;
@@ -513,6 +584,49 @@
     #themeCustomizePanel .theme-color-row label { color: var(--spd-text-on-surface); }
     #themeCustomizePanel p { color: var(--spd-muted-on-surface); }
     .theme-preset-btn:hover { background: var(--spd-surface) !important; color: var(--spd-text-on-surface) !important; border-color: var(--spd-accent) !important; }
+    #section-spawn_scale { padding: 0.7rem 0.9rem; }
+    #section-spawn_scale > h2 { margin-bottom: 0.3rem; }
+    #section-spawn_scale > .sub,
+    #section-spawn_scale #spawnScalePushStatus { margin-bottom: 0.3rem; font-size: 0.8rem; }
+    #section-spawn_scale h3 { margin: 0.4rem 0 0.15rem; font-size: 0.78rem; letter-spacing: 0.03em; text-transform: uppercase; color: var(--spd-muted-on-surface); }
+    #section-spawn_scale .ss-toolbar {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-bottom: 0.2rem;
+    }
+    #section-spawn_scale .ss-toolbar button,
+    #section-spawn_scale .ss-toolbar select {
+      margin-top: 0; padding: 0.2rem 0.5rem; font-size: 0.78rem; border-radius: 4px;
+    }
+    #section-spawn_scale .ss-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(188px, 1fr)); gap: 1px 10px;
+    }
+    #section-spawn_scale .ss-field {
+      display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; min-height: 1.5rem;
+    }
+    #section-spawn_scale .ss-field label {
+      min-width: 0; flex: 1 1 auto; font-size: 0.78rem; line-height: 1.2;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #section-spawn_scale .ss-field input[type="number"] {
+      width: 58px; padding: 0.12rem 0.28rem; font-size: 0.8rem; flex: 0 0 58px;
+    }
+    #section-spawn_scale .ss-inline {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 3px 10px;
+    }
+    #section-spawn_scale .ss-inline label {
+      min-width: 0; display: inline-flex; align-items: center; gap: 4px; font-size: 0.78rem;
+    }
+    #section-spawn_scale .ss-inline input[type="number"] {
+      width: 46px; padding: 0.12rem 0.25rem; font-size: 0.8rem;
+    }
+    #section-spawn_scale .ss-help { margin: 0 0 0.15rem; font-size: 0.75rem; }
+    #section-spawn_scale #spawnScalePreview { margin: 0; line-height: 1.2; font-size: 0.72rem; }
+    #section-spawn_scale .ss-preview-table {
+      width: 100%; border-collapse: collapse;
+      font-family: ui-monospace, Consolas, monospace; font-size: 0.72rem;
+    }
+    #section-spawn_scale .ss-preview-table th,
+    #section-spawn_scale .ss-preview-table td { padding: 0 8px 1px 0; text-align: left; white-space: nowrap; }
+    #section-spawn_scale .ss-preview-table th { color: var(--spd-muted-on-surface); font-weight: 600; }
   </style>
 </head>
 <body>
@@ -796,6 +910,64 @@
     <div class="row" style="margin-bottom:0.5rem;"><span style="color:var(--spd-muted-on-surface);font-size:0.9rem;">Live depth:</span> <span id="spawnDepthLabel">—</span></div>
     <div class="monsters" id="monsters"></div>
   </section>
+
+  <section id="section-spawn_scale" data-section="spawn_scale">
+    <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>Spawn scaling</h2>
+    <p class="sub" style="margin-bottom:0.5rem;" title="Hover any label or field for details. Higher usually = stronger / longer; lower = weaker / shorter. Save costs to push to the game.">Live combat / paralysis / XP for out-of-depth chat spawns. Hover options for help. Save pushes to the game (next spawn / next kill). Prices stay in Monster costs.</p>
+    <div class="ss-toolbar">
+      <button type="button" id="spawnScaleClassic" style="background:var(--spd-btn-secondary);" title="Load the old pre-live-scaling feel: sewers 1-dmg cap, milder paralysis gaps (0/1/2/3). Does not change prices. Click Save costs to push.">Classic</button>
+      <button type="button" id="spawnScaleDefault" style="background:var(--spd-btn-secondary);" title="Recommended stream balance: caves-and-earlier hit harder in sewers; city/halls squishier; no 1-dmg cap; gap paralysis 1/2/3/4. Does not change prices. Click Save costs to push.">Default</button>
+      <button type="button" id="spawnScaleMeaner" style="background:var(--spd-btn-secondary);" title="Tougher summons than Default (higher overall power / late HP / damage). Does not change prices. Click Save costs to push.">Meaner</button>
+      <select id="spawnScalePresetsSelect" title="Your saved scaling-only presets (this browser). Select one, then Apply, then Save costs."><option value="">—</option></select>
+      <button type="button" id="spawnScalePresetSave" style="background:var(--spd-btn-secondary);" title="Save the current scaling sliders as a named preset (scaling only — not monster prices).">Save scaling as…</button>
+      <button type="button" id="spawnScalePresetApply" style="background:var(--spd-btn-secondary);" title="Load the selected scaling preset into the form. Then click Save costs to push to the game.">Apply</button>
+      <button type="button" id="spawnScalePresetDelete" style="background:var(--spd-danger);" title="Delete the selected scaling preset from this browser.">Delete</button>
+    </div>
+    <div id="spawnScalePushStatus" class="sub" title="After Save costs: whether the game received the new knobs.">—</div>
+
+    <h3 title="Applies to chat !spawn / !champion when the mob’s native floor is deeper than you. Baked on next spawn only.">Combat</h3>
+    <div class="ss-grid">
+      <div class="ss-field"><label title="Multiplies out-of-depth HP/damage/armor scale after other math. ↑ = all scaled summons stronger/tankier. ↓ = weaker/squishier. 1.0 = normal.">Overall power</label><input type="number" id="ss_overall_power" min="0.25" max="3" step="0.05" value="1" title="↑ stronger/tankier scaled summons. ↓ weaker. Default 1.0."></div>
+      <div class="ss-field"><label title="Floor for HP% on early-native mobs (native depth ≤15: rat…ghoul) when spawned shallow. ↑ = they keep more HP (harder to kill). ↓ = squishier. Example 0.25 = never below 25% HP.">Early HP min (≤15)</label><input type="number" id="ss_early_hp_min" min="0.05" max="1" step="0.01" value="0.25" title="↑ more HP on caves-and-earlier summons. ↓ less HP. Default 0.25."></div>
+      <div class="ss-field"><label title="Floor for HP% on late-native mobs (native ≥16: warlock/monk/golem…). ↑ = city/halls summons tankier. ↓ = die faster. Default 0.15 is squishier than early.">Late HP min (≥16)</label><input type="number" id="ss_late_hp_min" min="0.05" max="1" step="0.01" value="0.15" title="↑ more HP on city/halls summons. ↓ less HP. Default 0.15."></div>
+      <div class="ss-field"><label title="HP floor override for Scorpio only (can go lower than other late mobs). ↑ = tankier Scorpios. ↓ = glassier.">Scorpio HP min</label><input type="number" id="ss_scorpio_hp_min" min="0.05" max="1" step="0.01" value="0.15" title="↑ Scorpio more HP. ↓ less. Default 0.15."></div>
+      <div class="ss-field"><label title="On floors 1–5, multiplies damage for early-native scaled mobs (after depth/native scale). ↑ = bats/brutes/etc hurt more in sewers. ↓ = tickle. 1.0 ≈ use scale as-is; old Classic used 0.25.">Early sewers dmg ×</label><input type="number" id="ss_early_sewers_dmg_mult" min="0.05" max="3" step="0.05" value="1" title="↑ early mobs hit harder in sewers. ↓ softer. Default 1.0."></div>
+      <div class="ss-field"><label title="On floors 1–5, multiplies damage for late-native scaled mobs (monk/golem/eye…). ↑ = city/halls summons more dangerous in sewers. ↓ = safer. Default 0.35.">Late sewers dmg ×</label><input type="number" id="ss_late_sewers_dmg_mult" min="0.05" max="3" step="0.05" value="0.35" title="↑ late mobs hit harder in sewers. ↓ softer. Default 0.35."></div>
+      <div class="ss-field"><label title="Minimum damage factor for early mobs in sewers (won’t go below this even if scale is tiny). ↑ = guaranteed more threat. ↓ = allow weaker hits.">Early sewers floor</label><input type="number" id="ss_early_sewers_dmg_floor" min="0.01" max="1" step="0.01" value="0.05" title="↑ higher minimum early damage in sewers. ↓ allow weaker. Default 0.05."></div>
+      <div class="ss-field"><label title="Minimum damage factor for late mobs in sewers. ↑ = city/halls summons always chip harder. ↓ = allow weaker.">Late sewers floor</label><input type="number" id="ss_late_sewers_dmg_floor" min="0.01" max="1" step="0.01" value="0.08" title="↑ higher minimum late damage in sewers. ↓ allow weaker. Default 0.08."></div>
+      <div class="ss-field"><label title="Minimum damage factor when you are on prison or deeper (floors 6+). ↑ = scaled summons hit harder mid/late dungeon. ↓ = softer.">Prison+ dmg floor</label><input type="number" id="ss_prison_plus_dmg_floor" min="0.01" max="1" step="0.01" value="0.15" title="↑ harder hits from floor 6+. ↓ softer. Default 0.15."></div>
+      <div class="ss-field"><label title="Armor/evasion mult for early-native scaled mobs (applied to DR and defense skill). ↑ = harder to kill / dodgier. ↓ = easier to hit and chew through.">Early DR ×</label><input type="number" id="ss_early_dr_mult" min="0.05" max="2" step="0.05" value="0.7" title="↑ early summons tankier/dodgier. ↓ glassier. Default 0.7."></div>
+      <div class="ss-field"><label title="Armor/evasion mult for late-native scaled mobs (monks/golems…). ↑ = tankier. ↓ = die faster / easier to hit. Default 0.4 is squishier than early.">Late DR ×</label><input type="number" id="ss_late_dr_mult" min="0.05" max="2" step="0.05" value="0.4" title="↑ late summons tankier. ↓ glassier. Default 0.4."></div>
+      <div class="ss-field"><label title="Minimum DR/evasion factor for any scaled mob. ↑ = never get too paper-thin. ↓ = allow very low armor.">DR floor</label><input type="number" id="ss_dr_floor" min="0.01" max="1" step="0.01" value="0.15" title="↑ higher minimum armor/evasion. ↓ allow lower. Default 0.15."></div>
+      <div class="ss-field"><label title="Scaled Eye death-gaze vs you deals this × your max HP (avoidable laser). ↑ = more lethal gaze. ↓ = less. Default 0.75 = 75% HT. Melee still uses normal damage scaling.">Eye gaze HT frac</label><input type="number" id="ss_eye_gaze_hero_ht_frac" min="0.1" max="2" step="0.05" value="0.75" title="↑ deadlier Eye laser. ↓ safer. Default 0.75 (75% of your max HP)."></div>
+    </div>
+    <div class="ss-inline" style="margin-top:0.2rem;">
+      <label title="When on: chat-spawn hits on you never round to 0 (at least 1 damage). When off: 0 damage possible after armor. Usually leave on."><input type="checkbox" id="ss_min_one_damage_vs_hero" checked> Min 1 dmg vs hero</label>
+      <label title="When on: in sewers, scaled chat-spawn hits on you are capped at 1 damage (old Classic). When off: they can hit for more (Default). Turn on if sewers feels too lethal."><input type="checkbox" id="ss_sewers_one_damage_cap"> Sewers 1-dmg cap</label>
+    </div>
+
+    <h3 title="Stun on arrival when the mob’s home chapter is later than yours. Gap = chapters pulled early. Next spawn only.">Paralysis (chapter gap)</h3>
+    <p class="sub ss-help" title="Example: halls mob on sewers = gap 4; halls on city = gap 1. Same chapter but earlier floor (e.g. brute on 10) = no paralysis.">Stun turns by how many chapters early you pulled the mob.</p>
+    <div class="ss-inline">
+      <label title="Master switch for spawn-in stun. Off = never paralyze on spawn. On = use the gap turn table."><input type="checkbox" id="ss_paralysis_enabled" checked> On</label>
+      <label title="Stun turns when the mob is only 1 chapter early (e.g. halls in city, caves in prison). ↑ = longer freeze when already close to native. ↓ = shorter / 0 = no stun at gap 1.">1 ch <input type="number" id="ss_paralysis_turns_gap_1" min="0" max="6" value="1" title="↑ longer stun when close to native. ↓ shorter. Default 1."></label>
+      <label title="Stun turns at 2 chapters early (e.g. halls in caves, city in prison). ↑ = longer. ↓ = shorter.">2 ch <input type="number" id="ss_paralysis_turns_gap_2" min="0" max="6" value="2" title="↑ longer stun at gap 2. ↓ shorter. Default 2."></label>
+      <label title="Stun turns at 3 chapters early (e.g. halls in prison, city in sewers). ↑ = longer. ↓ = shorter.">3 ch <input type="number" id="ss_paralysis_turns_gap_3" min="0" max="6" value="3" title="↑ longer stun at gap 3. ↓ shorter. Default 3."></label>
+      <label title="Stun turns at 4 chapters early (halls mob on sewers — farthest pull). ↑ = longest freeze. ↓ = shorter.">4 ch <input type="number" id="ss_paralysis_turns_gap_4" min="0" max="6" value="4" title="↑ longest stun for farthest pulls. ↓ shorter. Default 4."></label>
+    </div>
+
+    <h3 title="XP granted when you kill a chat-spawned enemy, based on YOUR current chapter (not the mob’s). Applies on next kill (live).">Chat-spawn XP (by your chapter)</h3>
+    <div class="ss-inline">
+      <label title="XP for killing a chat-spawn while you are in the Sewers (floors 1–5). ↑ = more XP / faster leveling from spam. ↓ = less. 0 = no XP.">Sewers <input type="number" id="ss_xp_sewers" min="0" max="30" value="2" title="↑ more XP in sewers. ↓ less. Default 2."></label>
+      <label title="XP for chat-spawn kills in Prison (6–10). ↑ = more. ↓ = less.">Prison <input type="number" id="ss_xp_prison" min="0" max="30" value="5" title="↑ more XP in prison. ↓ less. Default 5."></label>
+      <label title="XP for chat-spawn kills in Caves (11–15). ↑ = more. ↓ = less.">Caves <input type="number" id="ss_xp_caves" min="0" max="30" value="8" title="↑ more XP in caves. ↓ less. Default 8."></label>
+      <label title="XP for chat-spawn kills in City (16–20). ↑ = more. ↓ = less.">City <input type="number" id="ss_xp_city" min="0" max="30" value="11" title="↑ more XP in city. ↓ less. Default 11."></label>
+      <label title="XP for chat-spawn kills in Demon Halls (21+). ↑ = more. ↓ = less.">Halls <input type="number" id="ss_xp_halls" min="0" max="30" value="12" title="↑ more XP in halls. ↓ less. Default 12."></label>
+    </div>
+
+    <h3 title="Estimates for the live game depth (from WebSocket). Updates as you change sliders. Not exact combat.">Live preview</h3>
+    <div id="spawnScalePreview" class="sub" title="Rough HP%, damage factor, paralysis turns, and XP at the current depth for sample mobs.">—</div>
+  </section>
   <div class="column-drop-zone" data-column="left" id="dropZoneLeft">Drop here</div>
   </div>
 
@@ -1013,6 +1185,7 @@
       <div class="config-row"><label>Show sections:</label></div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-general" checked> General costs</label></div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-monsters" checked> Monster costs</label></div>
+      <div class="config-row"><label><input type="checkbox" id="cfg-section-spawn_scale" checked> Spawn scaling</label></div>
       <div class="config-row">
         <span style="display:block;margin-bottom:0.35rem;">Monster columns:</span>
         <div class="col-options">
@@ -1441,6 +1614,8 @@
           if (d.error) return;
           spawnCostPreview = { depth: d.depth, base: d.base || {}, costs: d.costs || {} };
           applySpawnCostPreview();
+          updateSpawnScalePreview();
+          updateSpawnScalePreview();
         })
         .catch(() => {});
     }
@@ -1740,6 +1915,179 @@
       renderFreePromosStrip();
     }
 
+
+    const SPAWN_SCALE_PRESETS_STORAGE = 'spd_spawn_scale_presets';
+    const SPAWN_SCALE_KEYS = [
+      'overall_power','early_hp_min','late_hp_min','scorpio_hp_min',
+      'early_sewers_dmg_mult','late_sewers_dmg_mult','early_sewers_dmg_floor','late_sewers_dmg_floor',
+      'prison_plus_dmg_floor','early_dr_mult','late_dr_mult','dr_floor',
+      'min_one_damage_vs_hero','sewers_one_damage_cap','eye_gaze_hero_ht_frac',
+      'paralysis_enabled','paralysis_turns_gap_1','paralysis_turns_gap_2','paralysis_turns_gap_3','paralysis_turns_gap_4',
+      'xp_sewers','xp_prison','xp_caves','xp_city','xp_halls'
+    ];
+    const SPAWN_SCALE_DEFAULT = {
+      overall_power: 1, early_hp_min: 0.25, late_hp_min: 0.15, scorpio_hp_min: 0.15,
+      early_sewers_dmg_mult: 1, late_sewers_dmg_mult: 0.35, early_sewers_dmg_floor: 0.05, late_sewers_dmg_floor: 0.08,
+      prison_plus_dmg_floor: 0.15, early_dr_mult: 0.7, late_dr_mult: 0.4, dr_floor: 0.15,
+      min_one_damage_vs_hero: true, sewers_one_damage_cap: false, eye_gaze_hero_ht_frac: 0.75,
+      paralysis_enabled: true, paralysis_turns_gap_1: 1, paralysis_turns_gap_2: 2, paralysis_turns_gap_3: 3, paralysis_turns_gap_4: 4,
+      xp_sewers: 2, xp_prison: 5, xp_caves: 8, xp_city: 11, xp_halls: 12
+    };
+    const SPAWN_SCALE_CLASSIC = {
+      overall_power: 1, early_hp_min: 0.25, late_hp_min: 0.25, scorpio_hp_min: 0.15,
+      early_sewers_dmg_mult: 0.25, late_sewers_dmg_mult: 0.25, early_sewers_dmg_floor: 0.05, late_sewers_dmg_floor: 0.05,
+      prison_plus_dmg_floor: 0.15, early_dr_mult: 0.7, late_dr_mult: 0.7, dr_floor: 0.15,
+      min_one_damage_vs_hero: true, sewers_one_damage_cap: true, eye_gaze_hero_ht_frac: 0.75,
+      paralysis_enabled: true, paralysis_turns_gap_1: 0, paralysis_turns_gap_2: 1, paralysis_turns_gap_3: 2, paralysis_turns_gap_4: 3,
+      xp_sewers: 2, xp_prison: 5, xp_caves: 8, xp_city: 11, xp_halls: 12
+    };
+    const SPAWN_SCALE_MEANER = Object.assign({}, SPAWN_SCALE_DEFAULT, {
+      overall_power: 1.25, early_sewers_dmg_mult: 1.15, late_sewers_dmg_mult: 0.5,
+      late_hp_min: 0.2, late_dr_mult: 0.5
+    });
+    const NATIVE_DEPTH_PREVIEW = { bat: 11, brute: 11, monk: 17, golem: 18, scorpio: 23, eye: 21 };
+    const MOB_DMG_PREVIEW = { bat: [5,18], brute: [5,25], monk: [12,25], golem: [25,30], scorpio: [24,32], eye: [30,50] };
+
+    function collectSpawnScale() {
+      const num = (id, def) => { const e = document.getElementById(id); const v = parseFloat(e && e.value); return isNaN(v) ? def : v; };
+      const intv = (id, def) => { const e = document.getElementById(id); const v = parseInt(e && e.value, 10); return isNaN(v) ? def : v; };
+      const chk = (id) => !!(document.getElementById(id) && document.getElementById(id).checked);
+      return {
+        overall_power: num('ss_overall_power', 1),
+        early_hp_min: num('ss_early_hp_min', 0.25),
+        late_hp_min: num('ss_late_hp_min', 0.15),
+        scorpio_hp_min: num('ss_scorpio_hp_min', 0.15),
+        early_sewers_dmg_mult: num('ss_early_sewers_dmg_mult', 1),
+        late_sewers_dmg_mult: num('ss_late_sewers_dmg_mult', 0.35),
+        early_sewers_dmg_floor: num('ss_early_sewers_dmg_floor', 0.05),
+        late_sewers_dmg_floor: num('ss_late_sewers_dmg_floor', 0.08),
+        prison_plus_dmg_floor: num('ss_prison_plus_dmg_floor', 0.15),
+        early_dr_mult: num('ss_early_dr_mult', 0.7),
+        late_dr_mult: num('ss_late_dr_mult', 0.4),
+        dr_floor: num('ss_dr_floor', 0.15),
+        min_one_damage_vs_hero: chk('ss_min_one_damage_vs_hero'),
+        sewers_one_damage_cap: chk('ss_sewers_one_damage_cap'),
+        eye_gaze_hero_ht_frac: num('ss_eye_gaze_hero_ht_frac', 0.75),
+        paralysis_enabled: chk('ss_paralysis_enabled'),
+        paralysis_turns_gap_1: intv('ss_paralysis_turns_gap_1', 1),
+        paralysis_turns_gap_2: intv('ss_paralysis_turns_gap_2', 2),
+        paralysis_turns_gap_3: intv('ss_paralysis_turns_gap_3', 3),
+        paralysis_turns_gap_4: intv('ss_paralysis_turns_gap_4', 4),
+        xp_sewers: intv('ss_xp_sewers', 2),
+        xp_prison: intv('ss_xp_prison', 5),
+        xp_caves: intv('ss_xp_caves', 8),
+        xp_city: intv('ss_xp_city', 11),
+        xp_halls: intv('ss_xp_halls', 12)
+      };
+    }
+
+    function applySpawnScaleToForm(ss) {
+      const d = Object.assign({}, SPAWN_SCALE_DEFAULT, ss || {});
+      const setN = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+      const setC = (id, v) => { const e = document.getElementById(id); if (e) e.checked = !!v; };
+      setN('ss_overall_power', d.overall_power);
+      setN('ss_early_hp_min', d.early_hp_min);
+      setN('ss_late_hp_min', d.late_hp_min);
+      setN('ss_scorpio_hp_min', d.scorpio_hp_min);
+      setN('ss_early_sewers_dmg_mult', d.early_sewers_dmg_mult);
+      setN('ss_late_sewers_dmg_mult', d.late_sewers_dmg_mult);
+      setN('ss_early_sewers_dmg_floor', d.early_sewers_dmg_floor);
+      setN('ss_late_sewers_dmg_floor', d.late_sewers_dmg_floor);
+      setN('ss_prison_plus_dmg_floor', d.prison_plus_dmg_floor);
+      setN('ss_early_dr_mult', d.early_dr_mult);
+      setN('ss_late_dr_mult', d.late_dr_mult);
+      setN('ss_dr_floor', d.dr_floor);
+      setC('ss_min_one_damage_vs_hero', d.min_one_damage_vs_hero);
+      setC('ss_sewers_one_damage_cap', d.sewers_one_damage_cap);
+      setN('ss_eye_gaze_hero_ht_frac', d.eye_gaze_hero_ht_frac);
+      setC('ss_paralysis_enabled', d.paralysis_enabled);
+      setN('ss_paralysis_turns_gap_1', d.paralysis_turns_gap_1);
+      setN('ss_paralysis_turns_gap_2', d.paralysis_turns_gap_2);
+      setN('ss_paralysis_turns_gap_3', d.paralysis_turns_gap_3);
+      setN('ss_paralysis_turns_gap_4', d.paralysis_turns_gap_4);
+      setN('ss_xp_sewers', d.xp_sewers);
+      setN('ss_xp_prison', d.xp_prison);
+      setN('ss_xp_caves', d.xp_caves);
+      setN('ss_xp_city', d.xp_city);
+      setN('ss_xp_halls', d.xp_halls);
+      updateSpawnScalePreview();
+    }
+
+    function setSpawnScalePushStatus(msg) {
+      const el = document.getElementById('spawnScalePushStatus');
+      if (el) el.textContent = msg || '—';
+    }
+
+    function previewParalysisTurns(ss, nativeDepth, depth) {
+      if (!ss.paralysis_enabled) return 0;
+      const natR = Math.floor((nativeDepth - 1) / 5);
+      const curR = Math.floor((depth - 1) / 5);
+      const gap = natR - curR;
+      if (gap < 1) return 0;
+      const table = [0, ss.paralysis_turns_gap_1, ss.paralysis_turns_gap_2, ss.paralysis_turns_gap_3, ss.paralysis_turns_gap_4];
+      return table[Math.min(4, gap)] || 0;
+    }
+
+    function previewXp(ss, depth) {
+      const r = Math.floor((depth - 1) / 5);
+      return [ss.xp_sewers, ss.xp_prison, ss.xp_caves, ss.xp_city, ss.xp_halls][Math.max(0, Math.min(4, r))];
+    }
+
+    function updateSpawnScalePreview() {
+      const el = document.getElementById('spawnScalePreview');
+      if (!el) return;
+      const ss = collectSpawnScale();
+      const depth = (typeof spawnCostPreview !== 'undefined' && spawnCostPreview.depth != null) ? spawnCostPreview.depth : 1;
+      const rows = [];
+      ['bat','brute','monk','golem','scorpio'].forEach(m => {
+        const native = NATIVE_DEPTH_PREVIEW[m];
+        if (depth >= native) {
+          rows.push('<tr><td>' + m + '</td><td colspan="4">no scale</td></tr>');
+          return;
+        }
+        const early = native <= 15;
+        let hpMin = m === 'scorpio' ? ss.scorpio_hp_min : (early ? ss.early_hp_min : ss.late_hp_min);
+        let scale = Math.max(hpMin, depth / native) * ss.overall_power;
+        scale = Math.max(0.01, scale);
+        let dmg;
+        if (depth <= 5) {
+          const mult = early ? ss.early_sewers_dmg_mult : ss.late_sewers_dmg_mult;
+          const floor = early ? ss.early_sewers_dmg_floor : ss.late_sewers_dmg_floor;
+          dmg = Math.max(floor, scale * mult);
+        } else {
+          dmg = Math.max(ss.prison_plus_dmg_floor, scale);
+        }
+        const dr = Math.max(ss.dr_floor, scale * (early ? ss.early_dr_mult : ss.late_dr_mult));
+        const range = MOB_DMG_PREVIEW[m];
+        const lo = Math.max(0, Math.round(range[0] * dmg));
+        const hi = Math.max(0, Math.round(range[1] * dmg));
+        let note = '';
+        if (ss.sewers_one_damage_cap && depth <= 5) note = ' cap1';
+        else if (ss.min_one_damage_vs_hero) note = ' min1';
+        const para = previewParalysisTurns(ss, native, depth);
+        rows.push('<tr><td>' + m + '</td><td>' + Math.round(scale * 100) + '%</td><td>×' + dmg.toFixed(2) + ' ~' + lo + '-' + hi + note + '</td><td>×' + dr.toFixed(2) + '</td><td>' + para + 't</td></tr>');
+      });
+      el.innerHTML = '<table class="ss-preview-table"><thead><tr><th>D' + depth + '</th><th>HP</th><th>dmg</th><th>DR</th><th>para</th></tr></thead><tbody>' + rows.join('') + '</tbody></table><div>XP here: ' + previewXp(ss, depth) + '</div>';
+    }
+
+    function getSpawnScalePresets() {
+      try {
+        const arr = JSON.parse(localStorage.getItem(SPAWN_SCALE_PRESETS_STORAGE) || '[]');
+        return Array.isArray(arr) ? arr : [];
+      } catch (_) { return []; }
+    }
+    function saveSpawnScalePresets(arr) {
+      try { localStorage.setItem(SPAWN_SCALE_PRESETS_STORAGE, JSON.stringify(arr)); } catch (_) {}
+    }
+    function refreshSpawnScalePresetsSelect() {
+      const sel = document.getElementById('spawnScalePresetsSelect');
+      if (!sel) return;
+      const presets = getSpawnScalePresets();
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">—</option>' + presets.map(p => '<option value="' + p.id + '">' + escapeHtml(p.name) + '</option>').join('');
+      if (cur && presets.some(p => String(p.id) === cur)) sel.value = cur;
+    }
+
     function load() {
       fetch('/api/points-config')
         .then(r => r.json())
@@ -1784,6 +2132,7 @@
           setIf('cooldown_bypass_users', bypass, 'DaltonGoesFast');
           const deathCostEl = document.getElementById('death_cost_inflation_enabled');
           if (deathCostEl) deathCostEl.checked = data.death_cost_inflation_enabled !== false;
+          applySpawnScaleToForm(data.spawn_scale);
           renderCmdDisableGrid(data.command_allowed_roles || {});
           const monsters = data.cost_per_monster || {};
           const container = document.getElementById('monsters');
@@ -1881,6 +2230,7 @@
           .filter(Boolean),
         death_cost_inflation_enabled: !!document.getElementById('death_cost_inflation_enabled')?.checked,
         command_allowed_roles: collectCommandAllowedRoles(),
+        spawn_scale: collectSpawnScale(),
       };
       return fetch('/api/points-config', {
         method: 'POST',
@@ -1891,7 +2241,9 @@
         .then(data => {
           if (data.error) throw new Error(data.error);
           setCostsDirty(false);
-          showMsg('Saved!', true);
+          const pushed = data.spawn_scale_pushed;
+          setSpawnScalePushStatus(pushed ? 'Saved + pushed to game' : 'Saved to disk (game not connected)');
+          showMsg(pushed ? 'Saved! (scaling pushed to game)' : 'Saved! (game not connected — reconnect will push)', true);
           logActivity('Costs saved');
           refreshLiveStatus();
           return true;
@@ -2154,18 +2506,25 @@
       updateStreamModeBtn();
       applyOverallConfig();
     }
-    const OVERALL_CONFIG_DEFAULT = { columns: 3, sections: { general: true, monsters: true, viewer: true, game: true, score: true, session: true, bestiary: true, companion: true, activity: true }, order: ['general', 'monsters', 'viewer', 'companion', 'game', 'score', 'session', 'bestiary'], columnCounts: [2, 2, 4], monsterColumns: 2, monsterSectionWidth: 540 };
+    const OVERALL_CONFIG_DEFAULT = { columns: 3, sections: { general: true, monsters: true, spawn_scale: true, viewer: true, game: true, score: true, session: true, bestiary: true, companion: true, activity: true }, order: ['general', 'monsters', 'spawn_scale', 'viewer', 'companion', 'game', 'score', 'session', 'bestiary'], columnCounts: [3, 2, 4], monsterColumns: 2, viewerSectionWidth: 540 };
     function getOverallConfig() {
       try {
         const s = localStorage.getItem(OVERALL_CONFIG_STORAGE);
         if (s) {
           const c = JSON.parse(s);
           if (c && typeof c.columns === 'number' && c.sections) {
-            if (!Array.isArray(c.order)) c.order = ['general', 'monsters', 'viewer', 'companion', 'game', 'score', 'session', 'bestiary'];
+            if (!Array.isArray(c.order)) c.order = ['general', 'monsters', 'spawn_scale', 'viewer', 'companion', 'game', 'score', 'session', 'bestiary'];
             c.order = c.order.filter(id => id !== 'helpers_hurters');
             if (c.sections && c.sections.helpers_hurters != null) delete c.sections.helpers_hurters;
             if (c.sections.session == null) c.sections.session = true;
             if (c.sections.bestiary == null) c.sections.bestiary = true;
+            if (c.sections.spawn_scale == null) { c.sections.spawn_scale = true; migrated = true; }
+            if (!c.order.includes('spawn_scale')) {
+              const mi = c.order.indexOf('monsters');
+              if (mi >= 0) c.order.splice(mi + 1, 0, 'spawn_scale');
+              else c.order.push('spawn_scale');
+              migrated = true;
+            }
             let migrated = false;
             if (c.sections.companion == null) { c.sections.companion = true; migrated = true; }
             if (localStorage.getItem('overlay_companion_migrate_v2') !== '1') {
@@ -2238,7 +2597,7 @@
         if (el) el.style.display = (cfg.sections[id] !== false) ? '' : 'none';
       });
       applyStreamSectionOverlay();
-      const order = cfg.order || ['general', 'monsters', 'viewer', 'companion', 'game', 'score', 'session', 'bestiary'];
+      const order = cfg.order || ['general', 'monsters', 'spawn_scale', 'viewer', 'companion', 'game', 'score', 'session', 'bestiary'];
       const orderFiltered = order.filter(id => id !== 'activity');
       let counts = cfg.columnCounts || [2, 1, 4];
       const movable = orderFiltered.length || 7;
@@ -2800,7 +3159,7 @@
       if (file) importConfigFile(file);
       e.target.value = '';
     });
-    ['section-general', 'section-monsters'].forEach(id => {
+    ['section-general', 'section-monsters', 'section-spawn_scale'].forEach(id => {
       const sec = document.getElementById(id);
       if (!sec) return;
       sec.addEventListener('input', () => setCostsDirty(true));
@@ -2815,6 +3174,42 @@
     document.getElementById('presetSaveAs').addEventListener('click', saveCurrentAsPreset);
     document.getElementById('presetApply').addEventListener('click', applyPreset);
     document.getElementById('presetDelete').addEventListener('click', deletePreset);
+    refreshSpawnScalePresetsSelect();
+    document.getElementById('spawnScaleClassic')?.addEventListener('click', () => { applySpawnScaleToForm(SPAWN_SCALE_CLASSIC); setCostsDirty(true); showMsg('Classic scaling loaded (Save to push)', true); });
+    document.getElementById('spawnScaleDefault')?.addEventListener('click', () => { applySpawnScaleToForm(SPAWN_SCALE_DEFAULT); setCostsDirty(true); showMsg('Default scaling loaded (Save to push)', true); });
+    document.getElementById('spawnScaleMeaner')?.addEventListener('click', () => { applySpawnScaleToForm(SPAWN_SCALE_MEANER); setCostsDirty(true); showMsg('Meaner scaling loaded (Save to push)', true); });
+    document.getElementById('spawnScalePresetSave')?.addEventListener('click', () => {
+      const name = prompt('Scaling preset name:');
+      if (name == null || !name.trim()) return;
+      const presets = getSpawnScalePresets();
+      const id = Date.now();
+      presets.push({ id, name: name.trim(), createdAt: id, spawn_scale: collectSpawnScale() });
+      saveSpawnScalePresets(presets);
+      refreshSpawnScalePresetsSelect();
+      document.getElementById('spawnScalePresetsSelect').value = String(id);
+      showMsg('Scaling preset saved', true);
+    });
+    document.getElementById('spawnScalePresetApply')?.addEventListener('click', () => {
+      const sel = document.getElementById('spawnScalePresetsSelect');
+      const id = sel && sel.value;
+      if (!id) { showMsg('Select a scaling preset', false); return; }
+      const preset = getSpawnScalePresets().find(p => String(p.id) === id);
+      if (!preset || !preset.spawn_scale) { showMsg('Preset not found', false); return; }
+      applySpawnScaleToForm(preset.spawn_scale);
+      setCostsDirty(true);
+      showMsg('Scaling preset applied (Save to push)', true);
+    });
+    document.getElementById('spawnScalePresetDelete')?.addEventListener('click', () => {
+      const sel = document.getElementById('spawnScalePresetsSelect');
+      const id = sel && sel.value;
+      if (!id) { showMsg('Select a scaling preset to delete', false); return; }
+      if (!confirm('Delete this scaling preset?')) return;
+      saveSpawnScalePresets(getSpawnScalePresets().filter(p => String(p.id) !== id));
+      refreshSpawnScalePresetsSelect();
+      showMsg('Scaling preset deleted', true);
+    });
+    document.getElementById('section-spawn_scale')?.addEventListener('input', () => updateSpawnScalePreview());
+    document.getElementById('section-spawn_scale')?.addEventListener('change', () => updateSpawnScalePreview());
     document.getElementById('refresh').addEventListener('click', () => {
       if (anyDirty() && !confirm('You have unsaved changes (costs, bestiary, and/or companion). Refresh anyway and lose them?')) return;
       load(); loadBestiaryConfig(); if (window.CompanionSettingsPanel) CompanionSettingsPanel.load(); loadViewerPoints(); loadScoreData(); refreshLiveStatus(); showMsg('Refreshed', true); logActivity('Refreshed');
@@ -3324,6 +3719,7 @@
       document.querySelector('input[name="monsterCols"][value="' + (cfg.monsterColumns === 'auto' ? 'auto' : String(cfg.monsterColumns || 2)) + '"]').checked = true;
       document.getElementById('cfg-section-general').checked = cfg.sections.general !== false;
       document.getElementById('cfg-section-monsters').checked = cfg.sections.monsters !== false;
+      document.getElementById('cfg-section-spawn_scale').checked = cfg.sections.spawn_scale !== false;
       document.getElementById('cfg-section-viewer').checked = cfg.sections.viewer !== false;
       document.getElementById('cfg-section-game').checked = cfg.sections.game !== false;
       document.getElementById('cfg-section-score').checked = cfg.sections.score !== false;
@@ -3337,7 +3733,7 @@
       if (e.target.id === 'overallConfigModal') e.target.classList.remove('open');
     });
     document.getElementById('overallConfigApply').addEventListener('click', () => {
-      const order = getSectionOrder().length ? getSectionOrder() : ['general', 'monsters', 'viewer', 'companion', 'game', 'score', 'session', 'bestiary'];
+      const order = getSectionOrder().length ? getSectionOrder() : ['general', 'monsters', 'spawn_scale', 'viewer', 'companion', 'game', 'score', 'session', 'bestiary'];
       const monsterCols = document.querySelector('input[name="monsterCols"]:checked').value;
       const cfg = getOverallConfig();
       const applied = {
@@ -3345,6 +3741,7 @@
         sections: {
           general: document.getElementById('cfg-section-general').checked,
           monsters: document.getElementById('cfg-section-monsters').checked,
+          spawn_scale: document.getElementById('cfg-section-spawn_scale').checked,
           viewer: document.getElementById('cfg-section-viewer').checked,
           game: document.getElementById('cfg-section-game').checked,
           score: document.getElementById('cfg-section-score').checked,
@@ -3366,6 +3763,7 @@
       document.querySelector('input[name="monsterCols"][value="2"]').checked = true;
       document.getElementById('cfg-section-general').checked = true;
       document.getElementById('cfg-section-monsters').checked = true;
+      document.getElementById('cfg-section-spawn_scale').checked = true;
       document.getElementById('cfg-section-viewer').checked = true;
       document.getElementById('cfg-section-game').checked = true;
       document.getElementById('cfg-section-score').checked = true;
@@ -3376,7 +3774,7 @@
     });
     document.getElementById('overallConfigRestoreLayout').addEventListener('click', () => {
       const cfg = getOverallConfig();
-      cfg.order = ['general', 'monsters', 'viewer', 'companion', 'game', 'score', 'session', 'bestiary'];
+      cfg.order = ['general', 'monsters', 'spawn_scale', 'viewer', 'companion', 'game', 'score', 'session', 'bestiary'];
       cfg.columnCounts = [2, 2, 4];
       cfg.sections.companion = true;
       saveOverallConfig(cfg);

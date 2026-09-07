@@ -134,7 +134,7 @@ public class Ghoul extends Mob {
 				if (parentScale != null) {
 					child.HT = this.HT;
 					child.HP = this.HT;
-					SpawnScaled.affect(child, parentScale.scale);
+					SpawnScaled.affect(child, parentScale);
 				}
 				if (buff(ChatSpawned.class) != null) {
 					Buff.affect(child, ChatSpawned.class);

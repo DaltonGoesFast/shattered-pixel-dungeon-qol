@@ -1,5 +1,5 @@
 {
-  "name": "main",
+  "name": "mainWaudio",
   "settings": {
     "network": {
       "bestiary_hud_enabled": true,
@@ -49,8 +49,8 @@
       "bestiary_level_up_banner_scale": 4,
       "bestiary_level_up_banner_sec": 3,
       "bestiary_panel_pad_px": 22,
-      "bestiary_shatter_pip_claimed_color": "#ffd933",
-      "bestiary_shatter_pip_unclaimed_color": "#f2f2ff",
+      "bestiary_shatter_pip_claimed_color": "#00ff41",
+      "bestiary_shatter_pip_unclaimed_color": "#bb4444",
       "bestiary_show_hall": true,
       "bestiary_show_heat_chip": true,
       "bestiary_show_sprint_chip": true,
@@ -69,12 +69,12 @@
       "bestiary_zone_y_px": 870,
       "chrome_boxes": [
         {
-          "body_font_color": "f2ebd9ff",
+          "body_font_color": "#f2ebd9",
           "body_font_size_px": 16,
           "body_text": "",
           "chrome_scale": 4,
           "enabled": true,
-          "header_font_color": "ffff45ff",
+          "header_font_color": "#ffff45",
           "header_font_size_px": 34,
           "header_text": "Chat",
           "id": "cb_10577548_69247",
@@ -84,7 +84,7 @@
           "padding_v_px": 0,
           "show_on_main": true,
           "show_on_other": true,
-          "show_on_pause": false,
+          "show_on_pause": true,
           "style": "window",
           "text_align": "center",
           "text_shadow": true,
@@ -167,7 +167,7 @@
           "other": true
         },
         "id_overlay": {
-          "pause": false,
+          "pause": true,
           "main": true,
           "other": true
         },
@@ -187,7 +187,7 @@
           "other": true
         },
         "bestiary": {
-          "pause": false,
+          "pause": true,
           "main": true,
           "other": true
         },
@@ -301,7 +301,7 @@
       "bestiary_zone_bottom_margin_px": 0,
       "bestiary_zone_height_px": 0,
       "bestiary_zone_width_px": 1000,
-      "bestiary_zone_x_px": 40,
+      "bestiary_zone_x_px": 70,
       "bestiary_zone_y_px": 1480,
       "chrome_boxes": [],
       "double_points_corner": "0",
@@ -364,7 +364,7 @@
           "other": true
         },
         "bestiary": {
-          "pause": false,
+          "pause": true,
           "main": false,
           "other": false
         },
@@ -374,7 +374,7 @@
           "other": true
         },
         "spend_indicator": {
-          "pause": true,
+          "pause": false,
           "main": true,
           "other": true
         },
@@ -390,7 +390,7 @@
         }
       },
       "show_alerts": true,
-      "show_bestiary": false,
+      "show_bestiary": true,
       "show_chrome_boxes": false,
       "show_double_points": true,
       "show_free_promos": true,
@@ -407,5 +407,5 @@
       "vertical_window_enabled": true
     }
   },
-  "saved_at": 1787355411.9939616
+  "saved_at": 1787356731.650524
 }

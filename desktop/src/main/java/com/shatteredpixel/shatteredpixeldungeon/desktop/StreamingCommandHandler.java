@@ -83,6 +83,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Recharging;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Roots;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Slow;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SpawnScaled;
+import com.shatteredpixel.shatteredpixeldungeon.utils.SpawnScaleConfig;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Vulnerable;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Weakness;
 import com.shatteredpixel.shatteredpixeldungeon.items.Dewdrop;
@@ -190,8 +191,6 @@ public final class StreamingCommandHandler {
 
 	private static final float SPAWN_DELAY = 0f;  // 0 = spawn immediately (was 2f)
 	private static final int SPAWN_RADIUS = 4;  // tiles away from hero (1–4)
-	private static final float MIN_HP_SCALE = 0.25f;  // minimum HP when spawning late-game mobs early
-	private static final float SCORPIO_MIN_HP_SCALE = 0.15f;  // chat scorpios scale down further when spawned early
 
 	/** Earliest depth each monster appears (from MobSpawner). Used to scale HP when spawned in earlier areas. */
 	private static final Map<String, Integer> NATIVE_DEPTH = new HashMap<>();
@@ -216,13 +215,91 @@ public final class StreamingCommandHandler {
 
 	private static void applyChatSpawnStatScaling(Mob mob, Class<? extends Mob> mobClass, Integer nativeDepth) {
 		if (!shouldApplyChatSpawnStatScaling(nativeDepth)) return;
-		float minScale = Scorpio.class.isAssignableFrom(mobClass) ? SCORPIO_MIN_HP_SCALE : MIN_HP_SCALE;
-		float scale = Math.max(minScale, (float) Dungeon.depth / nativeDepth);
+		boolean scorpio = Scorpio.class.isAssignableFrom(mobClass);
+		float minScale = SpawnScaleConfig.hpMinFor(nativeDepth, scorpio);
+		float scale = Math.max(minScale, (float) Dungeon.depth / nativeDepth) * SpawnScaleConfig.overallPower;
+		scale = Math.max(0.01f, scale);
+
+		float damageFactor;
+		if (Dungeon.depth <= 5) {
+			damageFactor = Math.max(
+					SpawnScaleConfig.sewersDmgFloorFor(nativeDepth),
+					scale * SpawnScaleConfig.sewersDmgMultFor(nativeDepth));
+		} else {
+			damageFactor = Math.max(SpawnScaleConfig.prisonPlusDmgFloor, scale);
+		}
+		float drFactor = Math.max(
+				SpawnScaleConfig.drFloor,
+				scale * SpawnScaleConfig.drMultFor(nativeDepth));
+
 		int newHT = Math.max(1, Math.round(mob.HT * scale));
 		int newHP = Math.max(1, Math.round(mob.HP * scale));
 		mob.HT = newHT;
 		mob.HP = newHP;
-		SpawnScaled.affect(mob, scale);
+		SpawnScaled.affect(mob, scale, damageFactor, drFactor);
+	}
+
+	/** Cross-chapter spawn-in paralysis from live {@link SpawnScaleConfig} (chapter gap). */
+	private static void applyChatSpawnParalysis(Mob mob, Integer nativeDepth) {
+		if (!SpawnScaleConfig.paralysisEnabled || nativeDepth == null) return;
+		int nativeRegion = (nativeDepth - 1) / 5;  // 0=sewers … 4=halls
+		int currentRegion = (Dungeon.depth - 1) / 5;
+		int gap = nativeRegion - currentRegion;
+		if (gap < 1) return;
+		int turns = SpawnScaleConfig.paralysisTurnsForGap(gap);
+		if (turns > 0) {
+			Buff.detach(mob, Paralysis.class);
+			// Pass turns-1: FlavourBuff.visualcooldown adds +1 for display, so we subtract to match
+			float duration = Math.max(1f, turns - 1f);
+			Buff.affect(mob, Paralysis.class, duration);
+		}
+	}
+
+	/** Apply live spawn-scale knobs from points-config. Returns null on success. */
+	public static String handleSpawnScaleConfig(com.google.gson.JsonObject obj) {
+		if (obj == null) return "Missing config";
+		com.google.gson.JsonObject cfg = obj;
+		if (obj.has("spawn_scale") && obj.get("spawn_scale").isJsonObject()) {
+			cfg = obj.getAsJsonObject("spawn_scale");
+		}
+		try {
+			if (cfg.has("overall_power")) SpawnScaleConfig.overallPower = clampFloat(cfg.get("overall_power").getAsFloat(), 0.25f, 3f);
+			if (cfg.has("early_hp_min")) SpawnScaleConfig.earlyHpMin = clampFloat(cfg.get("early_hp_min").getAsFloat(), 0.05f, 1f);
+			if (cfg.has("late_hp_min")) SpawnScaleConfig.lateHpMin = clampFloat(cfg.get("late_hp_min").getAsFloat(), 0.05f, 1f);
+			if (cfg.has("scorpio_hp_min")) SpawnScaleConfig.scorpioHpMin = clampFloat(cfg.get("scorpio_hp_min").getAsFloat(), 0.05f, 1f);
+			if (cfg.has("early_sewers_dmg_mult")) SpawnScaleConfig.earlySewersDmgMult = clampFloat(cfg.get("early_sewers_dmg_mult").getAsFloat(), 0.05f, 3f);
+			if (cfg.has("late_sewers_dmg_mult")) SpawnScaleConfig.lateSewersDmgMult = clampFloat(cfg.get("late_sewers_dmg_mult").getAsFloat(), 0.05f, 3f);
+			if (cfg.has("early_sewers_dmg_floor")) SpawnScaleConfig.earlySewersDmgFloor = clampFloat(cfg.get("early_sewers_dmg_floor").getAsFloat(), 0.01f, 1f);
+			if (cfg.has("late_sewers_dmg_floor")) SpawnScaleConfig.lateSewersDmgFloor = clampFloat(cfg.get("late_sewers_dmg_floor").getAsFloat(), 0.01f, 1f);
+			if (cfg.has("prison_plus_dmg_floor")) SpawnScaleConfig.prisonPlusDmgFloor = clampFloat(cfg.get("prison_plus_dmg_floor").getAsFloat(), 0.01f, 1f);
+			if (cfg.has("early_dr_mult")) SpawnScaleConfig.earlyDrMult = clampFloat(cfg.get("early_dr_mult").getAsFloat(), 0.05f, 2f);
+			if (cfg.has("late_dr_mult")) SpawnScaleConfig.lateDrMult = clampFloat(cfg.get("late_dr_mult").getAsFloat(), 0.05f, 2f);
+			if (cfg.has("dr_floor")) SpawnScaleConfig.drFloor = clampFloat(cfg.get("dr_floor").getAsFloat(), 0.01f, 1f);
+			if (cfg.has("min_one_damage_vs_hero")) SpawnScaleConfig.minOneDamageVsHero = cfg.get("min_one_damage_vs_hero").getAsBoolean();
+			if (cfg.has("sewers_one_damage_cap")) SpawnScaleConfig.sewersOneDamageCap = cfg.get("sewers_one_damage_cap").getAsBoolean();
+			if (cfg.has("eye_gaze_hero_ht_frac")) SpawnScaleConfig.eyeGazeHeroHtFrac = clampFloat(cfg.get("eye_gaze_hero_ht_frac").getAsFloat(), 0.1f, 2f);
+			if (cfg.has("paralysis_enabled")) SpawnScaleConfig.paralysisEnabled = cfg.get("paralysis_enabled").getAsBoolean();
+			if (cfg.has("paralysis_turns_gap_1")) SpawnScaleConfig.paralysisTurnsGap1 = clampInt(cfg.get("paralysis_turns_gap_1").getAsInt(), 0, 6);
+			if (cfg.has("paralysis_turns_gap_2")) SpawnScaleConfig.paralysisTurnsGap2 = clampInt(cfg.get("paralysis_turns_gap_2").getAsInt(), 0, 6);
+			if (cfg.has("paralysis_turns_gap_3")) SpawnScaleConfig.paralysisTurnsGap3 = clampInt(cfg.get("paralysis_turns_gap_3").getAsInt(), 0, 6);
+			if (cfg.has("paralysis_turns_gap_4")) SpawnScaleConfig.paralysisTurnsGap4 = clampInt(cfg.get("paralysis_turns_gap_4").getAsInt(), 0, 6);
+			if (cfg.has("xp_sewers")) SpawnScaleConfig.xpSewers = clampInt(cfg.get("xp_sewers").getAsInt(), 0, 30);
+			if (cfg.has("xp_prison")) SpawnScaleConfig.xpPrison = clampInt(cfg.get("xp_prison").getAsInt(), 0, 30);
+			if (cfg.has("xp_caves")) SpawnScaleConfig.xpCaves = clampInt(cfg.get("xp_caves").getAsInt(), 0, 30);
+			if (cfg.has("xp_city")) SpawnScaleConfig.xpCity = clampInt(cfg.get("xp_city").getAsInt(), 0, 30);
+			if (cfg.has("xp_halls")) SpawnScaleConfig.xpHalls = clampInt(cfg.get("xp_halls").getAsInt(), 0, 30);
+			return null;
+		} catch (Throwable t) {
+			return (t.getMessage() != null) ? t.getMessage() : "Invalid spawn_scale_config";
+		}
+	}
+
+	private static float clampFloat(float v, float lo, float hi) {
+		return Math.max(lo, Math.min(hi, v));
+	}
+
+	private static int clampInt(int v, int lo, int hi) {
+		return Math.max(lo, Math.min(hi, v));
 	}
 
 	/** Called from main thread via Gdx.app.postRunnable. Returns null on success, error message on failure. */
@@ -248,26 +325,9 @@ public final class StreamingCommandHandler {
 
 		Buff.affect(mob, ChatSpawned.class);
 
-		// Paralysis when spawning a monster outside its native biome. Max 3 turns (Halls), then 2 (City), 1 (Caves), 0 (Prison).
-		// Reduced by 1 when spawning in the Prison.
-		// Use affect+spend (not prolong) so we SET duration; prolong would extend existing and stack across duplicate spawns.
-		Integer nativeDepthForParalysis = NATIVE_DEPTH.get(monsterName);
-		if (nativeDepthForParalysis != null) {
-			int nativeRegion = (nativeDepthForParalysis - 1) / 5;  // 0=sewers, 1=prison, 2=caves, 3=city, 4=halls
-			int currentRegion = (Dungeon.depth - 1) / 5;
-			if (currentRegion < nativeRegion) {
-				int turns = Math.max(0, nativeRegion - 1);  // Halls=3, City=2, Caves=1, Prison=0
-				if (currentRegion == 1) turns = Math.max(0, turns - 1);  // reduce by 1 in prison
-				if (turns > 0) {
-					Buff.detach(mob, Paralysis.class);
-					// Pass turns-1: FlavourBuff.visualcooldown adds +1 for display, so we subtract to match
-					float duration = Math.max(1f, turns - 1f);
-					Buff.affect(mob, Paralysis.class, duration);
-				}
-			}
-		}
-
-		applyChatSpawnStatScaling(mob, mobClass, NATIVE_DEPTH.get(monsterName));
+		Integer nativeDepth = NATIVE_DEPTH.get(monsterName);
+		applyChatSpawnParalysis(mob, nativeDepth);
+		applyChatSpawnStatScaling(mob, mobClass, nativeDepth);
 
 		int heroPos = Dungeon.hero.pos;
 		boolean[] spawnPassable = new boolean[Dungeon.level.length()];
@@ -332,22 +392,9 @@ public final class StreamingCommandHandler {
 		Buff.affect(mob, ChatSpawned.class);
 		Buff.affect(mob, Random.element(CHAMPION_TYPES));
 
-		Integer nativeDepthForParalysis = NATIVE_DEPTH.get(monsterName);
-		if (nativeDepthForParalysis != null) {
-			int nativeRegion = (nativeDepthForParalysis - 1) / 5;
-			int currentRegion = (Dungeon.depth - 1) / 5;
-			if (currentRegion < nativeRegion) {
-				int turns = Math.max(0, nativeRegion - 1);
-				if (currentRegion == 1) turns = Math.max(0, turns - 1);
-				if (turns > 0) {
-					Buff.detach(mob, Paralysis.class);
-					float duration = Math.max(1f, turns - 1f);
-					Buff.affect(mob, Paralysis.class, duration);
-				}
-			}
-		}
-
-		applyChatSpawnStatScaling(mob, mobClass, NATIVE_DEPTH.get(monsterName));
+		Integer nativeDepth = NATIVE_DEPTH.get(monsterName);
+		applyChatSpawnParalysis(mob, nativeDepth);
+		applyChatSpawnStatScaling(mob, mobClass, nativeDepth);
 
 		int heroPos = Dungeon.hero.pos;
 		boolean[] spawnPassable = new boolean[Dungeon.level.length()];

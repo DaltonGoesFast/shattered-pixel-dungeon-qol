@@ -68,6 +68,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Preparation;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ShieldBuff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Sleep;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SpawnScaled;
+import com.shatteredpixel.shatteredpixeldungeon.utils.SpawnScaleConfig;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Slow;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SnipersMark;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Speed;
@@ -501,10 +502,15 @@ public abstract class Char extends Actor {
 			if (effectiveDamage >= 0) {
 				effectiveDamage = Math.max(effectiveDamage - dr, 0);
 				if (enemy == Dungeon.hero && buff(ChatSpawned.class) != null) {
-					if (Dungeon.depth >= 6) {
-						effectiveDamage = Math.max(1, effectiveDamage);
-					} else if (buff(SpawnScaled.class) != null) {
+					if (SpawnScaleConfig.sewersOneDamageCap
+							&& Dungeon.depth <= 5
+							&& buff(SpawnScaled.class) != null) {
 						effectiveDamage = Math.min(effectiveDamage, 1);
+					}
+					if (SpawnScaleConfig.minOneDamageVsHero) {
+						effectiveDamage = Math.max(1, effectiveDamage);
+					} else if (Dungeon.depth >= 6) {
+						effectiveDamage = Math.max(1, effectiveDamage);
 					}
 				}
 

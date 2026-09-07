@@ -134,7 +134,7 @@ public class Swarm extends Mob {
 		SpawnScaled parentScale = buff(SpawnScaled.class);
 		if (parentScale != null) {
 			clone.HT = this.HT;
-			SpawnScaled.affect(clone, parentScale.scale);
+			SpawnScaled.affect(clone, parentScale);
 		}
 		if (buff(ChatSpawned.class) != null) {
 			Buff.affect(clone, ChatSpawned.class);

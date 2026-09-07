@@ -254,7 +254,7 @@ public class Necromancer extends Mob {
 				int newHT = Math.max(1, Math.round(mySkeleton.HT * parentScale.scale));
 				mySkeleton.HT = newHT;
 				mySkeleton.HP = newHT;
-				SpawnScaled.affect(mySkeleton, parentScale.scale);
+				SpawnScaled.affect(mySkeleton, parentScale);
 			}
 			if (buff(ChatSpawned.class) != null) {
 				Buff.affect(mySkeleton, ChatSpawned.class);

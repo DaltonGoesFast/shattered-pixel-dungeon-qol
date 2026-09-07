@@ -3,6 +3,8 @@ extends Node
 
 signal state_updated(payload: Dictionary)
 signal level_up(payload: Dictionary)
+## Fired when Flask reports a new Shatter Event grant (seq increased after first poll).
+signal shatter_event(payload: Dictionary)
 signal connection_lost
 signal connection_restored
 
@@ -16,6 +18,7 @@ var _poll_in_flight: bool = false
 var _have_payload: bool = false
 var _last_level: int = -1
 var _last_level_up_ts: int = -1
+var _last_shatter_seq: int = -1
 
 
 func _ready() -> void:
@@ -89,13 +92,20 @@ func _on_request_completed(
 	var payload: Dictionary = data
 	var lvl := int(payload.get("level", 1))
 	var ts := int(payload.get("last_level_up_ts", 0))
+	var shatter_raw: Variant = payload.get("shatter", {})
+	var shatter_seq := 0
+	if typeof(shatter_raw) == TYPE_DICTIONARY:
+		shatter_seq = int((shatter_raw as Dictionary).get("last_shatter_seq", 0))
 	if _have_payload:
 		if lvl > _last_level:
 			level_up.emit(payload)
 		elif lvl == _last_level and ts > _last_level_up_ts:
 			level_up.emit(payload)
+		if shatter_seq > _last_shatter_seq:
+			shatter_event.emit(payload)
 	_last_level = lvl
 	_last_level_up_ts = ts
+	_last_shatter_seq = shatter_seq
 	_have_payload = true
 	last_payload = payload.duplicate(true)
 	state_updated.emit(payload)

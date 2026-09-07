@@ -28,6 +28,7 @@ ObsWebSocketClient="*res://scripts/obs_websocket_client.gd"
 SummonPollService="*res://scripts/summon_poll_service.gd"
 BestiaryPollService="*res://scripts/bestiary_poll_service.gd"
 CompanionSettingsPollService="*res://scripts/companion_settings_poll_service.gd"
+CompanionAudio="*res://scripts/companion_audio.gd"
 
 [display]
 

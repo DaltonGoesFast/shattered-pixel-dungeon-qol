@@ -67,6 +67,111 @@ DOUBLE_POINTS_END_FILE = os.path.join(SCRIPT_DIR, "double_points_end.txt")
 GAME_SUMMARY_TXT = os.path.join(SCRIPT_DIR, "game_summary.txt")
 GAME_SUMMARY_JSON = os.path.join(SCRIPT_DIR, "game_summary.json")
 POINTS_CONFIG_FILE = os.path.join(SCRIPT_DIR, "points_config.json")
+
+# Default spawn scaling (matches Java SpawnScaleConfig.applyDefault)
+DEFAULT_SPAWN_SCALE = {
+    "overall_power": 1.0,
+    "early_hp_min": 0.25,
+    "late_hp_min": 0.15,
+    "scorpio_hp_min": 0.15,
+    "early_sewers_dmg_mult": 1.0,
+    "late_sewers_dmg_mult": 0.35,
+    "early_sewers_dmg_floor": 0.05,
+    "late_sewers_dmg_floor": 0.08,
+    "prison_plus_dmg_floor": 0.15,
+    "early_dr_mult": 0.70,
+    "late_dr_mult": 0.40,
+    "dr_floor": 0.15,
+    "min_one_damage_vs_hero": True,
+    "sewers_one_damage_cap": False,
+    "eye_gaze_hero_ht_frac": 0.75,
+    "paralysis_enabled": True,
+    "paralysis_turns_gap_1": 1,
+    "paralysis_turns_gap_2": 2,
+    "paralysis_turns_gap_3": 3,
+    "paralysis_turns_gap_4": 4,
+    "xp_sewers": 2,
+    "xp_prison": 5,
+    "xp_caves": 8,
+    "xp_city": 11,
+    "xp_halls": 12,
+}
+
+
+def _clamp_float(v, lo, hi, default):
+    try:
+        return max(lo, min(hi, float(v)))
+    except (TypeError, ValueError):
+        return default
+
+
+def _clamp_int(v, lo, hi, default):
+    try:
+        return max(lo, min(hi, int(v)))
+    except (TypeError, ValueError):
+        return default
+
+
+def sanitize_spawn_scale(raw):
+    """Merge and clamp spawn_scale knobs; always returns a full dict."""
+    src = raw if isinstance(raw, dict) else {}
+    d = dict(DEFAULT_SPAWN_SCALE)
+    d.update({k: src[k] for k in DEFAULT_SPAWN_SCALE if k in src})
+    out = {
+        "overall_power": _clamp_float(d["overall_power"], 0.25, 3.0, 1.0),
+        "early_hp_min": _clamp_float(d["early_hp_min"], 0.05, 1.0, 0.25),
+        "late_hp_min": _clamp_float(d["late_hp_min"], 0.05, 1.0, 0.15),
+        "scorpio_hp_min": _clamp_float(d["scorpio_hp_min"], 0.05, 1.0, 0.15),
+        "early_sewers_dmg_mult": _clamp_float(d["early_sewers_dmg_mult"], 0.05, 3.0, 1.0),
+        "late_sewers_dmg_mult": _clamp_float(d["late_sewers_dmg_mult"], 0.05, 3.0, 0.35),
+        "early_sewers_dmg_floor": _clamp_float(d["early_sewers_dmg_floor"], 0.01, 1.0, 0.05),
+        "late_sewers_dmg_floor": _clamp_float(d["late_sewers_dmg_floor"], 0.01, 1.0, 0.08),
+        "prison_plus_dmg_floor": _clamp_float(d["prison_plus_dmg_floor"], 0.01, 1.0, 0.15),
+        "early_dr_mult": _clamp_float(d["early_dr_mult"], 0.05, 2.0, 0.70),
+        "late_dr_mult": _clamp_float(d["late_dr_mult"], 0.05, 2.0, 0.40),
+        "dr_floor": _clamp_float(d["dr_floor"], 0.01, 1.0, 0.15),
+        "min_one_damage_vs_hero": bool(d.get("min_one_damage_vs_hero", True)),
+        "sewers_one_damage_cap": bool(d.get("sewers_one_damage_cap", False)),
+        "eye_gaze_hero_ht_frac": _clamp_float(d["eye_gaze_hero_ht_frac"], 0.1, 2.0, 0.75),
+        "paralysis_enabled": bool(d.get("paralysis_enabled", True)),
+        "paralysis_turns_gap_1": _clamp_int(d.get("paralysis_turns_gap_1", d.get("paralysis_turns_prison", 1)), 0, 6, 1),
+        "paralysis_turns_gap_2": _clamp_int(d.get("paralysis_turns_gap_2", d.get("paralysis_turns_caves", 2)), 0, 6, 2),
+        "paralysis_turns_gap_3": _clamp_int(d.get("paralysis_turns_gap_3", d.get("paralysis_turns_city", 3)), 0, 6, 3),
+        "paralysis_turns_gap_4": _clamp_int(d.get("paralysis_turns_gap_4", d.get("paralysis_turns_halls", 4)), 0, 6, 4),
+        "xp_sewers": _clamp_int(d["xp_sewers"], 0, 30, 2),
+        "xp_prison": _clamp_int(d["xp_prison"], 0, 30, 5),
+        "xp_caves": _clamp_int(d["xp_caves"], 0, 30, 8),
+        "xp_city": _clamp_int(d["xp_city"], 0, 30, 11),
+        "xp_halls": _clamp_int(d["xp_halls"], 0, 30, 12),
+    }
+    return out
+
+
+def load_spawn_scale_from_disk():
+    try:
+        if os.path.exists(POINTS_CONFIG_FILE):
+            with open(POINTS_CONFIG_FILE, encoding="utf-8") as f:
+                data = json.load(f) or {}
+            return sanitize_spawn_scale(data.get("spawn_scale"))
+    except Exception:
+        pass
+    return sanitize_spawn_scale(None)
+
+
+def push_spawn_scale_to_game(spawn_scale=None):
+    """Push spawn_scale knobs to the game over WebSocket. Returns True if sent."""
+    if spawn_scale is None:
+        spawn_scale = load_spawn_scale_from_disk()
+    if not game_ws_app:
+        return False
+    try:
+        payload = {"command": "spawn_scale_config", "spawn_scale": spawn_scale}
+        _send_to_game(payload)
+        return True
+    except Exception as e:
+        print(f"push_spawn_scale_to_game: {e}")
+        return False
+
 FREE_UNTIL_FILE = os.path.join(SCRIPT_DIR, "free_until.json")
 SPEND_DISABLED_FILE = os.path.join(SCRIPT_DIR, "spend_disabled.txt")
 VIEWER_POINTS_FILE = os.path.join(SCRIPT_DIR, "viewer_points.txt")
@@ -903,7 +1008,11 @@ def game_ws_thread():
     while USE_GAME_WEBSOCKET and websocket:
         try:
             def on_open(conn):
-                pass
+                # Push latest spawn_scale so a restarted game picks up saved knobs
+                try:
+                    push_spawn_scale_to_game()
+                except Exception as e:
+                    print(f"Game WS on_open spawn_scale push: {e}")
             def on_close(conn, code, reason):
                 global last_obs_crop_top, last_obs_mask_enabled, last_open_best_crop, last_open_layout_key
                 global last_item_info_ignore_open_until, game_ws_received_count, game_ws_app
@@ -1026,6 +1135,7 @@ def points_config_api():
                 data.setdefault("curse_class_kit_duration_turns", 100)
                 data.setdefault("cooldown_bypass_users", ["DaltonGoesFast"])
                 data.setdefault("death_cost_inflation_enabled", True)
+                data["spawn_scale"] = sanitize_spawn_scale(data.get("spawn_scale"))
             else:
                 data = {
                     "cost_per_gold": 5,
@@ -1071,6 +1181,7 @@ def points_config_api():
                     "reset_debounce_hours": 4,
                     "curse_class_kit_duration_turns": 100,
                     "death_cost_inflation_enabled": True,
+                    "spawn_scale": sanitize_spawn_scale(None),
                 }
             try:
                 from points_command import load_free_until
@@ -1079,6 +1190,8 @@ def points_config_api():
                 free_until = {}
             data["free_until"] = free_until
             data["free_until_paused"] = bool(_free_clock_unavailable_reason())
+            if "spawn_scale" not in data:
+                data["spawn_scale"] = sanitize_spawn_scale(None)
             return jsonify(data)
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -1157,6 +1270,9 @@ def points_config_api():
             "reset_debounce_hours": max(0, float(data.get("reset_debounce_hours", 4))),
             "curse_class_kit_duration_turns": max(1, int(data.get("curse_class_kit_duration_turns", 100))),
             "death_cost_inflation_enabled": death_cost_enabled,
+            "spawn_scale": sanitize_spawn_scale(
+                data["spawn_scale"] if "spawn_scale" in data else existing.get("spawn_scale")
+            ),
         }
         for k, v in (data.get("cost_per_monster") or {}).items():
             try:
@@ -1165,12 +1281,13 @@ def points_config_api():
                 pass
         with open(POINTS_CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2)
+        pushed = push_spawn_scale_to_game(cfg["spawn_scale"])
         try:
             from points_command import refresh_death_cost_display_file
             refresh_death_cost_display_file()
         except Exception:
             pass
-        return jsonify({"ok": True})
+        return jsonify({"ok": True, "spawn_scale_pushed": pushed})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

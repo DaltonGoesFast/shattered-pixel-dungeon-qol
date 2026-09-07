@@ -333,6 +333,15 @@ var bestiary_banner_font_color: Color = Color(1.0, 1.0, 1.0, 1.0)
 var bestiary_shatter_pip_claimed_color: Color = Color(1.0, 0.85, 0.2, 1.0)
 var bestiary_shatter_pip_unclaimed_color: Color = Color(0.95, 0.95, 1.0, 0.92)
 
+## Windows playback device name for companion SFX (local only — not synced via Flask).
+var audio_output_device: String = "Default"
+## Master SFX volume as linear gain (1.0 = 100%, up to 1.5 = 150%). Synced via Flask.
+var audio_volume: float = 1.0
+## Mute all companion SFX. Synced via Flask.
+var audio_mute: bool = false
+## Play ShatterEvent1.mp3 when a Shatter Event grants. Synced via Flask.
+var shatter_sfx_enabled: bool = true
+
 ## Poll Flask [code]/api/companion-settings[/code] and apply layout/UI when revision increases.
 var remote_settings_enabled: bool = false
 var remote_settings_base_url: String = "http://127.0.0.1:5000"
@@ -716,6 +725,12 @@ func load_settings() -> void:
 	bestiary_shatter_pip_unclaimed_color = _read_color_cfg(
 		cfg, "ui", "bestiary_shatter_pip_unclaimed_color", bestiary_shatter_pip_unclaimed_color
 	)
+	audio_output_device = str(cfg.get_value("ui", "audio_output_device", audio_output_device)).strip_edges()
+	if audio_output_device.is_empty():
+		audio_output_device = "Default"
+	audio_volume = clampf(float(cfg.get_value("ui", "audio_volume", audio_volume)), 0.0, 1.5)
+	audio_mute = bool(cfg.get_value("ui", "audio_mute", audio_mute))
+	shatter_sfx_enabled = bool(cfg.get_value("ui", "shatter_sfx_enabled", shatter_sfx_enabled))
 	chrome_boxes = _read_chrome_boxes_cfg(cfg, "ui")
 	custom_alerts_enabled = bool(
 		cfg.get_value("ui", "custom_alerts_enabled", custom_alerts_enabled)
@@ -1887,6 +1902,10 @@ func save_settings() -> void:
 	cfg.set_value("ui", "bestiary_banner_font_color", bestiary_banner_font_color)
 	cfg.set_value("ui", "bestiary_shatter_pip_claimed_color", bestiary_shatter_pip_claimed_color)
 	cfg.set_value("ui", "bestiary_shatter_pip_unclaimed_color", bestiary_shatter_pip_unclaimed_color)
+	cfg.set_value("ui", "audio_output_device", audio_output_device)
+	cfg.set_value("ui", "audio_volume", audio_volume)
+	cfg.set_value("ui", "audio_mute", audio_mute)
+	cfg.set_value("ui", "shatter_sfx_enabled", shatter_sfx_enabled)
 	cfg.set_value("ui", "chrome_boxes", _serialize_chrome_boxes())
 	cfg.set_value("ui", "custom_alerts_enabled", custom_alerts_enabled)
 	cfg.set_value("ui", "custom_alerts_interval_sec", custom_alerts_interval_sec)
@@ -2097,6 +2116,7 @@ const REMOTE_UI_KEYS: Array[String] = [
 	"bestiary_zone_font_color", "bestiary_xp_font_color", "bestiary_sprint_font_color",
 	"bestiary_heat_font_color", "bestiary_hall_font_color", "bestiary_banner_font_color",
 	"bestiary_shatter_pip_claimed_color", "bestiary_shatter_pip_unclaimed_color",
+	"audio_volume", "audio_mute", "shatter_sfx_enabled",
 ]
 
 

@@ -486,6 +486,8 @@ def _grant_shatter_event(
     if sidecar_key:
         keys.append(sidecar_key)
     extend_free_until(keys, duration)
+    state["last_shatter_seq"] = int(state.get("last_shatter_seq", 0) or 0) + 1
+    state["last_shatter_ts"] = int(time.time())
     event = {
         "reason": reason,
         "level": level,
@@ -497,6 +499,7 @@ def _grant_shatter_event(
         "duration_sec": duration,
         "pip_index": pip_index,
         "cost_keys": keys,
+        "seq": int(state["last_shatter_seq"]),
     }
     return event
 
@@ -596,6 +599,8 @@ def _empty_state() -> dict:
         "session_summon_counts": {},
         "last_monster_by_user": {},
         "shatter_claimed_pips": [],
+        "last_shatter_seq": 0,
+        "last_shatter_ts": 0,
     }
 
 
@@ -635,6 +640,8 @@ def _load_state() -> dict:
             base["shatter_claimed_pips"] = [
                 int(x) for x in base["shatter_claimed_pips"] if str(x).strip().lstrip("-").isdigit()
             ]
+        base["last_shatter_seq"] = max(0, int(base.get("last_shatter_seq", 0) or 0))
+        base["last_shatter_ts"] = max(0, int(base.get("last_shatter_ts", 0) or 0))
         base["level"] = max(1, int(base.get("level", 1) or 1))
         base["bar_xp"] = max(0, int(base.get("bar_xp", 0) or 0))
         return base
@@ -1577,6 +1584,8 @@ def get_state_payload() -> dict[str, Any]:
                 ],
                 "pip_fractions": _pip_fractions(_pip_count_for_level(level, cfg)),
                 "duration_sec": int(_shatter_cfg(cfg).get("duration_sec", 60) or 60),
+                "last_shatter_seq": int(state.get("last_shatter_seq", 0) or 0),
+                "last_shatter_ts": int(state.get("last_shatter_ts", 0) or 0),
             },
         }
 

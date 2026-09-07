@@ -837,14 +837,7 @@ public abstract class Mob extends Char {
 			int baseExp = Dungeon.hero != null && Dungeon.hero.lvl <= maxLvl ? EXP : 0;
 			if (baseExp > 0) {
 				int region = (Dungeon.depth - 1) / 5;  // 0=sewers, 1=prison, 2=caves, 3=city, 4=demon
-				switch (region) {
-					case 0: chatSpawnedExp = 2; break;   // sewers
-					case 1: chatSpawnedExp = 5; break;   // prison (skeleton)
-					case 2: chatSpawnedExp = 8; break;   // caves (brute)
-					case 3: chatSpawnedExp = 11; break;  // city (warlock)
-					case 4: chatSpawnedExp = 12; break;  // demon halls (succubus)
-					default: chatSpawnedExp = 2; break;
-				}
+				chatSpawnedExp = com.shatteredpixel.shatteredpixeldungeon.utils.SpawnScaleConfig.chatSpawnXpForRegion(region);
 			}
 		}
 

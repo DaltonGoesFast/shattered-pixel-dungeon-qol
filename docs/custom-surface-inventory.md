@@ -43,7 +43,8 @@
 | `core/.../utils/TalentAutoPlan.java` | Auto talent plan when setting on |
 | `core/.../utils/TrainingExport.java` | Training export bridge (mirrors StreamingUI) |
 | `core/.../actors/buffs/ChatSpawned.java` | Chat-spawn XP + aura marker |
-| `core/.../actors/buffs/SpawnScaled.java` | Out-of-depth HP/dmg/DR scale |
+| `core/.../actors/buffs/SpawnScaled.java` | Out-of-depth HP/dmg/DR scale (baked factors) |
+| `core/.../utils/SpawnScaleConfig.java` | Live spawn-scale knobs (combat/paralysis/XP) |
 | `core/.../ui/TileIndicator.java` | Hover tile highlight |
 
 ### Messages / assets
@@ -118,6 +119,7 @@ Common fields: `request_id`, optional `username` (echoed on results as `username
 | `command` | Extra fields | Result `type` | Handler |
 |-----------|--------------|---------------|---------|
 | `ping` | — | `ping_result` (+ `version`) | inline |
+| `spawn_scale_config` | nested `spawn_scale` knobs (HP/dmg/DR/paralysis/XP) | `spawn_scale_config_result` | `StreamingCommandHandler.handleSpawnScaleConfig` |
 | `spawn` | `monster` | `spawn_result` | `handleSpawn` |
 | `champion` | `monster` | `champion_result` | `handleSpawnChampion` |
 | `gold` | `amount` (1–100) | `gold_result` | `handleDropGold` |
