@@ -424,10 +424,12 @@ public abstract class Level implements Bundlable {
 			customTiles.add(vis);
 		}
 
-		collection = bundle.getCollection( CUSTOM_TERRAIN );
-		for (Bundlable p : collection) {
-			CustomTilemap vis = (CustomTilemap)p;
-			customTerrain.add(vis);
+		if (bundle.contains( CUSTOM_TERRAIN )) {
+			collection = bundle.getCollection( CUSTOM_TERRAIN );
+			for (Bundlable p : collection) {
+				CustomTilemap vis = (CustomTilemap)p;
+				customTerrain.add(vis);
+			}
 		}
 
 		collection = bundle.getCollection( CUSTOM_WALLS );
