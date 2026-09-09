@@ -24,7 +24,6 @@ package com.shatteredpixel.shatteredpixeldungeon.ui;
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.SPDAction;
-import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.effects.CircleArc;
@@ -38,7 +37,6 @@ import com.shatteredpixel.shatteredpixeldungeon.windows.WndKeyBindings;
 import com.watabou.input.GameAction;
 import com.watabou.noosa.BitmapText;
 import com.watabou.noosa.Camera;
-import com.watabou.noosa.ColorBlock;
 import com.watabou.noosa.Game;
 import com.watabou.noosa.Image;
 import com.watabou.noosa.NinePatch;
@@ -50,8 +48,6 @@ import com.watabou.utils.GameMath;
 public class StatusPane extends Component {
 
 	private NinePatch bg;
-	/** Near-black #0c0c0c box behind HP bar and buffs for OBS chroma-key masking */
-	private ColorBlock obsMaskHpBuffs;
 	private Image avatar;
 	private Button heroInfo;
 	public static float talentBlink;
@@ -63,6 +59,7 @@ public class StatusPane extends Component {
 
 	private Image shieldHP;
 	private Image hp;
+	private Image Dot; //a visual darkening over HP and shield that shows total incoming DOT
 	private BitmapText hpText;
 	private Button heroInfoOnBar;
 
@@ -97,9 +94,6 @@ public class StatusPane extends Component {
 		String asset = Assets.Interfaces.STATUS;
 
 		this.large = large;
-
-		obsMaskHpBuffs = new ColorBlock(1, 1, SPDSettings.OBS_CHROMA_MASK_COLOR);
-		add(obsMaskHpBuffs);
 
 		if (large)  bg = new NinePatch( asset, 0, 64, 41, 39, 33, 0, 4, 0 );
 		else        bg = new NinePatch( asset, 0,  0, 82, 38, 32, 0, 5, 0 );
@@ -147,6 +141,12 @@ public class StatusPane extends Component {
 		if (large)  hp = new Image(asset, 0, 103, 128, 9);
 		else        hp = new Image(asset, 0, 40, 50, 4);
 		add( hp );
+
+		if (large)  Dot = new Image(asset, 0, 103, 128, 9);
+		else        Dot = new Image(asset, 0, 40, 50, 4);
+		Dot.hardlight(0, 0, 0);
+		Dot.alpha(0.25f);
+		add( Dot );
 
 		hpText = new BitmapText(PixelScene.pixelFont);
 		hpText.alpha(0.6f);
@@ -197,49 +197,22 @@ public class StatusPane extends Component {
 		if (large)  bg.size( 160, bg.height ); //HP bars must be 128px wide atm
 		else        bg.size(hpBarMaxWidth+32, bg.height ); //default max right is 50px health bar + 32
 
-		// Mirror the status pane horizontally so the portrait sits on the right of the HP bar.
-		// Only applies to PC + Large UI; HUD edit mode still moves the pane wholesale (the
-		// STATUS slot's bounds don't change), so this stays compatible.
-		boolean flip = large && SPDSettings.flipStatusPane() && HudLayout.isActive();
-
-		// Render the bg NinePatch mirrored in place. We can't use bg.flipHorizontal() here:
-		// the asset has a 33px portrait frame on the left and only a 4px trim on the right,
-		// so a UV-only flip squashes the 33px patch into 4px. Instead we apply a horizontal
-		// flip transform (origin = center, scale.x = -1), which mirrors the whole rendered
-		// quad set while keeping each patch's proportions intact.
-		bg.origin.set( flip ? bg.width / 2f : 0f, 0f );
-		bg.scale.x = flip ? -1f : 1f;
-
-		if (flip) {
-			avatar.x = bg.x + bg.width - 15 - avatar.width / 2f;
-		} else {
-			avatar.x = bg.x - avatar.width / 2f + 15;
-		}
+		avatar.x = bg.x - avatar.width / 2f + 15;
 		avatar.y = bg.y - avatar.height / 2f + 16;
 		PixelScene.align(avatar);
 
-		if (flip) {
-			heroInfo.setRect( bg.x + bg.width - heroPaneWidth, y, heroPaneWidth, 40 );
-		} else {
-			heroInfo.setRect( x, y, heroPaneWidth, large ? 40 : 36 );
-		}
+		heroInfo.setRect( x, y, heroPaneWidth, large ? 40 : 36 );
 
 		compass.x = avatar.x + avatar.width / 2f - compass.origin.x;
 		compass.y = avatar.y + avatar.height / 2f - compass.origin.y;
 		PixelScene.align(compass);
 
 		if (large) {
-			if (flip) {
-				// Bars hug the left edge of the pane (2px margin matches the right-side margin
-				// of the unflipped layout, where bars end at bg.x+158 inside a 160-wide bg).
-				exp.x = bg.x + 2;
-				hp.x = shieldHP.x = bg.x + 2;
-			} else {
-				exp.x = x + 30;
-				hp.x = shieldHP.x = x + 30;
-			}
+			exp.x = x + 30;
 			exp.y = y + 30;
-			hp.y = shieldHP.y = y + 19;
+
+			hp.x = shieldHP.x = Dot.x = x + 30;
+			hp.y = shieldHP.y = Dot.y = y + 19;
 
 			hpText.x = hp.x + (128 - hpText.width())/2f;
 			hpText.y = hp.y + 1;
@@ -249,20 +222,12 @@ public class StatusPane extends Component {
 			expText.y = exp.y;
 			PixelScene.align(expText);
 
-			if (flip) {
-				// Bar-click hit area covers the bar region (to the left of the portrait).
-				heroInfoOnBar.setRect(heroInfo.left() - 130, y + 19, 130, 20);
-				// Buffs above the HP bar, capped to 128 (HP bar width) so they wrap to a
-				// second row instead of overlapping the portrait when many are active.
-				buffs.setRect(bg.x + 3, y, 128, 16);
-				// Turn wheel just outside the left edge of the pane.
-				busy.x = bg.x - busy.width() - 1;
-			} else {
-				heroInfoOnBar.setRect(heroInfo.right(), y + 19, 130, 20);
-				//little extra for 14th buff
-				buffs.setRect(x + 31, y, 142, 16);
-				busy.x = x + bg.width + 1;
-			}
+			heroInfoOnBar.setRect(heroInfo.right(), y + 19, 130, 20);
+
+			//little extra for 14th buff
+			buffs.setRect(x + 31, y, 142, 16);
+
+			busy.x = x + bg.width + 1;
 			busy.y = y + bg.height - 9;
 		} else {
 			exp.x = x+2;
@@ -290,8 +255,8 @@ public class StatusPane extends Component {
 				shieldHP.frame(50-hpWidth, 44, 50, 4);
 			}
 
-			hp.x = shieldHP.x = hpleft;
-			hp.y = shieldHP.y = y + 2;
+			hp.x = shieldHP.x = Dot.x = hpleft;
+			hp.y = shieldHP.y = Dot.y = y + 2;
 
 			hpText.scale.set(PixelScene.align(0.5f));
 			hpText.x = hp.x + 1;
@@ -319,52 +284,6 @@ public class StatusPane extends Component {
 			busy.y = y + 37;
 		}
 
-		// Reposition level text relative to the (possibly HUD-offset) pane.
-		// The level text content is set in update() on level-up; layout() keeps it in sync
-		// with the current x/y so dragging StatusPane in HUD edit mode moves it too.
-		if ( lastLvl != -1 ) {
-			level.measure();
-			if (large) {
-				if (flip) {
-					level.x = bg.x + bg.width - 15 - level.width() / 2f;
-				} else {
-					level.x = x + (30f - level.width()) / 2f;
-				}
-				level.y = y + 33f - level.baseLine() / 2f;
-			} else {
-				level.x = x + heroPaneExtraWidth + 25.5f - level.width() / 2f;
-				level.y = y + 31.0f - level.baseLine() / 2f;
-			}
-			PixelScene.align(level);
-		}
-
-		// OBS mask: #0c0c0c behind HP bar, buffs, and turn wheel for chroma-key
-		if (large) {
-			if (flip) {
-				// Mask spans from the (left-side) turn wheel to the right edge of the HP bar.
-				float maskLeft = Math.min(busy.x, hp.x);
-				float maskRight = hp.x + 128;
-				obsMaskHpBuffs.x = maskLeft;
-				obsMaskHpBuffs.y = y;
-				obsMaskHpBuffs.size(maskRight - maskLeft, height);
-			} else {
-				// Extend right past turn wheel (~half the arc radius)
-				float maskRight = busy.x + busy.width() + 9;
-				obsMaskHpBuffs.x = hp.x;
-				obsMaskHpBuffs.y = y;
-				obsMaskHpBuffs.size(maskRight - hp.x, height);
-			}
-		} else {
-			// Extend left/down to cover turn wheel at bottom-left
-			float maskLeft = Math.min(hp.x, busy.x);
-			float maskRight = buffs.left() + buffs.width();
-			float maskBottom = Math.max(buffs.top() + buffs.height(), busy.y + busy.height());
-			obsMaskHpBuffs.x = maskLeft;
-			obsMaskHpBuffs.y = y;
-			obsMaskHpBuffs.size(maskRight - maskLeft, maskBottom - y);
-		}
-		obsMaskHpBuffs.visible = SPDSettings.obsChromaMasks();
-
 		counter.point(busy.center());
 	}
 	
@@ -377,10 +296,10 @@ public class StatusPane extends Component {
 	@Override
 	public void update() {
 		super.update();
-		obsMaskHpBuffs.visible = SPDSettings.obsChromaMasks();
-
+		
 		int health = Dungeon.hero.HP;
 		int shield = Dungeon.hero.shielding();
+		int incomingDOT = Dungeon.hero.incomingDOT();
 		int max = Dungeon.hero.HT;
 
 		if (!Dungeon.hero.isAlive()) {
@@ -398,15 +317,19 @@ public class StatusPane extends Component {
 
 		float healthPercent = health/(float)max;
 		float shieldPercent = shield/(float)max;
+		float DOTPercent    = incomingDOT/(float)max;
 
 		if (healthPercent + shieldPercent > 1f){
 			float excess = healthPercent + shieldPercent;
 			healthPercent /= excess;
 			shieldPercent /= excess;
+			DOTPercent    /= excess;
 		}
 
 		hp.scale.x = healthPercent;
 		shieldHP.scale.x = healthPercent + shieldPercent;
+		Dot.scale.x = Math.min(DOTPercent, shieldHP.scale.x);
+		Dot.x = shieldHP.x + shieldHP.width() - Dot.width();
 
 		if (oldHP != health || oldShield != shield || oldMax != max){
 			if (shield <= 0) {
@@ -445,11 +368,7 @@ public class StatusPane extends Component {
 			if (large){
 				level.text( "lv. " + lastLvl );
 				level.measure();
-				if (SPDSettings.flipStatusPane() && HudLayout.isActive()) {
-					level.x = bg.x + bg.width - 15 - level.width() / 2f;
-				} else {
-					level.x = x + (30f - level.width()) / 2f;
-				}
+				level.x = x + (30f - level.width()) / 2f;
 				level.y = y + 33f - level.baseLine() / 2f;
 			} else {
 				level.text( Integer.toString( lastLvl ) );
@@ -476,7 +395,6 @@ public class StatusPane extends Component {
 	public void alpha( float value ){
 		value = GameMath.gate(0, value, 1f);
 		bg.alpha(value);
-		obsMaskHpBuffs.alpha(value);
 		heroPaneCutout.alpha(value);
 		hpCutout.alpha(value);
 		avatar.alpha(value);

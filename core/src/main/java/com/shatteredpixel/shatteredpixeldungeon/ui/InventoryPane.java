@@ -53,6 +53,7 @@ import com.watabou.noosa.Image;
 import com.watabou.noosa.NinePatch;
 import com.watabou.noosa.PointerArea;
 import com.watabou.noosa.ui.Component;
+import com.watabou.utils.Point;
 import com.watabou.utils.PointF;
 import com.watabou.utils.Signal;
 
@@ -61,7 +62,6 @@ import java.util.ArrayList;
 public class InventoryPane extends Component {
 
 	private NinePatch bg;
-	private NinePatch bg2; //2 backgrounds to reduce transparency
 
 	//used to prevent clicks through the BG normally, or to cancel selectors if they're enabled
 	private PointerArea blocker;
@@ -566,6 +566,7 @@ public class InventoryPane extends Component {
 			}
 
 			if (selector == null && item.defaultAction() != null){
+				GameScene.centerNextWndOnInvPane();
 				item.execute(Dungeon.hero);
 				if (item != null && item.usesTargeting) {
 					targetingSlot = this;
@@ -600,6 +601,8 @@ public class InventoryPane extends Component {
 				PointF mousePos = PointerEvent.currentHoverPos();
 				mousePos = camera.screenToCamera((int)mousePos.x, (int)mousePos.y);
 				r.setPos(mousePos.x-3, mousePos.y-3);
+				r.setChildWindowOffset(new Point((int)centerX() - camera().width/2,
+						(int)centerY() - camera().height/2));
 			} else {
 				//do nothing
 			}

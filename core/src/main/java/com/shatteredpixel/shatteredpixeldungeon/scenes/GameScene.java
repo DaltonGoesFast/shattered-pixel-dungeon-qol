@@ -46,11 +46,13 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Snake;
 import com.shatteredpixel.shatteredpixeldungeon.effects.BannerSprites;
 import com.shatteredpixel.shatteredpixeldungeon.effects.BlobEmitter;
+import com.shatteredpixel.shatteredpixeldungeon.effects.CheckedCell;
 import com.shatteredpixel.shatteredpixeldungeon.effects.EmoIcon;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Flare;
 import com.shatteredpixel.shatteredpixeldungeon.effects.FloatingText;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Ripple;
 import com.shatteredpixel.shatteredpixeldungeon.effects.SpellSprite;
+import com.shatteredpixel.shatteredpixeldungeon.effects.TargetedCell;
 import com.shatteredpixel.shatteredpixeldungeon.items.Ankh;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Honeypot;
@@ -89,14 +91,13 @@ import com.shatteredpixel.shatteredpixeldungeon.tiles.GridTileMap;
 import com.shatteredpixel.shatteredpixeldungeon.tiles.RaisedTerrainTilemap;
 import com.shatteredpixel.shatteredpixeldungeon.tiles.TerrainFeaturesTilemap;
 import com.shatteredpixel.shatteredpixeldungeon.tiles.WallBlockingTilemap;
+import com.shatteredpixel.shatteredpixeldungeon.tiles.WallOcclusionTilemap;
 import com.shatteredpixel.shatteredpixeldungeon.ui.ActionIndicator;
 import com.shatteredpixel.shatteredpixeldungeon.ui.AttackIndicator;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Banner;
 import com.shatteredpixel.shatteredpixeldungeon.ui.BossHealthBar;
 import com.shatteredpixel.shatteredpixeldungeon.ui.CharHealthIndicator;
 import com.shatteredpixel.shatteredpixeldungeon.ui.GameLog;
-import com.shatteredpixel.shatteredpixeldungeon.ui.HudEditMode;
-import com.shatteredpixel.shatteredpixeldungeon.ui.HudLayout;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Icons;
 import com.shatteredpixel.shatteredpixeldungeon.ui.InventoryPane;
 import com.shatteredpixel.shatteredpixeldungeon.ui.LootIndicator;
@@ -108,17 +109,14 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.StatusPane;
 import com.shatteredpixel.shatteredpixeldungeon.ui.StyledButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Tag;
 import com.shatteredpixel.shatteredpixeldungeon.ui.TargetHealthIndicator;
-import com.shatteredpixel.shatteredpixeldungeon.ui.TileIndicator;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Toast;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Toolbar;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
-import com.shatteredpixel.shatteredpixeldungeon.utils.TransparentVoid;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndBag;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndGame;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndHero;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndInfoCell;
-import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingUI;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndInfoItem;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndInfoMob;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndInfoPlant;
@@ -132,10 +130,6 @@ import com.watabou.gltextures.TextureCache;
 import com.watabou.glwrap.Blending;
 import com.watabou.input.ControllerHandler;
 import com.watabou.input.KeyBindings;
-import com.watabou.input.KeyEvent;
-import com.watabou.utils.Signal;
-import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.graphics.GL20;
 import com.watabou.input.PointerEvent;
 import com.watabou.noosa.Camera;
 import com.watabou.noosa.Game;
@@ -144,7 +138,6 @@ import com.watabou.noosa.Group;
 import com.watabou.noosa.Image;
 import com.watabou.noosa.NoosaScript;
 import com.watabou.noosa.NoosaScriptNoLighting;
-import com.watabou.noosa.ColorBlock;
 import com.watabou.noosa.PointerArea;
 import com.watabou.noosa.SkinnedBlock;
 import com.watabou.noosa.Visual;
@@ -152,7 +145,6 @@ import com.watabou.noosa.audio.Sample;
 import com.watabou.noosa.particles.Emitter;
 import com.watabou.noosa.tweeners.Tweener;
 import com.watabou.utils.Callback;
-import com.watabou.utils.DeviceCompat;
 import com.watabou.utils.GameMath;
 import com.watabou.utils.PlatformSupport;
 import com.watabou.utils.Point;
@@ -169,16 +161,10 @@ public class GameScene extends PixelScene {
 
 	static GameScene scene;
 
-	public static GameScene getScene() {
-		return scene;
-	}
-
 	private SkinnedBlock water;
-	/** Opaque black tiles under non-void cells when OBS transparent void is enabled. */
-	private ColorBlock transparentVoidTerrainBlackPatch;
-
 	private DungeonTerrainTilemap tiles;
 	private GridTileMap visualGrid;
+	private WallOcclusionTilemap occlusion;
 	private TerrainFeaturesTilemap terrainFeatures;
 	private RaisedTerrainTilemap raisedTerrain;
 	private DungeonWallsTilemap walls;
@@ -187,20 +173,18 @@ public class GameScene extends PixelScene {
 	private HeroSprite hero;
 
 	private MenuPane menu;
-	private com.shatteredpixel.shatteredpixeldungeon.ui.DangerIndicator danger;
 	private StatusPane status;
 
 	private BossHealthBar boss;
 
 	private GameLog log;
-	/** Near-black #0c0c0c box behind log for OBS chroma-key masking */
-	private SkinnedBlock logBg;
 
 	private static CellSelector cellSelector;
 	
 	private Group terrain;
 	private Group customTiles;
 	private Group levelVisuals;
+	private Group customTerrain;
 	private Group levelWallVisuals;
 	private Group customWalls;
 	private Group ripples;
@@ -216,6 +200,8 @@ public class GameScene extends PixelScene {
 	private Group statuses;
 	private Group emoicons;
 	private Group overFogEffects;
+	private Group checkedCells;
+	private Group targetedCells;
 	private Group healthIndicators;
 
 	private InventoryPane inventory;
@@ -228,8 +214,6 @@ public class GameScene extends PixelScene {
 	private LootIndicator loot;
 	private ActionIndicator action;
 	private ResumeIndicator resume;
-
-	private Signal.Listener<KeyEvent> hudLayoutKeyListener;
 
 	{
 		inGameScene = true;
@@ -267,26 +251,6 @@ public class GameScene extends PixelScene {
 		terrain = new Group();
 		add( terrain );
 
-		transparentVoidTerrainBlackPatch = new ColorBlock(
-				DungeonTilemap.SIZE, DungeonTilemap.SIZE, 0xFF000000 );
-		terrain.add( new Group() {
-			@Override
-			public void draw() {
-				if (!TransparentVoid.enabled()) {
-					return;
-				}
-				Blending.disable();
-				float ts = DungeonTilemap.SIZE;
-				TransparentVoid.forEachNonVoidHorizontalRun((row, s, cEx) -> {
-					transparentVoidTerrainBlackPatch.x = s * ts;
-					transparentVoidTerrainBlackPatch.y = row * ts;
-					transparentVoidTerrainBlackPatch.size((cEx - s) * ts, ts);
-					transparentVoidTerrainBlackPatch.draw();
-				});
-				Blending.enable();
-			}
-		} );
-
 		water = new SkinnedBlock(
 			Dungeon.level.width() * DungeonTilemap.SIZE,
 			Dungeon.level.height() * DungeonTilemap.SIZE,
@@ -301,30 +265,7 @@ public class GameScene extends PixelScene {
 			public void draw() {
 				//water has no alpha component, this improves performance
 				Blending.disable();
-				if (!TransparentVoid.enabled()) {
-					super.draw();
-					Blending.enable();
-					return;
-				}
-				if (texture == null || (!dirty && buffer == null)) {
-					Blending.enable();
-					return;
-				}
-
-				beforeQuadDrawSetup();
-				NoosaScriptNoLighting shader = NoosaScriptNoLighting.get();
-				Camera cam = camera();
-				float ts = DungeonTilemap.SIZE;
-				TransparentVoid.forEachNonVoidHorizontalRun((row, s, cEx) -> {
-					float wx = x + s * ts;
-					float wy = y + row * ts;
-					float ww = (cEx - s) * ts;
-					float wh = ts;
-					shader.camera(cam);
-					enableTransparentVoidWaterScissor(cam, wx, wy, ww, wh);
-					renderTexturedQuadAfterCamera(shader);
-				});
-				disableTransparentVoidWaterScissor();
+				super.draw();
 				Blending.enable();
 			}
 		};
@@ -342,18 +283,18 @@ public class GameScene extends PixelScene {
 		customTiles = new Group();
 		terrain.add(customTiles);
 
-		for( CustomTilemap visual : Dungeon.level.customTiles){
-			addCustomTile(visual);
-		}
-
 		visualGrid = new GridTileMap();
 		terrain.add( visualGrid );
+
+		occlusion = new WallOcclusionTilemap();
+		terrain.add( occlusion );
 
 		terrainFeatures = new TerrainFeaturesTilemap(Dungeon.level.plants, Dungeon.level.traps);
 		terrain.add(terrainFeatures);
 
-		terrain.add( new TileIndicator( tiles ) );
-		
+		customTerrain = new Group();
+		terrain.add(customTerrain);
+
 		levelVisuals = Dungeon.level.addVisuals();
 		add(levelVisuals);
 
@@ -394,10 +335,6 @@ public class GameScene extends PixelScene {
 		customWalls = new Group();
 		add(customWalls);
 
-		for( CustomTilemap visual : Dungeon.level.customWalls){
-			addCustomWall(visual);
-		}
-
 		levelWallVisuals = Dungeon.level.addWallVisuals();
 		add( levelWallVisuals );
 
@@ -423,6 +360,29 @@ public class GameScene extends PixelScene {
 		add( spells );
 
 		add(overFogEffects);
+
+		checkedCells = new Group();
+		add(checkedCells);
+
+		targetedCells = new Group();
+		add(targetedCells);
+		for (TargetedCell cell : TargetedCell.cells.valueList()){
+			cell.reset(cell.pos, cell.time);
+			targetedCells.add(cell);
+		}
+
+		//set these up later so that they can influence previous tilemaps if needed
+		for( CustomTilemap visual : Dungeon.level.customTiles){
+			addCustomTile(visual);
+		}
+
+		for( CustomTilemap visual : Dungeon.level.customTerrain){
+			addCustomTerrain(visual);
+		}
+
+		for( CustomTilemap visual : Dungeon.level.customWalls){
+			addCustomWall(visual);
+		}
 		
 		statuses = new Group();
 		add( statuses );
@@ -505,24 +465,14 @@ public class GameScene extends PixelScene {
 		menu.setPos( menuBarMaxLeft, screentop);
 		add(menu);
 
-		// Danger indicator (switch-enemy / target switcher) is its own HUD element so it can
-		// be repositioned independently from the menu bar in HUD edit mode.
-		danger = new com.shatteredpixel.shatteredpixeldungeon.ui.DangerIndicator();
-		danger.camera = uiCamera;
-		danger.setSize( com.shatteredpixel.shatteredpixeldungeon.ui.DangerIndicator.SIZE,
-				com.shatteredpixel.shatteredpixeldungeon.ui.DangerIndicator.HEIGHT );
-		danger.setPos( menu.left() + MenuPane.WIDTH - danger.width(), menu.top() + 21 + 1 );
-		add(danger);
-
 		float extraRight = uiCamera.width - (menuBarMaxLeft + MenuPane.WIDTH);
-		float barWidth = Math.max(0, extraRight - insets.right);
-		if (barWidth > 0){
-			SkinnedBlock bar = new SkinnedBlock(barWidth, 20, TextureCache.createSolid(0x88000000));
+		if (extraRight > 0){
+			SkinnedBlock bar = new SkinnedBlock(extraRight, 20, TextureCache.createSolid(0x88000000));
 			bar.x = uiCamera.width - extraRight;
 			bar.camera = uiCamera;
 			add(bar);
 
-			PointerArea blocker = new PointerArea(uiCamera.width - extraRight, 0, barWidth, 20);
+			PointerArea blocker = new PointerArea(uiCamera.width - extraRight, 0, extraRight, 20);
 			blocker.camera = uiCamera;
 			add(blocker);
 		}
@@ -537,13 +487,11 @@ public class GameScene extends PixelScene {
 		add(status);
 
 		if (uiSize < 2 && largeInsetTop != 0) {
-			float topBarWidth = uiCamera.width - insets.left - insets.right;
-			SkinnedBlock bar = new SkinnedBlock(topBarWidth, largeInsetTop, TextureCache.createSolid(0x88000000));
+			SkinnedBlock bar = new SkinnedBlock(uiCamera.width, largeInsetTop, TextureCache.createSolid(0x88000000));
 			bar.camera = uiCamera;
-			bar.x = insets.left;
 			add(bar);
 
-			PointerArea blocker = new PointerArea(insets.left, 0, topBarWidth, largeInsetTop);
+			PointerArea blocker = new PointerArea(0, 0, uiCamera.width, largeInsetTop);
 			blocker.camera = uiCamera;
 			add(blocker);
 		}
@@ -576,10 +524,6 @@ public class GameScene extends PixelScene {
 		attack.camera = uiCamera;
 		add( attack );
 
-		logBg = new SkinnedBlock(1, 1, TextureCache.createSolid(SPDSettings.OBS_CHROMA_MASK_COLOR));
-		logBg.camera = uiCamera;
-		add(logBg);
-
 		log = new GameLog();
 		log.camera = uiCamera;
 		log.newLine();
@@ -599,50 +543,23 @@ public class GameScene extends PixelScene {
 			inventory.setPos(uiCamera.width - inventory.width() - insets.right, uiCamera.height - inventory.height() - insets.bottom);
 			add(inventory);
 
-			toolbar.setRect( insets.left, uiCamera.height - toolbar.height() - inventory.height() - insets.bottom, uiCamera.width - insets.left - insets.right, toolbar.height() );
+			toolbar.setRect( insets.left, uiCamera.height - toolbar.height() - inventory.height() - insets.bottom, uiCamera.width - insets.right, toolbar.height() );
 		} else {
-			toolbar.setRect( insets.left, uiCamera.height - toolbar.height() - insets.bottom, uiCamera.width - insets.left - insets.right, toolbar.height() );
+			toolbar.setRect( insets.left, uiCamera.height - toolbar.height() - insets.bottom, uiCamera.width - insets.right, toolbar.height() );
 		}
 
 		if (insets.bottom > 0){
-			float bottomBarWidth = uiCamera.width - insets.left - insets.right;
-			SkinnedBlock bar = new SkinnedBlock(bottomBarWidth, insets.bottom, TextureCache.createSolid(0x88000000));
+			SkinnedBlock bar = new SkinnedBlock(uiCamera.width, insets.bottom, TextureCache.createSolid(0x88000000));
 			bar.camera = uiCamera;
-			bar.x = insets.left;
 			bar.y = uiCamera.height - insets.bottom;
 			add(bar);
 
-			PointerArea blocker = new PointerArea(insets.left, uiCamera.height - insets.bottom, bottomBarWidth, insets.bottom);
+			PointerArea blocker = new PointerArea(0, uiCamera.height - insets.bottom, uiCamera.width, insets.bottom);
 			blocker.camera = uiCamera;
 			add(blocker);
 		}
 
-		if (HudLayout.isActive()) {
-			HudLayout.init( this );
-			layoutHud();
-			KeyEvent.addKeyListener( hudLayoutKeyListener = new Signal.Listener<KeyEvent>() {
-				@Override
-				public boolean onSignal( KeyEvent event ) {
-					if (!event.pressed || !HudLayout.isActive()) return false;
-					if (KeyBindings.getActionForKey( event ) == SPDAction.HUD_LAYOUT_EDIT) {
-						HudEditMode.toggle();
-						return true;
-					}
-					return false;
-				}
-			} );
-		} else {
-			layoutTags();
-		}
-		// Re-run after one frame so log/tags and toolbar/inventory stay in sync with margins
-		ShatteredPixelDungeon.runOnRenderThread(() -> {
-			if (HudLayout.isActive()) {
-				layoutHud();
-			} else {
-				layoutToolbarAndInventory();
-				layoutTags();
-			}
-		});
+		layoutTags();
 
 		switch (InterlevelScene.mode) {
 			case RESURRECT:
@@ -725,6 +642,7 @@ public class GameScene extends PixelScene {
 					}
 
 					if (spawnersAbove > 0) {
+						GLog.newLine();
 						if (Dungeon.bossLevel()) {
 							GLog.n(Messages.get(this, "spawner_warn_final"));
 						} else {
@@ -877,13 +795,7 @@ public class GameScene extends PixelScene {
 	}
 	
 	public void destroy() {
-		HudEditMode.disable( false );
-		HudLayout.dispose();
-		if (hudLayoutKeyListener != null) {
-			KeyEvent.removeKeyListener( hudLayoutKeyListener );
-			hudLayoutKeyListener = null;
-		}
-
+		
 		//tell the actor thread to finish, then wait for it to complete any actions it may be doing.
 		if (!waitForActorThread( 4500, true )){
 			Throwable t = new Throwable();
@@ -969,10 +881,6 @@ public class GameScene extends PixelScene {
 			return;
 		}
 
-		if (logBg != null) {
-			logBg.visible = SPDSettings.obsChromaMasks();
-		}
-
 		super.update();
 
 		if (notifyDelay > 0) notifyDelay -= Game.elapsed;
@@ -1019,8 +927,7 @@ public class GameScene extends PixelScene {
 			tagAction = action.visible;
 			tagResume = resume.visible;
 
-			if (HudLayout.isActive()) layoutHud();
-			else layoutTags();
+			layoutTags();
 
 		} else if (tagAttack != attack.active ||
 				tagLoot != loot.visible ||
@@ -1039,20 +946,12 @@ public class GameScene extends PixelScene {
 
 			//if a new tag appears, re-layout tags immediately
 			//otherwise, wait until the hero acts, so as to not suddenly change their position
-			if (tagAppearing) {
-				if (HudLayout.isActive()) layoutHud();
-				else layoutTags();
-			} else {
-				tagDisappeared = true;
-			}
+			if (tagAppearing)   layoutTags();
+			else                tagDisappeared = true;
 
 		}
 
-		if (HudEditMode.isEditing()) {
-			cellSelector.enable( false );
-		} else {
-			cellSelector.enable(Dungeon.hero.ready);
-		}
+		cellSelector.enable(Dungeon.hero.ready);
 
 		if (!toDestroy.isEmpty()) {
 			for (Gizmo g : toDestroy) {
@@ -1078,127 +977,11 @@ public class GameScene extends PixelScene {
 	private boolean tagAction    = false;
 	private boolean tagResume    = false;
 
-	/** Re-applies toolbar and inventory bounds from current common insets (keeps them in sync with margins). */
-	public static void layoutToolbarAndInventory() {
-		if (scene == null) return;
-		if (HudLayout.isActive()) {
-			layoutHud();
-			return;
-		}
-		RectF insets = scene.getCommonInsets();
-		float toolbarY = uiCamera.height - scene.toolbar.height() - insets.bottom;
-		if (scene.inventory != null && scene.inventory.visible) {
-			toolbarY -= scene.inventory.height();
-			scene.inventory.setPos(uiCamera.width - scene.inventory.width() - insets.right, uiCamera.height - scene.inventory.height() - insets.bottom);
-		}
-		float w = uiCamera.width - insets.left - insets.right;
-		scene.toolbar.setRect(insets.left, toolbarY, w, scene.toolbar.height());
-	}
-
-	public static void layoutHud() {
-		updateTags = false;
-		if (scene == null) return;
-		layoutHudDefaults();
-		HudLayout.apply( scene );
-	}
-
-	private static void layoutHudDefaults() {
-		if (scene == null) return;
-
-		if (scene.inventory != null && scene.inventory.visible
-				&& (uiCamera.width < 460 && uiCamera.height < 300)){
-			Camera.main.setCenterOffset(0, Math.min(300-uiCamera.height, 460-uiCamera.width) / Camera.main.zoom);
-		} else {
-			Camera.main.setCenterOffset(0, 0);
-		}
-
-		RectF insets = scene.getCommonInsets();
-		float largeInsetTop = Game.platform.getSafeInsets(PlatformSupport.INSET_LRG).scale(1f / defaultZoom).top;
-		float screentop = largeInsetTop;
-
-		scene.status.setRect(insets.left, uiCamera.height - HudLayout.STATUS_HEIGHT - insets.bottom,
-				uiCamera.width - insets.left - insets.right, 0);
-		scene.menu.setPos(uiCamera.width - insets.right - MenuPane.WIDTH, screentop);
-		// Danger indicator default: right edge of screen, just below the menu bar.
-		if (scene.danger != null) {
-			float dangerX = uiCamera.width - insets.right - scene.danger.width();
-			float dangerY = screentop + 21 + 1;
-			scene.danger.setPos(dangerX, dangerY);
-		}
-
-		float toolbarY = uiCamera.height - scene.toolbar.height() - insets.bottom;
-		if (scene.inventory != null && scene.inventory.visible) {
-			toolbarY -= scene.inventory.height();
-			scene.inventory.setPos(uiCamera.width - scene.inventory.width() - insets.right,
-					uiCamera.height - scene.inventory.height() - insets.bottom);
-		}
-		float w = uiCamera.width - insets.left - insets.right;
-		scene.toolbar.setRect(insets.left, toolbarY, w, scene.toolbar.height());
-
-		boolean tagsOnLeft = SPDSettings.flipTags();
-		float tagWidth = Tag.SIZE + (tagsOnLeft ? insets.left : insets.right);
-		float tagLeft = tagsOnLeft ? 0 : uiCamera.width - tagWidth;
-
-		float statusY = uiCamera.height - HudLayout.STATUS_HEIGHT - insets.bottom;
-		float logY = statusY - 2;
-
-		float logX, logWidth;
-		if (tagsOnLeft) {
-			logX = tagWidth;
-			logWidth = 160 - tagWidth;
-			scene.log.setRect(logX, logY, logWidth, 0);
-		} else {
-			logX = insets.left;
-			logWidth = 160 - insets.left;
-			scene.log.setRect(logX, logY, logWidth, 0);
-		}
-		float logBgHeight = 45;
-		scene.logBg.x = logX;
-		scene.logBg.y = logY - logBgHeight + 6;
-		scene.logBg.size(logWidth, logBgHeight);
-		scene.logBg.visible = SPDSettings.obsChromaMasks();
-
-		// Match original layoutTags: tag strip anchors to toolbar top by default,
-		// status top only when tags are flipped to the left side on full UI.
-		float pos = toolbarY;
-		if (tagsOnLeft) {
-			pos = statusY;
-		}
-
-		if (scene.tagAttack){
-			scene.attack.setRect( tagLeft, pos - Tag.SIZE, tagWidth, Tag.SIZE );
-			scene.attack.flip(tagsOnLeft);
-			pos = scene.attack.top();
-		}
-
-		if (scene.tagLoot) {
-			scene.loot.setRect( tagLeft, pos - Tag.SIZE, tagWidth, Tag.SIZE );
-			scene.loot.flip(tagsOnLeft);
-			pos = scene.loot.top();
-		}
-
-		if (scene.tagAction) {
-			scene.action.setRect( tagLeft, pos - Tag.SIZE, tagWidth, Tag.SIZE );
-			scene.action.flip(tagsOnLeft);
-			pos = scene.action.top();
-		}
-
-		if (scene.tagResume) {
-			scene.resume.setRect( tagLeft, pos - Tag.SIZE, tagWidth, Tag.SIZE );
-			scene.resume.flip(tagsOnLeft);
-		}
-	}
-
 	public static void layoutTags() {
 
 		updateTags = false;
 
 		if (scene == null) return;
-
-		if (HudLayout.isActive()) {
-			layoutHud();
-			return;
-		}
 
 		//move the camera center up a bit if we're on full UI and it is taking up lots of space
 		if (scene.inventory != null && scene.inventory.visible
@@ -1209,52 +992,33 @@ public class GameScene extends PixelScene {
 		}
 		//Camera.main.panTo(Dungeon.hero.sprite.center(), 5f);
 
-		//adjust spacing for elements based on display cutouts and user UI margin (same as rest of game UI)
-		RectF insets = scene.getCommonInsets();
-		int uiSize = SPDSettings.interfaceSize();
+		//adjust spacing for elements based on display cutouts
+		// We use ALL here as some elements can be a fair but up the side of the screen
+		RectF insets = Game.platform.getSafeInsets( PlatformSupport.INSET_ALL );
+		insets = insets.scale(1f / uiCamera.zoom);
 
 		boolean tagsOnLeft = SPDSettings.flipTags();
 		float tagWidth = Tag.SIZE + (tagsOnLeft ? insets.left : insets.right);
 		float tagLeft = tagsOnLeft ? 0 : uiCamera.width - tagWidth;
 
-		// Compute log Y from the same formulas used for status/toolbar in create(), so we stay in sync with margins
-		final float statusHeight = 39;
-		float toolbarY = uiCamera.height - scene.toolbar.height() - (scene.inventory != null && scene.inventory.visible ? scene.inventory.height() : 0) - insets.bottom;
-		float statusY = uiCamera.height - statusHeight - insets.bottom;
-		float logY = uiSize == 0 ? (toolbarY - 2) : (statusY - 2);
-
-		float logX, logWidth;
-		if (uiSize == 0){
+		float y = SPDSettings.interfaceSize() == 0 ? scene.toolbar.top()-2 : scene.status.top()-2;
+		if (SPDSettings.interfaceSize() == 0){
 			if (tagsOnLeft) {
-				logX = tagWidth;
-				logWidth = uiCamera.width - tagWidth - insets.right;
-				scene.log.setRect(logX, logY, logWidth, 0);
+				scene.log.setRect(tagWidth, y, uiCamera.width - tagWidth - insets.right, 0);
 			} else {
-				logX = insets.left;
-				logWidth = uiCamera.width - tagWidth - insets.left;
-				scene.log.setRect(logX, logY, logWidth, 0);
+				scene.log.setRect(insets.left, y, uiCamera.width - tagWidth - insets.left, 0);
 			}
 		} else {
 			if (tagsOnLeft) {
-				logX = tagWidth;
-				logWidth = 160 - tagWidth;
-				scene.log.setRect(logX, logY, logWidth, 0);
+				scene.log.setRect(tagWidth, y, 160 - tagWidth, 0);
 			} else {
-				logX = insets.left;
-				logWidth = 160 - insets.left;
-				scene.log.setRect(logX, logY, logWidth, 0);
+				scene.log.setRect(insets.left, y, 160 - insets.left, 0);
 			}
 		}
-		float logBgHeight = uiSize == 0 ? 27 : 45;
-		scene.logBg.x = logX;
-		scene.logBg.y = logY - logBgHeight + 6;
-		scene.logBg.size(logWidth, logBgHeight);
-		scene.logBg.visible = SPDSettings.obsChromaMasks();
 
-		// Tag strip position from same formulas (toolbar top or status top when tags on left and full UI)
-		float pos = toolbarY;
-		if (tagsOnLeft && uiSize > 0) {
-			pos = statusY;
+		float pos = scene.toolbar.top();
+		if (tagsOnLeft && SPDSettings.interfaceSize() > 0){
+			pos = scene.status.top();
 		}
 
 		if (scene.tagAttack){
@@ -1292,6 +1056,10 @@ public class GameScene extends PixelScene {
 		customTiles.add( visual.create() );
 	}
 
+	public void addCustomTerrain(CustomTilemap visual){
+		customTerrain.add( visual.create() );
+	}
+
 	public void addCustomWall( CustomTilemap visual){
 		customWalls.add( visual.create() );
 	}
@@ -1318,7 +1086,7 @@ public class GameScene extends PixelScene {
 	
 	private synchronized void addMobSprite( Mob mob ) {
 		CharSprite sprite = mob.sprite();
-		sprite.visible = Dungeon.level.heroFOV[mob.pos];
+		sprite.visible = sprite.visibleOutOfFFOV || Dungeon.level.heroFOV[mob.pos];
 		mobs.add( sprite );
 		sprite.link( mob );
 		sortMobSprites();
@@ -1448,9 +1216,41 @@ public class GameScene extends PixelScene {
 	}
 
 	public static void effectOverFog( Visual effect ) {
-		scene.overFogEffects.add( effect );
+		if (scene != null) scene.overFogEffects.add( effect );
 	}
 	
+	public static CheckedCell checkedCell( int pos, int source ){
+		if (scene != null) {
+			CheckedCell check = (CheckedCell) scene.checkedCells.recycle(CheckedCell.class);
+			check.reset(pos, source);
+			return check;
+		} else {
+			return null;
+		}
+	}
+
+	public static TargetedCell targetedCell(int pos, int color, float delay){
+		return targetedCell(pos, delay);
+	}
+
+	public static TargetedCell targetedCell(int pos, float delay){
+		if (scene != null) {
+			TargetedCell cell;
+			synchronized (TargetedCell.cells) {
+				if (TargetedCell.cells.containsKey(pos)) {
+					cell = TargetedCell.cells.get(pos);
+					cell.reset(pos, Actor.now()+delay);
+					return cell;
+				}
+			}
+			cell = (TargetedCell) scene.targetedCells.recycle(TargetedCell.class);
+			cell.reset(pos, Actor.now()+delay);
+			return cell;
+		} else {
+			return null;
+		}
+	}
+
 	public static Ripple ripple( int pos ) {
 		if (scene != null) {
 			Ripple ripple = (Ripple) scene.ripples.recycle(Ripple.class);
@@ -1570,6 +1370,7 @@ public class GameScene extends PixelScene {
 	public static void resetMap() {
 		if (scene != null) {
 			scene.tiles.map(Dungeon.level.map, Dungeon.level.width() );
+			scene.occlusion.map(Dungeon.level.map, Dungeon.level.width() );
 			scene.visualGrid.map(Dungeon.level.map, Dungeon.level.width() );
 			scene.terrainFeatures.map(Dungeon.level.map, Dungeon.level.width() );
 			scene.raisedTerrain.map(Dungeon.level.map, Dungeon.level.width() );
@@ -1582,6 +1383,7 @@ public class GameScene extends PixelScene {
 	public static void updateMap() {
 		if (scene != null) {
 			scene.tiles.updateMap();
+			scene.occlusion.updateMap();
 			scene.visualGrid.updateMap();
 			scene.terrainFeatures.updateMap();
 			scene.raisedTerrain.updateMap();
@@ -1593,6 +1395,7 @@ public class GameScene extends PixelScene {
 	public static void updateMap( int cell ) {
 		if (scene != null) {
 			scene.tiles.updateMapCell( cell );
+			scene.occlusion.updateMapCell( cell );
 			scene.visualGrid.updateMapCell( cell );
 			scene.terrainFeatures.updateMapCell( cell );
 			scene.raisedTerrain.updateMapCell( cell );
@@ -1635,9 +1438,6 @@ public class GameScene extends PixelScene {
 			}
 
 			scene.addToFront(wnd);
-			if ( wnd instanceof WndInfoItem ) {
-				StreamingUI.notifyItemInfoLayout();
-			}
 		}
 	}
 
@@ -1665,44 +1465,27 @@ public class GameScene extends PixelScene {
 
 	public static void toggleInvPane(){
 		if (scene != null && scene.inventory != null){
-			RectF insets = scene.getCommonInsets();
 			if (scene.inventory.visible){
 				scene.inventory.visible = scene.inventory.active = invVisible = false;
-				scene.toolbar.setPos(scene.toolbar.left(), uiCamera.height - scene.toolbar.height() - insets.bottom);
+				scene.toolbar.setPos(scene.toolbar.left(), uiCamera.height-scene.toolbar.height());
 			} else {
 				scene.inventory.visible = scene.inventory.active = invVisible = true;
-				scene.inventory.setPos(uiCamera.width - scene.inventory.width() - insets.right, uiCamera.height - scene.inventory.height() - insets.bottom);
-				scene.toolbar.setPos(scene.toolbar.left(), scene.inventory.top() - scene.toolbar.height());
+				scene.toolbar.setPos(scene.toolbar.left(), scene.inventory.top()-scene.toolbar.height());
 			}
-			if (HudLayout.isActive()) layoutHud();
-			else layoutTags();
+			layoutTags();
 		}
-	}
-
-	public StatusPane statusPane() { return status; }
-	public MenuPane menuPane() { return menu; }
-	public com.shatteredpixel.shatteredpixeldungeon.ui.DangerIndicator dangerIndicator() { return danger; }
-	public GameLog gameLog() { return log; }
-	public SkinnedBlock logBackground() { return logBg; }
-	public Toolbar gameToolbar() { return toolbar; }
-	public InventoryPane inventoryPane() { return inventory; }
-	public AttackIndicator attackIndicator() { return attack; }
-	public LootIndicator lootIndicator() { return loot; }
-	public ActionIndicator actionIndicator() { return action; }
-	public ResumeIndicator resumeIndicator() { return resume; }
-	public CellSelector cellSelector() { return cellSelector; }
-
-	public void showHudEditToast( boolean entering ) {
-		String text = entering
-				? Messages.get( GameScene.class, "hud_edit_enter" )
-				: Messages.get( GameScene.class, "hud_edit_exit" );
-		prompt( text );
 	}
 
 	public static void centerNextWndOnInvPane(){
 		if (scene != null && scene.inventory != null && scene.inventory.visible){
 			lastOffset = new Point((int)scene.inventory.centerX() - uiCamera.width/2,
 					(int)scene.inventory.centerY() - uiCamera.height/2);
+		}
+	}
+
+	public static void nextWndOffset(Point ofs){
+		if (scene != null){
+			lastOffset = ofs;
 		}
 	}
 
@@ -1733,9 +1516,10 @@ public class GameScene extends PixelScene {
 				if (mob.sprite != null) {
 					if (mob instanceof Mimic && mob.state == mob.PASSIVE && ((Mimic) mob).stealthy() && Dungeon.level.visited[mob.pos]){
 						//mimics stay visible in fog of war after being first seen
+						//TODO can probably migrate this to Charsprite.visibleOutOfFFOV
 						mob.sprite.visible = true;
 					} else {
-						mob.sprite.visible = Dungeon.level.heroFOV[mob.pos];
+						mob.sprite.visible = mob.sprite.visibleOutOfFFOV || Dungeon.level.heroFOV[mob.pos];
 					}
 				}
 				if (mob instanceof Ghoul){
@@ -1982,12 +1766,11 @@ public class GameScene extends PixelScene {
 	private static ArrayList<Object> getObjectsAtCell( int cell ){
 		ArrayList<Object> objects = new ArrayList<>();
 
-		if (cell == Dungeon.hero.pos) {
-			objects.add(Dungeon.hero);
-
-		} else if (Dungeon.level.heroFOV[cell]) {
-			Mob mob = (Mob) Actor.findChar(cell);
-			if (mob != null) objects.add(mob);
+		Char ch = Actor.findChar(cell);
+		if (ch != null && ch != Dungeon.hero){
+			if (Dungeon.level.heroFOV[cell] || Char.hasProp(ch, Char.Property.OBJECT)){
+				objects.add(ch);
+			}
 		}
 
 		Heap heap = Dungeon.level.heaps.get(cell);
@@ -1995,6 +1778,10 @@ public class GameScene extends PixelScene {
 
 		Plant plant = Dungeon.level.plants.get( cell );
 		if (plant != null) objects.add(plant);
+
+		if (cell == Dungeon.hero.pos) {
+			objects.add(Dungeon.hero);
+		}
 
 		Trap trap = Dungeon.level.traps.get( cell );
 		if (trap != null && trap.visible) objects.add(trap);
@@ -2037,33 +1824,7 @@ public class GameScene extends PixelScene {
 		}
 	}
 
-	private static void enableTransparentVoidWaterScissor(Camera cam, float wx, float wy,
-	                                                      float ww, float wh ) {
-		Point p0 = cam.cameraToScreen(wx, wy);
-		Point p1 = cam.cameraToScreen(wx + ww, wy + wh);
-		int minX = Math.min(p0.x, p1.x);
-		int maxX = Math.max(p0.x, p1.x);
-		int minY = Math.min(p0.y, p1.y);
-		int maxY = Math.max(p0.y, p1.y);
-		int vw = maxX - minX;
-		int vh = maxY - minY;
-		if (vw <= 0 || vh <= 0) {
-			return;
-		}
-		float xScale = DeviceCompat.getRealPixelScaleX();
-		float yScale = DeviceCompat.getRealPixelScaleY();
-		int glX = Math.round(minX * xScale);
-		int glY = Math.round((Game.height - maxY) * yScale);
-		int glW = Math.round(vw * xScale);
-		int glH = Math.round(vh * yScale);
-		Gdx.gl.glEnable(GL20.GL_SCISSOR_TEST);
-		Gdx.gl.glScissor(glX, glY, glW, glH);
-	}
-
-	private static void disableTransparentVoidWaterScissor() {
-		Gdx.gl.glDisable(GL20.GL_SCISSOR_TEST);
-	}
-
+	
 	private static final CellSelector.Listener defaultCellListener = new CellSelector.Listener() {
 		@Override
 		public void onSelect( Integer cell ) {
@@ -2114,7 +1875,7 @@ public class GameScene extends PixelScene {
 			if (objects.isEmpty()) {
 				textLines.add(0, Messages.get(GameScene.class, "go_here"));
 			} else if (objects.get(0) instanceof Hero) {
-				textLines.add(0, Messages.get(GameScene.class, "go_here"));
+				textLines.add(0, Messages.get(GameScene.class, "cancel"));
 			} else if (objects.get(0) instanceof Mob) {
 				if (((Mob) objects.get(0)).alignment != Char.Alignment.ENEMY) {
 					textLines.add(0, Messages.get(GameScene.class, "interact"));
