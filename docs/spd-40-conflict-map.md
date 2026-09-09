@@ -1,31 +1,29 @@
 # SPD 4.0 conflict map (merge prep)
 
-**Purpose:** Tell a later “merge official source” chat what will fight. This is **not** a port plan.
+**Purpose:** Conflict forecast and merge playbook for bringing this fork onto official **v4.0.0**. Owned-file lists and hook *intent* stay in [custom-surface-inventory.md](custom-surface-inventory.md); this map adds collision ratings.
 
-**Sources:** [custom-surface-inventory.md](custom-surface-inventory.md) §A / §B / §C (do not duplicate those tables), [README.md](../README.md) QoL + streaming list, Steam beta JARs vs this repo.
+**Sources:** [custom-surface-inventory.md](custom-surface-inventory.md) §A / §B / §C (do not duplicate those tables), [README.md](../README.md) QoL + streaming list. Ratings were first forecast from Steam beta JARs; official source is now on GitHub.
 
 **Versions**
 
 | Build | Identity |
 |-------|----------|
-| This fork | `build.gradle` **3.3.8** / `appVersionCode` **896** |
-| Official GitHub `00-Evan/shattered-pixel-dungeon` | Still **3.3.8** source. Tag `4.0.0-beta` is **binaries only**, pegged on the 3.3.8 commit. Do not treat it as source. |
-| Steam beta | `core-4.0.0-BETA-4.jar` + `desktop-4.0.0-BETA-4.jar`. Desktop manifest `Specification-Version` **4.0.0-BETA-4**, `Implementation-Version` **906**. |
+| This fork (freeze) | Branch/tag **`v3.3.8-qol`**: `build.gradle` **3.3.8** / `appVersionCode` **896** |
+| Official GitHub `00-Evan/shattered-pixel-dungeon` | Tag **`v4.0.0`** (source published): `appVersionName` **4.0.0** / `appVersionCode` **912**. Work branch: **`upstream-4.0`**. |
+| Steam beta (historical) | `core-4.0.0-BETA-4.jar` was used for the original forecast (`Implementation-Version` **906**). Prefer GitHub source for the merge. |
 
-**Class-name snapshot** (top-level types only; inner `$` classes skipped): Steam `core` JAR **1228** classes, this repo `core/src/main/java` **1210**. **45** types only in 4.0, **27** only in the fork.
+**Class-name snapshot** (top-level types only; inner `$` classes skipped; from beta JAR forecast): Steam `core` JAR **1228** classes, this repo `core/src/main/java` **1210**. **45** types only in 4.0, **27** only in the fork.
 
 ---
 
 ## How to use
 
-Wait for **official 4.0 Java source**. Evan has not published beta source; the Steam / GitHub beta is compiled jars.
+Official **v4.0.0** Java source is on GitHub. Merge on **`upstream-4.0`**; keep **`v3.3.8-qol`** as fallback. Do not land 4.0 on `master` until asked.
 
-Until that lands:
-
-- Do **not** rebase, decompile into this repo, or port 4.0 logic from JARs.
-- Use this file as a conflict forecast. Ratings come from **JAR class presence**, **English message keys** in `desktop-4.0.0-BETA-4.jar`, and optional `javap` on a few hot classes.
-- Owned-file lists and hook *intent* stay in [custom-surface-inventory.md](custom-surface-inventory.md). This map only adds a **4.0 collision rating**.
-- A later chat may scratch-extract **assets + English strings** for preview. That is not a merge.
+- Use severity tables below during conflict resolution.
+- Owned-file lists and hook *intent* stay in [custom-surface-inventory.md](custom-surface-inventory.md).
+- Do **not** decompile Steam/JAR builds into this repo — take `upstream` tag `v4.0.0`.
+- Store-only extras (`Analytics`, `Payment`, `Sync`, …) are **not** in open-source `SPDSettings`; skip unless they land inside a §B file we already patch.
 
 ---
 
@@ -39,7 +37,7 @@ Until that lands:
 | **replace tester** | 3.3 vault-tester name that 4.0 deleted or renamed. Do not 3-way merge. |
 | **leave until source** | New 4.0 type we do not hook. Ignore unless a later chat opts in. |
 
-Store-only extras (`Analytics`, `Payment`, `Sync`, `WndAnalytics`, `WndSupporterTiers`, `WndGooglePlayGames`) are **leave until source** unless they land inside a §B file we already patch (`SPDSettings` / `WndSettings`).
+Store-only extras (`Analytics`, `Payment`, `Sync`, `WndAnalytics`, `WndSupporterTiers`, `WndGooglePlayGames`) are **not** in open-source 4.0 `SPDSettings` — skip unless they land inside a §B file we already patch (`SPDSettings` / `WndSettings`). Open-source does add `KEY_VAULT_INJURE_WARNS`.
 
 ---
 
@@ -274,10 +272,10 @@ Inventory §E already says: city / enchant / AI / swarm overhauls — merge firs
 
 ---
 
-## Suggested merge order (future port chat)
+## Suggested merge order
 
-1. **Wait** until official 4.0 source is on GitHub. Do not treat tag `4.0.0-beta` as source.
-2. **Take upstream 4.0** (new branch off a clean point). Let vault / Imp / enchant / tile-stack / swarm files become 4.0.
+1. **Freeze** `v3.3.8-qol` (branch + tag) and work on `upstream-4.0`. Fetch official tag `v4.0.0`.
+2. **Take upstream 4.0**. Let vault / Imp / enchant / tile-stack / swarm files become 4.0.
 3. **Delete** the four replace-tester paths. Do not resolve those conflicts hunk-by-hunk.
 4. **Restore §A** owned Java + `01*` / `noteicon`. For `misc.properties` / `windows.properties`, **merge keys** — do not wholesale-overwrite 4.0.
 5. **Re-patch §B by severity:** `expect rewrite` first (`GameScene`, `Assets`, `SPDSettings`, `WndSettings`, `Weapon`, `Swarm`), then `re-patch likely` HUD / combat / alt-tiles / `Statistics` / launcher.
@@ -293,8 +291,9 @@ Smoke list after that is inventory **§D** (unchanged commands).
 - No Vineflower / CFR / JADX dump into this repo.
 - No economy, points, or `COMMANDS.md` cost changes.
 - No Python overlay, Godot companion, or Streamer.bot work.
-- No rebase and no “port 4.0 from the Steam JAR.”
-- No store-module port (`Analytics` / `Payment` / `Sync`) unless it lands inside `SPDSettings` / `WndSettings` during the real source merge.
+- No rebase and no “port 4.0 from the Steam JAR” (source is on GitHub).
+- No store-module port (`Analytics` / `Payment` / `Sync`) unless it lands inside `SPDSettings` / `WndSettings`.
+- Do not land 4.0 on `master` until explicitly asked.
 
 ---
 
