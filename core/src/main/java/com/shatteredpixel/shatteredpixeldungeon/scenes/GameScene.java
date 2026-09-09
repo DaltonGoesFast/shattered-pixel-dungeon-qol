@@ -98,6 +98,8 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.Banner;
 import com.shatteredpixel.shatteredpixeldungeon.ui.BossHealthBar;
 import com.shatteredpixel.shatteredpixeldungeon.ui.CharHealthIndicator;
 import com.shatteredpixel.shatteredpixeldungeon.ui.GameLog;
+import com.shatteredpixel.shatteredpixeldungeon.ui.HudEditMode;
+import com.shatteredpixel.shatteredpixeldungeon.ui.HudLayout;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Icons;
 import com.shatteredpixel.shatteredpixeldungeon.ui.InventoryPane;
 import com.shatteredpixel.shatteredpixeldungeon.ui.LootIndicator;
@@ -109,10 +111,12 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.StatusPane;
 import com.shatteredpixel.shatteredpixeldungeon.ui.StyledButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Tag;
 import com.shatteredpixel.shatteredpixeldungeon.ui.TargetHealthIndicator;
+import com.shatteredpixel.shatteredpixeldungeon.ui.TileIndicator;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Toast;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Toolbar;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingUI;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndBag;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndGame;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndHero;
@@ -130,7 +134,9 @@ import com.watabou.gltextures.TextureCache;
 import com.watabou.glwrap.Blending;
 import com.watabou.input.ControllerHandler;
 import com.watabou.input.KeyBindings;
+import com.watabou.input.KeyEvent;
 import com.watabou.input.PointerEvent;
+import com.watabou.utils.Signal;
 import com.watabou.noosa.Camera;
 import com.watabou.noosa.Game;
 import com.watabou.noosa.Gizmo;
@@ -161,6 +167,10 @@ public class GameScene extends PixelScene {
 
 	static GameScene scene;
 
+	public static GameScene getScene() {
+		return scene;
+	}
+
 	private SkinnedBlock water;
 	private DungeonTerrainTilemap tiles;
 	private GridTileMap visualGrid;
@@ -173,11 +183,14 @@ public class GameScene extends PixelScene {
 	private HeroSprite hero;
 
 	private MenuPane menu;
+	private com.shatteredpixel.shatteredpixeldungeon.ui.DangerIndicator danger;
 	private StatusPane status;
 
 	private BossHealthBar boss;
 
 	private GameLog log;
+	/** Near-black #0c0c0c box behind log for OBS chroma-key masking */
+	private SkinnedBlock logBg;
 
 	private static CellSelector cellSelector;
 	
@@ -214,6 +227,8 @@ public class GameScene extends PixelScene {
 	private LootIndicator loot;
 	private ActionIndicator action;
 	private ResumeIndicator resume;
+
+	private Signal.Listener<KeyEvent> hudLayoutKeyListener;
 
 	{
 		inGameScene = true;
@@ -291,6 +306,8 @@ public class GameScene extends PixelScene {
 
 		terrainFeatures = new TerrainFeaturesTilemap(Dungeon.level.plants, Dungeon.level.traps);
 		terrain.add(terrainFeatures);
+
+		terrain.add( new TileIndicator( tiles ) );
 
 		customTerrain = new Group();
 		terrain.add(customTerrain);
@@ -465,6 +482,15 @@ public class GameScene extends PixelScene {
 		menu.setPos( menuBarMaxLeft, screentop);
 		add(menu);
 
+		// Danger indicator (switch-enemy / target switcher) is its own HUD element so it can
+		// be repositioned independently from the menu bar in HUD edit mode.
+		danger = new com.shatteredpixel.shatteredpixeldungeon.ui.DangerIndicator();
+		danger.camera = uiCamera;
+		danger.setSize( com.shatteredpixel.shatteredpixeldungeon.ui.DangerIndicator.SIZE,
+				com.shatteredpixel.shatteredpixeldungeon.ui.DangerIndicator.HEIGHT );
+		danger.setPos( menu.left() + MenuPane.WIDTH - danger.width(), menu.top() + 21 + 1 );
+		add(danger);
+
 		float extraRight = uiCamera.width - (menuBarMaxLeft + MenuPane.WIDTH);
 		if (extraRight > 0){
 			SkinnedBlock bar = new SkinnedBlock(extraRight, 20, TextureCache.createSolid(0x88000000));
@@ -524,6 +550,10 @@ public class GameScene extends PixelScene {
 		attack.camera = uiCamera;
 		add( attack );
 
+		logBg = new SkinnedBlock(1, 1, TextureCache.createSolid(SPDSettings.OBS_CHROMA_MASK_COLOR));
+		logBg.camera = uiCamera;
+		add(logBg);
+
 		log = new GameLog();
 		log.camera = uiCamera;
 		log.newLine();
@@ -559,7 +589,32 @@ public class GameScene extends PixelScene {
 			add(blocker);
 		}
 
-		layoutTags();
+		if (HudLayout.isActive()) {
+			HudLayout.init( this );
+			layoutHud();
+			KeyEvent.addKeyListener( hudLayoutKeyListener = new Signal.Listener<KeyEvent>() {
+				@Override
+				public boolean onSignal( KeyEvent event ) {
+					if (!event.pressed || !HudLayout.isActive()) return false;
+					if (KeyBindings.getActionForKey( event ) == SPDAction.HUD_LAYOUT_EDIT) {
+						HudEditMode.toggle();
+						return true;
+					}
+					return false;
+				}
+			} );
+		} else {
+			layoutTags();
+		}
+		// Re-run after one frame so log/tags and toolbar/inventory stay in sync with margins
+		ShatteredPixelDungeon.runOnRenderThread(() -> {
+			if (HudLayout.isActive()) {
+				layoutHud();
+			} else {
+				layoutToolbarAndInventory();
+				layoutTags();
+			}
+		});
 
 		switch (InterlevelScene.mode) {
 			case RESURRECT:
@@ -795,7 +850,13 @@ public class GameScene extends PixelScene {
 	}
 	
 	public void destroy() {
-		
+		HudEditMode.disable( false );
+		HudLayout.dispose();
+		if (hudLayoutKeyListener != null) {
+			KeyEvent.removeKeyListener( hudLayoutKeyListener );
+			hudLayoutKeyListener = null;
+		}
+
 		//tell the actor thread to finish, then wait for it to complete any actions it may be doing.
 		if (!waitForActorThread( 4500, true )){
 			Throwable t = new Throwable();
@@ -881,6 +942,10 @@ public class GameScene extends PixelScene {
 			return;
 		}
 
+		if (logBg != null) {
+			logBg.visible = SPDSettings.obsChromaMasks();
+		}
+
 		super.update();
 
 		if (notifyDelay > 0) notifyDelay -= Game.elapsed;
@@ -927,7 +992,8 @@ public class GameScene extends PixelScene {
 			tagAction = action.visible;
 			tagResume = resume.visible;
 
-			layoutTags();
+			if (HudLayout.isActive()) layoutHud();
+			else layoutTags();
 
 		} else if (tagAttack != attack.active ||
 				tagLoot != loot.visible ||
@@ -946,12 +1012,20 @@ public class GameScene extends PixelScene {
 
 			//if a new tag appears, re-layout tags immediately
 			//otherwise, wait until the hero acts, so as to not suddenly change their position
-			if (tagAppearing)   layoutTags();
-			else                tagDisappeared = true;
+			if (tagAppearing) {
+				if (HudLayout.isActive()) layoutHud();
+				else layoutTags();
+			} else {
+				tagDisappeared = true;
+			}
 
 		}
 
-		cellSelector.enable(Dungeon.hero.ready);
+		if (HudEditMode.isEditing()) {
+			cellSelector.enable( false );
+		} else {
+			cellSelector.enable(Dungeon.hero.ready);
+		}
 
 		if (!toDestroy.isEmpty()) {
 			for (Gizmo g : toDestroy) {
@@ -977,11 +1051,127 @@ public class GameScene extends PixelScene {
 	private boolean tagAction    = false;
 	private boolean tagResume    = false;
 
+	/** Re-applies toolbar and inventory bounds from current common insets (keeps them in sync with margins). */
+	public static void layoutToolbarAndInventory() {
+		if (scene == null) return;
+		if (HudLayout.isActive()) {
+			layoutHud();
+			return;
+		}
+		RectF insets = scene.getCommonInsets();
+		float toolbarY = uiCamera.height - scene.toolbar.height() - insets.bottom;
+		if (scene.inventory != null && scene.inventory.visible) {
+			toolbarY -= scene.inventory.height();
+			scene.inventory.setPos(uiCamera.width - scene.inventory.width() - insets.right, uiCamera.height - scene.inventory.height() - insets.bottom);
+		}
+		float w = uiCamera.width - insets.left - insets.right;
+		scene.toolbar.setRect(insets.left, toolbarY, w, scene.toolbar.height());
+	}
+
+	public static void layoutHud() {
+		updateTags = false;
+		if (scene == null) return;
+		layoutHudDefaults();
+		HudLayout.apply( scene );
+	}
+
+	private static void layoutHudDefaults() {
+		if (scene == null) return;
+
+		if (scene.inventory != null && scene.inventory.visible
+				&& (uiCamera.width < 460 && uiCamera.height < 300)){
+			Camera.main.setCenterOffset(0, Math.min(300-uiCamera.height, 460-uiCamera.width) / Camera.main.zoom);
+		} else {
+			Camera.main.setCenterOffset(0, 0);
+		}
+
+		RectF insets = scene.getCommonInsets();
+		float largeInsetTop = Game.platform.getSafeInsets(PlatformSupport.INSET_LRG).scale(1f / defaultZoom).top;
+		float screentop = largeInsetTop;
+
+		scene.status.setRect(insets.left, uiCamera.height - HudLayout.STATUS_HEIGHT - insets.bottom,
+				uiCamera.width - insets.left - insets.right, 0);
+		scene.menu.setPos(uiCamera.width - insets.right - MenuPane.WIDTH, screentop);
+		// Danger indicator default: right edge of screen, just below the menu bar.
+		if (scene.danger != null) {
+			float dangerX = uiCamera.width - insets.right - scene.danger.width();
+			float dangerY = screentop + 21 + 1;
+			scene.danger.setPos(dangerX, dangerY);
+		}
+
+		float toolbarY = uiCamera.height - scene.toolbar.height() - insets.bottom;
+		if (scene.inventory != null && scene.inventory.visible) {
+			toolbarY -= scene.inventory.height();
+			scene.inventory.setPos(uiCamera.width - scene.inventory.width() - insets.right,
+					uiCamera.height - scene.inventory.height() - insets.bottom);
+		}
+		float w = uiCamera.width - insets.left - insets.right;
+		scene.toolbar.setRect(insets.left, toolbarY, w, scene.toolbar.height());
+
+		boolean tagsOnLeft = SPDSettings.flipTags();
+		float tagWidth = Tag.SIZE + (tagsOnLeft ? insets.left : insets.right);
+		float tagLeft = tagsOnLeft ? 0 : uiCamera.width - tagWidth;
+
+		float statusY = uiCamera.height - HudLayout.STATUS_HEIGHT - insets.bottom;
+		float logY = statusY - 2;
+
+		float logX, logWidth;
+		if (tagsOnLeft) {
+			logX = tagWidth;
+			logWidth = 160 - tagWidth;
+			scene.log.setRect(logX, logY, logWidth, 0);
+		} else {
+			logX = insets.left;
+			logWidth = 160 - insets.left;
+			scene.log.setRect(logX, logY, logWidth, 0);
+		}
+		float logBgHeight = 45;
+		scene.logBg.x = logX;
+		scene.logBg.y = logY - logBgHeight + 6;
+		scene.logBg.size(logWidth, logBgHeight);
+		scene.logBg.visible = SPDSettings.obsChromaMasks();
+
+		// Match original layoutTags: tag strip anchors to toolbar top by default,
+		// status top only when tags are flipped to the left side on full UI.
+		float pos = toolbarY;
+		if (tagsOnLeft) {
+			pos = statusY;
+		}
+
+		if (scene.tagAttack){
+			scene.attack.setRect( tagLeft, pos - Tag.SIZE, tagWidth, Tag.SIZE );
+			scene.attack.flip(tagsOnLeft);
+			pos = scene.attack.top();
+		}
+
+		if (scene.tagLoot) {
+			scene.loot.setRect( tagLeft, pos - Tag.SIZE, tagWidth, Tag.SIZE );
+			scene.loot.flip(tagsOnLeft);
+			pos = scene.loot.top();
+		}
+
+		if (scene.tagAction) {
+			scene.action.setRect( tagLeft, pos - Tag.SIZE, tagWidth, Tag.SIZE );
+			scene.action.flip(tagsOnLeft);
+			pos = scene.action.top();
+		}
+
+		if (scene.tagResume) {
+			scene.resume.setRect( tagLeft, pos - Tag.SIZE, tagWidth, Tag.SIZE );
+			scene.resume.flip(tagsOnLeft);
+		}
+	}
+
 	public static void layoutTags() {
 
 		updateTags = false;
 
 		if (scene == null) return;
+
+		if (HudLayout.isActive()) {
+			layoutHud();
+			return;
+		}
 
 		//move the camera center up a bit if we're on full UI and it is taking up lots of space
 		if (scene.inventory != null && scene.inventory.visible
@@ -992,33 +1182,51 @@ public class GameScene extends PixelScene {
 		}
 		//Camera.main.panTo(Dungeon.hero.sprite.center(), 5f);
 
-		//adjust spacing for elements based on display cutouts
-		// We use ALL here as some elements can be a fair but up the side of the screen
-		RectF insets = Game.platform.getSafeInsets( PlatformSupport.INSET_ALL );
-		insets = insets.scale(1f / uiCamera.zoom);
+		//adjust spacing for elements based on display cutouts and user UI margin
+		RectF insets = scene.getCommonInsets();
+		int uiSize = SPDSettings.interfaceSize();
 
 		boolean tagsOnLeft = SPDSettings.flipTags();
 		float tagWidth = Tag.SIZE + (tagsOnLeft ? insets.left : insets.right);
 		float tagLeft = tagsOnLeft ? 0 : uiCamera.width - tagWidth;
 
-		float y = SPDSettings.interfaceSize() == 0 ? scene.toolbar.top()-2 : scene.status.top()-2;
-		if (SPDSettings.interfaceSize() == 0){
+		// Compute log Y from the same formulas used for status/toolbar in create()
+		final float statusHeight = 39;
+		float toolbarY = uiCamera.height - scene.toolbar.height() - (scene.inventory != null && scene.inventory.visible ? scene.inventory.height() : 0) - insets.bottom;
+		float statusY = uiCamera.height - statusHeight - insets.bottom;
+		float logY = uiSize == 0 ? (toolbarY - 2) : (statusY - 2);
+
+		float logX, logWidth;
+		if (uiSize == 0){
 			if (tagsOnLeft) {
-				scene.log.setRect(tagWidth, y, uiCamera.width - tagWidth - insets.right, 0);
+				logX = tagWidth;
+				logWidth = uiCamera.width - tagWidth - insets.right;
+				scene.log.setRect(logX, logY, logWidth, 0);
 			} else {
-				scene.log.setRect(insets.left, y, uiCamera.width - tagWidth - insets.left, 0);
+				logX = insets.left;
+				logWidth = uiCamera.width - tagWidth - insets.left;
+				scene.log.setRect(logX, logY, logWidth, 0);
 			}
 		} else {
 			if (tagsOnLeft) {
-				scene.log.setRect(tagWidth, y, 160 - tagWidth, 0);
+				logX = tagWidth;
+				logWidth = 160 - tagWidth;
+				scene.log.setRect(logX, logY, logWidth, 0);
 			} else {
-				scene.log.setRect(insets.left, y, 160 - insets.left, 0);
+				logX = insets.left;
+				logWidth = 160 - insets.left;
+				scene.log.setRect(logX, logY, logWidth, 0);
 			}
 		}
+		float logBgHeight = uiSize == 0 ? 27 : 45;
+		scene.logBg.x = logX;
+		scene.logBg.y = logY - logBgHeight + 6;
+		scene.logBg.size(logWidth, logBgHeight);
+		scene.logBg.visible = SPDSettings.obsChromaMasks();
 
-		float pos = scene.toolbar.top();
-		if (tagsOnLeft && SPDSettings.interfaceSize() > 0){
-			pos = scene.status.top();
+		float pos = toolbarY;
+		if (tagsOnLeft && uiSize > 0) {
+			pos = statusY;
 		}
 
 		if (scene.tagAttack){
@@ -1438,6 +1646,9 @@ public class GameScene extends PixelScene {
 			}
 
 			scene.addToFront(wnd);
+			if ( wnd instanceof WndInfoItem ) {
+				StreamingUI.notifyItemInfoLayout();
+			}
 		}
 	}
 
@@ -1465,15 +1676,38 @@ public class GameScene extends PixelScene {
 
 	public static void toggleInvPane(){
 		if (scene != null && scene.inventory != null){
+			RectF insets = scene.getCommonInsets();
 			if (scene.inventory.visible){
 				scene.inventory.visible = scene.inventory.active = invVisible = false;
-				scene.toolbar.setPos(scene.toolbar.left(), uiCamera.height-scene.toolbar.height());
+				scene.toolbar.setPos(scene.toolbar.left(), uiCamera.height - scene.toolbar.height() - insets.bottom);
 			} else {
 				scene.inventory.visible = scene.inventory.active = invVisible = true;
-				scene.toolbar.setPos(scene.toolbar.left(), scene.inventory.top()-scene.toolbar.height());
+				scene.inventory.setPos(uiCamera.width - scene.inventory.width() - insets.right, uiCamera.height - scene.inventory.height() - insets.bottom);
+				scene.toolbar.setPos(scene.toolbar.left(), scene.inventory.top() - scene.toolbar.height());
 			}
-			layoutTags();
+			if (HudLayout.isActive()) layoutHud();
+			else layoutTags();
 		}
+	}
+
+	public StatusPane statusPane() { return status; }
+	public MenuPane menuPane() { return menu; }
+	public com.shatteredpixel.shatteredpixeldungeon.ui.DangerIndicator dangerIndicator() { return danger; }
+	public GameLog gameLog() { return log; }
+	public SkinnedBlock logBackground() { return logBg; }
+	public Toolbar gameToolbar() { return toolbar; }
+	public InventoryPane inventoryPane() { return inventory; }
+	public AttackIndicator attackIndicator() { return attack; }
+	public LootIndicator lootIndicator() { return loot; }
+	public ActionIndicator actionIndicator() { return action; }
+	public ResumeIndicator resumeIndicator() { return resume; }
+	public CellSelector cellSelector() { return cellSelector; }
+
+	public void showHudEditToast( boolean entering ) {
+		String text = entering
+				? Messages.get( GameScene.class, "hud_edit_enter" )
+				: Messages.get( GameScene.class, "hud_edit_exit" );
+		prompt( text );
 	}
 
 	public static void centerNextWndOnInvPane(){

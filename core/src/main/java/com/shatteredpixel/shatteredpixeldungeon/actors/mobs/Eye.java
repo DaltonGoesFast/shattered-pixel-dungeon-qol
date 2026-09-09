@@ -27,6 +27,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.AscensionChallenge;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Invisibility;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SpawnScaled;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Light;
 import com.shatteredpixel.shatteredpixeldungeon.effects.CellEmitter;
 import com.shatteredpixel.shatteredpixeldungeon.effects.particles.PurpleParticle;
@@ -192,6 +193,14 @@ public class Eye extends Mob {
 			if (hit( this, ch, true )) {
 				int dmg = Random.NormalIntRange( 30, 50 );
 				dmg = Math.round(dmg * AscensionChallenge.statModifier(this));
+
+				if (buff(SpawnScaled.class) != null) {
+					if (ch == Dungeon.hero) {
+						dmg = Math.round(Dungeon.hero.HT * com.shatteredpixel.shatteredpixeldungeon.utils.SpawnScaleConfig.eyeGazeHeroHtFrac);
+					} else {
+						dmg = Math.round(dmg * buff(SpawnScaled.class).damageFactor());
+					}
+				}
 
 				ch.damage( dmg, new DeathGaze() );
 

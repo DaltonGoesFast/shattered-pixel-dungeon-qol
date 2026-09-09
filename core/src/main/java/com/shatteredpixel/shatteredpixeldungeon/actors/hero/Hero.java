@@ -175,6 +175,7 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.BuffIndicator;
 import com.shatteredpixel.shatteredpixeldungeon.ui.QuickSlotButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.StatusPane;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
+import com.shatteredpixel.shatteredpixeldungeon.utils.TalentAutoPlan;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndHero;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndOptions;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndResurrect;
@@ -215,6 +216,18 @@ public class Hero extends Char {
 	public ArmorAbility armorAbility = null;
 	public ArrayList<LinkedHashMap<Talent, Integer>> talents = new ArrayList<>();
 	public LinkedHashMap<Talent, Talent> metamorphedTalents = new LinkedHashMap<>();
+
+	/** Per-run auto talent priority; null = not configured yet for this tier. Empty list = no auto-spend. */
+	public ArrayList<String> talentAutoOrderTier1;
+	public ArrayList<String> talentAutoOrderTier2;
+	public ArrayList<String> talentAutoOrderTier3;
+	public ArrayList<String> talentAutoOrderTier4;
+
+	/** Order talents were applied via auto-plan (for spending divine inspiration when the pending queue is empty). */
+	public ArrayList<String> talentAutoSpendHistoryTier1;
+	public ArrayList<String> talentAutoSpendHistoryTier2;
+	public ArrayList<String> talentAutoSpendHistoryTier3;
+	public ArrayList<String> talentAutoSpendHistoryTier4;
 	
 	private int attackSkill = 10;
 	private int defenseSkill = 5;
@@ -295,6 +308,16 @@ public class Hero extends Char {
 	private static final String SUBCLASS    = "subClass";
 	private static final String ABILITY     = "armorAbility";
 
+	private static final String TALENT_AUTO_ORDER_1 = "talent_auto_order_1";
+	private static final String TALENT_AUTO_ORDER_2 = "talent_auto_order_2";
+	private static final String TALENT_AUTO_ORDER_3 = "talent_auto_order_3";
+	private static final String TALENT_AUTO_ORDER_4 = "talent_auto_order_4";
+
+	private static final String TALENT_AUTO_SPEND_HIST_1 = "talent_auto_spend_hist_1";
+	private static final String TALENT_AUTO_SPEND_HIST_2 = "talent_auto_spend_hist_2";
+	private static final String TALENT_AUTO_SPEND_HIST_3 = "talent_auto_spend_hist_3";
+	private static final String TALENT_AUTO_SPEND_HIST_4 = "talent_auto_spend_hist_4";
+
 	private static final String ATTACK		= "attackSkill";
 	private static final String DEFENSE		= "defenseSkill";
 	private static final String STRENGTH	= "STR";
@@ -311,6 +334,14 @@ public class Hero extends Char {
 		bundle.put( SUBCLASS, subClass );
 		bundle.put( ABILITY, armorAbility );
 		Talent.storeTalentsInBundle( bundle, this );
+		putTalentAutoOrderInBundle( bundle, TALENT_AUTO_ORDER_1, talentAutoOrderTier1 );
+		putTalentAutoOrderInBundle( bundle, TALENT_AUTO_ORDER_2, talentAutoOrderTier2 );
+		putTalentAutoOrderInBundle( bundle, TALENT_AUTO_ORDER_3, talentAutoOrderTier3 );
+		putTalentAutoOrderInBundle( bundle, TALENT_AUTO_ORDER_4, talentAutoOrderTier4 );
+		putTalentAutoOrderInBundle( bundle, TALENT_AUTO_SPEND_HIST_1, talentAutoSpendHistoryTier1 );
+		putTalentAutoOrderInBundle( bundle, TALENT_AUTO_SPEND_HIST_2, talentAutoSpendHistoryTier2 );
+		putTalentAutoOrderInBundle( bundle, TALENT_AUTO_SPEND_HIST_3, talentAutoSpendHistoryTier3 );
+		putTalentAutoOrderInBundle( bundle, TALENT_AUTO_SPEND_HIST_4, talentAutoSpendHistoryTier4 );
 		
 		bundle.put( ATTACK, attackSkill );
 		bundle.put( DEFENSE, defenseSkill );
@@ -339,6 +370,14 @@ public class Hero extends Char {
 		subClass = bundle.getEnum( SUBCLASS, HeroSubClass.class );
 		armorAbility = (ArmorAbility)bundle.get( ABILITY );
 		Talent.restoreTalentsFromBundle( bundle, this );
+		talentAutoOrderTier1 = readTalentAutoOrderFromBundle( bundle, TALENT_AUTO_ORDER_1 );
+		talentAutoOrderTier2 = readTalentAutoOrderFromBundle( bundle, TALENT_AUTO_ORDER_2 );
+		talentAutoOrderTier3 = readTalentAutoOrderFromBundle( bundle, TALENT_AUTO_ORDER_3 );
+		talentAutoOrderTier4 = readTalentAutoOrderFromBundle( bundle, TALENT_AUTO_ORDER_4 );
+		talentAutoSpendHistoryTier1 = readTalentAutoOrderFromBundle( bundle, TALENT_AUTO_SPEND_HIST_1 );
+		talentAutoSpendHistoryTier2 = readTalentAutoOrderFromBundle( bundle, TALENT_AUTO_SPEND_HIST_2 );
+		talentAutoSpendHistoryTier3 = readTalentAutoOrderFromBundle( bundle, TALENT_AUTO_SPEND_HIST_3 );
+		talentAutoSpendHistoryTier4 = readTalentAutoOrderFromBundle( bundle, TALENT_AUTO_SPEND_HIST_4 );
 		
 		attackSkill = bundle.getInt( ATTACK );
 		defenseSkill = bundle.getInt( DEFENSE );
@@ -346,6 +385,25 @@ public class Hero extends Char {
 		STR = bundle.getInt( STRENGTH );
 
 		belongings.restoreFromBundle( bundle );
+	}
+
+	private static void putTalentAutoOrderInBundle( Bundle bundle, String key, ArrayList<String> order ) {
+		if (order != null) {
+			bundle.put( key, order.toArray( new String[0] ) );
+		}
+	}
+
+	private static ArrayList<String> readTalentAutoOrderFromBundle( Bundle bundle, String key ) {
+		if (!bundle.contains( key )) {
+			return null;
+		}
+		String[] arr = bundle.getStringArray( key );
+		if (arr == null) {
+			return null;
+		}
+		ArrayList<String> list = new ArrayList<>();
+		Collections.addAll( list, arr );
+		return list;
 	}
 	
 	public static void preview( GamesInProgress.Info info, Bundle bundle ) {
@@ -413,6 +471,138 @@ public class Hero extends Char {
 		} else {
 			return 0;
 		}
+	}
+
+	/** Level-up talent points only; divine-inspiration bonus is handled in a separate pass. */
+	public int talentPointsAvailableExcludingBonus( int tier ){
+		return Math.max( 0, talentPointsAvailable( tier ) - bonusTalentPoints( tier ) );
+	}
+
+	public ArrayList<String> talentAutoOrderForTier( int tier ) {
+		switch (tier) {
+			case 1: return talentAutoOrderTier1;
+			case 2: return talentAutoOrderTier2;
+			case 3: return talentAutoOrderTier3;
+			case 4: return talentAutoOrderTier4;
+			default: return null;
+		}
+	}
+
+	public void setTalentAutoOrderForTier( int tier, ArrayList<String> order ) {
+		switch (tier) {
+			case 1: talentAutoOrderTier1 = order; break;
+			case 2: talentAutoOrderTier2 = order; break;
+			case 3: talentAutoOrderTier3 = order; break;
+			case 4: talentAutoOrderTier4 = order; break;
+		}
+	}
+
+	public ArrayList<String> talentAutoSpendHistoryForTier( int tier ) {
+		switch (tier) {
+			case 1: return talentAutoSpendHistoryTier1;
+			case 2: return talentAutoSpendHistoryTier2;
+			case 3: return talentAutoSpendHistoryTier3;
+			case 4: return talentAutoSpendHistoryTier4;
+			default: return null;
+		}
+	}
+
+	public void setTalentAutoSpendHistoryForTier( int tier, ArrayList<String> history ) {
+		switch (tier) {
+			case 1: talentAutoSpendHistoryTier1 = history; break;
+			case 2: talentAutoSpendHistoryTier2 = history; break;
+			case 3: talentAutoSpendHistoryTier3 = history; break;
+			case 4: talentAutoSpendHistoryTier4 = history; break;
+		}
+	}
+
+	public void appendTalentAutoSpendHistory( int tier, String talentName ) {
+		ArrayList<String> h = talentAutoSpendHistoryForTier( tier );
+		if (h == null) {
+			h = new ArrayList<>();
+			setTalentAutoSpendHistoryForTier( tier, h );
+		}
+		h.add( talentName );
+	}
+
+	public void clearTalentAutoSpendHistory( int tier ) {
+		setTalentAutoSpendHistoryForTier( tier, null );
+	}
+
+	/** Max entries in the auto queue for this tier (normal level-based points, not divine inspiration). */
+	public int talentAutoPlanMaxQueueSize( int tier ) {
+		if (tier < 1 || tier > Talent.MAX_TALENT_TIERS) {
+			return 0;
+		}
+		int maxNorm = Talent.tierLevelThresholds[tier + 1] - Talent.tierLevelThresholds[tier];
+		int spent = talentPointsSpent( tier );
+		return Math.max( 0, maxNorm - Math.min( spent, maxNorm ) );
+	}
+
+	public void pruneStaleTalentAutoPlanEntries( int tier ) {
+		if (tier < 1 || tier > Talent.MAX_TALENT_TIERS) {
+			return;
+		}
+		ArrayList<String> q = talentAutoOrderForTier( tier );
+		if (q == null || q.isEmpty()) {
+			return;
+		}
+		q.removeIf( name -> {
+			try {
+				Talent t = Talent.valueOf( name );
+				if (!talents.get( tier - 1 ).containsKey( t )) {
+					return true;
+				}
+				return pointsInTalent( t ) >= t.maxPoints();
+			} catch (IllegalArgumentException e) {
+				return true;
+			}
+		} );
+	}
+
+	public boolean appendTalentAutoPlanEntry( int tier, Talent t ) {
+		pruneStaleTalentAutoPlanEntries( tier );
+		if (pointsInTalent( t ) + talentAutoPlanQueuedRanksFor( tier, t ) >= t.maxPoints()) {
+			return false;
+		}
+		ArrayList<String> q = talentAutoOrderForTier( tier );
+		int size = q == null ? 0 : q.size();
+		if (size >= talentAutoPlanMaxQueueSize( tier )) {
+			return false;
+		}
+		if (q == null) {
+			setTalentAutoOrderForTier( tier, new ArrayList<>() );
+			q = talentAutoOrderForTier( tier );
+		}
+		q.add( t.name() );
+		return true;
+	}
+
+	public void removeLastTalentAutoPlanEntryFor( int tier, Talent t ) {
+		ArrayList<String> q = talentAutoOrderForTier( tier );
+		if (q == null) {
+			return;
+		}
+		for (int i = q.size() - 1; i >= 0; i--) {
+			if (q.get( i ).equals( t.name() )) {
+				q.remove( i );
+				return;
+			}
+		}
+	}
+
+	public int talentAutoPlanQueuedRanksFor( int tier, Talent t ) {
+		ArrayList<String> q = talentAutoOrderForTier( tier );
+		if (q == null) {
+			return 0;
+		}
+		int n = 0;
+		for (String s : q) {
+			if (s.equals( t.name() )) {
+				n++;
+			}
+		}
+		return n;
 	}
 	
 	public String className() {
@@ -2104,6 +2294,8 @@ public class Hero extends Char {
 			Item.updateQuickslot();
 			
 			Badges.validateLevelReached();
+
+			TalentAutoPlan.tryApply( this );
 		}
 	}
 	
