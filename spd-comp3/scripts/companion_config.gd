@@ -9,6 +9,8 @@ const _SpdUiArt := preload("res://scripts/spd_ui_art.gd")
 signal settings_saved
 ## Fired after [method load_settings] successfully read the cfg file (incl. F5 reload).
 signal settings_loaded
+## Fired when a session-only toast layout preview is pinned or cleared.
+signal preview_visibility_changed
 
 var _notify_listeners: bool = false
 ## Matches [code]meta/defaults_revision[/code] in the active cfg. Bumped when saving export defaults.
@@ -74,6 +76,16 @@ var free_promos_http_url: String = "http://127.0.0.1:5000/api/points-config"
 var free_promos_poll_sec: float = 3.0
 ## Show a short "pending" line when UDP fires before game confirms.
 var show_pending_udp_alerts: bool = true
+## Main-window master visibility toggles. Stream Deck control packets can persist these.
+var show_alerts: bool = true
+var show_title: bool = true
+var show_live_water: bool = true
+var show_chrome_boxes: bool = true
+## Session-only layout previews. Never loaded from or written to the settings file.
+var preview_pin_alerts: bool = false
+var preview_pin_tip_toasts: bool = false
+var preview_pin_paid_notices: bool = false
+var preview_pin_first_words: bool = false
 ## Max alerts waiting in queue (excess dropped).
 var alert_queue_max: int = 5
 ## Seconds the alert stays fully visible after popping in.
@@ -121,6 +133,13 @@ var live_water_gradient_fade_start: float = 0.73
 var live_water_gradient_fade_end: float = 1.0
 ## Soften L-shape edges along Y (top of bottom bar / left-strip top inset), in px. 0 = hard cut.
 var live_water_edge_feather_v_px: int = 0
+## Live layout only: top horizontal band height (px, full width). 0 = off.
+var live_water_top_bar_px: int = 0
+## Shader UV.y fade toward black at the top of the screen. start >= end; both 0 = no extra fade.
+var live_water_top_gradient_fade_start: float = 0.0
+var live_water_top_gradient_fade_end: float = 0.0
+## Soften the bottom edge of the top bar, in px. 0 = hard cut.
+var live_water_top_edge_feather_v_px: int = 0
 ## When true, root viewport + window use per-pixel transparency so OBS (layer below) shows through masked regions. Default off: some Windows exports show a blank/white window with transparency on.
 var window_per_pixel_transparency_enabled: bool = false
 ## Caps redraw rate ([member Engine.max_fps]). **0** = unlimited (higher GPU). **30–60** is usually enough for overlays and lowers compositor/GPU load.
@@ -188,6 +207,27 @@ var paid_notice_enable_gifted_membership: bool = true
 var paid_notice_enable_sub: bool = true
 var paid_notice_enable_highlight: bool = true
 
+## Streamer.bot First Words welcome toast (dedicated queue and layout zone).
+var first_words_enabled: bool = true
+var first_words_queue_max: int = 8
+var first_words_default_ttl_sec: float = 7.0
+var first_words_fade_in_sec: float = 0.35
+var first_words_fade_out_sec: float = 0.45
+var first_words_zone_x_px: int = 560
+var first_words_zone_y_px: int = 320
+var first_words_zone_width_px: int = 800
+var first_words_zone_height_px: int = 160
+var first_words_zone_bottom_margin_px: int = 0
+var first_words_chrome_style: String = "toast_tr"
+var first_words_chrome_scale: float = 4.0
+var first_words_font_size_px: int = 48
+var first_words_font_color: Color = Color(1.0, 1.0, 0.27, 1.0)
+var first_words_text_shadow: bool = true
+var first_words_padding_h_px: int = 14
+var first_words_padding_v_px: int = 10
+var first_words_text_align: String = "center"
+var first_words_pop_scale: bool = false
+
 ## Show potion/scroll identification strip from WebSocket snapshot data.
 var id_overlay_enabled: bool = true
 ## Pixel width of each ID cell (portrait tile in the flow grid).
@@ -231,6 +271,50 @@ var double_points_font_size_px: int = 14
 var double_points_font_color: Color = Color(1.0, 0.85, 0.2, 1.0)
 var double_points_chrome_style: String = "toast"
 var double_points_chrome_scale: float = 1.0
+## Persistent career 9-challenge death count (GET /api/nine-challenge-deaths).
+var nine_challenge_deaths_panel_visible: bool = true
+var nine_challenge_deaths_poll_sec: float = 1.0
+var nine_challenge_deaths_corner: int = 2
+var nine_challenge_deaths_margin_x: int = 16
+var nine_challenge_deaths_margin_y: int = 16
+var nine_challenge_deaths_padding_h_px: int = 10
+var nine_challenge_deaths_padding_v_px: int = 8
+var nine_challenge_deaths_font_size_px: int = 14
+var nine_challenge_deaths_font_color: Color = Color(1.0, 0.85, 0.2, 1.0)
+var nine_challenge_deaths_chrome_style: String = "toast"
+var nine_challenge_deaths_chrome_scale: float = 1.0
+## Concurrent Twitch / YouTube / TikTok viewers. Credentials stay local and are never remote-synced.
+var viewer_counts_panel_visible: bool = true
+var viewer_counts_show_twitch: bool = true
+var viewer_counts_show_youtube: bool = true
+var viewer_counts_show_tiktok: bool = true
+## row | stack | total
+var viewer_counts_layout_mode: String = "row"
+var viewer_counts_show_icons: bool = true
+var viewer_counts_corner: int = 1
+var viewer_counts_margin_x: int = 16
+var viewer_counts_margin_y: int = 64
+var viewer_counts_padding_h_px: int = 10
+var viewer_counts_padding_v_px: int = 8
+var viewer_counts_font_size_px: int = 18
+var viewer_counts_font_color: Color = Color.WHITE
+var viewer_counts_chrome_style: String = "toast"
+var viewer_counts_chrome_scale: float = 1.0
+## Starting-soon banner (soon.png + glow pulse + side flames). Off until Stream Deck / F2.
+var starting_soon_visible: bool = false
+var starting_soon_x_px: int = 722
+var starting_soon_y_px: int = 360
+var starting_soon_scale: float = 4.0
+var viewer_counts_twitch_poll_sec: float = 20.0
+var viewer_counts_youtube_poll_sec: float = 60.0
+var viewer_counts_youtube_search_sec: float = 300.0
+var viewer_counts_tiktok_poll_sec: float = 15.0
+var viewer_counts_twitch_client_id: String = ""
+var viewer_counts_twitch_client_secret: String = ""
+var viewer_counts_twitch_channel: String = ""
+var viewer_counts_youtube_api_key: String = ""
+var viewer_counts_youtube_channel_id: String = ""
+var viewer_counts_casterlabs_url: String = ""
 ## Poll chat !summon march queue from Lastest UI server (GET /api/summon-march).
 var summon_march_enabled: bool = true
 ## Base URL e.g. http://127.0.0.1:5000 (no trailing path).
@@ -399,6 +483,10 @@ func load_settings() -> void:
 	if not user_ok:
 		return
 	defaults_revision = int(cfg.get_value("meta", "defaults_revision", defaults_revision))
+	show_alerts = bool(cfg.get_value("ui", "show_alerts", show_alerts))
+	show_title = bool(cfg.get_value("ui", "show_title", show_title))
+	show_live_water = bool(cfg.get_value("ui", "show_live_water", show_live_water))
+	show_chrome_boxes = bool(cfg.get_value("ui", "show_chrome_boxes", show_chrome_boxes))
 	game_ws_host = str(cfg.get_value("network", "game_ws_host", game_ws_host))
 	game_ws_port = int(cfg.get_value("network", "game_ws_port", game_ws_port))
 	streamerbot_udp_port = int(cfg.get_value("network", "streamerbot_udp_port", streamerbot_udp_port))
@@ -480,6 +568,48 @@ func load_settings() -> void:
 	free_promos_poll_sec = maxf(0.5, float(cfg.get_value("network", "free_promos_poll_sec", free_promos_poll_sec)))
 	double_points_poll_sec = maxf(
 		0.5, float(cfg.get_value("network", "double_points_poll_sec", double_points_poll_sec))
+	)
+	nine_challenge_deaths_poll_sec = maxf(
+		0.5,
+		float(
+			cfg.get_value(
+				"network", "nine_challenge_deaths_poll_sec", nine_challenge_deaths_poll_sec
+			)
+		)
+	)
+	viewer_counts_twitch_poll_sec = maxf(
+		5.0, float(cfg.get_value("network", "viewer_counts_twitch_poll_sec", viewer_counts_twitch_poll_sec))
+	)
+	viewer_counts_youtube_poll_sec = maxf(
+		60.0, float(cfg.get_value("network", "viewer_counts_youtube_poll_sec", viewer_counts_youtube_poll_sec))
+	)
+	viewer_counts_youtube_search_sec = maxf(
+		60.0, float(cfg.get_value("network", "viewer_counts_youtube_search_sec", viewer_counts_youtube_search_sec))
+	)
+	viewer_counts_tiktok_poll_sec = maxf(
+		5.0, float(cfg.get_value("network", "viewer_counts_tiktok_poll_sec", viewer_counts_tiktok_poll_sec))
+	)
+	viewer_counts_twitch_client_id = str(
+		cfg.get_value("network", "viewer_counts_twitch_client_id", viewer_counts_twitch_client_id)
+	)
+	viewer_counts_twitch_client_secret = str(
+		cfg.get_value(
+			"network", "viewer_counts_twitch_client_secret", viewer_counts_twitch_client_secret
+		)
+	)
+	viewer_counts_twitch_channel = str(
+		cfg.get_value("network", "viewer_counts_twitch_channel", viewer_counts_twitch_channel)
+	)
+	viewer_counts_youtube_api_key = str(
+		cfg.get_value("network", "viewer_counts_youtube_api_key", viewer_counts_youtube_api_key)
+	)
+	viewer_counts_youtube_channel_id = str(
+		cfg.get_value(
+			"network", "viewer_counts_youtube_channel_id", viewer_counts_youtube_channel_id
+		)
+	)
+	viewer_counts_casterlabs_url = str(
+		cfg.get_value("network", "viewer_counts_casterlabs_url", viewer_counts_casterlabs_url)
 	)
 	summon_march_enabled = bool(cfg.get_value("network", "summon_march_enabled", summon_march_enabled))
 	summon_march_base_url = str(cfg.get_value("network", "summon_march_base_url", summon_march_base_url))
@@ -823,6 +953,28 @@ func load_settings() -> void:
 		0,
 		2048
 	)
+	live_water_top_bar_px = clampi(
+		int(cfg.get_value("ui", "live_water_top_bar_px", live_water_top_bar_px)),
+		0,
+		8192
+	)
+	live_water_top_gradient_fade_start = clampf(
+		float(cfg.get_value("ui", "live_water_top_gradient_fade_start", live_water_top_gradient_fade_start)),
+		0.0,
+		1.0
+	)
+	live_water_top_gradient_fade_end = clampf(
+		float(cfg.get_value("ui", "live_water_top_gradient_fade_end", live_water_top_gradient_fade_end)),
+		0.0,
+		1.0
+	)
+	if live_water_top_gradient_fade_end > live_water_top_gradient_fade_start:
+		live_water_top_gradient_fade_end = live_water_top_gradient_fade_start
+	live_water_top_edge_feather_v_px = clampi(
+		int(cfg.get_value("ui", "live_water_top_edge_feather_v_px", live_water_top_edge_feather_v_px)),
+		0,
+		2048
+	)
 	window_per_pixel_transparency_enabled = bool(
 		cfg.get_value("ui", "window_per_pixel_transparency_enabled", window_per_pixel_transparency_enabled)
 	)
@@ -947,6 +1099,57 @@ func load_settings() -> void:
 	paid_notice_enable_highlight = bool(
 		cfg.get_value("ui", "paid_notice_enable_highlight", paid_notice_enable_highlight)
 	)
+	first_words_enabled = bool(cfg.get_value("ui", "first_words_enabled", first_words_enabled))
+	first_words_queue_max = clampi(
+		int(cfg.get_value("ui", "first_words_queue_max", first_words_queue_max)), 1, 32
+	)
+	first_words_default_ttl_sec = maxf(
+		0.5, float(cfg.get_value("ui", "first_words_default_ttl_sec", first_words_default_ttl_sec))
+	)
+	first_words_fade_in_sec = maxf(
+		0.05, float(cfg.get_value("ui", "first_words_fade_in_sec", first_words_fade_in_sec))
+	)
+	first_words_fade_out_sec = maxf(
+		0.05, float(cfg.get_value("ui", "first_words_fade_out_sec", first_words_fade_out_sec))
+	)
+	first_words_zone_x_px = int(cfg.get_value("ui", "first_words_zone_x_px", first_words_zone_x_px))
+	first_words_zone_y_px = int(cfg.get_value("ui", "first_words_zone_y_px", first_words_zone_y_px))
+	first_words_zone_width_px = clampi(
+		int(cfg.get_value("ui", "first_words_zone_width_px", first_words_zone_width_px)), 64, 1920
+	)
+	first_words_zone_height_px = clampi(
+		int(cfg.get_value("ui", "first_words_zone_height_px", first_words_zone_height_px)), 0, 1080
+	)
+	first_words_zone_bottom_margin_px = int(
+		cfg.get_value("ui", "first_words_zone_bottom_margin_px", first_words_zone_bottom_margin_px)
+	)
+	first_words_chrome_style = _SpdUiArt.normalize_chrome_style_id(
+		str(cfg.get_value("ui", "first_words_chrome_style", first_words_chrome_style))
+	)
+	first_words_chrome_scale = clampf(
+		float(cfg.get_value("ui", "first_words_chrome_scale", first_words_chrome_scale)), 0.5, 4.0
+	)
+	first_words_font_size_px = clampi(
+		int(cfg.get_value("ui", "first_words_font_size_px", first_words_font_size_px)), 8, 96
+	)
+	first_words_font_color = _read_color_cfg(
+		cfg, "ui", "first_words_font_color", first_words_font_color
+	)
+	first_words_text_shadow = bool(
+		cfg.get_value("ui", "first_words_text_shadow", first_words_text_shadow)
+	)
+	first_words_padding_h_px = clampi(
+		int(cfg.get_value("ui", "first_words_padding_h_px", first_words_padding_h_px)), 0, 64
+	)
+	first_words_padding_v_px = clampi(
+		int(cfg.get_value("ui", "first_words_padding_v_px", first_words_padding_v_px)), 0, 64
+	)
+	first_words_text_align = _normalize_paid_notice_text_align(
+		str(cfg.get_value("ui", "first_words_text_align", first_words_text_align))
+	)
+	first_words_pop_scale = bool(
+		cfg.get_value("ui", "first_words_pop_scale", first_words_pop_scale)
+	)
 	id_overlay_enabled = bool(cfg.get_value("ui", "id_overlay_enabled", id_overlay_enabled))
 	if cfg.has_section_key("ui", "id_cell_width_px"):
 		id_cell_width_px = int(cfg.get_value("ui", "id_cell_width_px", id_cell_width_px))
@@ -1029,6 +1232,125 @@ func load_settings() -> void:
 	double_points_chrome_scale = clampf(
 		float(cfg.get_value("ui", "double_points_chrome_scale", double_points_chrome_scale)), 0.5, 4.0
 	)
+	nine_challenge_deaths_panel_visible = bool(
+		cfg.get_value(
+			"ui", "nine_challenge_deaths_panel_visible", nine_challenge_deaths_panel_visible
+		)
+	)
+	nine_challenge_deaths_corner = clampi(
+		int(cfg.get_value("ui", "nine_challenge_deaths_corner", nine_challenge_deaths_corner)),
+		0,
+		3
+	)
+	nine_challenge_deaths_margin_x = int(
+		cfg.get_value("ui", "nine_challenge_deaths_margin_x", nine_challenge_deaths_margin_x)
+	)
+	nine_challenge_deaths_margin_y = int(
+		cfg.get_value("ui", "nine_challenge_deaths_margin_y", nine_challenge_deaths_margin_y)
+	)
+	nine_challenge_deaths_padding_h_px = clampi(
+		int(
+			cfg.get_value(
+				"ui", "nine_challenge_deaths_padding_h_px", nine_challenge_deaths_padding_h_px
+			)
+		),
+		0,
+		64
+	)
+	nine_challenge_deaths_padding_v_px = clampi(
+		int(
+			cfg.get_value(
+				"ui", "nine_challenge_deaths_padding_v_px", nine_challenge_deaths_padding_v_px
+			)
+		),
+		0,
+		64
+	)
+	nine_challenge_deaths_font_size_px = clampi(
+		int(
+			cfg.get_value(
+				"ui", "nine_challenge_deaths_font_size_px", nine_challenge_deaths_font_size_px
+			)
+		),
+		8,
+		48
+	)
+	nine_challenge_deaths_font_color = _read_color_cfg(
+		cfg, "ui", "nine_challenge_deaths_font_color", nine_challenge_deaths_font_color
+	)
+	nine_challenge_deaths_chrome_style = _SpdUiArt.normalize_chrome_style_id(
+		str(
+			cfg.get_value(
+				"ui", "nine_challenge_deaths_chrome_style", nine_challenge_deaths_chrome_style
+			)
+		)
+	)
+	nine_challenge_deaths_chrome_scale = clampf(
+		float(
+			cfg.get_value(
+				"ui", "nine_challenge_deaths_chrome_scale", nine_challenge_deaths_chrome_scale
+			)
+		),
+		0.5,
+		4.0
+	)
+	viewer_counts_panel_visible = bool(
+		cfg.get_value("ui", "viewer_counts_panel_visible", viewer_counts_panel_visible)
+	)
+	viewer_counts_show_twitch = bool(
+		cfg.get_value("ui", "viewer_counts_show_twitch", viewer_counts_show_twitch)
+	)
+	viewer_counts_show_youtube = bool(
+		cfg.get_value("ui", "viewer_counts_show_youtube", viewer_counts_show_youtube)
+	)
+	viewer_counts_show_tiktok = bool(
+		cfg.get_value("ui", "viewer_counts_show_tiktok", viewer_counts_show_tiktok)
+	)
+	viewer_counts_layout_mode = str(
+		cfg.get_value("ui", "viewer_counts_layout_mode", viewer_counts_layout_mode)
+	).to_lower()
+	if viewer_counts_layout_mode not in ["row", "stack", "total"]:
+		viewer_counts_layout_mode = "row"
+	viewer_counts_show_icons = bool(
+		cfg.get_value("ui", "viewer_counts_show_icons", viewer_counts_show_icons)
+	)
+	viewer_counts_corner = clampi(
+		int(cfg.get_value("ui", "viewer_counts_corner", viewer_counts_corner)), 0, 3
+	)
+	viewer_counts_margin_x = int(
+		cfg.get_value("ui", "viewer_counts_margin_x", viewer_counts_margin_x)
+	)
+	viewer_counts_margin_y = int(
+		cfg.get_value("ui", "viewer_counts_margin_y", viewer_counts_margin_y)
+	)
+	viewer_counts_padding_h_px = clampi(
+		int(cfg.get_value("ui", "viewer_counts_padding_h_px", viewer_counts_padding_h_px)), 0, 64
+	)
+	viewer_counts_padding_v_px = clampi(
+		int(cfg.get_value("ui", "viewer_counts_padding_v_px", viewer_counts_padding_v_px)), 0, 64
+	)
+	viewer_counts_font_size_px = clampi(
+		int(cfg.get_value("ui", "viewer_counts_font_size_px", viewer_counts_font_size_px)), 8, 64
+	)
+	viewer_counts_font_color = _read_color_cfg(
+		cfg, "ui", "viewer_counts_font_color", viewer_counts_font_color
+	)
+	viewer_counts_chrome_style = _SpdUiArt.normalize_chrome_style_id(
+		str(cfg.get_value("ui", "viewer_counts_chrome_style", viewer_counts_chrome_style))
+	)
+	starting_soon_visible = bool(
+		cfg.get_value("ui", "starting_soon_visible", starting_soon_visible)
+	)
+	starting_soon_x_px = int(cfg.get_value("ui", "starting_soon_x_px", starting_soon_x_px))
+	starting_soon_y_px = int(cfg.get_value("ui", "starting_soon_y_px", starting_soon_y_px))
+	starting_soon_scale = clampf(
+		float(cfg.get_value("ui", "starting_soon_scale", starting_soon_scale)), 0.25, 12.0
+	)
+	viewer_counts_chrome_scale = clampf(
+		float(cfg.get_value("ui", "viewer_counts_chrome_scale", viewer_counts_chrome_scale)),
+		0.5,
+		4.0
+	)
 	_load_vertical_layout(cfg)
 	_apply_render_limits()
 	settings_loaded.emit()
@@ -1039,6 +1361,15 @@ func live_water_gradient_for(for_control: Control) -> Vector2:
 	var gs := clampf(L.live_water_gradient_fade_start, 0.0, 1.0)
 	var ge := clampf(L.live_water_gradient_fade_end, 0.0, 1.0)
 	if ge < gs:
+		ge = gs
+	return Vector2(gs, ge)
+
+
+func live_water_top_gradient_for(for_control: Control) -> Vector2:
+	var L := layout_data_for(for_control)
+	var gs := clampf(L.live_water_top_gradient_fade_start, 0.0, 1.0)
+	var ge := clampf(L.live_water_top_gradient_fade_end, 0.0, 1.0)
+	if ge > gs:
 		ge = gs
 	return Vector2(gs, ge)
 
@@ -1074,6 +1405,18 @@ func live_water_edge_feather_v_uv(for_control: Control) -> float:
 	var L := layout_data_for(for_control)
 	var sz := layout_canvas_size(for_control)
 	return clampf(float(maxi(0, L.live_water_edge_feather_v_px)) / maxf(sz.y, 1.0), 0.0, 1.0)
+
+
+func live_water_top_bar_uv(for_control: Control) -> float:
+	var L := layout_data_for(for_control)
+	var sz := layout_canvas_size(for_control)
+	return clampf(float(maxi(0, L.live_water_top_bar_px)) / maxf(sz.y, 1.0), 0.0, 1.0)
+
+
+func live_water_top_edge_feather_v_uv(for_control: Control) -> float:
+	var L := layout_data_for(for_control)
+	var sz := layout_canvas_size(for_control)
+	return clampf(float(maxi(0, L.live_water_top_edge_feather_v_px)) / maxf(sz.y, 1.0), 0.0, 1.0)
 
 
 func layout_profile_for(node: Node) -> StringName:
@@ -1124,12 +1467,21 @@ func _main_layout_snapshot() -> UiLayoutData:
 	L.paid_notice_zone_width_px = paid_notice_zone_width_px
 	L.paid_notice_zone_height_px = paid_notice_zone_height_px
 	L.paid_notice_zone_bottom_margin_px = paid_notice_zone_bottom_margin_px
+	L.first_words_zone_x_px = first_words_zone_x_px
+	L.first_words_zone_y_px = first_words_zone_y_px
+	L.first_words_zone_width_px = first_words_zone_width_px
+	L.first_words_zone_height_px = first_words_zone_height_px
+	L.first_words_zone_bottom_margin_px = first_words_zone_bottom_margin_px
 	L.live_water_bottom_bar_px = live_water_bottom_bar_px
 	L.live_water_left_strip_px = live_water_left_strip_px
 	L.live_water_left_strip_top_px = live_water_left_strip_top_px
 	L.live_water_gradient_fade_start = live_water_gradient_fade_start
 	L.live_water_gradient_fade_end = live_water_gradient_fade_end
 	L.live_water_edge_feather_v_px = live_water_edge_feather_v_px
+	L.live_water_top_bar_px = live_water_top_bar_px
+	L.live_water_top_gradient_fade_start = live_water_top_gradient_fade_start
+	L.live_water_top_gradient_fade_end = live_water_top_gradient_fade_end
+	L.live_water_top_edge_feather_v_px = live_water_top_edge_feather_v_px
 	L.spend_indicator_corner = spend_indicator_corner
 	L.spend_indicator_margin_x = spend_indicator_margin_x
 	L.spend_indicator_margin_y = spend_indicator_margin_y
@@ -1139,19 +1491,32 @@ func _main_layout_snapshot() -> UiLayoutData:
 	L.double_points_corner = double_points_corner
 	L.double_points_margin_x = double_points_margin_x
 	L.double_points_margin_y = double_points_margin_y
+	L.nine_challenge_deaths_corner = nine_challenge_deaths_corner
+	L.nine_challenge_deaths_margin_x = nine_challenge_deaths_margin_x
+	L.nine_challenge_deaths_margin_y = nine_challenge_deaths_margin_y
+	L.viewer_counts_corner = viewer_counts_corner
+	L.viewer_counts_margin_x = viewer_counts_margin_x
+	L.viewer_counts_margin_y = viewer_counts_margin_y
+	L.starting_soon_x_px = starting_soon_x_px
+	L.starting_soon_y_px = starting_soon_y_px
+	L.starting_soon_scale = starting_soon_scale
 	L.chrome_boxes = chrome_boxes
-	L.show_live_water = true
-	L.show_title = true
-	L.show_chrome_boxes = true
+	L.show_live_water = show_live_water
+	L.show_title = show_title
+	L.show_chrome_boxes = show_chrome_boxes
 	L.show_id_overlay = id_overlay_enabled
-	L.show_alerts = true
+	L.show_alerts = show_alerts
 	L.show_tip_toasts = custom_alerts_enabled
 	L.show_paid_notices = paid_notice_enabled
+	L.show_first_words = first_words_enabled
 	L.show_bestiary = bestiary_hud_enabled
 	L.show_summon_march = summon_march_enabled
 	L.show_spend_indicator = spend_indicator_visible
 	L.show_free_promos = free_promos_panel_visible
 	L.show_double_points = double_points_panel_visible
+	L.show_nine_challenge_deaths = nine_challenge_deaths_panel_visible
+	L.show_viewer_counts = viewer_counts_panel_visible
+	L.show_starting_soon = starting_soon_visible
 	L.hide_spend_when_off = false
 	ensure_main_scene_show()
 	L.scene_show = main_scene_show.duplicate(true)
@@ -1174,6 +1539,11 @@ func duplicate_chrome_boxes_for_profile(profile: StringName) -> Array:
 
 
 func element_enabled(node: Node, key: String) -> bool:
+	if preview_pin_for_element(key):
+		return true
+	# Stream Deck / F2 master applies to both windows. Per-layout show_* can still hide one side.
+	if not _main_control_enabled(key):
+		return false
 	var L := layout_data_for(node)
 	match key:
 		"live_water":
@@ -1183,30 +1553,197 @@ func element_enabled(node: Node, key: String) -> bool:
 		"chrome_boxes":
 			return L.show_chrome_boxes
 		"id_overlay":
-			return L.show_id_overlay and (id_overlay_enabled if not is_vertical_layout(node) else true)
+			return L.show_id_overlay
 		"alerts":
 			return L.show_alerts
 		"tip_toasts":
-			return L.show_tip_toasts and (
-				custom_alerts_enabled if not is_vertical_layout(node) else true
-			)
+			return L.show_tip_toasts
 		"paid_notices":
-			return L.show_paid_notices and (paid_notice_enabled if not is_vertical_layout(node) else true)
+			return L.show_paid_notices
+		"first_words":
+			return L.show_first_words
 		"bestiary":
-			return L.show_bestiary and (bestiary_hud_enabled if not is_vertical_layout(node) else true)
+			return L.show_bestiary
 		"summon_march":
-			return L.show_summon_march and (summon_march_enabled if not is_vertical_layout(node) else true)
+			return L.show_summon_march
 		"spend_indicator":
-			return L.show_spend_indicator and (spend_indicator_visible if not is_vertical_layout(node) else true)
+			return L.show_spend_indicator
 		"free_promos":
-			return L.show_free_promos and (free_promos_panel_visible if not is_vertical_layout(node) else true)
+			return L.show_free_promos
 		"double_points":
-			return L.show_double_points and (
-				double_points_panel_visible if not is_vertical_layout(node) else true
-			)
+			return L.show_double_points
+		"nine_challenge_deaths":
+			return L.show_nine_challenge_deaths
+		"viewer_counts":
+			return L.show_viewer_counts
+		"starting_soon":
+			return L.show_starting_soon
 		_:
 			return true
+
+
+func preview_pin_for_element(key: String) -> bool:
+	match key:
+		"alerts":
+			return preview_pin_alerts
+		"tip_toasts":
+			return preview_pin_tip_toasts
+		"paid_notices":
+			return preview_pin_paid_notices
+		"first_words":
+			return preview_pin_first_words
+		_:
+			return false
+
+
+func set_preview_pin(key: String, pinned: bool) -> void:
+	match key:
+		"alerts":
+			preview_pin_alerts = pinned
+		"tip_toasts":
+			preview_pin_tip_toasts = pinned
+		"paid_notices":
+			preview_pin_paid_notices = pinned
+		"first_words":
+			preview_pin_first_words = pinned
+		_:
+			return
+	preview_visibility_changed.emit()
+
+
+func apply_control_event(data: Dictionary) -> void:
+	var target := str(data.get("target", "")).strip_edges().to_lower()
+	if target not in UiLayoutData.element_keys():
+		push_warning("CompanionControl: unknown target=%s" % target)
+		return
+	var action := str(data.get("action", "toggle")).strip_edges().to_lower()
+	if action == "on":
+		action = "show"
+	elif action == "off":
+		action = "hide"
+	if action not in ["show", "hide", "toggle"]:
+		push_warning("CompanionControl: unknown action=%s target=%s" % [action, target])
+		return
+	if vertical_layout == null:
+		vertical_layout = UiLayoutData.default_vertical()
+	var currently_on := _main_control_enabled(target)
+	var next_on := not currently_on if action == "toggle" else action == "show"
+	_set_main_control_enabled(target, next_on)
+	_set_vertical_control_enabled(target, next_on)
+	print("CompanionControl: %s %s -> %s" % [action, target, next_on])
+	save_settings()
+
+
+func _main_control_enabled(target: String) -> bool:
+	match target:
+		"title":
+			return show_title
+		"live_water":
+			return show_live_water
+		"chrome_boxes":
+			return show_chrome_boxes
+		"id_overlay":
+			return id_overlay_enabled
+		"alerts":
+			return show_alerts
+		"tip_toasts":
+			return custom_alerts_enabled
+		"paid_notices":
+			return paid_notice_enabled
+		"first_words":
+			return first_words_enabled
+		"bestiary":
+			return bestiary_hud_enabled
+		"summon_march":
+			return summon_march_enabled
+		"spend_indicator":
+			return spend_indicator_visible
+		"free_promos":
+			return free_promos_panel_visible
+		"double_points":
+			return double_points_panel_visible
+		"nine_challenge_deaths":
+			return nine_challenge_deaths_panel_visible
+		"viewer_counts":
+			return viewer_counts_panel_visible
+		"starting_soon":
+			return starting_soon_visible
 	return true
+
+
+func _set_main_control_enabled(target: String, enabled: bool) -> void:
+	match target:
+		"title":
+			show_title = enabled
+		"live_water":
+			show_live_water = enabled
+		"chrome_boxes":
+			show_chrome_boxes = enabled
+		"id_overlay":
+			id_overlay_enabled = enabled
+		"alerts":
+			show_alerts = enabled
+		"tip_toasts":
+			custom_alerts_enabled = enabled
+		"paid_notices":
+			paid_notice_enabled = enabled
+		"first_words":
+			first_words_enabled = enabled
+		"bestiary":
+			bestiary_hud_enabled = enabled
+		"summon_march":
+			summon_march_enabled = enabled
+		"spend_indicator":
+			spend_indicator_visible = enabled
+		"free_promos":
+			free_promos_panel_visible = enabled
+		"double_points":
+			double_points_panel_visible = enabled
+		"nine_challenge_deaths":
+			nine_challenge_deaths_panel_visible = enabled
+		"viewer_counts":
+			viewer_counts_panel_visible = enabled
+		"starting_soon":
+			starting_soon_visible = enabled
+
+
+func _set_vertical_control_enabled(target: String, enabled: bool) -> void:
+	if vertical_layout == null:
+		vertical_layout = UiLayoutData.default_vertical()
+	var L := vertical_layout
+	match target:
+		"title":
+			L.show_title = enabled
+		"live_water":
+			L.show_live_water = enabled
+		"chrome_boxes":
+			L.show_chrome_boxes = enabled
+		"id_overlay":
+			L.show_id_overlay = enabled
+		"alerts":
+			L.show_alerts = enabled
+		"tip_toasts":
+			L.show_tip_toasts = enabled
+		"paid_notices":
+			L.show_paid_notices = enabled
+		"first_words":
+			L.show_first_words = enabled
+		"bestiary":
+			L.show_bestiary = enabled
+		"summon_march":
+			L.show_summon_march = enabled
+		"spend_indicator":
+			L.show_spend_indicator = enabled
+		"free_promos":
+			L.show_free_promos = enabled
+		"double_points":
+			L.show_double_points = enabled
+		"nine_challenge_deaths":
+			L.show_nine_challenge_deaths = enabled
+		"viewer_counts":
+			L.show_viewer_counts = enabled
+		"starting_soon":
+			L.show_starting_soon = enabled
 
 
 ## OBS program scene → pause / main / other (pause wins if both markers match).
@@ -1240,6 +1777,8 @@ func ensure_main_scene_show() -> void:
 
 ## Feature enable (layout show_* / globals) AND OBS scene gate for this canvas.
 func element_visible_on_scene(node: Node, key: String, kind: StringName) -> bool:
+	if preview_pin_for_element(key):
+		return true
 	if not element_enabled(node, key):
 		return false
 	var L := layout_data_for(node)
@@ -1309,6 +1848,23 @@ func _load_vertical_layout(cfg: ConfigFile) -> void:
 			sec, "paid_notice_zone_bottom_margin_px", seeded.paid_notice_zone_bottom_margin_px
 		)
 	)
+	L.first_words_zone_x_px = int(
+		cfg.get_value(sec, "first_words_zone_x_px", seeded.first_words_zone_x_px)
+	)
+	L.first_words_zone_y_px = int(
+		cfg.get_value(sec, "first_words_zone_y_px", seeded.first_words_zone_y_px)
+	)
+	L.first_words_zone_width_px = int(
+		cfg.get_value(sec, "first_words_zone_width_px", seeded.first_words_zone_width_px)
+	)
+	L.first_words_zone_height_px = int(
+		cfg.get_value(sec, "first_words_zone_height_px", seeded.first_words_zone_height_px)
+	)
+	L.first_words_zone_bottom_margin_px = int(
+		cfg.get_value(
+			sec, "first_words_zone_bottom_margin_px", seeded.first_words_zone_bottom_margin_px
+		)
+	)
 	L.live_water_bottom_bar_px = clampi(
 		int(cfg.get_value(sec, "live_water_bottom_bar_px", seeded.live_water_bottom_bar_px)), 0, 8192
 	)
@@ -1339,6 +1895,34 @@ func _load_vertical_layout(cfg: ConfigFile) -> void:
 		0,
 		2048
 	)
+	L.live_water_top_bar_px = clampi(
+		int(cfg.get_value(sec, "live_water_top_bar_px", seeded.live_water_top_bar_px)), 0, 8192
+	)
+	L.live_water_top_gradient_fade_start = clampf(
+		float(
+			cfg.get_value(
+				sec, "live_water_top_gradient_fade_start", seeded.live_water_top_gradient_fade_start
+			)
+		),
+		0.0,
+		1.0
+	)
+	L.live_water_top_gradient_fade_end = clampf(
+		float(
+			cfg.get_value(
+				sec, "live_water_top_gradient_fade_end", seeded.live_water_top_gradient_fade_end
+			)
+		),
+		0.0,
+		1.0
+	)
+	if L.live_water_top_gradient_fade_end > L.live_water_top_gradient_fade_start:
+		L.live_water_top_gradient_fade_end = L.live_water_top_gradient_fade_start
+	L.live_water_top_edge_feather_v_px = clampi(
+		int(cfg.get_value(sec, "live_water_top_edge_feather_v_px", seeded.live_water_top_edge_feather_v_px)),
+		0,
+		2048
+	)
 	L.spend_indicator_corner = clampi(
 		int(cfg.get_value(sec, "spend_indicator_corner", seeded.spend_indicator_corner)), 0, 3
 	)
@@ -1362,6 +1946,45 @@ func _load_vertical_layout(cfg: ConfigFile) -> void:
 	L.double_points_margin_y = int(
 		cfg.get_value(sec, "double_points_margin_y", seeded.double_points_margin_y)
 	)
+	L.nine_challenge_deaths_corner = clampi(
+		int(
+			cfg.get_value(
+				sec, "nine_challenge_deaths_corner", seeded.nine_challenge_deaths_corner
+			)
+		),
+		0,
+		3
+	)
+	L.nine_challenge_deaths_margin_x = int(
+		cfg.get_value(
+			sec, "nine_challenge_deaths_margin_x", seeded.nine_challenge_deaths_margin_x
+		)
+	)
+	L.nine_challenge_deaths_margin_y = int(
+		cfg.get_value(
+			sec, "nine_challenge_deaths_margin_y", seeded.nine_challenge_deaths_margin_y
+		)
+	)
+	L.viewer_counts_corner = clampi(
+		int(cfg.get_value(sec, "viewer_counts_corner", seeded.viewer_counts_corner)), 0, 3
+	)
+	L.viewer_counts_margin_x = int(
+		cfg.get_value(sec, "viewer_counts_margin_x", seeded.viewer_counts_margin_x)
+	)
+	L.viewer_counts_margin_y = int(
+		cfg.get_value(sec, "viewer_counts_margin_y", seeded.viewer_counts_margin_y)
+	)
+	L.starting_soon_x_px = int(
+		cfg.get_value(sec, "starting_soon_x_px", seeded.starting_soon_x_px)
+	)
+	L.starting_soon_y_px = int(
+		cfg.get_value(sec, "starting_soon_y_px", seeded.starting_soon_y_px)
+	)
+	L.starting_soon_scale = clampf(
+		float(cfg.get_value(sec, "starting_soon_scale", seeded.starting_soon_scale)),
+		0.25,
+		12.0
+	)
 	L.chrome_boxes = _read_chrome_boxes_cfg(cfg, sec)
 	L.show_live_water = bool(cfg.get_value(sec, "show_live_water", true))
 	L.show_title = bool(cfg.get_value(sec, "show_title", true))
@@ -1370,11 +1993,17 @@ func _load_vertical_layout(cfg: ConfigFile) -> void:
 	L.show_alerts = bool(cfg.get_value(sec, "show_alerts", true))
 	L.show_tip_toasts = bool(cfg.get_value(sec, "show_tip_toasts", true))
 	L.show_paid_notices = bool(cfg.get_value(sec, "show_paid_notices", true))
+	L.show_first_words = bool(cfg.get_value(sec, "show_first_words", true))
 	L.show_bestiary = bool(cfg.get_value(sec, "show_bestiary", true))
 	L.show_summon_march = bool(cfg.get_value(sec, "show_summon_march", true))
 	L.show_spend_indicator = bool(cfg.get_value(sec, "show_spend_indicator", true))
 	L.show_free_promos = bool(cfg.get_value(sec, "show_free_promos", true))
 	L.show_double_points = bool(cfg.get_value(sec, "show_double_points", true))
+	L.show_nine_challenge_deaths = bool(
+		cfg.get_value(sec, "show_nine_challenge_deaths", true)
+	)
+	L.show_viewer_counts = bool(cfg.get_value(sec, "show_viewer_counts", true))
+	L.show_starting_soon = bool(cfg.get_value(sec, "show_starting_soon", false))
 	L.hide_spend_when_off = bool(
 		cfg.get_value(sec, "hide_spend_when_off", seeded.hide_spend_when_off)
 	)
@@ -1399,11 +2028,15 @@ func _seed_vertical_scene_show_from_toggles(L: UiLayoutData) -> void:
 		"alerts": L.show_alerts,
 		"tip_toasts": L.show_tip_toasts,
 		"paid_notices": L.show_paid_notices,
+		"first_words": L.show_first_words,
 		"bestiary": L.show_bestiary,
 		"summon_march": L.show_summon_march,
 		"spend_indicator": L.show_spend_indicator,
 		"free_promos": L.show_free_promos,
 		"double_points": L.show_double_points,
+		"nine_challenge_deaths": L.show_nine_challenge_deaths,
+		"viewer_counts": L.show_viewer_counts,
+		"starting_soon": L.show_starting_soon,
 	}
 	for key in map.keys():
 		if not bool(map[key]):
@@ -1434,12 +2067,21 @@ func _save_vertical_layout(cfg: ConfigFile) -> void:
 	cfg.set_value(sec, "paid_notice_zone_width_px", L.paid_notice_zone_width_px)
 	cfg.set_value(sec, "paid_notice_zone_height_px", L.paid_notice_zone_height_px)
 	cfg.set_value(sec, "paid_notice_zone_bottom_margin_px", L.paid_notice_zone_bottom_margin_px)
+	cfg.set_value(sec, "first_words_zone_x_px", L.first_words_zone_x_px)
+	cfg.set_value(sec, "first_words_zone_y_px", L.first_words_zone_y_px)
+	cfg.set_value(sec, "first_words_zone_width_px", L.first_words_zone_width_px)
+	cfg.set_value(sec, "first_words_zone_height_px", L.first_words_zone_height_px)
+	cfg.set_value(sec, "first_words_zone_bottom_margin_px", L.first_words_zone_bottom_margin_px)
 	cfg.set_value(sec, "live_water_bottom_bar_px", L.live_water_bottom_bar_px)
 	cfg.set_value(sec, "live_water_left_strip_px", L.live_water_left_strip_px)
 	cfg.set_value(sec, "live_water_left_strip_top_px", L.live_water_left_strip_top_px)
 	cfg.set_value(sec, "live_water_gradient_fade_start", L.live_water_gradient_fade_start)
 	cfg.set_value(sec, "live_water_gradient_fade_end", L.live_water_gradient_fade_end)
 	cfg.set_value(sec, "live_water_edge_feather_v_px", L.live_water_edge_feather_v_px)
+	cfg.set_value(sec, "live_water_top_bar_px", L.live_water_top_bar_px)
+	cfg.set_value(sec, "live_water_top_gradient_fade_start", L.live_water_top_gradient_fade_start)
+	cfg.set_value(sec, "live_water_top_gradient_fade_end", L.live_water_top_gradient_fade_end)
+	cfg.set_value(sec, "live_water_top_edge_feather_v_px", L.live_water_top_edge_feather_v_px)
 	cfg.set_value(sec, "spend_indicator_corner", L.spend_indicator_corner)
 	cfg.set_value(sec, "spend_indicator_margin_x", L.spend_indicator_margin_x)
 	cfg.set_value(sec, "spend_indicator_margin_y", L.spend_indicator_margin_y)
@@ -1449,6 +2091,15 @@ func _save_vertical_layout(cfg: ConfigFile) -> void:
 	cfg.set_value(sec, "double_points_corner", L.double_points_corner)
 	cfg.set_value(sec, "double_points_margin_x", L.double_points_margin_x)
 	cfg.set_value(sec, "double_points_margin_y", L.double_points_margin_y)
+	cfg.set_value(sec, "nine_challenge_deaths_corner", L.nine_challenge_deaths_corner)
+	cfg.set_value(sec, "nine_challenge_deaths_margin_x", L.nine_challenge_deaths_margin_x)
+	cfg.set_value(sec, "nine_challenge_deaths_margin_y", L.nine_challenge_deaths_margin_y)
+	cfg.set_value(sec, "viewer_counts_corner", L.viewer_counts_corner)
+	cfg.set_value(sec, "viewer_counts_margin_x", L.viewer_counts_margin_x)
+	cfg.set_value(sec, "viewer_counts_margin_y", L.viewer_counts_margin_y)
+	cfg.set_value(sec, "starting_soon_x_px", L.starting_soon_x_px)
+	cfg.set_value(sec, "starting_soon_y_px", L.starting_soon_y_px)
+	cfg.set_value(sec, "starting_soon_scale", L.starting_soon_scale)
 	cfg.set_value(sec, "chrome_boxes", _serialize_chrome_boxes_list(L.chrome_boxes))
 	cfg.set_value(sec, "show_live_water", L.show_live_water)
 	cfg.set_value(sec, "show_title", L.show_title)
@@ -1457,11 +2108,15 @@ func _save_vertical_layout(cfg: ConfigFile) -> void:
 	cfg.set_value(sec, "show_alerts", L.show_alerts)
 	cfg.set_value(sec, "show_tip_toasts", L.show_tip_toasts)
 	cfg.set_value(sec, "show_paid_notices", L.show_paid_notices)
+	cfg.set_value(sec, "show_first_words", L.show_first_words)
 	cfg.set_value(sec, "show_bestiary", L.show_bestiary)
 	cfg.set_value(sec, "show_summon_march", L.show_summon_march)
 	cfg.set_value(sec, "show_spend_indicator", L.show_spend_indicator)
 	cfg.set_value(sec, "show_free_promos", L.show_free_promos)
 	cfg.set_value(sec, "show_double_points", L.show_double_points)
+	cfg.set_value(sec, "show_nine_challenge_deaths", L.show_nine_challenge_deaths)
+	cfg.set_value(sec, "show_viewer_counts", L.show_viewer_counts)
+	cfg.set_value(sec, "show_starting_soon", L.show_starting_soon)
 	cfg.set_value(sec, "hide_spend_when_off", L.hide_spend_when_off)
 	L.ensure_scene_show()
 	cfg.set_value(sec, "scene_show", L.scene_show.duplicate(true))
@@ -1595,6 +2250,19 @@ func apply_paid_notice_zone_layout(ctrl: Control, canvas: Vector2) -> void:
 		L.paid_notice_zone_width_px,
 		L.paid_notice_zone_height_px,
 		L.paid_notice_zone_bottom_margin_px
+	)
+
+
+func apply_first_words_zone_layout(ctrl: Control, canvas: Vector2) -> void:
+	var L := layout_data_for(ctrl)
+	apply_pixel_zone_layout(
+		ctrl,
+		canvas,
+		L.first_words_zone_x_px,
+		L.first_words_zone_y_px,
+		L.first_words_zone_width_px,
+		L.first_words_zone_height_px,
+		L.first_words_zone_bottom_margin_px
 	)
 
 
@@ -1823,6 +2491,23 @@ func save_settings() -> void:
 	cfg.set_value("network", "free_promos_http_url", free_promos_http_url)
 	cfg.set_value("network", "free_promos_poll_sec", free_promos_poll_sec)
 	cfg.set_value("network", "double_points_poll_sec", double_points_poll_sec)
+	cfg.set_value(
+		"network", "nine_challenge_deaths_poll_sec", nine_challenge_deaths_poll_sec
+	)
+	cfg.set_value("network", "viewer_counts_twitch_poll_sec", viewer_counts_twitch_poll_sec)
+	cfg.set_value("network", "viewer_counts_youtube_poll_sec", viewer_counts_youtube_poll_sec)
+	cfg.set_value("network", "viewer_counts_youtube_search_sec", viewer_counts_youtube_search_sec)
+	cfg.set_value("network", "viewer_counts_tiktok_poll_sec", viewer_counts_tiktok_poll_sec)
+	cfg.set_value("network", "viewer_counts_twitch_client_id", viewer_counts_twitch_client_id)
+	cfg.set_value(
+		"network", "viewer_counts_twitch_client_secret", viewer_counts_twitch_client_secret
+	)
+	cfg.set_value("network", "viewer_counts_twitch_channel", viewer_counts_twitch_channel)
+	cfg.set_value("network", "viewer_counts_youtube_api_key", viewer_counts_youtube_api_key)
+	cfg.set_value(
+		"network", "viewer_counts_youtube_channel_id", viewer_counts_youtube_channel_id
+	)
+	cfg.set_value("network", "viewer_counts_casterlabs_url", viewer_counts_casterlabs_url)
 	cfg.set_value("network", "summon_march_enabled", summon_march_enabled)
 	cfg.set_value("network", "summon_march_base_url", summon_march_base_url)
 	cfg.set_value("network", "summon_march_poll_sec", summon_march_poll_sec)
@@ -1911,6 +2596,10 @@ func save_settings() -> void:
 	cfg.set_value("ui", "custom_alerts_interval_sec", custom_alerts_interval_sec)
 	cfg.set_value("ui", "custom_alerts_hold_sec", custom_alerts_hold_sec)
 	cfg.set_value("ui", "custom_alerts", _serialize_custom_alerts())
+	cfg.set_value("ui", "show_alerts", show_alerts)
+	cfg.set_value("ui", "show_title", show_title)
+	cfg.set_value("ui", "show_live_water", show_live_water)
+	cfg.set_value("ui", "show_chrome_boxes", show_chrome_boxes)
 	cfg.set_value("ui", "show_pending_udp_alerts", show_pending_udp_alerts)
 	cfg.set_value("ui", "hud_status_panel_visible", hud_status_panel_visible)
 	cfg.set_value("ui", "settings_window_width_px", settings_window_width_px)
@@ -1940,6 +2629,10 @@ func save_settings() -> void:
 	cfg.set_value("ui", "live_water_gradient_fade_start", live_water_gradient_fade_start)
 	cfg.set_value("ui", "live_water_gradient_fade_end", live_water_gradient_fade_end)
 	cfg.set_value("ui", "live_water_edge_feather_v_px", live_water_edge_feather_v_px)
+	cfg.set_value("ui", "live_water_top_bar_px", live_water_top_bar_px)
+	cfg.set_value("ui", "live_water_top_gradient_fade_start", live_water_top_gradient_fade_start)
+	cfg.set_value("ui", "live_water_top_gradient_fade_end", live_water_top_gradient_fade_end)
+	cfg.set_value("ui", "live_water_top_edge_feather_v_px", live_water_top_edge_feather_v_px)
 	cfg.set_value("ui", "window_per_pixel_transparency_enabled", window_per_pixel_transparency_enabled)
 	cfg.set_value("ui", "render_max_fps", render_max_fps)
 	cfg.set_value("ui", "alert_text_align", alert_text_align)
@@ -1982,6 +2675,25 @@ func save_settings() -> void:
 	cfg.set_value("ui", "paid_notice_enable_gifted_membership", paid_notice_enable_gifted_membership)
 	cfg.set_value("ui", "paid_notice_enable_sub", paid_notice_enable_sub)
 	cfg.set_value("ui", "paid_notice_enable_highlight", paid_notice_enable_highlight)
+	cfg.set_value("ui", "first_words_enabled", first_words_enabled)
+	cfg.set_value("ui", "first_words_queue_max", first_words_queue_max)
+	cfg.set_value("ui", "first_words_default_ttl_sec", first_words_default_ttl_sec)
+	cfg.set_value("ui", "first_words_fade_in_sec", first_words_fade_in_sec)
+	cfg.set_value("ui", "first_words_fade_out_sec", first_words_fade_out_sec)
+	cfg.set_value("ui", "first_words_zone_x_px", first_words_zone_x_px)
+	cfg.set_value("ui", "first_words_zone_y_px", first_words_zone_y_px)
+	cfg.set_value("ui", "first_words_zone_width_px", first_words_zone_width_px)
+	cfg.set_value("ui", "first_words_zone_height_px", first_words_zone_height_px)
+	cfg.set_value("ui", "first_words_zone_bottom_margin_px", first_words_zone_bottom_margin_px)
+	cfg.set_value("ui", "first_words_chrome_style", first_words_chrome_style)
+	cfg.set_value("ui", "first_words_chrome_scale", first_words_chrome_scale)
+	cfg.set_value("ui", "first_words_font_size_px", first_words_font_size_px)
+	cfg.set_value("ui", "first_words_font_color", first_words_font_color)
+	cfg.set_value("ui", "first_words_text_shadow", first_words_text_shadow)
+	cfg.set_value("ui", "first_words_padding_h_px", first_words_padding_h_px)
+	cfg.set_value("ui", "first_words_padding_v_px", first_words_padding_v_px)
+	cfg.set_value("ui", "first_words_text_align", first_words_text_align)
+	cfg.set_value("ui", "first_words_pop_scale", first_words_pop_scale)
 	cfg.set_value("ui", "id_overlay_enabled", id_overlay_enabled)
 	cfg.set_value("ui", "id_cell_width_px", id_cell_width_px)
 	cfg.set_value("ui", "id_cell_height_px", id_cell_height_px)
@@ -2010,6 +2722,47 @@ func save_settings() -> void:
 	cfg.set_value("ui", "double_points_font_color", double_points_font_color)
 	cfg.set_value("ui", "double_points_chrome_style", double_points_chrome_style)
 	cfg.set_value("ui", "double_points_chrome_scale", double_points_chrome_scale)
+	cfg.set_value(
+		"ui", "nine_challenge_deaths_panel_visible", nine_challenge_deaths_panel_visible
+	)
+	cfg.set_value("ui", "nine_challenge_deaths_corner", nine_challenge_deaths_corner)
+	cfg.set_value("ui", "nine_challenge_deaths_margin_x", nine_challenge_deaths_margin_x)
+	cfg.set_value("ui", "nine_challenge_deaths_margin_y", nine_challenge_deaths_margin_y)
+	cfg.set_value(
+		"ui", "nine_challenge_deaths_padding_h_px", nine_challenge_deaths_padding_h_px
+	)
+	cfg.set_value(
+		"ui", "nine_challenge_deaths_padding_v_px", nine_challenge_deaths_padding_v_px
+	)
+	cfg.set_value(
+		"ui", "nine_challenge_deaths_font_size_px", nine_challenge_deaths_font_size_px
+	)
+	cfg.set_value("ui", "nine_challenge_deaths_font_color", nine_challenge_deaths_font_color)
+	cfg.set_value(
+		"ui", "nine_challenge_deaths_chrome_style", nine_challenge_deaths_chrome_style
+	)
+	cfg.set_value(
+		"ui", "nine_challenge_deaths_chrome_scale", nine_challenge_deaths_chrome_scale
+	)
+	cfg.set_value("ui", "viewer_counts_panel_visible", viewer_counts_panel_visible)
+	cfg.set_value("ui", "viewer_counts_show_twitch", viewer_counts_show_twitch)
+	cfg.set_value("ui", "viewer_counts_show_youtube", viewer_counts_show_youtube)
+	cfg.set_value("ui", "viewer_counts_show_tiktok", viewer_counts_show_tiktok)
+	cfg.set_value("ui", "viewer_counts_layout_mode", viewer_counts_layout_mode)
+	cfg.set_value("ui", "viewer_counts_show_icons", viewer_counts_show_icons)
+	cfg.set_value("ui", "viewer_counts_corner", viewer_counts_corner)
+	cfg.set_value("ui", "viewer_counts_margin_x", viewer_counts_margin_x)
+	cfg.set_value("ui", "viewer_counts_margin_y", viewer_counts_margin_y)
+	cfg.set_value("ui", "viewer_counts_padding_h_px", viewer_counts_padding_h_px)
+	cfg.set_value("ui", "viewer_counts_padding_v_px", viewer_counts_padding_v_px)
+	cfg.set_value("ui", "viewer_counts_font_size_px", viewer_counts_font_size_px)
+	cfg.set_value("ui", "viewer_counts_font_color", viewer_counts_font_color)
+	cfg.set_value("ui", "viewer_counts_chrome_style", viewer_counts_chrome_style)
+	cfg.set_value("ui", "viewer_counts_chrome_scale", viewer_counts_chrome_scale)
+	cfg.set_value("ui", "starting_soon_visible", starting_soon_visible)
+	cfg.set_value("ui", "starting_soon_x_px", starting_soon_x_px)
+	cfg.set_value("ui", "starting_soon_y_px", starting_soon_y_px)
+	cfg.set_value("ui", "starting_soon_scale", starting_soon_scale)
 	_save_vertical_layout(cfg)
 	_apply_render_limits()
 	var err := cfg.save(SETTINGS_PATH)
@@ -2060,6 +2813,7 @@ const REMOTE_UI_KEYS: Array[String] = [
 	"spend_indicator_visible", "spend_indicator_corner", "spend_indicator_margin_x", "spend_indicator_margin_y",
 	"spend_indicator_padding_h_px", "spend_indicator_padding_v_px", "spend_indicator_font_size_px",
 	"spend_indicator_chrome_style", "spend_indicator_chrome_scale",
+	"show_alerts", "show_title", "show_live_water", "show_chrome_boxes",
 	"show_pending_udp_alerts", "alert_queue_max", "alert_hold_sec", "alert_fade_in_sec", "alert_fade_out_sec",
 	"alert_hold_sec_when_free", "alert_fade_in_sec_when_free", "alert_fade_out_sec_when_free",
 	"show_ping_alerts", "show_failed_command_alerts", "hud_status_panel_visible",
@@ -2068,6 +2822,8 @@ const REMOTE_UI_KEYS: Array[String] = [
 	"id_zone_x_px", "id_zone_y_px", "id_zone_width_px", "id_zone_height_px", "id_zone_bottom_margin_px",
 	"live_water_bottom_bar_px", "live_water_left_strip_px", "live_water_left_strip_top_px",
 	"live_water_gradient_fade_start", "live_water_gradient_fade_end", "live_water_edge_feather_v_px",
+	"live_water_top_bar_px", "live_water_top_gradient_fade_start", "live_water_top_gradient_fade_end",
+	"live_water_top_edge_feather_v_px",
 	"window_per_pixel_transparency_enabled", "render_max_fps",
 	"alert_text_align", "alert_chrome_style", "alert_chrome_scale",
 	"alert_title_font_size_px", "alert_subtitle_font_size_px", "alert_padding_h_px", "alert_padding_v_px",
@@ -2084,14 +2840,33 @@ const REMOTE_UI_KEYS: Array[String] = [
 	"paid_notice_show_on_live", "paid_notice_show_on_pause",
 	"paid_notice_enable_superchat", "paid_notice_enable_gifted_membership",
 	"paid_notice_enable_sub", "paid_notice_enable_highlight",
+	"first_words_enabled", "first_words_queue_max", "first_words_default_ttl_sec",
+	"first_words_fade_in_sec", "first_words_fade_out_sec",
+	"first_words_zone_x_px", "first_words_zone_y_px", "first_words_zone_width_px",
+	"first_words_zone_height_px", "first_words_zone_bottom_margin_px",
+	"first_words_chrome_style", "first_words_chrome_scale",
+	"first_words_font_size_px", "first_words_font_color", "first_words_text_shadow",
+	"first_words_padding_h_px", "first_words_padding_v_px", "first_words_text_align",
+	"first_words_pop_scale",
 	"id_overlay_enabled", "id_cell_width_px", "id_cell_height_px", "id_cell_padding_px",
 	"id_known_icon_fraction", "id_flow_h_separation_px", "id_block_separation_px", "icon_cell_background_color",
 	"free_promos_panel_visible", "free_promos_corner", "free_promos_margin_x", "free_promos_margin_y",
+	"viewer_counts_panel_visible", "viewer_counts_show_twitch", "viewer_counts_show_youtube",
+	"viewer_counts_show_tiktok", "viewer_counts_layout_mode", "viewer_counts_show_icons",
+	"viewer_counts_corner", "viewer_counts_margin_x", "viewer_counts_margin_y",
+	"viewer_counts_padding_h_px", "viewer_counts_padding_v_px", "viewer_counts_font_size_px",
+	"viewer_counts_font_color", "viewer_counts_chrome_style", "viewer_counts_chrome_scale",
 	"free_promos_padding_h_px", "free_promos_padding_v_px", "free_promos_font_size_px",
 	"free_promos_max_width_px", "free_promos_chrome_style", "free_promos_chrome_scale",
 	"double_points_panel_visible", "double_points_corner", "double_points_margin_x", "double_points_margin_y",
 	"double_points_padding_h_px", "double_points_padding_v_px", "double_points_font_size_px",
 	"double_points_font_color", "double_points_chrome_style", "double_points_chrome_scale",
+	"nine_challenge_deaths_panel_visible", "nine_challenge_deaths_corner",
+	"nine_challenge_deaths_margin_x", "nine_challenge_deaths_margin_y",
+	"nine_challenge_deaths_padding_h_px", "nine_challenge_deaths_padding_v_px",
+	"nine_challenge_deaths_font_size_px", "nine_challenge_deaths_font_color",
+	"nine_challenge_deaths_chrome_style", "nine_challenge_deaths_chrome_scale",
+	"starting_soon_visible", "starting_soon_x_px", "starting_soon_y_px", "starting_soon_scale",
 	"summon_march_duration_sec", "summon_march_max_concurrent",
 	"summon_march_lane_y_fraction", "summon_march_lane_y_min_fraction", "summon_march_lane_y_max_fraction",
 	"summon_march_lane_spacing_px", "summon_march_edge_margin_px", "summon_march_mob_fps",
@@ -2173,6 +2948,18 @@ func to_remote_dict() -> Dictionary:
 		"ui": ui,
 		"ui_vertical": vert,
 	}
+
+
+func is_remote_apply_in_progress() -> bool:
+	return _remote_apply_in_progress
+
+
+func begin_remote_apply() -> void:
+	_remote_apply_in_progress = true
+
+
+func end_remote_apply() -> void:
+	_remote_apply_in_progress = false
 
 
 ## Apply a remote settings dict (partial merge). Returns number of top-level keys touched.

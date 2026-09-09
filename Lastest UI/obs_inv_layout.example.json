@@ -1,20 +1,38 @@
 {
   "enabled": true,
-  "obs_ws_url": "ws://127.0.0.1:4455",
-  "source_group": "V - INV HUD GROUP",
+  "obs_ws_url": "ws://127.0.0.1:4456",
+  "source_group": "INGAME - INV",
   "filter_crop": "Crop/Pad",
-  "source_hud": "V - INV HUD",
+  "source_hud": "INGAME - INV",
   "filter_mask": "Image Mask/Blend",
   "crop_top_closed": 683,
-  "crop_top_min": 390,
+  "crop_top_min": 380,
   "crop_top_boost": 0,
   "game_top_at_crop_min": 70,
   "game_top_at_crop_closed": 215,
-  "full_expand_top_max": 85,
+  "full_expand_top_max": 100,
   "full_expand_height_min": 130,
   "short_box_height_max": 85,
   "short_box_crop_add": 250,
   "no_expand_max_height": 100,
   "margin_px": 12,
-  "ui_to_obs_scale": 1.0
+  "ui_to_obs_scale": 1.0,
+  "pin_bottom": true,
+  "scene_name": "",
+  "follow_sources": [
+    {
+      "scene_name": "V01 LIVE - MAIN",
+      "source_name": "CAM CROPPED",
+      "rotation": -90,
+      "closed_x": 1170,
+      "closed_y": 287,
+      "open_x": 772,
+      "open_y": 287,
+      "points": [
+        {"extra": 0, "x": 1170, "y": 287},
+        {"extra": 102, "x": 1113, "y": 287},
+        {"extra": 303, "x": 772, "y": 287}
+      ]
+    }
+  ]
 }

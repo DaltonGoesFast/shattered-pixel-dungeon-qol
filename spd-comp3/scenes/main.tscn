@@ -61,6 +61,20 @@ size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 18
 text = "…"
 
+[node name="OBSRow" type="HBoxContainer" parent="CanvasLayerHUD/HUDStatus/MarginContainer/VBox"]
+layout_mode = 2
+
+[node name="Key" type="Label" parent="CanvasLayerHUD/HUDStatus/MarginContainer/VBox/OBSRow"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "OBS"
+
+[node name="Value" type="Label" parent="CanvasLayerHUD/HUDStatus/MarginContainer/VBox/OBSRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 18
+text = "…"
+
 [node name="UDPRow" type="HBoxContainer" parent="CanvasLayerHUD/HUDStatus/MarginContainer/VBox"]
 layout_mode = 2
 

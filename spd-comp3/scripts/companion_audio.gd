@@ -77,8 +77,8 @@ func play_shatter(force: bool = false) -> void:
 func list_output_devices() -> PackedStringArray:
 	var out := PackedStringArray()
 	out.append(DEFAULT_DEVICE)
-	for name in AudioServer.get_output_device_list():
-		var s := str(name)
+	for device_name in AudioServer.get_output_device_list():
+		var s := str(device_name)
 		if s.is_empty() or s == DEFAULT_DEVICE:
 			continue
 		if not out.has(s):

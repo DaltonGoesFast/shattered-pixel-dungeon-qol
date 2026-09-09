@@ -26,6 +26,12 @@ var paid_notice_zone_width_px: int = 800
 var paid_notice_zone_height_px: int = 220
 var paid_notice_zone_bottom_margin_px: int = 0
 
+var first_words_zone_x_px: int = 560
+var first_words_zone_y_px: int = 320
+var first_words_zone_width_px: int = 800
+var first_words_zone_height_px: int = 160
+var first_words_zone_bottom_margin_px: int = 0
+
 var live_water_bottom_bar_px: int = 200
 var live_water_left_strip_px: int = 420
 var live_water_left_strip_top_px: int = 0
@@ -33,6 +39,13 @@ var live_water_gradient_fade_start: float = 0.73
 var live_water_gradient_fade_end: float = 1.0
 ## Soften top edge of bottom bar / left-strip top (px). 0 = hard cut.
 var live_water_edge_feather_v_px: int = 0
+## Full-width top band height (px). 0 = off.
+var live_water_top_bar_px: int = 0
+## UV.y fade toward black at the top of the screen. start >= end; both 0 = no extra fade.
+var live_water_top_gradient_fade_start: float = 0.0
+var live_water_top_gradient_fade_end: float = 0.0
+## Soften bottom edge of the top bar (px). 0 = hard cut.
+var live_water_top_edge_feather_v_px: int = 0
 
 var spend_indicator_corner: int = 1
 var spend_indicator_margin_x: int = 16
@@ -45,6 +58,15 @@ var free_promos_margin_y: int = 64
 var double_points_corner: int = 1
 var double_points_margin_x: int = 16
 var double_points_margin_y: int = 16
+var nine_challenge_deaths_corner: int = 2
+var nine_challenge_deaths_margin_x: int = 16
+var nine_challenge_deaths_margin_y: int = 16
+var viewer_counts_corner: int = 1
+var viewer_counts_margin_x: int = 16
+var viewer_counts_margin_y: int = 64
+var starting_soon_x_px: int = 722
+var starting_soon_y_px: int = 360
+var starting_soon_scale: float = 4.0
 
 var chrome_boxes: Array = []
 
@@ -55,12 +77,16 @@ var show_chrome_boxes: bool = true
 var show_id_overlay: bool = true
 var show_alerts: bool = true
 var show_paid_notices: bool = true
+var show_first_words: bool = true
 var show_tip_toasts: bool = true
 var show_bestiary: bool = true
 var show_summon_march: bool = true
 var show_spend_indicator: bool = true
 var show_free_promos: bool = true
 var show_double_points: bool = true
+var show_nine_challenge_deaths: bool = true
+var show_viewer_counts: bool = true
+var show_starting_soon: bool = false
 ## Vertical only: hide chat-spend badge while spend_disabled.txt exists.
 var hide_spend_when_off: bool = false
 
@@ -79,11 +105,15 @@ static func element_keys() -> PackedStringArray:
 			"alerts",
 			"tip_toasts",
 			"paid_notices",
+			"first_words",
 			"bestiary",
 			"summon_march",
 			"spend_indicator",
 			"free_promos",
 			"double_points",
+			"nine_challenge_deaths",
+			"viewer_counts",
+			"starting_soon",
 		]
 	)
 
@@ -104,6 +134,8 @@ static func element_label(key: String) -> String:
 			return "Tip toasts"
 		"paid_notices":
 			return "Paid notices"
+		"first_words":
+			return "First words"
 		"bestiary":
 			return "Bestiary"
 		"summon_march":
@@ -114,6 +146,12 @@ static func element_label(key: String) -> String:
 			return "Free promos"
 		"double_points":
 			return "2x points"
+		"nine_challenge_deaths":
+			return "9c deaths"
+		"viewer_counts":
+			return "Viewer counts"
+		"starting_soon":
+			return "Starting soon"
 		_:
 			return key
 
@@ -200,12 +238,21 @@ static func default_vertical() -> UiLayoutData:
 	L.paid_notice_zone_width_px = 800
 	L.paid_notice_zone_height_px = 260
 	L.paid_notice_zone_bottom_margin_px = 0
+	L.first_words_zone_x_px = 140
+	L.first_words_zone_y_px = 700
+	L.first_words_zone_width_px = 800
+	L.first_words_zone_height_px = 180
+	L.first_words_zone_bottom_margin_px = 0
 	L.live_water_bottom_bar_px = 280
 	L.live_water_left_strip_px = 0
 	L.live_water_left_strip_top_px = 0
 	L.live_water_gradient_fade_start = 0.55
 	L.live_water_gradient_fade_end = 1.0
 	L.live_water_edge_feather_v_px = 0
+	L.live_water_top_bar_px = 420
+	L.live_water_top_gradient_fade_start = 0.0
+	L.live_water_top_gradient_fade_end = 0.0
+	L.live_water_top_edge_feather_v_px = 72
 	L.spend_indicator_corner = 1
 	L.spend_indicator_margin_x = 16
 	L.spend_indicator_margin_y = 16
@@ -216,6 +263,16 @@ static func default_vertical() -> UiLayoutData:
 	L.double_points_corner = 1
 	L.double_points_margin_x = 16
 	L.double_points_margin_y = 120
+	L.nine_challenge_deaths_corner = 2
+	L.nine_challenge_deaths_margin_x = 16
+	L.nine_challenge_deaths_margin_y = 16
+	L.viewer_counts_corner = 1
+	L.viewer_counts_margin_x = 16
+	L.viewer_counts_margin_y = 180
+	L.starting_soon_x_px = 332
+	L.starting_soon_y_px = 480
+	L.starting_soon_scale = 3.5
+	L.show_starting_soon = false
 	L.chrome_boxes = []
 	L.scene_show = default_scene_show()
 	return L
@@ -248,12 +305,21 @@ func copy_from(other: UiLayoutData) -> void:
 	paid_notice_zone_width_px = other.paid_notice_zone_width_px
 	paid_notice_zone_height_px = other.paid_notice_zone_height_px
 	paid_notice_zone_bottom_margin_px = other.paid_notice_zone_bottom_margin_px
+	first_words_zone_x_px = other.first_words_zone_x_px
+	first_words_zone_y_px = other.first_words_zone_y_px
+	first_words_zone_width_px = other.first_words_zone_width_px
+	first_words_zone_height_px = other.first_words_zone_height_px
+	first_words_zone_bottom_margin_px = other.first_words_zone_bottom_margin_px
 	live_water_bottom_bar_px = other.live_water_bottom_bar_px
 	live_water_left_strip_px = other.live_water_left_strip_px
 	live_water_left_strip_top_px = other.live_water_left_strip_top_px
 	live_water_gradient_fade_start = other.live_water_gradient_fade_start
 	live_water_gradient_fade_end = other.live_water_gradient_fade_end
 	live_water_edge_feather_v_px = other.live_water_edge_feather_v_px
+	live_water_top_bar_px = other.live_water_top_bar_px
+	live_water_top_gradient_fade_start = other.live_water_top_gradient_fade_start
+	live_water_top_gradient_fade_end = other.live_water_top_gradient_fade_end
+	live_water_top_edge_feather_v_px = other.live_water_top_edge_feather_v_px
 	spend_indicator_corner = other.spend_indicator_corner
 	spend_indicator_margin_x = other.spend_indicator_margin_x
 	spend_indicator_margin_y = other.spend_indicator_margin_y
@@ -263,6 +329,15 @@ func copy_from(other: UiLayoutData) -> void:
 	double_points_corner = other.double_points_corner
 	double_points_margin_x = other.double_points_margin_x
 	double_points_margin_y = other.double_points_margin_y
+	nine_challenge_deaths_corner = other.nine_challenge_deaths_corner
+	nine_challenge_deaths_margin_x = other.nine_challenge_deaths_margin_x
+	nine_challenge_deaths_margin_y = other.nine_challenge_deaths_margin_y
+	viewer_counts_corner = other.viewer_counts_corner
+	viewer_counts_margin_x = other.viewer_counts_margin_x
+	viewer_counts_margin_y = other.viewer_counts_margin_y
+	starting_soon_x_px = other.starting_soon_x_px
+	starting_soon_y_px = other.starting_soon_y_px
+	starting_soon_scale = other.starting_soon_scale
 	chrome_boxes = []
 	for entry in other.chrome_boxes:
 		if typeof(entry) == TYPE_DICTIONARY:
@@ -275,12 +350,16 @@ func copy_from(other: UiLayoutData) -> void:
 	show_id_overlay = other.show_id_overlay
 	show_alerts = other.show_alerts
 	show_paid_notices = other.show_paid_notices
+	show_first_words = other.show_first_words
 	show_tip_toasts = other.show_tip_toasts
 	show_bestiary = other.show_bestiary
 	show_summon_march = other.show_summon_march
 	show_spend_indicator = other.show_spend_indicator
 	show_free_promos = other.show_free_promos
 	show_double_points = other.show_double_points
+	show_nine_challenge_deaths = other.show_nine_challenge_deaths
+	show_viewer_counts = other.show_viewer_counts
+	show_starting_soon = other.show_starting_soon
 	hide_spend_when_off = other.hide_spend_when_off
 	scene_show = {}
 	other.ensure_scene_show()
@@ -320,12 +399,21 @@ func to_remote_dict() -> Dictionary:
 		"paid_notice_zone_width_px": paid_notice_zone_width_px,
 		"paid_notice_zone_height_px": paid_notice_zone_height_px,
 		"paid_notice_zone_bottom_margin_px": paid_notice_zone_bottom_margin_px,
+		"first_words_zone_x_px": first_words_zone_x_px,
+		"first_words_zone_y_px": first_words_zone_y_px,
+		"first_words_zone_width_px": first_words_zone_width_px,
+		"first_words_zone_height_px": first_words_zone_height_px,
+		"first_words_zone_bottom_margin_px": first_words_zone_bottom_margin_px,
 		"live_water_bottom_bar_px": live_water_bottom_bar_px,
 		"live_water_left_strip_px": live_water_left_strip_px,
 		"live_water_left_strip_top_px": live_water_left_strip_top_px,
 		"live_water_gradient_fade_start": live_water_gradient_fade_start,
 		"live_water_gradient_fade_end": live_water_gradient_fade_end,
 		"live_water_edge_feather_v_px": live_water_edge_feather_v_px,
+		"live_water_top_bar_px": live_water_top_bar_px,
+		"live_water_top_gradient_fade_start": live_water_top_gradient_fade_start,
+		"live_water_top_gradient_fade_end": live_water_top_gradient_fade_end,
+		"live_water_top_edge_feather_v_px": live_water_top_edge_feather_v_px,
 		"spend_indicator_corner": spend_indicator_corner,
 		"spend_indicator_margin_x": spend_indicator_margin_x,
 		"spend_indicator_margin_y": spend_indicator_margin_y,
@@ -335,6 +423,15 @@ func to_remote_dict() -> Dictionary:
 		"double_points_corner": double_points_corner,
 		"double_points_margin_x": double_points_margin_x,
 		"double_points_margin_y": double_points_margin_y,
+		"nine_challenge_deaths_corner": nine_challenge_deaths_corner,
+		"nine_challenge_deaths_margin_x": nine_challenge_deaths_margin_x,
+		"nine_challenge_deaths_margin_y": nine_challenge_deaths_margin_y,
+		"viewer_counts_corner": viewer_counts_corner,
+		"viewer_counts_margin_x": viewer_counts_margin_x,
+		"viewer_counts_margin_y": viewer_counts_margin_y,
+		"starting_soon_x_px": starting_soon_x_px,
+		"starting_soon_y_px": starting_soon_y_px,
+		"starting_soon_scale": starting_soon_scale,
 		"chrome_boxes": chrome_boxes.duplicate(true),
 		"show_live_water": show_live_water,
 		"show_title": show_title,
@@ -342,12 +439,16 @@ func to_remote_dict() -> Dictionary:
 		"show_id_overlay": show_id_overlay,
 		"show_alerts": show_alerts,
 		"show_paid_notices": show_paid_notices,
+		"show_first_words": show_first_words,
 		"show_tip_toasts": show_tip_toasts,
 		"show_bestiary": show_bestiary,
 		"show_summon_march": show_summon_march,
 		"show_spend_indicator": show_spend_indicator,
 		"show_free_promos": show_free_promos,
 		"show_double_points": show_double_points,
+		"show_nine_challenge_deaths": show_nine_challenge_deaths,
+		"show_viewer_counts": show_viewer_counts,
+		"show_starting_soon": show_starting_soon,
 		"hide_spend_when_off": hide_spend_when_off,
 		"scene_show": ss,
 	}
@@ -396,6 +497,16 @@ func apply_remote_dict(raw: Dictionary) -> void:
 		paid_notice_zone_height_px = int(raw["paid_notice_zone_height_px"])
 	if raw.has("paid_notice_zone_bottom_margin_px"):
 		paid_notice_zone_bottom_margin_px = int(raw["paid_notice_zone_bottom_margin_px"])
+	if raw.has("first_words_zone_x_px"):
+		first_words_zone_x_px = int(raw["first_words_zone_x_px"])
+	if raw.has("first_words_zone_y_px"):
+		first_words_zone_y_px = int(raw["first_words_zone_y_px"])
+	if raw.has("first_words_zone_width_px"):
+		first_words_zone_width_px = int(raw["first_words_zone_width_px"])
+	if raw.has("first_words_zone_height_px"):
+		first_words_zone_height_px = int(raw["first_words_zone_height_px"])
+	if raw.has("first_words_zone_bottom_margin_px"):
+		first_words_zone_bottom_margin_px = int(raw["first_words_zone_bottom_margin_px"])
 	if raw.has("live_water_bottom_bar_px"):
 		live_water_bottom_bar_px = clampi(int(raw["live_water_bottom_bar_px"]), 0, 8192)
 	if raw.has("live_water_left_strip_px"):
@@ -408,6 +519,16 @@ func apply_remote_dict(raw: Dictionary) -> void:
 		live_water_gradient_fade_end = float(raw["live_water_gradient_fade_end"])
 	if raw.has("live_water_edge_feather_v_px"):
 		live_water_edge_feather_v_px = clampi(int(raw["live_water_edge_feather_v_px"]), 0, 512)
+	if raw.has("live_water_top_bar_px"):
+		live_water_top_bar_px = clampi(int(raw["live_water_top_bar_px"]), 0, 8192)
+	if raw.has("live_water_top_gradient_fade_start"):
+		live_water_top_gradient_fade_start = float(raw["live_water_top_gradient_fade_start"])
+	if raw.has("live_water_top_gradient_fade_end"):
+		live_water_top_gradient_fade_end = float(raw["live_water_top_gradient_fade_end"])
+	if live_water_top_gradient_fade_end > live_water_top_gradient_fade_start:
+		live_water_top_gradient_fade_end = live_water_top_gradient_fade_start
+	if raw.has("live_water_top_edge_feather_v_px"):
+		live_water_top_edge_feather_v_px = clampi(int(raw["live_water_top_edge_feather_v_px"]), 0, 512)
 	if raw.has("spend_indicator_corner"):
 		spend_indicator_corner = clampi(int(raw["spend_indicator_corner"]), 0, 3)
 	if raw.has("spend_indicator_margin_x"):
@@ -426,6 +547,24 @@ func apply_remote_dict(raw: Dictionary) -> void:
 		double_points_margin_x = int(raw["double_points_margin_x"])
 	if raw.has("double_points_margin_y"):
 		double_points_margin_y = int(raw["double_points_margin_y"])
+	if raw.has("nine_challenge_deaths_corner"):
+		nine_challenge_deaths_corner = clampi(int(raw["nine_challenge_deaths_corner"]), 0, 3)
+	if raw.has("nine_challenge_deaths_margin_x"):
+		nine_challenge_deaths_margin_x = int(raw["nine_challenge_deaths_margin_x"])
+	if raw.has("nine_challenge_deaths_margin_y"):
+		nine_challenge_deaths_margin_y = int(raw["nine_challenge_deaths_margin_y"])
+	if raw.has("viewer_counts_corner"):
+		viewer_counts_corner = clampi(int(raw["viewer_counts_corner"]), 0, 3)
+	if raw.has("viewer_counts_margin_x"):
+		viewer_counts_margin_x = int(raw["viewer_counts_margin_x"])
+	if raw.has("viewer_counts_margin_y"):
+		viewer_counts_margin_y = int(raw["viewer_counts_margin_y"])
+	if raw.has("starting_soon_x_px"):
+		starting_soon_x_px = int(raw["starting_soon_x_px"])
+	if raw.has("starting_soon_y_px"):
+		starting_soon_y_px = int(raw["starting_soon_y_px"])
+	if raw.has("starting_soon_scale"):
+		starting_soon_scale = clampf(float(raw["starting_soon_scale"]), 0.25, 12.0)
 	if raw.has("chrome_boxes") and typeof(raw["chrome_boxes"]) == TYPE_ARRAY:
 		chrome_boxes = (raw["chrome_boxes"] as Array).duplicate(true)
 	if raw.has("show_live_water"):
@@ -440,6 +579,8 @@ func apply_remote_dict(raw: Dictionary) -> void:
 		show_alerts = bool(raw["show_alerts"])
 	if raw.has("show_paid_notices"):
 		show_paid_notices = bool(raw["show_paid_notices"])
+	if raw.has("show_first_words"):
+		show_first_words = bool(raw["show_first_words"])
 	if raw.has("show_tip_toasts"):
 		show_tip_toasts = bool(raw["show_tip_toasts"])
 	if raw.has("show_bestiary"):
@@ -452,6 +593,12 @@ func apply_remote_dict(raw: Dictionary) -> void:
 		show_free_promos = bool(raw["show_free_promos"])
 	if raw.has("show_double_points"):
 		show_double_points = bool(raw["show_double_points"])
+	if raw.has("show_nine_challenge_deaths"):
+		show_nine_challenge_deaths = bool(raw["show_nine_challenge_deaths"])
+	if raw.has("show_viewer_counts"):
+		show_viewer_counts = bool(raw["show_viewer_counts"])
+	if raw.has("show_starting_soon"):
+		show_starting_soon = bool(raw["show_starting_soon"])
 	if raw.has("hide_spend_when_off"):
 		hide_spend_when_off = bool(raw["hide_spend_when_off"])
 	if raw.has("scene_show") and typeof(raw["scene_show"]) == TYPE_DICTIONARY:

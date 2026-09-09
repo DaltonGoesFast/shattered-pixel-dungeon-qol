@@ -16,6 +16,10 @@
 [ext_resource type="Script" path="res://scripts/paid_notice_overlay.gd" id="16_paid"]
 [ext_resource type="Script" path="res://scripts/double_points_panel.gd" id="17_double_points"]
 [ext_resource type="Script" path="res://scripts/tip_toast_presenter.gd" id="18_tip"]
+[ext_resource type="Script" path="res://scripts/nine_challenge_deaths_panel.gd" id="19_nine_deaths"]
+[ext_resource type="Script" path="res://scripts/first_words_overlay.gd" id="20_first_words"]
+[ext_resource type="Script" path="res://scripts/viewer_counts_panel.gd" id="21_viewer_counts"]
+[ext_resource type="Script" path="res://scripts/starting_soon_banner.gd" id="22_starting_soon"]
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_alert_toast"]
 texture = ExtResource("6_toast_chrome")
@@ -226,6 +230,66 @@ theme_override_colors/font_color = Color(1, 0.85, 0.2, 1)
 text = "2x points: 0 min"
 autowrap_mode = 0
 
+[node name="CanvasLayerNineChallengeDeaths" type="CanvasLayer" parent="."]
+layer = 6
+
+[node name="NineChallengeDeathsPanel" type="PanelContainer" parent="CanvasLayerNineChallengeDeaths"]
+visible = false
+layout_mode = 1
+anchors_preset = 0
+offset_right = 0.0
+offset_bottom = 0.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxTexture_alert_toast")
+script = ExtResource("19_nine_deaths")
+
+[node name="MarginContainer" type="MarginContainer" parent="CanvasLayerNineChallengeDeaths/NineChallengeDeathsPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 8
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="CanvasLayerNineChallengeDeaths/NineChallengeDeathsPanel/MarginContainer"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_fonts/font = ExtResource("7_font")
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.65)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(1, 0.85, 0.2, 1)
+text = "9c deaths: 1314"
+autowrap_mode = 0
+
+[node name="CanvasLayerViewerCounts" type="CanvasLayer" parent="."]
+layer = 6
+
+[node name="ViewerCountsPanel" type="PanelContainer" parent="CanvasLayerViewerCounts"]
+visible = false
+layout_mode = 1
+anchors_preset = 0
+offset_right = 0.0
+offset_bottom = 0.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxTexture_alert_toast")
+script = ExtResource("21_viewer_counts")
+
+[node name="CanvasLayerStartingSoon" type="CanvasLayer" parent="."]
+layer = 8
+
+[node name="StartingSoonBanner" type="Control" parent="CanvasLayerStartingSoon"]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("22_starting_soon")
+
 [node name="CanvasLayerID" type="CanvasLayer" parent="."]
 layer = 3
 canvas_item_default_texture_filter = 0
@@ -288,6 +352,19 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("16_paid")
+
+[node name="CanvasLayerFirstWords" type="CanvasLayer" parent="."]
+layer = 12
+
+[node name="FirstWordsOverlay" type="Control" parent="CanvasLayerFirstWords"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("20_first_words")
 
 [node name="CanvasLayerTipToasts" type="CanvasLayer" parent="."]
 layer = 9

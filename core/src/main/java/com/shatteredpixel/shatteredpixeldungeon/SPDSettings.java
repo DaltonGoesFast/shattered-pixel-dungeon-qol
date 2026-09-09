@@ -599,6 +599,8 @@ public class SPDSettings extends GameSettings {
 	public static final String KEY_STREAMING_ENABLED = "streaming_enabled";
 	public static final String KEY_STREAMING_PORT    = "streaming_port";
 	public static final String KEY_OBS_CHROMA_MASKS  = "obs_chroma_masks";
+	/** Near-black #0c0c0c so OBS color key can spare true #000000 game pixels. */
+	public static final int OBS_CHROMA_MASK_COLOR = 0xFF0C0C0C;
 	/** Transparent undiscovered dungeon void for OBS composite (desktop; requires restart). */
 	public static final String KEY_TRANSPARENT_VOID  = "transparent_void";
 

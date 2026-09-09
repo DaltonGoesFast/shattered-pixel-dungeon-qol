@@ -1,10 +1,12 @@
-// Streamer.bot inline C# — build + send paid-notice JSON to SPD Companion (UDP port 5100).
+// Streamer.bot inline C# — build + send companion popup JSON (UDP port 5100).
 // Uses CPH.BroadcastUdp only (System.Net / System.Diagnostics are NOT referenced by default).
 // Also writes companion_paid_notice_udp.json + sets companionPaidNoticeJson for a Run Program
 // PowerShell unicast fallback if broadcast does not reach Godot (see apply doc).
 //
 // Optional args (Set Argument before this step):
-//   companionUi        — superchat | gifted_membership | sub | highlight  (default: superchat)
+//   companionUi        — superchat | gifted_membership | sub | highlight | first_words
+//                        | follow | subscriber | youtube_subscriber
+//                        (default: superchat)
 //   companionTtlSec    — hold seconds (default: 6)
 //   companionUdpPort   — default 5100
 // Also reads trigger vars: userName/user, message/msg/comment, amount/amountFormatted,

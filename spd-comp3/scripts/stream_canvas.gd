@@ -16,7 +16,11 @@ const _LIVE_FILL_CHROMA_DEBUG := Color(1.0, 8.0 / 255.0, 147.0 / 255.0, 1.0)
 @onready var _spend_layer: CanvasLayer = $CanvasLayerSpendIndicator
 @onready var _free_layer: CanvasLayer = $CanvasLayerFreePromos
 @onready var _double_points_layer: CanvasLayer = $CanvasLayerDoublePoints
+@onready var _nine_challenge_deaths_layer: CanvasLayer = $CanvasLayerNineChallengeDeaths
+@onready var _viewer_counts_layer: CanvasLayer = $CanvasLayerViewerCounts
+@onready var _starting_soon_layer: CanvasLayer = $CanvasLayerStartingSoon
 @onready var _paid_layer: CanvasLayer = $CanvasLayerPaidNotices
+@onready var _first_words_layer: CanvasLayer = $CanvasLayerFirstWords
 @onready var _alerts_layer: CanvasLayer = $CanvasLayerAlerts
 @onready var _tip_toasts_layer: CanvasLayer = $CanvasLayerTipToasts
 @onready var _id_overlay: Control = $CanvasLayerID/IdentificationOverlay
@@ -40,6 +44,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	CompanionConfig.settings_loaded.connect(_on_settings_changed)
 	CompanionConfig.settings_saved.connect(_on_settings_changed)
+	CompanionConfig.preview_visibility_changed.connect(_on_settings_changed)
 	_obs = get_node_or_null("/root/ObsWebSocketClient")
 	if _obs:
 		if _obs.has_signal("program_scene_kind_changed"):
@@ -112,9 +117,19 @@ func _apply_obs_visibility() -> void:
 	var show_alerts := CompanionConfig.element_visible_on_scene(self, "alerts", kind)
 	var show_tips := CompanionConfig.element_visible_on_scene(self, "tip_toasts", kind)
 	var show_paid := CompanionConfig.element_visible_on_scene(self, "paid_notices", kind)
+	var show_first_words := CompanionConfig.element_visible_on_scene(self, "first_words", kind)
 	var show_spend := CompanionConfig.element_visible_on_scene(self, "spend_indicator", kind)
 	var show_free := CompanionConfig.element_visible_on_scene(self, "free_promos", kind)
 	var show_double := CompanionConfig.element_visible_on_scene(self, "double_points", kind)
+	var show_nine_deaths := CompanionConfig.element_visible_on_scene(
+		self, "nine_challenge_deaths", kind
+	)
+	var show_viewer_counts := CompanionConfig.element_visible_on_scene(
+		self, "viewer_counts", kind
+	)
+	var show_starting_soon := CompanionConfig.element_visible_on_scene(
+		self, "starting_soon", kind
+	)
 
 	if not _obs_scene_known:
 		# Match prior disconnect: title on (if enabled), live water off, overlays follow gates with unknown→any.
@@ -126,9 +141,13 @@ func _apply_obs_visibility() -> void:
 		show_alerts = CompanionConfig.element_enabled(self, "alerts")
 		show_tips = CompanionConfig.element_enabled(self, "tip_toasts")
 		show_paid = CompanionConfig.element_enabled(self, "paid_notices")
+		show_first_words = CompanionConfig.element_enabled(self, "first_words")
 		show_spend = CompanionConfig.element_enabled(self, "spend_indicator")
 		show_free = CompanionConfig.element_enabled(self, "free_promos")
 		show_double = CompanionConfig.element_enabled(self, "double_points")
+		show_nine_deaths = CompanionConfig.element_enabled(self, "nine_challenge_deaths")
+		show_viewer_counts = CompanionConfig.element_enabled(self, "viewer_counts")
+		show_starting_soon = CompanionConfig.element_enabled(self, "starting_soon")
 		show_title = CompanionConfig.element_enabled(self, "title")
 
 	_title_backdrop.visible = show_title
@@ -140,9 +159,13 @@ func _apply_obs_visibility() -> void:
 	_alerts_layer.visible = show_alerts
 	_tip_toasts_layer.visible = show_tips
 	_paid_layer.visible = show_paid
+	_first_words_layer.visible = show_first_words
 	_spend_layer.visible = show_spend
 	_free_layer.visible = show_free
 	_double_points_layer.visible = show_double
+	_nine_challenge_deaths_layer.visible = show_nine_deaths
+	_viewer_counts_layer.visible = show_viewer_counts
+	_starting_soon_layer.visible = show_starting_soon
 	_sync_live_chroma_overlay()
 	if show_id and _id_overlay and _id_overlay.has_method("sync_visibility_after_obs"):
 		_id_overlay.sync_visibility_after_obs()

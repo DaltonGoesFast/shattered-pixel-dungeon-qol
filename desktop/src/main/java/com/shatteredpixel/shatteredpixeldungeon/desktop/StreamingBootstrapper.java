@@ -21,6 +21,7 @@ import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingUI;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -43,10 +44,20 @@ public final class StreamingBootstrapper {
 			try {
 				server.start();
 				System.out.println("[Streaming] WebSocket server started on ws://127.0.0.1:" + port);
-				StreamingUI.setListener( layout -> {
-					StreamingServer s = serverRef.get();
-					if ( s != null ) {
-						s.broadcastUILayout( layout );
+				StreamingUI.setListener( new StreamingUI.Listener() {
+					@Override
+					public void onItemInfoLayout( Map<String, Object> layout ) {
+						StreamingServer s = serverRef.get();
+						if ( s != null ) {
+							s.broadcastUILayout( layout );
+						}
+					}
+					@Override
+					public void onUIState( String scene, List<String> openWindows ) {
+						StreamingServer s = serverRef.get();
+						if ( s != null ) {
+							s.broadcastUIState( scene, openWindows );
+						}
 					}
 				} );
 			} catch (Exception e) {

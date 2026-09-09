@@ -72,6 +72,7 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.ScrollPane;
 import com.shatteredpixel.shatteredpixeldungeon.ui.ScrollingGridPane;
 import com.shatteredpixel.shatteredpixeldungeon.ui.ScrollingListPane;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingUI;
 import com.watabou.input.KeyBindings;
 import com.watabou.input.KeyEvent;
 import com.watabou.noosa.BitmapText;
@@ -107,7 +108,7 @@ public class WndJournal extends WndTabbed {
 
 	/** Used by streaming/overlay to detect if the journal window is open. */
 	public static boolean isOpen() {
-		return INSTANCE != null;
+		return INSTANCE != null && INSTANCE.parent != null;
 	}
 	
 	public WndJournal(){
@@ -217,6 +218,7 @@ public class WndJournal extends WndTabbed {
 		select(last_index);
 
 		INSTANCE = this;
+		StreamingUI.notifyUIState();
 	}
 
 	@Override
@@ -225,6 +227,7 @@ public class WndJournal extends WndTabbed {
 		if (INSTANCE == this) {
 			INSTANCE = null;
 		}
+		StreamingUI.notifyUIState();
 	}
 
 	@Override

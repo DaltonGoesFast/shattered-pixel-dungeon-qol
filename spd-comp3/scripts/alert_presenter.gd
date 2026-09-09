@@ -23,6 +23,10 @@ const _SpdUi := preload("res://scripts/spd_ui_art.gd")
 
 var _queue: Array[Dictionary] = []
 var _busy: bool = false
+var _preview_pinned: bool = false
+var _preview_sample: Dictionary = {}
+var _playback_generation: int = 0
+var _active_tween: Tween
 ## Emitted when command-toast busy state changes (tip toasts yield while true).
 signal busy_changed(busy: bool)
 ## { "request_id", "username", "headline_hint", "command", "monster_hint", "scroll_hint", "slot", "amount", "msec" }
@@ -89,6 +93,8 @@ func _on_settings_saved() -> void:
 	_apply_text_alignment()
 	_apply_alert_font_sizes()
 	_apply_command_icon_sizes()
+	if _preview_pinned:
+		_render_item(_preview_sample)
 
 
 func is_busy() -> bool:
@@ -807,19 +813,67 @@ func _enqueue(item: Dictionary) -> void:
 	while _queue.size() >= cap:
 		_queue.pop_front()
 	_queue.append(item)
-	if not _busy:
+	if not _busy and not _preview_pinned:
 		_play_next()
 	else:
 		busy_changed.emit(true)
 
 
-func _play_next() -> void:
-	if _queue.is_empty():
-		_set_busy(false)
-		_hide_panel()
+func show_preview(sample: Dictionary, pinned: bool) -> void:
+	var item := sample.duplicate(true)
+	if not item.has("headline"):
+		item["headline"] = "spawn: rat"
+	if not item.has("subtitle"):
+		item["subtitle"] = "PreviewUser — layout preview"
+	if not item.has("kind"):
+		item["kind"] = "pending"
+	if not item.has("mob_idle_frames"):
+		var monster := str(item.get("monster_hint", "rat")).strip_edges()
+		item["mob_idle_frames"] = _MobArt.idle_frames_for_monster_label(monster)
+		var frames: Array = item["mob_idle_frames"]
+		if not frames.is_empty():
+			item["command_icon_item"] = frames[0]
+	if not pinned:
+		if _preview_pinned:
+			clear_preview()
+		_queue.push_front(item)
+		if not _busy:
+			_play_next()
 		return
+	_cancel_playback()
+	_preview_pinned = true
+	_preview_sample = item
 	_set_busy(true)
-	var item: Dictionary = _queue.pop_front()
+	_render_item(_preview_sample)
+
+
+func clear_preview() -> void:
+	_cancel_playback()
+	_preview_pinned = false
+	_preview_sample.clear()
+	_set_busy(false)
+	_hide_panel()
+	if not _queue.is_empty():
+		_play_next()
+
+
+func is_preview_pinned() -> bool:
+	return _preview_pinned
+
+
+func _cancel_playback() -> void:
+	_playback_generation += 1
+	if _active_tween and _active_tween.is_valid():
+		_active_tween.kill()
+	_active_tween = null
+
+
+func _render_item(item: Dictionary) -> void:
+	_apply_alert_chrome()
+	_apply_alert_padding()
+	_apply_alert_layout()
+	_apply_text_alignment()
+	_apply_alert_font_sizes()
 	_apply_mob_frames_from_item(item)
 	_title.text = str(item.get("headline", ""))
 	_subtitle.text = str(item.get("subtitle", ""))
@@ -831,32 +885,42 @@ func _play_next() -> void:
 		var legacy: Texture2D = item.get("command_icon", null) as Texture2D
 		if legacy != null:
 			tex_i = legacy
-	if tex_r != null:
-		_icon_rune.texture = tex_r
-		_icon_rune.visible = true
-	else:
-		_icon_rune.texture = null
-		_icon_rune.visible = false
-	if tex_i != null:
-		_icon_item.texture = tex_i
-		_icon_item.visible = true
-	else:
-		_icon_item.texture = null
-		_icon_item.visible = false
-
-	if _mob_idle_frames.size() > 0:
+	_icon_rune.texture = tex_r
+	_icon_rune.visible = tex_r != null
+	_icon_item.texture = tex_i
+	_icon_item.visible = tex_i != null
+	if not _mob_idle_frames.is_empty():
 		_active_command_icon_layout = "mob"
 	elif tex_r != null or tex_i != null:
 		_active_command_icon_layout = "scroll"
 	else:
 		_active_command_icon_layout = "none"
-
 	if _active_command_icon_layout != "none":
 		_apply_command_icon_sizes()
-
 	_icons_row.visible = _active_command_icon_layout != "none"
 	_fit_toast_to_content()
+	call_deferred("_fit_toast_to_content")
+	_panel.pivot_offset = _panel.size * 0.5
+	_row.pivot_offset = _row.size * 0.5
+	_row.scale = Vector2.ONE
+	_row.modulate.a = 1.0
+
+
+func _play_next() -> void:
+	if _preview_pinned:
+		return
+	if _queue.is_empty():
+		_set_busy(false)
+		_hide_panel()
+		return
+	_set_busy(true)
+	var generation := _playback_generation
+	var item: Dictionary = _queue.pop_front()
+	_render_item(item)
+	_row.modulate.a = 0.0
 	await get_tree().process_frame
+	if generation != _playback_generation:
+		return
 	_fit_toast_to_content()
 	_panel.pivot_offset = _panel.size * 0.5
 	_row.pivot_offset = _row.size * 0.5
@@ -870,15 +934,22 @@ func _play_next() -> void:
 		hold += 0.75
 	elif kind == "error":
 		hold = maxf(0.0, hold * 0.65)
-	var tween := create_tween().set_parallel(true)
-	tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tween.tween_property(_row, "modulate:a", 1.0, fade_in).from(0.0)
-	tween.tween_property(_row, "scale", Vector2.ONE, fade_in).from(Vector2(0.92, 0.92))
-	await tween.finished
+	_active_tween = create_tween().set_parallel(true)
+	_active_tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_active_tween.tween_property(_row, "modulate:a", 1.0, fade_in).from(0.0)
+	_active_tween.tween_property(_row, "scale", Vector2.ONE, fade_in).from(Vector2(0.92, 0.92))
+	await _active_tween.finished
+	if generation != _playback_generation:
+		return
 	await get_tree().create_timer(hold).timeout
-	var out := create_tween()
-	out.tween_property(_row, "modulate:a", 0.0, fade_out)
-	await out.finished
+	if generation != _playback_generation:
+		return
+	_active_tween = create_tween()
+	_active_tween.tween_property(_row, "modulate:a", 0.0, fade_out)
+	await _active_tween.finished
+	if generation != _playback_generation:
+		return
+	_active_tween = null
 	_play_next()
 
 

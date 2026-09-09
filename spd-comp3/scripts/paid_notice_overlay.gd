@@ -22,6 +22,10 @@ var _body_label: Label
 
 var _queue: Array[Dictionary] = []
 var _busy: bool = false
+var _preview_pinned: bool = false
+var _preview_sample: Dictionary = {}
+var _playback_generation: int = 0
+var _active_tween: Tween
 var _obs_scene_known: bool = false
 var _scene_kind: StringName = CompanionConfig.SCENE_UNKNOWN
 
@@ -33,6 +37,7 @@ func _ready() -> void:
 	StreamerBotUdp.ui_event.connect(_on_ui_event)
 	CompanionConfig.settings_saved.connect(_on_cfg)
 	CompanionConfig.settings_loaded.connect(_on_cfg)
+	CompanionConfig.preview_visibility_changed.connect(_update_layer_visibility)
 	get_viewport().size_changed.connect(_apply_layout)
 	var obs := get_node_or_null("/root/ObsWebSocketClient")
 	if obs:
@@ -94,6 +99,8 @@ func _on_cfg() -> void:
 	_apply_fonts()
 	_apply_layout()
 	_update_layer_visibility()
+	if _preview_pinned:
+		_render_item(_preview_sample)
 
 
 func _on_obs_scene_kind(kind: StringName) -> void:
@@ -220,7 +227,7 @@ func _on_ui_event(data: Dictionary) -> void:
 	while _queue.size() >= cap:
 		_queue.pop_front()
 	_queue.append(item)
-	if not _busy:
+	if not _busy and not _preview_pinned:
 		_play_next()
 
 
@@ -371,12 +378,67 @@ func _kind_banner(kind: String) -> String:
 			return "NOTICE"
 
 
+func show_preview(sample: Dictionary, pinned: bool) -> void:
+	var kind := _normalize_kind(sample)
+	var item := _build_item(KIND_SUPERCHAT if kind.is_empty() else kind, sample)
+	if not pinned:
+		if _preview_pinned:
+			clear_preview()
+		_queue.push_front(item)
+		if not _busy:
+			_play_next()
+		return
+	_cancel_playback()
+	_preview_pinned = true
+	_preview_sample = item
+	_busy = true
+	_render_item(_preview_sample)
+
+
+func clear_preview() -> void:
+	_cancel_playback()
+	_preview_pinned = false
+	_preview_sample.clear()
+	_busy = false
+	_hide()
+	if not _queue.is_empty():
+		_play_next()
+
+
+func is_preview_pinned() -> bool:
+	return _preview_pinned
+
+
+func _cancel_playback() -> void:
+	_playback_generation += 1
+	if _active_tween and _active_tween.is_valid():
+		_active_tween.kill()
+	_active_tween = null
+
+
+func _render_item(item: Dictionary) -> void:
+	_apply_layout()
+	_apply_chrome()
+	_apply_padding()
+	_apply_fonts()
+	_kind_label.text = str(item.get("kind_title", "SUPER CHAT"))
+	_title_label.text = str(item.get("title", "PreviewUser — Super Chat $5.00"))
+	_body_label.text = str(item.get("body", "Layout preview message"))
+	_body_label.visible = not _body_label.text.is_empty()
+	_row.scale = Vector2.ONE
+	_row.modulate.a = 1.0
+	_row.pivot_offset = Vector2(roundf(_row.size.x * 0.5), roundf(_row.size.y * 0.5))
+
+
 func _play_next() -> void:
+	if _preview_pinned:
+		return
 	if _queue.is_empty():
 		_busy = false
 		_hide()
 		return
 	_busy = true
+	var generation := _playback_generation
 	_apply_layout()
 	_apply_chrome()
 	_apply_padding()
@@ -387,25 +449,34 @@ func _play_next() -> void:
 	_body_label.text = str(item.get("body", ""))
 	_body_label.visible = not _body_label.text.is_empty()
 	await get_tree().process_frame
+	if generation != _playback_generation:
+		return
 	_row.scale = Vector2.ONE
 	_row.pivot_offset = Vector2(roundf(_row.size.x * 0.5), roundf(_row.size.y * 0.5))
 	var fade_in := maxf(0.05, CompanionConfig.paid_notice_fade_in_sec)
 	var hold := maxf(0.5, float(item.get("ttl", CompanionConfig.paid_notice_default_ttl_sec)))
 	var fade_out := maxf(0.05, CompanionConfig.paid_notice_fade_out_sec)
-	var tween := create_tween().set_parallel(true)
-	tween.tween_property(_row, "modulate:a", 1.0, fade_in).from(0.0).set_trans(
+	_active_tween = create_tween().set_parallel(true)
+	_active_tween.tween_property(_row, "modulate:a", 1.0, fade_in).from(0.0).set_trans(
 		Tween.TRANS_SINE
 	).set_ease(Tween.EASE_OUT)
 	if CompanionConfig.paid_notice_pop_scale:
-		tween.tween_property(_row, "scale", Vector2.ONE, fade_in).from(Vector2(0.94, 0.94)).set_trans(
+		_active_tween.tween_property(_row, "scale", Vector2.ONE, fade_in).from(Vector2(0.94, 0.94)).set_trans(
 			Tween.TRANS_BACK
 		).set_ease(Tween.EASE_OUT)
-	await tween.finished
+	await _active_tween.finished
+	if generation != _playback_generation:
+		return
 	_row.scale = Vector2.ONE
 	await get_tree().create_timer(hold).timeout
-	var out := create_tween()
-	out.tween_property(_row, "modulate:a", 0.0, fade_out)
-	await out.finished
+	if generation != _playback_generation:
+		return
+	_active_tween = create_tween()
+	_active_tween.tween_property(_row, "modulate:a", 0.0, fade_out)
+	await _active_tween.finished
+	if generation != _playback_generation:
+		return
+	_active_tween = null
 	_play_next()
 
 

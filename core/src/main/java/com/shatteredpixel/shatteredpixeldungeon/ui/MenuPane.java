@@ -51,7 +51,7 @@ import com.watabou.utils.DeviceCompat;
 public class MenuPane extends Component {
 
 	private Image bg;
-	/** Solid black box behind depth/challenges for OBS chroma-key masking */
+	/** Near-black #0c0c0c box behind depth/challenges for OBS chroma-key masking */
 	private ColorBlock obsMaskDepthChallenges;
 
 	private Image depthIcon;
@@ -79,7 +79,7 @@ public class MenuPane extends Component {
 		bg = new Image(Assets.Interfaces.MENU, 1, 0, 31, 21);
 		add(bg);
 
-		obsMaskDepthChallenges = new ColorBlock(1, 1, 0xFF000000);
+		obsMaskDepthChallenges = new ColorBlock(1, 1, SPDSettings.OBS_CHROMA_MASK_COLOR);
 		add(obsMaskDepthChallenges);
 
 		versionOverflowBG = new NinePatch(bg.texture, 1, 22, 6, 8, 3, 0, 2, 0);
@@ -208,7 +208,7 @@ public class MenuPane extends Component {
 			challengeButton.setRect(challengeIcon.x, challengeIcon.y, challengeIcon.width(), challengeIcon.height() + challengeText.height());
 		}
 
-		// OBS mask: solid black behind depth/challenges for chroma-key
+		// OBS mask: #0c0c0c behind depth/challenges for chroma-key
 		float maskLeft = (challengeIcon != null) ? challengeIcon.x - 1 : depthIcon.x - 1;
 		float maskRight = btnJournal.left() + 1;
 		float maskBottom = depthIcon.y + depthIcon.height() + depthText.height() + 1;

@@ -1,0 +1,86 @@
+{
+  "enabled": true,
+  "obs_ws_url": "ws://127.0.0.1:4456",
+  "actions": [
+    {
+      "enabled": true,
+      "scene_name": "V01 LIVE - MAIN",
+      "source_name": "INGAME - INV",
+      "scene_item_id": null,
+      "when": {
+        "scenes": [
+          "alchemy"
+        ],
+        "windows": []
+      },
+      "then": {
+        "visible": false
+      }
+    },
+    {
+      "enabled": true,
+      "scene_name": "V01 LIVE - MAIN",
+      "source_name": "INGAME - GAME",
+      "scene_item_id": null,
+      "when": {
+        "scenes": [
+          "alchemy"
+        ],
+        "windows": []
+      },
+      "then": {
+        "visible": false
+      }
+    },
+    {
+      "enabled": true,
+      "scene_name": "V01 LIVE - MAIN",
+      "source_name": "INGAME - ALCHEMY",
+      "scene_item_id": null,
+      "when": {
+        "scenes": [
+          "alchemy"
+        ],
+        "windows": []
+      },
+      "then": {
+        "visible": true
+      }
+    },
+    {
+      "enabled": true,
+      "scene_name": "V01 LIVE - MAIN",
+      "source_name": "INGAME - CHAL",
+      "scene_item_id": null,
+      "when": {
+        "scenes": [
+          "alchemy"
+        ],
+        "windows": []
+      },
+      "then": {
+        "visible": false
+      }
+    },
+    {
+      "enabled": true,
+      "scene_name": "V01 LIVE - MAIN",
+      "source_name": "INGAME - GAME",
+      "scene_item_id": null,
+      "when": {
+        "scenes": [],
+        "windows": [
+          "journal"
+        ]
+      },
+      "then": {
+        "filters": [
+          {
+            "name": "Image Mask/Blend",
+            "enabled": false
+          }
+        ]
+      }
+    }
+  ]
+}

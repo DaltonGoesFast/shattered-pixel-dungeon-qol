@@ -21,6 +21,8 @@ import com.shatteredpixel.shatteredpixeldungeon.utils.GameStateSnapshot;
 import org.java_websocket.server.WebSocketServer;
 
 import java.net.InetSocketAddress;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -79,6 +81,21 @@ public class StreamingServer extends WebSocketServer {
 		broadcast( obj.toString() );
 	}
 
+	/** Immediate scene + open_windows for OBS visibility (no geometry). */
+	public void broadcastUIState( String scene, List<String> openWindows ) {
+		broadcast( uiStateJson( scene, openWindows ) );
+	}
+
+	static String uiStateJson( String scene, List<String> openWindows ) {
+		JsonObject obj = new JsonObject();
+		obj.addProperty( "type", "ui_state" );
+		obj.addProperty( "source", "shattered-pixel-dungeon" );
+		obj.addProperty( "scene", scene != null ? scene : "unknown" );
+		obj.add( "open_windows", GSON.toJsonTree(
+				openWindows != null ? openWindows : Collections.emptyList() ) );
+		return obj.toString();
+	}
+
 	/** Echo chatter name on command results so read-only clients (e.g. Godot) don’t rely only on UDP pairing. */
 	private void addChatter(JsonObject resp, String chatter) {
 		if (chatter != null && !chatter.isEmpty()) {
@@ -95,6 +112,9 @@ public class StreamingServer extends WebSocketServer {
 					Map<String, Object> snapshot = GameStateSnapshot.build();
 					String json = GSON.toJson(snapshot);
 					if (json != null && !json.isEmpty()) conn.send(json);
+					conn.send( uiStateJson(
+							GameStateSnapshot.currentSceneId(),
+							GameStateSnapshot.currentOpenWindows() ) );
 				} catch (Throwable t) {
 					String json = lastPayload.get();
 					if (json != null && !json.isEmpty()) conn.send(json);

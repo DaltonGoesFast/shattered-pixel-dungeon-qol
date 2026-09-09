@@ -3,8 +3,10 @@ extends Node
 ## Listens for UTF-8 JSON datagrams from Streamer.bot (Send UDP).
 
 signal command_attempt(data: Dictionary)
-## Overlay / HUD events (superchat, sub, highlight, …). Payload must include a string [code]ui[/code] field.
+## Overlay / HUD events (superchat, sub, first words, …). Payload includes [code]ui[/code] or [code]kind[/code].
 signal ui_event(data: Dictionary)
+## Stream Deck / Streamer.bot requests to show, hide, or toggle companion elements.
+signal control_event(data: Dictionary)
 
 var _udp: PacketPeerUDP
 var _bound_port: int = -1
@@ -12,6 +14,7 @@ var _bound_port: int = -1
 
 func _ready() -> void:
 	_udp = PacketPeerUDP.new()
+	control_event.connect(CompanionConfig.apply_control_event)
 	CompanionConfig.settings_saved.connect(rebind)
 	rebind()
 
@@ -35,16 +38,27 @@ func _physics_process(_delta: float) -> void:
 		var data = json.data
 		if data is Dictionary:
 			var d: Dictionary = data
-			if _is_ui_event(d):
-				print("StreamerBotUdp: ui_event ui=%s" % str(d.get("ui", "")))
+			if _is_control_event(d):
+				control_event.emit(d)
+			elif _is_ui_event(d):
+				print(
+					"StreamerBotUdp: ui_event kind=%s"
+					% str(d.get("ui", d.get("kind", "")))
+				)
 				ui_event.emit(d)
 			else:
 				command_attempt.emit(d)
 
 
+func _is_control_event(data: Dictionary) -> bool:
+	var kind := str(data.get("ui", data.get("kind", ""))).strip_edges().to_lower()
+	return kind == "control"
+
+
 func _is_ui_event(data: Dictionary) -> bool:
 	var ui := str(data.get("ui", "")).strip_edges()
-	return not ui.is_empty()
+	var kind := str(data.get("kind", "")).strip_edges()
+	return not ui.is_empty() or not kind.is_empty()
 
 
 func _bind_udp() -> void:

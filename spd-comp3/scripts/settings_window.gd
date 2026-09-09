@@ -48,6 +48,46 @@ var _dp_fs: SpinBox
 var _dp_color: ColorPickerButton
 var _dp_chrome_style: OptionButton
 var _dp_chrome_scale: SpinBox
+var _nine_vis: CheckBox
+var _nine_poll: SpinBox
+var _nine_corner: OptionButton
+var _nine_mx: SpinBox
+var _nine_my: SpinBox
+var _nine_pad_h: SpinBox
+var _nine_pad_v: SpinBox
+var _nine_fs: SpinBox
+var _nine_color: ColorPickerButton
+var _nine_chrome_style: OptionButton
+var _nine_chrome_scale: SpinBox
+var _soon_vis: CheckBox
+var _soon_x: SpinBox
+var _soon_y: SpinBox
+var _soon_scale: SpinBox
+var _vc_vis: CheckBox
+var _vc_twitch: CheckBox
+var _vc_youtube: CheckBox
+var _vc_tiktok: CheckBox
+var _vc_layout: OptionButton
+var _vc_icons: CheckBox
+var _vc_corner: OptionButton
+var _vc_mx: SpinBox
+var _vc_my: SpinBox
+var _vc_pad_h: SpinBox
+var _vc_pad_v: SpinBox
+var _vc_fs: SpinBox
+var _vc_color: ColorPickerButton
+var _vc_chrome_style: OptionButton
+var _vc_chrome_scale: SpinBox
+var _vc_tw_poll: SpinBox
+var _vc_tw_id: LineEdit
+var _vc_tw_secret: LineEdit
+var _vc_tw_channel: LineEdit
+var _vc_yt_poll: SpinBox
+var _vc_yt_search: SpinBox
+var _vc_yt_key: LineEdit
+var _vc_yt_channel: LineEdit
+var _vc_tt_poll: SpinBox
+var _vc_caster_url: LineEdit
 var _sm_on: CheckBox
 var _sm_url: LineEdit
 var _sm_poll: SpinBox
@@ -145,6 +185,10 @@ var _lw_left_top: SpinBox
 var _lw_grad_start: SpinBox
 var _lw_grad_end: SpinBox
 var _lw_feather_v: SpinBox
+var _lw_top: SpinBox
+var _lw_top_grad_start: SpinBox
+var _lw_top_grad_end: SpinBox
+var _lw_top_feather_v: SpinBox
 
 var _pending_udp: CheckBox
 var _hud_status_panel: CheckBox
@@ -181,6 +225,8 @@ var _custom_alerts_editor_host: VBoxContainer
 var _custom_alerts_count_label: Label
 var _custom_alerts_selected_index: int = 0
 var _custom_alerts_editor: Dictionary = {}
+var _alert_preview_pin: CheckBox
+var _tip_preview_pin: CheckBox
 var _paid_on: CheckBox
 var _paid_qmax: SpinBox
 var _paid_ttl: SpinBox
@@ -209,6 +255,30 @@ var _paid_superchat: CheckBox
 var _paid_gifted: CheckBox
 var _paid_sub: CheckBox
 var _paid_highlight: CheckBox
+var _paid_preview_kind: OptionButton
+var _paid_preview_pin: CheckBox
+
+var _first_words_on: CheckBox
+var _first_words_qmax: SpinBox
+var _first_words_ttl: SpinBox
+var _first_words_fade_in: SpinBox
+var _first_words_fade_out: SpinBox
+var _first_words_zx: SpinBox
+var _first_words_zy: SpinBox
+var _first_words_zw: SpinBox
+var _first_words_zh: SpinBox
+var _first_words_zbm: SpinBox
+var _first_words_chrome_style: OptionButton
+var _first_words_chrome_scale: SpinBox
+var _first_words_font_size: SpinBox
+var _first_words_font_color: ColorPickerButton
+var _first_words_shadow: CheckBox
+var _first_words_pad_h: SpinBox
+var _first_words_pad_v: SpinBox
+var _first_words_align: OptionButton
+var _first_words_pop_scale: CheckBox
+var _first_words_preview_kind: OptionButton
+var _first_words_preview_pin: CheckBox
 
 var _id_on: CheckBox
 var _iz_x: SpinBox
@@ -227,6 +297,7 @@ var _icon_cell_bg: ColorPickerButton
 var _nav: ItemList
 var _page_host: Control
 var _pages: Array = []
+var _preview_test_tokens: Dictionary = {}
 ## Draft list edited in Settings before Apply (Array of Dictionary).
 var _chrome_draft: Array = []
 ## Active chrome box editor widgets (0–1 entries).
@@ -252,12 +323,19 @@ var _vert_show_id: CheckBox
 var _vert_show_alerts: CheckBox
 var _vert_show_tips: CheckBox
 var _vert_show_paid: CheckBox
+var _vert_show_first_words: CheckBox
 var _vert_show_bestiary: CheckBox
 var _vert_show_march: CheckBox
 var _vert_show_spend: CheckBox
 var _vert_hide_spend_off: CheckBox
 var _vert_show_free: CheckBox
 var _vert_show_double: CheckBox
+var _vert_show_nine: CheckBox
+var _vert_show_viewers: CheckBox
+var _vert_show_soon: CheckBox
+var _vsoon_x: SpinBox
+var _vsoon_y: SpinBox
+var _vsoon_scale: SpinBox
 var _vaz_x: SpinBox
 var _vaz_y: SpinBox
 var _vaz_w: SpinBox
@@ -278,12 +356,21 @@ var _vpz_y: SpinBox
 var _vpz_w: SpinBox
 var _vpz_h: SpinBox
 var _vpz_bm: SpinBox
+var _vfwz_x: SpinBox
+var _vfwz_y: SpinBox
+var _vfwz_w: SpinBox
+var _vfwz_h: SpinBox
+var _vfwz_bm: SpinBox
 var _vlw_bottom: SpinBox
 var _vlw_left: SpinBox
 var _vlw_left_top: SpinBox
 var _vlw_grad_start: SpinBox
 var _vlw_grad_end: SpinBox
 var _vlw_feather_v: SpinBox
+var _vlw_top: SpinBox
+var _vlw_top_grad_start: SpinBox
+var _vlw_top_grad_end: SpinBox
+var _vlw_top_feather_v: SpinBox
 var _vspend_corner: OptionButton
 var _vspend_mx: SpinBox
 var _vspend_my: SpinBox
@@ -293,6 +380,12 @@ var _vfree_my: SpinBox
 var _vdp_corner: OptionButton
 var _vdp_mx: SpinBox
 var _vdp_my: SpinBox
+var _vnine_corner: OptionButton
+var _vnine_mx: SpinBox
+var _vnine_my: SpinBox
+var _vviewers_corner: OptionButton
+var _vviewers_mx: SpinBox
+var _vviewers_my: SpinBox
 
 
 func _ready() -> void:
@@ -544,6 +637,147 @@ func _build_ui() -> void:
 			["Font color", _dp_color],
 			["Chrome style", _dp_chrome_style],
 			["Chrome scale (border)", _dp_chrome_scale],
+		]
+	)
+	_nine_vis = CheckBox.new()
+	_nine_poll = _spin_f(0.5, 120.0, 0.5)
+	_nine_corner = _opt(PackedStringArray(["Top-left", "Top-right", "Bottom-left", "Bottom-right"]))
+	_nine_mx = _spin_i(0, 4000)
+	_nine_my = _spin_i(0, 4000)
+	_nine_pad_h = _spin_i(0, 64)
+	_nine_pad_v = _spin_i(0, 64)
+	_nine_fs = _spin_i(8, 48)
+	_nine_color = _color_picker()
+	_nine_chrome_style = _opt(PackedStringArray(_SpdUiArt.CHROME_STYLE_LABELS))
+	_nine_chrome_scale = _spin_f(0.5, 4.0, 0.05)
+	_add_section_header(free_sc, "9-challenge deaths")
+	_add_rows(
+		free_sc,
+		[
+			["Always show career count", _nine_vis],
+			["Poll interval (sec)", _nine_poll],
+			["Panel corner", _nine_corner],
+			["Margin X (px)", _nine_mx],
+			["Margin Y (px)", _nine_my],
+			["Padding horizontal (px)", _nine_pad_h],
+			["Padding vertical (px)", _nine_pad_v],
+			["Font size (px)", _nine_fs],
+			["Font color", _nine_color],
+			["Chrome style", _nine_chrome_style],
+			["Chrome scale (border)", _nine_chrome_scale],
+		]
+	)
+
+	var soon_sc := _make_scroll_vbox()
+	_add_settings_page("Starting soon", soon_sc)
+	_soon_vis = CheckBox.new()
+	_soon_x = _spin_i(-2000, 4000)
+	_soon_y = _spin_i(-2000, 4000)
+	_soon_scale = _spin_f(0.25, 12.0, 0.05)
+	var soon_note := _section_note()
+	soon_note.text = (
+		"soon.png + pulsing soonglow, with title flames on each side. "
+		+ "X/Y is the top-left of the banner. Stream Deck uses C06 target starting_soon."
+	)
+	soon_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	(soon_sc.get_node("InnerVBox") as VBoxContainer).add_child(soon_note)
+	_add_section_header(soon_sc, "Starting soon banner")
+	_add_rows(
+		soon_sc,
+		[
+			["Show banner", _soon_vis],
+			["Position X (px)", _soon_x],
+			["Position Y (px)", _soon_y],
+			["Scale", _soon_scale],
+		]
+	)
+
+	# --- Concurrent viewer counts (platform APIs + Casterlabs) ---
+	var vc_sc := _make_scroll_vbox()
+	_add_settings_page("Viewer counts", vc_sc)
+	_vc_vis = CheckBox.new()
+	_vc_twitch = CheckBox.new()
+	_vc_youtube = CheckBox.new()
+	_vc_tiktok = CheckBox.new()
+	_vc_layout = _opt(PackedStringArray(["Row", "Stack", "Total"]))
+	_vc_icons = CheckBox.new()
+	_vc_corner = _opt(PackedStringArray(["Top-left", "Top-right", "Bottom-left", "Bottom-right"]))
+	_vc_mx = _spin_i(0, 4000)
+	_vc_my = _spin_i(0, 4000)
+	_vc_pad_h = _spin_i(0, 64)
+	_vc_pad_v = _spin_i(0, 64)
+	_vc_fs = _spin_i(8, 64)
+	_vc_color = _color_picker()
+	_vc_chrome_style = _opt(PackedStringArray(_SpdUiArt.CHROME_STYLE_LABELS))
+	_vc_chrome_scale = _spin_f(0.5, 4.0, 0.05)
+	_vc_tw_poll = _spin_f(5.0, 300.0, 1.0)
+	_vc_tw_id = _line()
+	_vc_tw_secret = _line()
+	_vc_tw_secret.secret = true
+	_vc_tw_channel = _line()
+	_vc_yt_poll = _spin_f(60.0, 600.0, 5.0)
+	_vc_yt_search = _spin_f(60.0, 1800.0, 30.0)
+	_vc_yt_key = _line()
+	_vc_yt_key.secret = true
+	_vc_yt_channel = _line()
+	_vc_tt_poll = _spin_f(5.0, 300.0, 1.0)
+	_vc_caster_url = _line()
+	_vc_caster_url.secret = true
+	var vc_note := _section_note()
+	vc_note.text = (
+		"Casterlabs must be running. Paste the TikTok-only Viewers Count browser-source URL; "
+		+ "its authorization stays in local companion_settings.cfg and is not remote-synced. "
+		+ "A * after a count means the last good value is stale."
+	)
+	vc_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	(vc_sc.get_node("InnerVBox") as VBoxContainer).add_child(vc_note)
+	_add_section_header(vc_sc, "Display")
+	_add_rows(
+		vc_sc,
+		[
+			["Show viewer-count panel", _vc_vis],
+			["Show Twitch", _vc_twitch],
+			["Show YouTube", _vc_youtube],
+			["Show TikTok", _vc_tiktok],
+			["Layout", _vc_layout],
+			["Show platform badges", _vc_icons],
+			["Panel corner", _vc_corner],
+			["Margin X (px)", _vc_mx],
+			["Margin Y (px)", _vc_my],
+			["Padding horizontal (px)", _vc_pad_h],
+			["Padding vertical (px)", _vc_pad_v],
+			["Font size (px)", _vc_fs],
+			["Font color", _vc_color],
+			["Chrome style", _vc_chrome_style],
+			["Chrome scale (border)", _vc_chrome_scale],
+		]
+	)
+	_add_section_header(vc_sc, "Twitch Helix")
+	_add_rows(
+		vc_sc,
+		[
+			["Poll interval (sec)", _vc_tw_poll],
+			["Client ID", _vc_tw_id],
+			["Client secret", _vc_tw_secret],
+			["Channel login", _vc_tw_channel],
+		]
+	)
+	_add_section_header(vc_sc, "YouTube Data API")
+	_add_rows(
+		vc_sc,
+		[
+			["Viewer poll interval (sec)", _vc_yt_poll],
+			["Live-stream search interval (sec)", _vc_yt_search],
+			["API key", _vc_yt_key],
+			["Channel ID", _vc_yt_channel],
+		]
+	)
+	_add_section_header(vc_sc, "TikTok via Casterlabs")
+	_add_rows(
+		vc_sc,
+		[
+			["Reconnect interval (sec)", _vc_tt_poll],
+			["TikTok-only browser-source URL", _vc_caster_url],
 		]
 	)
 
@@ -887,6 +1121,10 @@ func _build_ui() -> void:
 	_lw_grad_start = _spin_f(0.0, 1.0, 0.01)
 	_lw_grad_end = _spin_f(0.0, 1.0, 0.01)
 	_lw_feather_v = _spin_i(0, 512)
+	_lw_top = _spin_i(0, 4000)
+	_lw_top_grad_start = _spin_f(0.0, 1.0, 0.01)
+	_lw_top_grad_end = _spin_f(0.0, 1.0, 0.01)
+	_lw_top_feather_v = _spin_i(0, 512)
 	_add_section_header(obs_sc, "obs-websocket")
 	_add_rows(
 		obs_sc,
@@ -907,11 +1145,15 @@ func _build_ui() -> void:
 		[
 			["Transparent window (OBS sees layers beneath gaps)", _win_transparent],
 			["Live water: bottom bar height (px)", _lw_bottom],
+			["Live water: top bar height (px)", _lw_top],
 			["Live water: left strip width (px)", _lw_left],
 			["Live water: left strip top inset (px, below chat)", _lw_left_top],
 			["Live water: fade start Y (0=top, 1=bottom)", _lw_grad_start],
 			["Live water: fade end Y (full black)", _lw_grad_end],
 			["Live water: edge feather vertical (px)", _lw_feather_v],
+			["Live water: top fade start Y (0=top)", _lw_top_grad_start],
+			["Live water: top fade end Y (black at top)", _lw_top_grad_end],
+			["Live water: top edge feather (px)", _lw_top_feather_v],
 		]
 	)
 
@@ -1007,6 +1249,33 @@ func _build_ui() -> void:
 			["Twitch Highlight My Message", _paid_highlight],
 		]
 	)
+	_paid_preview_kind = _opt(
+		PackedStringArray(["Super Chat", "Gifted membership", "Subscription", "Highlight"])
+	)
+	_paid_preview_pin = CheckBox.new()
+	var paid_test := Button.new()
+	paid_test.text = "Test paid notice"
+	paid_test.pressed.connect(_on_test_paid_preview)
+	_paid_preview_pin.toggled.connect(_on_paid_preview_pin_toggled)
+	_paid_preview_kind.item_selected.connect(_on_paid_preview_input_changed)
+	_add_section_header(paid_sc, "Preview")
+	_add_rows(
+		paid_sc,
+		[
+			["Sample type", _paid_preview_kind],
+			["Play once", paid_test],
+			["Always show (session only)", _paid_preview_pin],
+		]
+	)
+	_connect_preview_inputs(
+		[
+			_paid_zx, _paid_zy, _paid_zw, _paid_zh, _paid_zbm,
+			_paid_chrome_style, _paid_chrome_scale, _paid_kind_fs, _paid_title_fs,
+			_paid_body_fs, _paid_kind_color, _paid_title_color, _paid_body_color,
+			_paid_shadow, _paid_pad_h, _paid_pad_v, _paid_sep, _paid_align,
+		],
+		_on_paid_preview_input_changed
+	)
 	var paid_scene_note := _section_note()
 	paid_scene_note.text = (
 		"When to show paid notices (LIVE - PAUSE / LIVE - MAIN / other) is under Scene gates "
@@ -1014,6 +1283,101 @@ func _build_ui() -> void:
 	)
 	paid_scene_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	(paid_sc.get_node("InnerVBox") as VBoxContainer).add_child(paid_scene_note)
+
+	var first_words_sc := _make_scroll_vbox()
+	_add_settings_page("Welcome toasts", first_words_sc)
+	_first_words_on = CheckBox.new()
+	_first_words_qmax = _spin_i(1, 32)
+	_first_words_ttl = _spin_f(0.5, 60.0, 0.25)
+	_first_words_fade_in = _spin_f(0.05, 5.0, 0.05)
+	_first_words_fade_out = _spin_f(0.05, 5.0, 0.05)
+	_first_words_zx = _spin_i(0, 4000)
+	_first_words_zy = _spin_i(0, 4000)
+	_first_words_zw = _spin_i(64, 1920)
+	_first_words_zh = _spin_i(0, 1080)
+	_first_words_zbm = _spin_i(0, 400)
+	_first_words_chrome_style = _opt(PackedStringArray(_SpdUiArt.CHROME_STYLE_LABELS))
+	_first_words_chrome_scale = _spin_f(0.5, 4.0, 0.05)
+	_first_words_font_size = _spin_i(8, 96)
+	_first_words_font_color = _color_picker()
+	_first_words_shadow = CheckBox.new()
+	_first_words_pad_h = _spin_i(0, 64)
+	_first_words_pad_v = _spin_i(0, 64)
+	_first_words_align = _opt(PackedStringArray(["Left", "Center"]))
+	_first_words_pop_scale = CheckBox.new()
+	var first_words_note := _section_note()
+	first_words_note.text = (
+		"Shared Streamer.bot UDP toast for First Words, Twitch follows/paid subs, and free "
+		+ "YouTube subscribers. Send ui=first_words, ui=follow, ui=subscriber, or "
+		+ "ui=youtube_subscriber with username and optional ttl_sec. "
+		+ "Existing sounds remain in Streamer.bot."
+	)
+	first_words_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	(first_words_sc.get_node("InnerVBox") as VBoxContainer).add_child(first_words_note)
+	_add_section_header(first_words_sc, "Timing")
+	_add_rows(
+		first_words_sc,
+		[
+			["Enable welcome toasts", _first_words_on],
+			["Queue max", _first_words_qmax],
+			["Default hold (sec)", _first_words_ttl],
+			["Fade in (sec)", _first_words_fade_in],
+			["Fade out (sec)", _first_words_fade_out],
+		]
+	)
+	_add_section_header(first_words_sc, "Position & chrome")
+	_add_rows(
+		first_words_sc,
+		[
+			["Zone X (px)", _first_words_zx],
+			["Zone Y (px)", _first_words_zy],
+			["Zone width (px)", _first_words_zw],
+			["Zone height (0=auto)", _first_words_zh],
+			["Bottom margin if height is auto", _first_words_zbm],
+			["Chrome style", _first_words_chrome_style],
+			["Chrome scale (border)", _first_words_chrome_scale],
+			["Padding horizontal (px)", _first_words_pad_h],
+			["Padding vertical (px)", _first_words_pad_v],
+			["Text align", _first_words_align],
+		]
+	)
+	_add_section_header(first_words_sc, "Typography")
+	_add_rows(
+		first_words_sc,
+		[
+			["Font size (px)", _first_words_font_size],
+			["Font color", _first_words_font_color],
+			["Text shadow", _first_words_shadow],
+			["Pop-in scale animation", _first_words_pop_scale],
+		]
+	)
+	_first_words_preview_kind = _opt(
+		PackedStringArray(["First Words", "Follow", "Subscription", "YouTube subscriber"])
+	)
+	_first_words_preview_pin = CheckBox.new()
+	var first_words_test := Button.new()
+	first_words_test.text = "Test welcome toast"
+	first_words_test.pressed.connect(_on_test_first_words_preview)
+	_first_words_preview_pin.toggled.connect(_on_first_words_preview_pin_toggled)
+	_first_words_preview_kind.item_selected.connect(_on_first_words_preview_input_changed)
+	_add_section_header(first_words_sc, "Preview")
+	_add_rows(
+		first_words_sc,
+		[
+			["Sample type", _first_words_preview_kind],
+			["Play once", first_words_test],
+			["Always show (session only)", _first_words_preview_pin],
+		]
+	)
+	_connect_preview_inputs(
+		[
+			_first_words_zx, _first_words_zy, _first_words_zw, _first_words_zh,
+			_first_words_zbm, _first_words_chrome_style, _first_words_chrome_scale,
+			_first_words_font_size, _first_words_font_color, _first_words_shadow,
+			_first_words_pad_h, _first_words_pad_v, _first_words_align,
+		],
+		_on_first_words_preview_input_changed
+	)
 
 	var al_sc := _make_scroll_vbox()
 	_add_settings_page("Alerts", al_sc)
@@ -1091,6 +1455,19 @@ func _build_ui() -> void:
 			["Mob idle animation (FPS)", _mob_idle_fps],
 		]
 	)
+	_alert_preview_pin = CheckBox.new()
+	var alert_test := Button.new()
+	alert_test.text = "Test command alert"
+	alert_test.pressed.connect(_on_test_alert_preview)
+	_alert_preview_pin.toggled.connect(_on_alert_preview_pin_toggled)
+	_add_section_header(al_sc, "Command alert preview")
+	_add_rows(
+		al_sc,
+		[
+			["Play once", alert_test],
+			["Always show (session only)", _alert_preview_pin],
+		]
+	)
 
 	_custom_alerts_on = CheckBox.new()
 	_custom_alerts_interval = _spin_f(5.0, 600.0, 1.0)
@@ -1134,6 +1511,32 @@ func _build_ui() -> void:
 	_custom_alerts_editor_host.add_theme_constant_override("separation", 8)
 	_custom_alerts_editor_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	(al_sc.get_node("InnerVBox") as VBoxContainer).add_child(_custom_alerts_editor_host)
+	_tip_preview_pin = CheckBox.new()
+	var tip_test := Button.new()
+	tip_test.text = "Test selected tip"
+	tip_test.pressed.connect(_on_test_tip_preview)
+	_tip_preview_pin.toggled.connect(_on_tip_preview_pin_toggled)
+	_add_section_header(al_sc, "Tip preview")
+	_add_rows(
+		al_sc,
+		[
+			["Play selected tip once", tip_test],
+			["Always show selected tip (session only)", _tip_preview_pin],
+		]
+	)
+	var preview_note := _section_note()
+	preview_note.text = (
+		"Always show is for layout only, updates while you edit, and clears on companion restart."
+	)
+	(al_sc.get_node("InnerVBox") as VBoxContainer).add_child(preview_note)
+	var alert_preview_inputs: Array[Control] = [
+		_az_x, _az_y, _az_w, _az_h, _az_bm, _ata, _alert_chrome_style,
+		_alert_chrome_scale, _alert_title_fs, _alert_subtitle_fs, _alert_pad_h,
+		_alert_pad_v, _alert_icon_sz, _mob_idle_fps,
+	]
+	_connect_preview_inputs(alert_preview_inputs, _on_alert_preview_input_changed)
+	_connect_preview_inputs(alert_preview_inputs, _on_tip_preview_input_changed)
+	_connect_preview_inputs([_custom_alerts_hold], _on_tip_preview_input_changed)
 
 	var id_sc := _make_scroll_vbox()
 	_add_settings_page("ID overlay", id_sc)
@@ -1191,12 +1594,19 @@ func _build_ui() -> void:
 	_vert_show_alerts = CheckBox.new()
 	_vert_show_tips = CheckBox.new()
 	_vert_show_paid = CheckBox.new()
+	_vert_show_first_words = CheckBox.new()
 	_vert_show_bestiary = CheckBox.new()
 	_vert_show_march = CheckBox.new()
 	_vert_show_spend = CheckBox.new()
 	_vert_hide_spend_off = CheckBox.new()
 	_vert_show_free = CheckBox.new()
 	_vert_show_double = CheckBox.new()
+	_vert_show_nine = CheckBox.new()
+	_vert_show_viewers = CheckBox.new()
+	_vert_show_soon = CheckBox.new()
+	_vsoon_x = _spin_i(-2000, 4000)
+	_vsoon_y = _spin_i(-2000, 4000)
+	_vsoon_scale = _spin_f(0.25, 12.0, 0.05)
 	_vaz_x = _spin_i(0, 4000)
 	_vaz_y = _spin_i(0, 4000)
 	_vaz_w = _spin_i(32, 4000)
@@ -1217,12 +1627,21 @@ func _build_ui() -> void:
 	_vpz_w = _spin_i(32, 4000)
 	_vpz_h = _spin_i(0, 4000)
 	_vpz_bm = _spin_i(0, 4000)
+	_vfwz_x = _spin_i(0, 4000)
+	_vfwz_y = _spin_i(0, 4000)
+	_vfwz_w = _spin_i(32, 4000)
+	_vfwz_h = _spin_i(0, 4000)
+	_vfwz_bm = _spin_i(0, 4000)
 	_vlw_bottom = _spin_i(0, 4000)
 	_vlw_left = _spin_i(0, 4000)
 	_vlw_left_top = _spin_i(0, 4000)
 	_vlw_grad_start = _spin_f(0.0, 1.0, 0.01)
 	_vlw_grad_end = _spin_f(0.0, 1.0, 0.01)
 	_vlw_feather_v = _spin_i(0, 512)
+	_vlw_top = _spin_i(0, 4000)
+	_vlw_top_grad_start = _spin_f(0.0, 1.0, 0.01)
+	_vlw_top_grad_end = _spin_f(0.0, 1.0, 0.01)
+	_vlw_top_feather_v = _spin_i(0, 512)
 	_vspend_corner = _opt(PackedStringArray(["Top-left", "Top-right", "Bottom-left", "Bottom-right"]))
 	_vspend_mx = _spin_i(0, 4000)
 	_vspend_my = _spin_i(0, 4000)
@@ -1232,6 +1651,12 @@ func _build_ui() -> void:
 	_vdp_corner = _opt(PackedStringArray(["Top-left", "Top-right", "Bottom-left", "Bottom-right"]))
 	_vdp_mx = _spin_i(0, 4000)
 	_vdp_my = _spin_i(0, 4000)
+	_vnine_corner = _opt(PackedStringArray(["Top-left", "Top-right", "Bottom-left", "Bottom-right"]))
+	_vnine_mx = _spin_i(0, 4000)
+	_vnine_my = _spin_i(0, 4000)
+	_vviewers_corner = _opt(PackedStringArray(["Top-left", "Top-right", "Bottom-left", "Bottom-right"]))
+	_vviewers_mx = _spin_i(0, 4000)
+	_vviewers_my = _spin_i(0, 4000)
 	var vert_note := _section_note()
 	vert_note.text = (
 		"Second 1080×1920 window for vertical OBS (F4). Capture it separately — "
@@ -1254,12 +1679,16 @@ func _build_ui() -> void:
 			["Alerts", _vert_show_alerts],
 			["Tip toasts", _vert_show_tips],
 			["Paid notices", _vert_show_paid],
+			["First words", _vert_show_first_words],
 			["Bestiary", _vert_show_bestiary],
 			["Summon march", _vert_show_march],
 			["Chat spend", _vert_show_spend],
 			["Hide chat spend when spending is off", _vert_hide_spend_off],
 			["Free promos", _vert_show_free],
 			["2x points countdown", _vert_show_double],
+			["9c deaths", _vert_show_nine],
+			["Viewer counts", _vert_show_viewers],
+			["Starting soon", _vert_show_soon],
 		]
 	)
 	_add_section_header(vert_sc, "Alert zone")
@@ -1306,16 +1735,31 @@ func _build_ui() -> void:
 			["Bottom margin", _vpz_bm],
 		]
 	)
-	_add_section_header(vert_sc, "Live water L-shape")
+	_add_section_header(vert_sc, "First Words zone")
+	_add_rows(
+		vert_sc,
+		[
+			["X", _vfwz_x],
+			["Y", _vfwz_y],
+			["Width", _vfwz_w],
+			["Height", _vfwz_h],
+			["Bottom margin", _vfwz_bm],
+		]
+	)
+	_add_section_header(vert_sc, "Live water")
 	_add_rows(
 		vert_sc,
 		[
 			["Bottom bar height (px)", _vlw_bottom],
+			["Top bar height (px)", _vlw_top],
 			["Left strip width (px)", _vlw_left],
 			["Left strip top inset (px)", _vlw_left_top],
 			["Gradient fade start", _vlw_grad_start],
 			["Gradient fade end", _vlw_grad_end],
 			["Edge feather vertical (px)", _vlw_feather_v],
+			["Top fade start Y (0=top)", _vlw_top_grad_start],
+			["Top fade end Y (black at top)", _vlw_top_grad_end],
+			["Top edge feather (px)", _vlw_top_feather_v],
 		]
 	)
 	_add_section_header(vert_sc, "Corners")
@@ -1331,6 +1775,21 @@ func _build_ui() -> void:
 			["2x points corner", _vdp_corner],
 			["2x points margin X", _vdp_mx],
 			["2x points margin Y", _vdp_my],
+			["9c deaths corner", _vnine_corner],
+			["9c deaths margin X", _vnine_mx],
+			["9c deaths margin Y", _vnine_my],
+			["Viewer counts corner", _vviewers_corner],
+			["Viewer counts margin X", _vviewers_mx],
+			["Viewer counts margin Y", _vviewers_my],
+		]
+	)
+	_add_section_header(vert_sc, "Starting soon")
+	_add_rows(
+		vert_sc,
+		[
+			["Position X (px)", _vsoon_x],
+			["Position Y (px)", _vsoon_y],
+			["Scale", _vsoon_scale],
 		]
 	)
 
@@ -1496,11 +1955,17 @@ func _apply_scene_gates_to_config() -> void:
 	VL.show_alerts = VL.allows_scene("alerts", CompanionConfig.SCENE_UNKNOWN)
 	VL.show_tip_toasts = VL.allows_scene("tip_toasts", CompanionConfig.SCENE_UNKNOWN)
 	VL.show_paid_notices = VL.allows_scene("paid_notices", CompanionConfig.SCENE_UNKNOWN)
+	VL.show_first_words = VL.allows_scene("first_words", CompanionConfig.SCENE_UNKNOWN)
 	VL.show_bestiary = VL.allows_scene("bestiary", CompanionConfig.SCENE_UNKNOWN)
 	VL.show_summon_march = VL.allows_scene("summon_march", CompanionConfig.SCENE_UNKNOWN)
 	VL.show_spend_indicator = VL.allows_scene("spend_indicator", CompanionConfig.SCENE_UNKNOWN)
 	VL.show_free_promos = VL.allows_scene("free_promos", CompanionConfig.SCENE_UNKNOWN)
 	VL.show_double_points = VL.allows_scene("double_points", CompanionConfig.SCENE_UNKNOWN)
+	VL.show_nine_challenge_deaths = VL.allows_scene(
+		"nine_challenge_deaths", CompanionConfig.SCENE_UNKNOWN
+	)
+	VL.show_viewer_counts = VL.allows_scene("viewer_counts", CompanionConfig.SCENE_UNKNOWN)
+	VL.show_starting_soon = VL.allows_scene("starting_soon", CompanionConfig.SCENE_UNKNOWN)
 	# Legacy paid fields ← horizontal paid_notices gates.
 	var paid_h: Dictionary = CompanionConfig.main_scene_show.get("paid_notices", {})
 	CompanionConfig.paid_notice_show_on_pause = bool(paid_h.get("pause", true))
@@ -1559,6 +2024,19 @@ func _add_rows(parent_sc: ScrollContainer, rows: Array) -> void:
 func _add_section_header(parent_sc: ScrollContainer, text: String) -> void:
 	var vb: VBoxContainer = parent_sc.get_node("InnerVBox") as VBoxContainer
 	vb.add_child(_section_header(text))
+
+
+func _connect_preview_inputs(controls: Array, callback: Callable) -> void:
+	for control_v in controls:
+		var control := control_v as Control
+		if control is SpinBox:
+			(control as SpinBox).value_changed.connect(callback)
+		elif control is OptionButton:
+			(control as OptionButton).item_selected.connect(callback)
+		elif control is CheckBox:
+			(control as CheckBox).toggled.connect(callback)
+		elif control is ColorPickerButton:
+			(control as ColorPickerButton).color_changed.connect(callback)
 
 
 func _form_row(label_text: String, control: Control) -> HBoxContainer:
@@ -1768,6 +2246,50 @@ func _sync_from_config() -> void:
 		_SpdUiArt.chrome_style_id_index(CompanionConfig.double_points_chrome_style)
 	)
 	_dp_chrome_scale.value = CompanionConfig.double_points_chrome_scale
+	_nine_vis.button_pressed = CompanionConfig.nine_challenge_deaths_panel_visible
+	_nine_poll.value = CompanionConfig.nine_challenge_deaths_poll_sec
+	_nine_corner.select(clampi(CompanionConfig.nine_challenge_deaths_corner, 0, 3))
+	_nine_mx.value = CompanionConfig.nine_challenge_deaths_margin_x
+	_nine_my.value = CompanionConfig.nine_challenge_deaths_margin_y
+	_nine_pad_h.value = CompanionConfig.nine_challenge_deaths_padding_h_px
+	_nine_pad_v.value = CompanionConfig.nine_challenge_deaths_padding_v_px
+	_nine_fs.value = CompanionConfig.nine_challenge_deaths_font_size_px
+	_nine_color.color = CompanionConfig.nine_challenge_deaths_font_color
+	_nine_chrome_style.select(
+		_SpdUiArt.chrome_style_id_index(CompanionConfig.nine_challenge_deaths_chrome_style)
+	)
+	_nine_chrome_scale.value = CompanionConfig.nine_challenge_deaths_chrome_scale
+	_soon_vis.button_pressed = CompanionConfig.starting_soon_visible
+	_soon_x.value = CompanionConfig.starting_soon_x_px
+	_soon_y.value = CompanionConfig.starting_soon_y_px
+	_soon_scale.value = CompanionConfig.starting_soon_scale
+	_vc_vis.button_pressed = CompanionConfig.viewer_counts_panel_visible
+	_vc_twitch.button_pressed = CompanionConfig.viewer_counts_show_twitch
+	_vc_youtube.button_pressed = CompanionConfig.viewer_counts_show_youtube
+	_vc_tiktok.button_pressed = CompanionConfig.viewer_counts_show_tiktok
+	_select_option(_vc_layout, CompanionConfig.viewer_counts_layout_mode)
+	_vc_icons.button_pressed = CompanionConfig.viewer_counts_show_icons
+	_vc_corner.select(clampi(CompanionConfig.viewer_counts_corner, 0, 3))
+	_vc_mx.value = CompanionConfig.viewer_counts_margin_x
+	_vc_my.value = CompanionConfig.viewer_counts_margin_y
+	_vc_pad_h.value = CompanionConfig.viewer_counts_padding_h_px
+	_vc_pad_v.value = CompanionConfig.viewer_counts_padding_v_px
+	_vc_fs.value = CompanionConfig.viewer_counts_font_size_px
+	_vc_color.color = CompanionConfig.viewer_counts_font_color
+	_vc_chrome_style.select(
+		_SpdUiArt.chrome_style_id_index(CompanionConfig.viewer_counts_chrome_style)
+	)
+	_vc_chrome_scale.value = CompanionConfig.viewer_counts_chrome_scale
+	_vc_tw_poll.value = CompanionConfig.viewer_counts_twitch_poll_sec
+	_vc_tw_id.text = CompanionConfig.viewer_counts_twitch_client_id
+	_vc_tw_secret.text = CompanionConfig.viewer_counts_twitch_client_secret
+	_vc_tw_channel.text = CompanionConfig.viewer_counts_twitch_channel
+	_vc_yt_poll.value = CompanionConfig.viewer_counts_youtube_poll_sec
+	_vc_yt_search.value = CompanionConfig.viewer_counts_youtube_search_sec
+	_vc_yt_key.text = CompanionConfig.viewer_counts_youtube_api_key
+	_vc_yt_channel.text = CompanionConfig.viewer_counts_youtube_channel_id
+	_vc_tt_poll.value = CompanionConfig.viewer_counts_tiktok_poll_sec
+	_vc_caster_url.text = CompanionConfig.viewer_counts_casterlabs_url
 	_sm_on.button_pressed = CompanionConfig.summon_march_enabled
 	_sm_url.text = CompanionConfig.summon_march_base_url
 	_sm_poll.value = CompanionConfig.summon_march_poll_sec
@@ -1865,6 +2387,10 @@ func _sync_from_config() -> void:
 	_lw_grad_start.value = CompanionConfig.live_water_gradient_fade_start
 	_lw_grad_end.value = CompanionConfig.live_water_gradient_fade_end
 	_lw_feather_v.value = CompanionConfig.live_water_edge_feather_v_px
+	_lw_top.value = CompanionConfig.live_water_top_bar_px
+	_lw_top_grad_start.value = CompanionConfig.live_water_top_gradient_fade_start
+	_lw_top_grad_end.value = CompanionConfig.live_water_top_gradient_fade_end
+	_lw_top_feather_v.value = CompanionConfig.live_water_top_edge_feather_v_px
 
 	_pending_udp.button_pressed = CompanionConfig.show_pending_udp_alerts
 	_hud_status_panel.button_pressed = CompanionConfig.hud_status_panel_visible
@@ -1900,6 +2426,8 @@ func _sync_from_config() -> void:
 	_custom_alerts_draft = CompanionConfig.duplicate_custom_alerts()
 	_custom_alerts_selected_index = 0
 	_rebuild_custom_alerts_editor()
+	_alert_preview_pin.set_pressed_no_signal(CompanionConfig.preview_pin_alerts)
+	_tip_preview_pin.set_pressed_no_signal(CompanionConfig.preview_pin_tip_toasts)
 
 	_paid_on.button_pressed = CompanionConfig.paid_notice_enabled
 	_paid_qmax.value = CompanionConfig.paid_notice_queue_max
@@ -1931,6 +2459,30 @@ func _sync_from_config() -> void:
 	_paid_gifted.button_pressed = CompanionConfig.paid_notice_enable_gifted_membership
 	_paid_sub.button_pressed = CompanionConfig.paid_notice_enable_sub
 	_paid_highlight.button_pressed = CompanionConfig.paid_notice_enable_highlight
+	_paid_preview_pin.set_pressed_no_signal(CompanionConfig.preview_pin_paid_notices)
+
+	_first_words_on.button_pressed = CompanionConfig.first_words_enabled
+	_first_words_qmax.value = CompanionConfig.first_words_queue_max
+	_first_words_ttl.value = CompanionConfig.first_words_default_ttl_sec
+	_first_words_fade_in.value = CompanionConfig.first_words_fade_in_sec
+	_first_words_fade_out.value = CompanionConfig.first_words_fade_out_sec
+	_first_words_zx.value = CompanionConfig.first_words_zone_x_px
+	_first_words_zy.value = CompanionConfig.first_words_zone_y_px
+	_first_words_zw.value = CompanionConfig.first_words_zone_width_px
+	_first_words_zh.value = CompanionConfig.first_words_zone_height_px
+	_first_words_zbm.value = CompanionConfig.first_words_zone_bottom_margin_px
+	_first_words_chrome_style.select(
+		_SpdUiArt.chrome_style_id_index(CompanionConfig.first_words_chrome_style)
+	)
+	_first_words_chrome_scale.value = CompanionConfig.first_words_chrome_scale
+	_first_words_font_size.value = CompanionConfig.first_words_font_size_px
+	_first_words_font_color.color = CompanionConfig.first_words_font_color
+	_first_words_shadow.button_pressed = CompanionConfig.first_words_text_shadow
+	_first_words_pad_h.value = CompanionConfig.first_words_padding_h_px
+	_first_words_pad_v.value = CompanionConfig.first_words_padding_v_px
+	_first_words_align.select(1 if CompanionConfig.first_words_text_align == "center" else 0)
+	_first_words_pop_scale.button_pressed = CompanionConfig.first_words_pop_scale
+	_first_words_preview_pin.set_pressed_no_signal(CompanionConfig.preview_pin_first_words)
 
 	_id_on.button_pressed = CompanionConfig.id_overlay_enabled
 	_iz_x.value = CompanionConfig.id_zone_x_px
@@ -2005,12 +2557,19 @@ func _sync_vertical_from_config() -> void:
 	_vert_show_alerts.button_pressed = L.show_alerts
 	_vert_show_tips.button_pressed = L.show_tip_toasts
 	_vert_show_paid.button_pressed = L.show_paid_notices
+	_vert_show_first_words.button_pressed = L.show_first_words
 	_vert_show_bestiary.button_pressed = L.show_bestiary
 	_vert_show_march.button_pressed = L.show_summon_march
 	_vert_show_spend.button_pressed = L.show_spend_indicator
 	_vert_hide_spend_off.button_pressed = L.hide_spend_when_off
 	_vert_show_free.button_pressed = L.show_free_promos
 	_vert_show_double.button_pressed = L.show_double_points
+	_vert_show_nine.button_pressed = L.show_nine_challenge_deaths
+	_vert_show_viewers.button_pressed = L.show_viewer_counts
+	_vert_show_soon.button_pressed = L.show_starting_soon
+	_vsoon_x.value = L.starting_soon_x_px
+	_vsoon_y.value = L.starting_soon_y_px
+	_vsoon_scale.value = L.starting_soon_scale
 	_vaz_x.value = L.alert_zone_x_px
 	_vaz_y.value = L.alert_zone_y_px
 	_vaz_w.value = L.alert_zone_width_px
@@ -2031,12 +2590,21 @@ func _sync_vertical_from_config() -> void:
 	_vpz_w.value = L.paid_notice_zone_width_px
 	_vpz_h.value = L.paid_notice_zone_height_px
 	_vpz_bm.value = L.paid_notice_zone_bottom_margin_px
+	_vfwz_x.value = L.first_words_zone_x_px
+	_vfwz_y.value = L.first_words_zone_y_px
+	_vfwz_w.value = L.first_words_zone_width_px
+	_vfwz_h.value = L.first_words_zone_height_px
+	_vfwz_bm.value = L.first_words_zone_bottom_margin_px
 	_vlw_bottom.value = L.live_water_bottom_bar_px
 	_vlw_left.value = L.live_water_left_strip_px
 	_vlw_left_top.value = L.live_water_left_strip_top_px
 	_vlw_grad_start.value = L.live_water_gradient_fade_start
 	_vlw_grad_end.value = L.live_water_gradient_fade_end
 	_vlw_feather_v.value = L.live_water_edge_feather_v_px
+	_vlw_top.value = L.live_water_top_bar_px
+	_vlw_top_grad_start.value = L.live_water_top_gradient_fade_start
+	_vlw_top_grad_end.value = L.live_water_top_gradient_fade_end
+	_vlw_top_feather_v.value = L.live_water_top_edge_feather_v_px
 	_vspend_corner.select(clampi(L.spend_indicator_corner, 0, 3))
 	_vspend_mx.value = L.spend_indicator_margin_x
 	_vspend_my.value = L.spend_indicator_margin_y
@@ -2046,6 +2614,12 @@ func _sync_vertical_from_config() -> void:
 	_vdp_corner.select(clampi(L.double_points_corner, 0, 3))
 	_vdp_mx.value = L.double_points_margin_x
 	_vdp_my.value = L.double_points_margin_y
+	_vnine_corner.select(clampi(L.nine_challenge_deaths_corner, 0, 3))
+	_vnine_mx.value = L.nine_challenge_deaths_margin_x
+	_vnine_my.value = L.nine_challenge_deaths_margin_y
+	_vviewers_corner.select(clampi(L.viewer_counts_corner, 0, 3))
+	_vviewers_mx.value = L.viewer_counts_margin_x
+	_vviewers_my.value = L.viewer_counts_margin_y
 
 
 func _apply_vertical_to_config() -> void:
@@ -2061,12 +2635,19 @@ func _apply_vertical_to_config() -> void:
 	L.show_alerts = _vert_show_alerts.button_pressed
 	L.show_tip_toasts = _vert_show_tips.button_pressed
 	L.show_paid_notices = _vert_show_paid.button_pressed
+	L.show_first_words = _vert_show_first_words.button_pressed
 	L.show_bestiary = _vert_show_bestiary.button_pressed
 	L.show_summon_march = _vert_show_march.button_pressed
 	L.show_spend_indicator = _vert_show_spend.button_pressed
 	L.hide_spend_when_off = _vert_hide_spend_off.button_pressed
 	L.show_free_promos = _vert_show_free.button_pressed
 	L.show_double_points = _vert_show_double.button_pressed
+	L.show_nine_challenge_deaths = _vert_show_nine.button_pressed
+	L.show_viewer_counts = _vert_show_viewers.button_pressed
+	L.show_starting_soon = _vert_show_soon.button_pressed
+	L.starting_soon_x_px = int(_vsoon_x.value)
+	L.starting_soon_y_px = int(_vsoon_y.value)
+	L.starting_soon_scale = clampf(float(_vsoon_scale.value), 0.25, 12.0)
 	L.alert_zone_x_px = int(_vaz_x.value)
 	L.alert_zone_y_px = int(_vaz_y.value)
 	L.alert_zone_width_px = int(_vaz_w.value)
@@ -2087,6 +2668,11 @@ func _apply_vertical_to_config() -> void:
 	L.paid_notice_zone_width_px = int(_vpz_w.value)
 	L.paid_notice_zone_height_px = int(_vpz_h.value)
 	L.paid_notice_zone_bottom_margin_px = int(_vpz_bm.value)
+	L.first_words_zone_x_px = int(_vfwz_x.value)
+	L.first_words_zone_y_px = int(_vfwz_y.value)
+	L.first_words_zone_width_px = int(_vfwz_w.value)
+	L.first_words_zone_height_px = int(_vfwz_h.value)
+	L.first_words_zone_bottom_margin_px = int(_vfwz_bm.value)
 	L.live_water_bottom_bar_px = int(_vlw_bottom.value)
 	L.live_water_left_strip_px = int(_vlw_left.value)
 	L.live_water_left_strip_top_px = int(_vlw_left_top.value)
@@ -2097,6 +2683,14 @@ func _apply_vertical_to_config() -> void:
 	L.live_water_gradient_fade_start = gs
 	L.live_water_gradient_fade_end = ge
 	L.live_water_edge_feather_v_px = clampi(int(_vlw_feather_v.value), 0, 2048)
+	L.live_water_top_bar_px = int(_vlw_top.value)
+	var tgs := clampf(float(_vlw_top_grad_start.value), 0.0, 1.0)
+	var tge := clampf(float(_vlw_top_grad_end.value), 0.0, 1.0)
+	if tge > tgs:
+		tge = tgs
+	L.live_water_top_gradient_fade_start = tgs
+	L.live_water_top_gradient_fade_end = tge
+	L.live_water_top_edge_feather_v_px = clampi(int(_vlw_top_feather_v.value), 0, 2048)
 	L.spend_indicator_corner = clampi(_vspend_corner.selected, 0, 3)
 	L.spend_indicator_margin_x = int(_vspend_mx.value)
 	L.spend_indicator_margin_y = int(_vspend_my.value)
@@ -2106,6 +2700,12 @@ func _apply_vertical_to_config() -> void:
 	L.double_points_corner = clampi(_vdp_corner.selected, 0, 3)
 	L.double_points_margin_x = int(_vdp_mx.value)
 	L.double_points_margin_y = int(_vdp_my.value)
+	L.nine_challenge_deaths_corner = clampi(_vnine_corner.selected, 0, 3)
+	L.nine_challenge_deaths_margin_x = int(_vnine_mx.value)
+	L.nine_challenge_deaths_margin_y = int(_vnine_my.value)
+	L.viewer_counts_corner = clampi(_vviewers_corner.selected, 0, 3)
+	L.viewer_counts_margin_x = int(_vviewers_mx.value)
+	L.viewer_counts_margin_y = int(_vviewers_my.value)
 
 
 func _select_option(ob: OptionButton, value: String) -> void:
@@ -2179,6 +2779,64 @@ func _on_apply_pressed() -> void:
 			_SpdUiArt.CHROME_STYLE_IDS[_dp_chrome_style.selected]
 		)
 	CompanionConfig.double_points_chrome_scale = clampf(float(_dp_chrome_scale.value), 0.5, 4.0)
+	CompanionConfig.nine_challenge_deaths_panel_visible = _nine_vis.button_pressed
+	CompanionConfig.nine_challenge_deaths_poll_sec = maxf(0.5, float(_nine_poll.value))
+	CompanionConfig.nine_challenge_deaths_corner = clampi(_nine_corner.selected, 0, 3)
+	CompanionConfig.nine_challenge_deaths_margin_x = int(_nine_mx.value)
+	CompanionConfig.nine_challenge_deaths_margin_y = int(_nine_my.value)
+	CompanionConfig.nine_challenge_deaths_padding_h_px = clampi(int(_nine_pad_h.value), 0, 64)
+	CompanionConfig.nine_challenge_deaths_padding_v_px = clampi(int(_nine_pad_v.value), 0, 64)
+	CompanionConfig.nine_challenge_deaths_font_size_px = clampi(int(_nine_fs.value), 8, 48)
+	CompanionConfig.nine_challenge_deaths_font_color = _nine_color.color
+	if (
+		_nine_chrome_style.selected >= 0
+		and _nine_chrome_style.selected < _SpdUiArt.CHROME_STYLE_IDS.size()
+	):
+		CompanionConfig.nine_challenge_deaths_chrome_style = (
+			_SpdUiArt.CHROME_STYLE_IDS[_nine_chrome_style.selected]
+		)
+	CompanionConfig.nine_challenge_deaths_chrome_scale = clampf(
+		float(_nine_chrome_scale.value), 0.5, 4.0
+	)
+	CompanionConfig.starting_soon_visible = _soon_vis.button_pressed
+	CompanionConfig.starting_soon_x_px = int(_soon_x.value)
+	CompanionConfig.starting_soon_y_px = int(_soon_y.value)
+	CompanionConfig.starting_soon_scale = clampf(float(_soon_scale.value), 0.25, 12.0)
+	CompanionConfig.viewer_counts_panel_visible = _vc_vis.button_pressed
+	CompanionConfig.viewer_counts_show_twitch = _vc_twitch.button_pressed
+	CompanionConfig.viewer_counts_show_youtube = _vc_youtube.button_pressed
+	CompanionConfig.viewer_counts_show_tiktok = _vc_tiktok.button_pressed
+	CompanionConfig.viewer_counts_layout_mode = _vc_layout.get_item_text(_vc_layout.selected).to_lower()
+	CompanionConfig.viewer_counts_show_icons = _vc_icons.button_pressed
+	CompanionConfig.viewer_counts_corner = clampi(_vc_corner.selected, 0, 3)
+	CompanionConfig.viewer_counts_margin_x = int(_vc_mx.value)
+	CompanionConfig.viewer_counts_margin_y = int(_vc_my.value)
+	CompanionConfig.viewer_counts_padding_h_px = clampi(int(_vc_pad_h.value), 0, 64)
+	CompanionConfig.viewer_counts_padding_v_px = clampi(int(_vc_pad_v.value), 0, 64)
+	CompanionConfig.viewer_counts_font_size_px = clampi(int(_vc_fs.value), 8, 64)
+	CompanionConfig.viewer_counts_font_color = _vc_color.color
+	if (
+		_vc_chrome_style.selected >= 0
+		and _vc_chrome_style.selected < _SpdUiArt.CHROME_STYLE_IDS.size()
+	):
+		CompanionConfig.viewer_counts_chrome_style = (
+			_SpdUiArt.CHROME_STYLE_IDS[_vc_chrome_style.selected]
+		)
+	CompanionConfig.viewer_counts_chrome_scale = clampf(
+		float(_vc_chrome_scale.value), 0.5, 4.0
+	)
+	CompanionConfig.viewer_counts_twitch_poll_sec = maxf(5.0, float(_vc_tw_poll.value))
+	CompanionConfig.viewer_counts_twitch_client_id = _vc_tw_id.text.strip_edges()
+	CompanionConfig.viewer_counts_twitch_client_secret = _vc_tw_secret.text.strip_edges()
+	CompanionConfig.viewer_counts_twitch_channel = _vc_tw_channel.text.strip_edges()
+	CompanionConfig.viewer_counts_youtube_poll_sec = maxf(60.0, float(_vc_yt_poll.value))
+	CompanionConfig.viewer_counts_youtube_search_sec = maxf(
+		60.0, float(_vc_yt_search.value)
+	)
+	CompanionConfig.viewer_counts_youtube_api_key = _vc_yt_key.text.strip_edges()
+	CompanionConfig.viewer_counts_youtube_channel_id = _vc_yt_channel.text.strip_edges()
+	CompanionConfig.viewer_counts_tiktok_poll_sec = maxf(5.0, float(_vc_tt_poll.value))
+	CompanionConfig.viewer_counts_casterlabs_url = _vc_caster_url.text.strip_edges()
 	CompanionConfig.summon_march_enabled = _sm_on.button_pressed
 	CompanionConfig.summon_march_base_url = _sm_url.text.strip_edges()
 	CompanionConfig.summon_march_poll_sec = maxf(0.15, float(_sm_poll.value))
@@ -2287,6 +2945,14 @@ func _on_apply_pressed() -> void:
 	CompanionConfig.live_water_gradient_fade_start = grad_start
 	CompanionConfig.live_water_gradient_fade_end = grad_end
 	CompanionConfig.live_water_edge_feather_v_px = clampi(int(_lw_feather_v.value), 0, 2048)
+	CompanionConfig.live_water_top_bar_px = int(_lw_top.value)
+	var top_grad_start := clampf(float(_lw_top_grad_start.value), 0.0, 1.0)
+	var top_grad_end := clampf(float(_lw_top_grad_end.value), 0.0, 1.0)
+	if top_grad_end > top_grad_start:
+		top_grad_end = top_grad_start
+	CompanionConfig.live_water_top_gradient_fade_start = top_grad_start
+	CompanionConfig.live_water_top_gradient_fade_end = top_grad_end
+	CompanionConfig.live_water_top_edge_feather_v_px = clampi(int(_lw_top_feather_v.value), 0, 2048)
 
 	CompanionConfig.show_pending_udp_alerts = _pending_udp.button_pressed
 	CompanionConfig.hud_status_panel_visible = _hud_status_panel.button_pressed
@@ -2362,6 +3028,36 @@ func _on_apply_pressed() -> void:
 	CompanionConfig.paid_notice_enable_sub = _paid_sub.button_pressed
 	CompanionConfig.paid_notice_enable_highlight = _paid_highlight.button_pressed
 
+	CompanionConfig.first_words_enabled = _first_words_on.button_pressed
+	CompanionConfig.first_words_queue_max = clampi(int(_first_words_qmax.value), 1, 32)
+	CompanionConfig.first_words_default_ttl_sec = maxf(0.5, float(_first_words_ttl.value))
+	CompanionConfig.first_words_fade_in_sec = maxf(0.05, float(_first_words_fade_in.value))
+	CompanionConfig.first_words_fade_out_sec = maxf(0.05, float(_first_words_fade_out.value))
+	CompanionConfig.first_words_zone_x_px = int(_first_words_zx.value)
+	CompanionConfig.first_words_zone_y_px = int(_first_words_zy.value)
+	CompanionConfig.first_words_zone_width_px = clampi(int(_first_words_zw.value), 64, 1920)
+	CompanionConfig.first_words_zone_height_px = clampi(int(_first_words_zh.value), 0, 1080)
+	CompanionConfig.first_words_zone_bottom_margin_px = int(_first_words_zbm.value)
+	if (
+		_first_words_chrome_style.selected >= 0
+		and _first_words_chrome_style.selected < _SpdUiArt.CHROME_STYLE_IDS.size()
+	):
+		CompanionConfig.first_words_chrome_style = (
+			_SpdUiArt.CHROME_STYLE_IDS[_first_words_chrome_style.selected]
+		)
+	CompanionConfig.first_words_chrome_scale = clampf(
+		float(_first_words_chrome_scale.value), 0.5, 4.0
+	)
+	CompanionConfig.first_words_font_size_px = clampi(int(_first_words_font_size.value), 8, 96)
+	CompanionConfig.first_words_font_color = _first_words_font_color.color
+	CompanionConfig.first_words_text_shadow = _first_words_shadow.button_pressed
+	CompanionConfig.first_words_padding_h_px = clampi(int(_first_words_pad_h.value), 0, 64)
+	CompanionConfig.first_words_padding_v_px = clampi(int(_first_words_pad_v.value), 0, 64)
+	CompanionConfig.first_words_text_align = (
+		"center" if _first_words_align.selected == 1 else "left"
+	)
+	CompanionConfig.first_words_pop_scale = _first_words_pop_scale.button_pressed
+
 	CompanionConfig.id_overlay_enabled = _id_on.button_pressed
 	CompanionConfig.id_zone_x_px = int(_iz_x.value)
 	CompanionConfig.id_zone_y_px = int(_iz_y.value)
@@ -2399,9 +3095,9 @@ func _refresh_audio_devices() -> void:
 	var devices := CompanionAudio.list_output_devices()
 	var pick := 0
 	for i in range(devices.size()):
-		var name := str(devices[i])
-		_audio_device.add_item(name)
-		if name == previous:
+		var device_name := str(devices[i])
+		_audio_device.add_item(device_name)
+		if device_name == previous:
 			pick = i
 	if _audio_device.item_count > 0:
 		_audio_device.select(pick)
@@ -2410,8 +3106,8 @@ func _refresh_audio_devices() -> void:
 func _selected_audio_device() -> String:
 	if _audio_device == null or _audio_device.selected < 0:
 		return CompanionConfig.audio_output_device
-	var name := _audio_device.get_item_text(_audio_device.selected).strip_edges()
-	return name if not name.is_empty() else "Default"
+	var device_name := _audio_device.get_item_text(_audio_device.selected).strip_edges()
+	return device_name if not device_name.is_empty() else "Default"
 
 
 func _on_test_shatter_sfx() -> void:
@@ -2419,6 +3115,296 @@ func _on_test_shatter_sfx() -> void:
 	CompanionAudio.apply_output_device(_selected_audio_device())
 	CompanionAudio.apply_volume(float(_audio_volume.value), _audio_mute.button_pressed)
 	CompanionAudio.play_shatter(true)
+
+
+func _toast_overlay_nodes(relative_path: String) -> Array[Node]:
+	var out: Array[Node] = []
+	var main := get_parent()
+	if main == null:
+		return out
+	for path in [
+		"StreamCanvas/%s" % relative_path,
+		"VerticalCompanionWindow/StreamCanvas/%s" % relative_path,
+	]:
+		var overlay := main.get_node_or_null(path)
+		if overlay:
+			out.append(overlay)
+	return out
+
+
+func _set_toast_preview(
+	key: String, relative_path: String, sample: Dictionary, pinned: bool
+) -> void:
+	CompanionConfig.set_preview_pin(key, pinned)
+	for overlay in _toast_overlay_nodes(relative_path):
+		if pinned:
+			overlay.call("show_preview", sample, true)
+		else:
+			overlay.call("clear_preview")
+
+
+func _play_toast_preview_once(
+	key: String,
+	relative_path: String,
+	sample: Dictionary,
+	pin_checkbox: CheckBox,
+	visible_sec: float
+) -> void:
+	if pin_checkbox.button_pressed:
+		_set_toast_preview(key, relative_path, sample, true)
+		return
+	var token := int(_preview_test_tokens.get(key, 0)) + 1
+	_preview_test_tokens[key] = token
+	CompanionConfig.set_preview_pin(key, true)
+	for overlay in _toast_overlay_nodes(relative_path):
+		overlay.call("show_preview", sample, false)
+	await get_tree().create_timer(maxf(0.5, visible_sec)).timeout
+	if (
+		int(_preview_test_tokens.get(key, 0)) == token
+		and not pin_checkbox.button_pressed
+	):
+		CompanionConfig.set_preview_pin(key, false)
+
+
+func _apply_alert_preview_values() -> void:
+	CompanionConfig.alert_hold_sec = float(_hold.value)
+	CompanionConfig.alert_fade_in_sec = float(_fade_in.value)
+	CompanionConfig.alert_fade_out_sec = float(_fade_out.value)
+	CompanionConfig.custom_alerts_hold_sec = maxf(0.5, float(_custom_alerts_hold.value))
+	CompanionConfig.alert_zone_x_px = int(_az_x.value)
+	CompanionConfig.alert_zone_y_px = int(_az_y.value)
+	CompanionConfig.alert_zone_width_px = int(_az_w.value)
+	CompanionConfig.alert_zone_height_px = int(_az_h.value)
+	CompanionConfig.alert_zone_bottom_margin_px = int(_az_bm.value)
+	CompanionConfig.alert_text_align = _ata.get_item_text(_ata.selected).strip_edges()
+	if (
+		_alert_chrome_style.selected >= 0
+		and _alert_chrome_style.selected < _SpdUiArt.CHROME_STYLE_IDS.size()
+	):
+		CompanionConfig.alert_chrome_style = _SpdUiArt.CHROME_STYLE_IDS[_alert_chrome_style.selected]
+	CompanionConfig.alert_chrome_scale = clampf(float(_alert_chrome_scale.value), 0.5, 4.0)
+	CompanionConfig.alert_title_font_size_px = int(_alert_title_fs.value)
+	CompanionConfig.alert_subtitle_font_size_px = int(_alert_subtitle_fs.value)
+	CompanionConfig.alert_padding_h_px = clampi(int(_alert_pad_h.value), 0, 64)
+	CompanionConfig.alert_padding_v_px = clampi(int(_alert_pad_v.value), 0, 64)
+	CompanionConfig.alert_command_icon_size_px = int(_alert_icon_sz.value)
+	CompanionConfig.alert_mob_idle_anim_fps = float(_mob_idle_fps.value)
+
+
+func _apply_paid_preview_values() -> void:
+	CompanionConfig.paid_notice_default_ttl_sec = maxf(0.5, float(_paid_ttl.value))
+	CompanionConfig.paid_notice_fade_in_sec = maxf(0.05, float(_paid_fade_in.value))
+	CompanionConfig.paid_notice_fade_out_sec = maxf(0.05, float(_paid_fade_out.value))
+	CompanionConfig.paid_notice_zone_x_px = int(_paid_zx.value)
+	CompanionConfig.paid_notice_zone_y_px = int(_paid_zy.value)
+	CompanionConfig.paid_notice_zone_width_px = clampi(int(_paid_zw.value), 64, 1920)
+	CompanionConfig.paid_notice_zone_height_px = clampi(int(_paid_zh.value), 0, 1080)
+	CompanionConfig.paid_notice_zone_bottom_margin_px = int(_paid_zbm.value)
+	if (
+		_paid_chrome_style.selected >= 0
+		and _paid_chrome_style.selected < _SpdUiArt.CHROME_STYLE_IDS.size()
+	):
+		CompanionConfig.paid_notice_chrome_style = (
+			_SpdUiArt.CHROME_STYLE_IDS[_paid_chrome_style.selected]
+		)
+	CompanionConfig.paid_notice_chrome_scale = clampf(float(_paid_chrome_scale.value), 0.5, 4.0)
+	CompanionConfig.paid_notice_kind_font_size_px = clampi(int(_paid_kind_fs.value), 8, 96)
+	CompanionConfig.paid_notice_title_font_size_px = clampi(int(_paid_title_fs.value), 8, 96)
+	CompanionConfig.paid_notice_body_font_size_px = clampi(int(_paid_body_fs.value), 8, 96)
+	CompanionConfig.paid_notice_kind_font_color = _paid_kind_color.color
+	CompanionConfig.paid_notice_title_font_color = _paid_title_color.color
+	CompanionConfig.paid_notice_body_font_color = _paid_body_color.color
+	CompanionConfig.paid_notice_text_shadow = _paid_shadow.button_pressed
+	CompanionConfig.paid_notice_padding_h_px = clampi(int(_paid_pad_h.value), 0, 64)
+	CompanionConfig.paid_notice_padding_v_px = clampi(int(_paid_pad_v.value), 0, 64)
+	CompanionConfig.paid_notice_line_separation_px = clampi(int(_paid_sep.value), 0, 48)
+	CompanionConfig.paid_notice_text_align = "center" if _paid_align.selected == 1 else "left"
+	CompanionConfig.paid_notice_pop_scale = _paid_pop_scale.button_pressed
+
+
+func _apply_first_words_preview_values() -> void:
+	CompanionConfig.first_words_default_ttl_sec = maxf(0.5, float(_first_words_ttl.value))
+	CompanionConfig.first_words_fade_in_sec = maxf(0.05, float(_first_words_fade_in.value))
+	CompanionConfig.first_words_fade_out_sec = maxf(0.05, float(_first_words_fade_out.value))
+	CompanionConfig.first_words_zone_x_px = int(_first_words_zx.value)
+	CompanionConfig.first_words_zone_y_px = int(_first_words_zy.value)
+	CompanionConfig.first_words_zone_width_px = clampi(int(_first_words_zw.value), 64, 1920)
+	CompanionConfig.first_words_zone_height_px = clampi(int(_first_words_zh.value), 0, 1080)
+	CompanionConfig.first_words_zone_bottom_margin_px = int(_first_words_zbm.value)
+	if (
+		_first_words_chrome_style.selected >= 0
+		and _first_words_chrome_style.selected < _SpdUiArt.CHROME_STYLE_IDS.size()
+	):
+		CompanionConfig.first_words_chrome_style = (
+			_SpdUiArt.CHROME_STYLE_IDS[_first_words_chrome_style.selected]
+		)
+	CompanionConfig.first_words_chrome_scale = clampf(
+		float(_first_words_chrome_scale.value), 0.5, 4.0
+	)
+	CompanionConfig.first_words_font_size_px = clampi(int(_first_words_font_size.value), 8, 96)
+	CompanionConfig.first_words_font_color = _first_words_font_color.color
+	CompanionConfig.first_words_text_shadow = _first_words_shadow.button_pressed
+	CompanionConfig.first_words_padding_h_px = clampi(int(_first_words_pad_h.value), 0, 64)
+	CompanionConfig.first_words_padding_v_px = clampi(int(_first_words_pad_v.value), 0, 64)
+	CompanionConfig.first_words_text_align = (
+		"center" if _first_words_align.selected == 1 else "left"
+	)
+	CompanionConfig.first_words_pop_scale = _first_words_pop_scale.button_pressed
+
+
+func _paid_preview_sample() -> Dictionary:
+	var kind: String = ["superchat", "gifted_membership", "sub", "highlight"][
+		clampi(_paid_preview_kind.selected, 0, 3)
+	]
+	return {
+		"ui": kind,
+		"username": "PreviewUser",
+		"message": "This is a layout preview message.",
+		"amount": "$5.00",
+		"count": "5",
+		"months": "12",
+		"tier": "Tier 1",
+		"ttl_sec": float(_paid_ttl.value),
+	}
+
+
+func _first_words_preview_sample() -> Dictionary:
+	var text: String = [
+		"Welcome PreviewUser!",
+		"Thanks for following, PreviewUser!",
+		"PreviewUser subscribed!",
+		"Thanks for subscribing, PreviewUser!",
+	][clampi(_first_words_preview_kind.selected, 0, 3)]
+	return {"text": text, "hold": float(_first_words_ttl.value)}
+
+
+func _alert_preview_sample() -> Dictionary:
+	return {
+		"kind": "pending",
+		"headline": "spawn: rat",
+		"subtitle": "PreviewUser — layout preview",
+		"command": "spawn",
+		"monster_hint": "rat",
+	}
+
+
+func _tip_preview_sample() -> Dictionary:
+	_flush_custom_alerts_editor_into_draft()
+	if not _custom_alerts_draft.is_empty():
+		var idx := clampi(_custom_alerts_selected_index, 0, _custom_alerts_draft.size() - 1)
+		var tip := CompanionConfig.normalize_custom_alert(_custom_alerts_draft[idx], idx + 1)
+		var tip_title := str(tip.get("title", "")).strip_edges()
+		var subtitle := str(tip.get("subtitle", "")).strip_edges()
+		if not tip_title.is_empty() or not subtitle.is_empty():
+			return {"title": tip_title, "subtitle": subtitle, "hold": float(_custom_alerts_hold.value)}
+	return {
+		"title": "Preview tip",
+		"subtitle": "Adjust the alert zone here",
+		"hold": float(_custom_alerts_hold.value),
+	}
+
+
+func _on_test_paid_preview() -> void:
+	_apply_paid_preview_values()
+	_play_toast_preview_once(
+		"paid_notices",
+		"CanvasLayerPaidNotices/PaidNoticeOverlay",
+		_paid_preview_sample(),
+		_paid_preview_pin,
+		float(_paid_ttl.value) + float(_paid_fade_in.value) + float(_paid_fade_out.value)
+	)
+
+
+func _on_paid_preview_pin_toggled(pinned: bool) -> void:
+	_apply_paid_preview_values()
+	_set_toast_preview(
+		"paid_notices",
+		"CanvasLayerPaidNotices/PaidNoticeOverlay",
+		_paid_preview_sample(),
+		pinned
+	)
+
+
+func _on_paid_preview_input_changed(_value: Variant) -> void:
+	if _paid_preview_pin.button_pressed:
+		_on_paid_preview_pin_toggled(true)
+
+
+func _on_test_first_words_preview() -> void:
+	_apply_first_words_preview_values()
+	_play_toast_preview_once(
+		"first_words",
+		"CanvasLayerFirstWords/FirstWordsOverlay",
+		_first_words_preview_sample(),
+		_first_words_preview_pin,
+		float(_first_words_ttl.value)
+		+ float(_first_words_fade_in.value)
+		+ float(_first_words_fade_out.value)
+	)
+
+
+func _on_first_words_preview_pin_toggled(pinned: bool) -> void:
+	_apply_first_words_preview_values()
+	_set_toast_preview(
+		"first_words",
+		"CanvasLayerFirstWords/FirstWordsOverlay",
+		_first_words_preview_sample(),
+		pinned
+	)
+
+
+func _on_first_words_preview_input_changed(_value: Variant) -> void:
+	if _first_words_preview_pin.button_pressed:
+		_on_first_words_preview_pin_toggled(true)
+
+
+func _on_test_alert_preview() -> void:
+	_apply_alert_preview_values()
+	_play_toast_preview_once(
+		"alerts",
+		"CanvasLayerAlerts/AlertPresenter",
+		_alert_preview_sample(),
+		_alert_preview_pin,
+		float(_hold.value) + float(_fade_in.value) + float(_fade_out.value)
+	)
+
+
+func _on_alert_preview_pin_toggled(pinned: bool) -> void:
+	_apply_alert_preview_values()
+	_set_toast_preview(
+		"alerts", "CanvasLayerAlerts/AlertPresenter", _alert_preview_sample(), pinned
+	)
+
+
+func _on_alert_preview_input_changed(_value: Variant) -> void:
+	if _alert_preview_pin.button_pressed:
+		_on_alert_preview_pin_toggled(true)
+
+
+func _on_test_tip_preview() -> void:
+	_apply_alert_preview_values()
+	_play_toast_preview_once(
+		"tip_toasts",
+		"CanvasLayerTipToasts/TipToastPresenter",
+		_tip_preview_sample(),
+		_tip_preview_pin,
+		float(_custom_alerts_hold.value) + float(_fade_in.value) + float(_fade_out.value)
+	)
+
+
+func _on_tip_preview_pin_toggled(pinned: bool) -> void:
+	_apply_alert_preview_values()
+	_set_toast_preview(
+		"tip_toasts",
+		"CanvasLayerTipToasts/TipToastPresenter",
+		_tip_preview_sample(),
+		pinned
+	)
+
+
+func _on_tip_preview_input_changed(_value: Variant) -> void:
+	if _tip_preview_pin.button_pressed:
+		_on_tip_preview_pin_toggled(true)
 
 
 func _refresh_remote_status() -> void:
@@ -2512,6 +3498,7 @@ func _on_custom_alert_picked(index: int) -> void:
 	_flush_custom_alerts_editor_into_draft()
 	_custom_alerts_selected_index = index
 	_rebuild_custom_alerts_editor()
+	_on_tip_preview_input_changed(index)
 
 
 func _flush_custom_alerts_editor_into_draft() -> void:
@@ -2550,9 +3537,9 @@ func _rebuild_custom_alerts_editor() -> void:
 	if _custom_alerts_pick:
 		_custom_alerts_pick.clear()
 		for i in range(_custom_alerts_draft.size()):
-			var tip := CompanionConfig.normalize_custom_alert(_custom_alerts_draft[i], i + 1)
-			var label := str(tip.get("title", "Tip %d" % (i + 1)))
-			if not bool(tip.get("enabled", true)):
+			var draft_tip := CompanionConfig.normalize_custom_alert(_custom_alerts_draft[i], i + 1)
+			var label := str(draft_tip.get("title", "Tip %d" % (i + 1)))
+			if not bool(draft_tip.get("enabled", true)):
 				label += " (off)"
 			_custom_alerts_pick.add_item(label, i)
 		if _custom_alerts_draft.is_empty():
@@ -2583,11 +3570,13 @@ func _rebuild_custom_alerts_editor() -> void:
 	title_le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_le.text = str(tip.get("title", ""))
 	title_le.placeholder_text = "Title (e.g. remember to !fard)"
+	title_le.text_changed.connect(_on_tip_preview_input_changed)
 	_custom_alerts_editor_host.add_child(_form_row("Title", title_le))
 	var sub_le := LineEdit.new()
 	sub_le.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sub_le.text = str(tip.get("subtitle", ""))
 	sub_le.placeholder_text = "Subtitle (optional)"
+	sub_le.text_changed.connect(_on_tip_preview_input_changed)
 	_custom_alerts_editor_host.add_child(_form_row("Subtitle", sub_le))
 	_custom_alerts_editor = {
 		"draft_index": _custom_alerts_selected_index,

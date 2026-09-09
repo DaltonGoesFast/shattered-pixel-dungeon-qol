@@ -717,7 +717,7 @@ func _layout_chrome() -> void:
 		_glow.scale = Vector2(s, s)
 		_glow.position = _banner.position + Vector2((tw - gw) * 0.5, 0.0)
 
-	var ox := 34.0 * s
+	var ox := 44.0 * s
 	var oy := 38.0 * s
 	_layout_torch(_torch_l, _banner.position.x + ox, _banner.position.y + oy, s)
 	_layout_torch(_torch_r, _banner.position.x + tw - ox, _banner.position.y + oy, s)

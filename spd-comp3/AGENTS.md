@@ -18,6 +18,7 @@ Godot **desktop** companion for **Shattered Pixel Dungeon QoL** streaming: **rea
 
 - **Enable** in OBS: **Tools → WebSocket Server Settings** (plugin **obs-websocket** 5.x). Default URL `ws://127.0.0.1:4455`; set a password if you use one.
 - **Companion:** Settings → OBS → enable sync; set **LIVE - PAUSE** and **LIVE - MAIN** substrings (defaults match those names). Per-element show/hide for pause/main/other on Horizontal and Vertical is under **Scene gates**.
+- **Streamer.bot does not toggle OBS HUD/text/counters.** Alerts, fard, kesha, deaths, superchat, first words, and 2x live in this companion. SB only sends UDP (and plays sounds). Do not add OBS GDI or Source Visibility for those.
 - **Behavior:** When the **current program scene** matches that name → **TitleBackdrop** visible, **CanvasLayerID** (ID strip) hidden. Any **other** program scene → title hidden, ID layer shown (inner visibility still follows `id_overlay_enabled` + snapshot when the layer is on).
 - **Protocol:** Subscribes to **Scenes** events; uses `GetCurrentProgramScene` on connect and `CurrentProgramSceneChanged` afterward.
 
@@ -120,6 +121,28 @@ Streamer.bot group **Companion Commands**: `C01 - Superchat`, `C02 - New Sub/Mem
 | `highlight` | Twitch | **None** (no SB action — leave disabled) |
 
 Optional fields: `username`, `message` / `text`, `amount`, `tier`, `months`, `count` / `gift_count`, `ttl_sec` (default from settings, often `6`).
+
+### Welcome toasts (companion overlay only)
+
+The shared welcome zone queues First Words, Twitch follows/paid subscribers, and free
+YouTube channel subscribers.
+`username` is required; `ttl_sec` is optional and defaults to 7 seconds.
+
+```json
+{"ui":"first_words","username":"viewer42","ttl_sec":7}
+{"ui":"follow","username":"new_follower","ttl_sec":7}
+{"ui":"subscriber","username":"new_subscriber","ttl_sec":7}
+{"ui":"youtube_subscriber","username":"new_youtube_subscriber","ttl_sec":7}
+```
+
+Aliases: First Words also accepts `firstwords` and `first_word`; follows accept `follower`
+and `twitch_follow`; Twitch paid subscribers accept `new_sub` and `new_subscriber`;
+YouTube free subscribers accept `youtube_sub` and `yt_subscriber`. Use `subscriber` or
+`youtube_subscriber`, not `sub`, because `sub` remains reserved for Paid notices.
+
+Configure it under **Settings → Welcome toasts**. Main and Vertical visibility use the
+**First words** scene gate. Streamer.bot R02 keeps the existing sound, but its OBS GDI
+text, source visibility, delay, and hide sub-actions should be removed.
 
 ### Custom tip toasts (companion overlay only)
 

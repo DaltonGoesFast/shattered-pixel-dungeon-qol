@@ -165,6 +165,7 @@ func _build() -> void:
 
 	# Banner on CanvasLayer so it centers on the full viewport (not the HUD zone).
 	_banner = TextureRect.new()
+	_banner.name = "BestiaryBanner"
 	_banner.texture = _SpdUi.banner_boss_slain()
 	_banner.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_banner.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -175,6 +176,7 @@ func _build() -> void:
 	_banner.z_index = 20
 
 	_banner_label = Label.new()
+	_banner_label.name = "BestiaryBannerLabel"
 	_banner_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_banner_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_banner_label.add_theme_font_override("font", _SpdUi.hud_font())
@@ -190,26 +192,24 @@ func _build() -> void:
 
 
 func _mount_banner_on_layer() -> void:
-	var layer := get_parent()
-	if layer == null:
-		if _banner.get_parent() != self:
-			if _banner.get_parent():
-				_banner.get_parent().remove_child(_banner)
-			add_child.call_deferred(_banner)
-		if _banner_label.get_parent() != self:
-			if _banner_label.get_parent():
-				_banner_label.get_parent().remove_child(_banner_label)
-			add_child.call_deferred(_banner_label)
+	# Parent CanvasLayer is already in the tree when this HUD _ready/_layout runs.
+	# Immediate add + parent check avoids stacking deferred add_child calls that
+	# then fail with "already has a parent CanvasLayerBestiary".
+	var target: Node = get_parent()
+	if target == null:
+		target = self
+	_ensure_parented(_banner, target)
+	_ensure_parented(_banner_label, target)
+
+
+func _ensure_parented(node: Node, new_parent: Node) -> void:
+	if node == null or new_parent == null:
 		return
-	if _banner.get_parent() != layer:
-		if _banner.get_parent():
-			_banner.get_parent().remove_child(_banner)
-		# Defer: parent CanvasLayer may still be mid-_ready when HUD builds.
-		layer.add_child.call_deferred(_banner)
-	if _banner_label.get_parent() != layer:
-		if _banner_label.get_parent():
-			_banner_label.get_parent().remove_child(_banner_label)
-		layer.add_child.call_deferred(_banner_label)
+	if node.get_parent() == new_parent:
+		return
+	if node.get_parent():
+		node.get_parent().remove_child(node)
+	new_parent.add_child(node)
 
 
 func _content_width() -> float:

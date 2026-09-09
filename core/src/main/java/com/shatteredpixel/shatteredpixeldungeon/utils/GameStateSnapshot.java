@@ -127,13 +127,21 @@ public class GameStateSnapshot {
 		Map<String, Object> ui = new LinkedHashMap<>();
 		Object scene = ShatteredPixelDungeon.scene();
 		ui.put("scene", sceneToId(scene));
-		if (scene instanceof GameScene || scene instanceof TitleScene) {
-			ui.put("open_windows", buildOpenWindows());
-		}
+		ui.put("open_windows", buildOpenWindows());
 		if (scene instanceof GameScene) {
 			ui.put("item_info", ItemInfoLayout.build());
 		}
 		return ui;
+	}
+
+	/** Current scene id for immediate {@code ui_state} events. Game thread only. */
+	public static String currentSceneId() {
+		return sceneToId(ShatteredPixelDungeon.scene());
+	}
+
+	/** Current tracked windows for immediate {@code ui_state} events. Game thread only. */
+	public static List<String> currentOpenWindows() {
+		return buildOpenWindows();
 	}
 
 	private static String sceneToId(Object scene) {
@@ -160,7 +168,7 @@ public class GameStateSnapshot {
 	private static List<String> buildOpenWindows() {
 		List<String> open = new ArrayList<>();
 		if (WndJournal.isOpen()) open.add("journal");
-		if (WndBag.INSTANCE != null) open.add("inventory");
+		if (WndBag.INSTANCE != null && WndBag.INSTANCE.parent != null) open.add("inventory");
 		if (WndInfoItem.isOpen()) open.add("item_info");
 		return open;
 	}

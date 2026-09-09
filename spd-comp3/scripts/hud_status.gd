@@ -1,6 +1,7 @@
 extends PanelContainer
 
 @onready var _ws: Label = $MarginContainer/VBox/WSRow/Value
+@onready var _obs: Label = $MarginContainer/VBox/OBSRow/Value
 @onready var _udp: Label = $MarginContainer/VBox/UDPRow/Value
 @onready var _snap: Label = $MarginContainer/VBox/SnapshotRow/Value
 @onready var _summon: Label = $MarginContainer/VBox/SummonMarchRow/Value
@@ -23,7 +24,14 @@ func _ready() -> void:
 	CompanionConfig.settings_saved.connect(_on_settings_saved)
 	CompanionConfig.settings_loaded.connect(_on_settings_loaded)
 	_settings_btn.pressed.connect(_on_settings_btn_pressed)
+	var obs := get_node_or_null("/root/ObsWebSocketClient")
+	if obs:
+		obs.connected_to_obs.connect(_refresh_obs)
+		obs.disconnected_from_obs.connect(_refresh_obs)
+		if obs.has_signal("program_scene_kind_changed"):
+			obs.program_scene_kind_changed.connect(_on_obs_scene_kind)
 	_refresh_ws(false)
+	_refresh_obs()
 	_udp.text = "UDP :%d" % CompanionConfig.streamerbot_udp_port
 	_refresh_summon()
 
@@ -34,6 +42,25 @@ func _on_ws_conn() -> void:
 
 func _on_ws_disc() -> void:
 	_refresh_ws(false)
+
+
+func _on_obs_scene_kind(_kind: StringName) -> void:
+	_refresh_obs()
+
+
+func _refresh_obs(_a: Variant = null) -> void:
+	if _obs == null:
+		return
+	if not CompanionConfig.obs_scene_sync_enabled:
+		_obs.text = "disabled"
+		return
+	var client := get_node_or_null("/root/ObsWebSocketClient")
+	var endpoint := "%s:%d" % [CompanionConfig.obs_ws_host, CompanionConfig.obs_ws_port]
+	if client != null and client.has_method("is_connected_to_obs") and client.is_connected_to_obs():
+		var scene := str(client.get("current_scene_name")).strip_edges()
+		_obs.text = "%s  %s" % [endpoint, scene if not scene.is_empty() else "identified"]
+	else:
+		_obs.text = "reconnecting %s" % endpoint
 
 
 func _refresh_ws(connected: bool) -> void:
@@ -63,6 +90,7 @@ func _on_settings_saved() -> void:
 	visible = CompanionConfig.hud_status_panel_visible
 	_udp.text = "UDP :%d" % CompanionConfig.streamerbot_udp_port
 	_refresh_ws(GameWebSocketClient.is_connected_to_game())
+	_refresh_obs()
 	_refresh_summon()
 
 

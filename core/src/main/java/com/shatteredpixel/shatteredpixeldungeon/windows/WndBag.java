@@ -42,6 +42,7 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.QuickSlotButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RenderedTextBlock;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RightClickMenu;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingUI;
 import com.watabou.input.GameAction;
 import com.watabou.input.KeyBindings;
 import com.watabou.input.KeyEvent;
@@ -140,6 +141,7 @@ public class WndBag extends WndTabbed {
 		}
 
 		layoutTabs();
+		StreamingUI.notifyUIState();
 	}
 
 	public ItemSelector getSelector() {
@@ -398,6 +400,7 @@ public class WndBag extends WndTabbed {
 		if (INSTANCE == this){
 			INSTANCE = null;
 		}
+		StreamingUI.notifyUIState();
 	}
 	
 	@Override

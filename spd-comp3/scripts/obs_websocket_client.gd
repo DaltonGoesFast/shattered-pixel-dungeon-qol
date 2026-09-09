@@ -28,6 +28,7 @@ var _rpc_version: int = 1
 var _req_seq: int = 0
 ## Dedup by exact scene name, not pause bool — otherwise startup on a non-pause scene never emitted (both were [code]false[/code]).
 var _last_scene_applied: String = "\u0001"
+var _connect_key: String = ""
 var current_scene_kind: StringName = CompanionConfig.SCENE_UNKNOWN
 var current_scene_name: String = ""
 
@@ -44,17 +45,38 @@ func is_connected_to_obs() -> bool:
 	return _peer != null and _peer.get_ready_state() == _STATE_OPEN and _was_identified
 
 
+func _obs_connect_key() -> String:
+	return "%s|%s|%d|%s" % [
+		CompanionConfig.obs_scene_sync_enabled,
+		CompanionConfig.obs_ws_host.strip_edges(),
+		CompanionConfig.obs_ws_port,
+		CompanionConfig.obs_ws_password,
+	]
+
+
 func _on_settings_reloaded() -> void:
+	var key := _obs_connect_key()
+	if key == _connect_key:
+		if _was_identified:
+			refresh_program_scene()
+		return
 	var had_ident := _was_identified
-	_peer.close()
 	_was_identified = false
 	_reconnect_acc = 0.0
+	_connect_key = ""
+	_replace_peer()
 	if had_ident:
 		_last_scene_applied = "\u0001"
 		current_scene_kind = CompanionConfig.SCENE_UNKNOWN
 		current_scene_name = ""
 		disconnected_from_obs.emit()
 	call_deferred("_try_connect")
+
+
+func _replace_peer() -> void:
+	if _peer != null:
+		_peer.close()
+	_peer = WebSocketPeer.new()
 
 
 func _physics_process(delta: float) -> void:
@@ -92,12 +114,22 @@ func _physics_process(delta: float) -> void:
 func _try_connect() -> void:
 	if not CompanionConfig.obs_scene_sync_enabled:
 		return
-	var st := _peer.get_ready_state()
-	if st == WebSocketPeer.STATE_CLOSING:
-		return
-	if st == _STATE_OPEN or st == WebSocketPeer.STATE_CONNECTING:
-		return
-	var url := "ws://%s:%d" % [CompanionConfig.obs_ws_host, CompanionConfig.obs_ws_port]
+	if _peer == null:
+		_peer = WebSocketPeer.new()
+	else:
+		_peer.poll()
+		var st := _peer.get_ready_state()
+		if st == _STATE_OPEN or st == WebSocketPeer.STATE_CONNECTING:
+			return
+		if st == WebSocketPeer.STATE_CLOSING:
+			return
+		# Godot will not reliably connect_to_url() on a peer that already closed.
+		_replace_peer()
+	var url := "ws://%s:%d" % [
+		CompanionConfig.obs_ws_host.strip_edges(),
+		CompanionConfig.obs_ws_port,
+	]
+	_connect_key = _obs_connect_key()
 	var err := _peer.connect_to_url(url)
 	if err != OK:
 		push_warning("ObsWebSocketClient: connect_to_url failed err=%d url=%s" % [err, url])
@@ -132,6 +164,10 @@ func _handle_packet(text: String) -> void:
 		var first := not _was_identified
 		_was_identified = true
 		if first:
+			print(
+				"ObsWebSocket: identified %s:%d"
+				% [CompanionConfig.obs_ws_host, CompanionConfig.obs_ws_port]
+			)
 			connected_to_obs.emit()
 		_request_get_current_program_scene()
 	elif op == _OP_EVENT:
@@ -148,6 +184,10 @@ func _handle_packet(text: String) -> void:
 		if typeof(rs) != TYPE_DICTIONARY:
 			return
 		if not bool((rs as Dictionary).get("result", false)):
+			push_warning(
+				"ObsWebSocket: GetCurrentProgramScene failed status=%s"
+				% str(rs)
+			)
 			return
 		var rd: Variant = dd.get("responseData")
 		if typeof(rd) != TYPE_DICTIONARY:

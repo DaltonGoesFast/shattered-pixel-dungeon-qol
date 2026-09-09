@@ -143,23 +143,27 @@ OVERLAY - HUD
     └── TXT - COUNTDOWN
 ```
 
-### Streamer.bot stable names (migrate last)
+### Streamer.bot vs companion (current)
 
-These paths are wired in Streamer.bot export and `presentation_config.py`. **Keep old names until Phase 5**, or update SB + Python together:
+Streamer.bot **does not** drive OBS visual effects, GDI text, HUD groups, or counters.
+Those live in **SPD Companion** (UDP + window capture). Do not retarget leftover SB
+OBS show/hide or Set GDI steps (`GROUP - Farder`, `TEXT - farder`, `kesha`,
+`GROUP - DEATHS`, `GROUP - SUPERCHAT`, `GROUP - FIRST WORDS`, 2x counter, etc.) —
+delete them if they are still in the export.
 
-| Current path | Rebuild name (optional) |
-|--------------|-------------------------|
-| `HUD :: GROUP - Farder` | `OVERLAY - HUD :: GRP - FARDER` |
-| `HUD :: TEXT - farder` | `OVERLAY - HUD :: TXT - FARDER` |
-| `V - HUD :: …` | **Delete** — single path only |
-| `kesha` | `IMG - KESHA` inside `GRP - ALERTS` |
-| `V - INV HUD GROUP` | `GRP - INV HUD` (keep if `server.py` crop automation stays) |
+Still OBS-side (not Streamer.bot visuals):
+
+| Path | Why |
+|------|-----|
+| `LIVE - MAIN` / `LIVE - PAUSE` (and `V01` / `V02` / `V LIVE` variants) | Stream Deck scene switch + companion scene-gate substrings |
+| `V - INV HUD GROUP` → `INGAME - INV` | `server.py` inventory crop/mask only |
+| Capture / audio sources | Stream Deck mutes and window captures |
 
 ### Naming rules
 
 1. **No loose sources** in LIVE scenes — only nested `BASE -`, `OVERLAY -`, `CAP -`, and `GRP - AUDIO`.
 2. **No cam/game capture inside overlay** — move `VTUBER`, `Nintedo Cam`, `CAP - CAM` nests out of HUD.
-3. **One group per alert** — Streamer.bot toggles `GRP - *`; text/image children stay visible inside hidden group.
+3. **No Streamer.bot alert groups** — companion draws alerts/counters; OBS HUD is chat/browsers + companion capture.
 4. **No duplicate sources** — one `IMG - HUNTRESS DANCE`, one `IMG - KESHA`.
 5. **Scene Collection folders:** `00 LIVE` · `01 OVERLAY` · `02 BASE` · `03 ELSE` · `99 DEV`.
 
@@ -286,26 +290,15 @@ For each `LIVE -` scene you stream vertically:
 
 ---
 
-### Phase 5 — Streamer.bot dedupe
+### Phase 5 — Streamer.bot: drop leftover OBS visuals
 
-Remove every duplicate `V - HUD ::` sub-action. One path per target:
+Do **not** retarget Fard / Kesha / Deaths / Superchat / First Words / 2x / pause text
+to new scene names. Companion already presents those. In Streamer.bot, remove any
+remaining OBS GDI or Source Visibility sub-actions on those actions (export still
+had them as of the Sep 2026 inventory). Keep UDP to companion + sounds.
 
-| Action | Before | After |
-|--------|--------|-------|
-| R09 / Fard GDI | `HUD` + `V - HUD` text set | `OVERLAY - HUD :: TXT - FARDER` once |
-| R09 / Fard show | 2× Source Visibility | `OVERLAY - HUD :: GRP - FARDER` once |
-| Kesha | `kesha` on HUD + V-HUD | `OVERLAY - HUD :: IMG - KESHA` once |
-| First Words | 4+ OBS steps | 2 steps (GDI + show group) |
-
-Update `Lastest UI/presentation_config.py`:
-
-```python
-OBS_SOURCES = {
-    "GRP_FARDER": "OVERLAY - HUD :: GRP - FARDER",
-    "TXT_FARDER": "OVERLAY - HUD :: TXT - FARDER",
-    # remove _H / _V pairs
-}
-```
+`presentation_config.py` `OBS_SOURCES` is unused for live presentation; leave or
+delete later, do not migrate names for Streamer.bot.
 
 ---
 
@@ -330,13 +323,10 @@ OBS_SOURCES = {
 
 | Test | Pass criteria |
 |------|---------------|
-| `!fard` | GRP + TXT flash on **both** 16:9 and 9:16 outputs |
-| `!kesha` | IMG flashes both outputs |
-| First Words | GDI + group show both outputs |
-| `!doublepoints` | HUD - 2x Counter visible both outputs |
-| Inventory popup | `server.py` crop still moves `GRP - INV HUD` filter |
-| Scene switch | Stream Deck only touches `LIVE - *` |
-| Streamer.bot OBS picker | All targets appear under main canvas scenes |
+| `!fard` / `!kesha` / First Words / 2x / deaths | Companion overlay, not OBS groups |
+| Inventory popup | `server.py` crop still moves `INGAME - INV` (or current inv clone) filter |
+| Scene switch | Stream Deck only touches `LIVE - *` / `V01` / `V02` as built |
+| Streamer.bot | No OBS visual sub-actions; UDP + sound only |
 
 ---
 

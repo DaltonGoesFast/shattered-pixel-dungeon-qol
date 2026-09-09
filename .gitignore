@@ -42,6 +42,7 @@ desktop.ini
 # Scratch / local-only assets
 temp_banners.png
 temp_*.png
+*.reapeaks
 
 # Lastest UI generated/runtime
 Lastest UI/**/My-Nice-Script_*.cmd
@@ -67,6 +68,7 @@ Lastest UI/superchat_debug.log
 Lastest UI/spend_disabled.txt
 Lastest UI/streamer_chat_score.json
 Lastest UI/streamer_chat_score.txt
+Lastest UI/nine_challenge_deaths.json
 Lastest UI/streamer_debug_result.txt
 Lastest UI/__pycache__/
 Lastest UI/*.log
@@ -80,6 +82,7 @@ Lastest UI/switch_side_last.txt
 Lastest UI/switch_success_cooldown.json
 Lastest UI/session_state.json
 Lastest UI/free_until.json
+Lastest UI/spend_actions.jsonl
 Lastest UI/chat_command_audit.jsonl
 Lastest UI/chat_command_body.json
 Lastest UI/chat_command_body_*.json

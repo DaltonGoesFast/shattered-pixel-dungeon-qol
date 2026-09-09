@@ -10,6 +10,7 @@ import shutil
 import uuid
 import threading
 import time
+import math
 from datetime import datetime
 
 # Glance console by default; SPD_LOG_VERBOSE=1 or --verbose restores HTTP + game transport detail
@@ -181,6 +182,7 @@ VIEWER_POINTS_UNDO_META_FILE = os.path.join(SCRIPT_DIR, "viewer_points_undo_meta
 DOUBLE_POINTS_COUNTDOWN_FILE = os.path.join(SCRIPT_DIR, "double_points_countdown.txt")
 STREAMER_CHAT_SCORE_FILE = os.path.join(SCRIPT_DIR, "streamer_chat_score.json")
 STREAMER_CHAT_SCORE_TXT = os.path.join(SCRIPT_DIR, "streamer_chat_score.txt")
+NINE_CHALLENGE_DEATHS_FILE = os.path.join(SCRIPT_DIR, "nine_challenge_deaths.json")
 TOP_SUMMONER_FILE = os.path.join(SCRIPT_DIR, "top_summoner.txt")
 SUMMON_MARCH_QUEUE_FILE = os.path.join(SCRIPT_DIR, "summon_march_queue.jsonl")
 COMPANION_SETTINGS_FILE = os.path.join(SCRIPT_DIR, "companion_settings_remote.json")
@@ -197,26 +199,46 @@ GAME_WS_RECONNECT_INTERVAL = 10       # Seconds between reconnect attempts when 
 # OBS inventory crop: direct SetSourceFilterSettings from game item_info geometry
 OBS_INV_LAYOUT_FILE = os.path.join(SCRIPT_DIR, "obs_inv_layout.json")
 OBS_INV_LAYOUT_EXAMPLE = os.path.join(SCRIPT_DIR, "obs_inv_layout.example.json")
+OBS_UI_ACTIONS_FILE = os.path.join(SCRIPT_DIR, "obs_ui_actions.json")
+OBS_UI_ACTIONS_EXAMPLE = os.path.join(SCRIPT_DIR, "obs_ui_actions.example.json")
 
 _DEFAULT_OBS_INV_LAYOUT = {
     "enabled": True,
-    "obs_ws_url": "ws://127.0.0.1:4455",
-    "source_group": "V - INV HUD GROUP",
+    "obs_ws_url": "ws://127.0.0.1:4456",
+    "source_group": "INGAME - INV",
     "filter_crop": "Crop/Pad",
-    "source_hud": "V - INV HUD",
+    "source_hud": "INGAME - INV",
     "filter_mask": "Image Mask/Blend",
     "crop_top_closed": 683,
-    "crop_top_min": 390,
+    "crop_top_min": 380,
     "margin_px": 12,
     "ui_to_obs_scale": 1.0,
     "crop_top_boost": 0,
     "game_top_at_crop_min": 70,
     "game_top_at_crop_closed": 215,
-    "full_expand_top_max": 85,
+    "full_expand_top_max": 100,
     "full_expand_height_min": 130,
     "short_box_height_max": 85,
     "short_box_crop_add": 250,
     "no_expand_max_height": 100,
+    "pin_bottom": True,
+    "scene_name": "",
+    "follow_sources": [
+        {
+            "scene_name": "V01 LIVE - MAIN",
+            "source_name": "CAM CROPPED",
+            "rotation": -90,
+            "closed_x": 1170,
+            "closed_y": 287,
+            "open_x": 772,
+            "open_y": 287,
+            "points": [
+                {"extra": 0, "x": 1170, "y": 287},
+                {"extra": 102, "x": 1113, "y": 287},
+                {"extra": 303, "x": 772, "y": 287},
+            ],
+        }
+    ],
 }
 
 
@@ -238,6 +260,151 @@ def load_obs_inv_layout():
 
 obs_inv_config = load_obs_inv_layout()
 
+_OBS_UI_TRANSFORM_KEYS = ("positionX", "positionY", "scaleX", "scaleY", "rotation")
+
+_DEFAULT_OBS_UI_ACTIONS = {
+    "enabled": False,
+    "obs_ws_url": "ws://127.0.0.1:4456",
+    "actions": [
+        {
+            "enabled": True,
+            "scene_name": "V01 LIVE - MAIN",
+            "source_name": "INGAME - INV",
+            "scene_item_id": None,
+            "when": {
+                "scenes": ["alchemy", "journal", "interlevel", "title"],
+                "windows": ["journal"],
+            },
+            "then": {"visible": False},
+        }
+    ],
+}
+
+
+def _obs_ui_item_id(value):
+    try:
+        return int(value) if value is not None and value != "" else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _obs_ui_transform(raw):
+    if not isinstance(raw, dict):
+        return None
+    out = {}
+    for key in _OBS_UI_TRANSFORM_KEYS:
+        if raw.get(key) in (None, ""):
+            continue
+        try:
+            out[key] = float(raw[key])
+        except (TypeError, ValueError):
+            continue
+    return out or None
+
+
+def _obs_ui_filters(raw):
+    """Keep filter enable/disable rows. Settings are ignored until that UI exists."""
+    if not isinstance(raw, list):
+        return None
+    out = []
+    seen = set()
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or item.get("filter_name") or "").strip()
+        if not name or name in seen or item.get("enabled") is None:
+            continue
+        seen.add(name)
+        out.append({"name": name, "enabled": bool(item.get("enabled"))})
+    return out or None
+
+
+def _normalize_obs_ui_action(raw):
+    """Accept legacy hide_scenes/hide_windows or when/then rules."""
+    if not isinstance(raw, dict):
+        return None
+    scene_name = str(raw.get("scene_name") or "").strip()
+    source_name = str(raw.get("source_name") or "").strip()
+    when = raw.get("when") if isinstance(raw.get("when"), dict) else {}
+    scenes = when.get("scenes")
+    if scenes is None:
+        scenes = raw.get("hide_scenes")
+    windows = when.get("windows")
+    if windows is None:
+        windows = raw.get("hide_windows")
+    then = raw.get("then") if isinstance(raw.get("then"), dict) else {}
+    visible = then.get("visible")
+    if visible is None and "then" not in raw and (
+        raw.get("hide_scenes") is not None or raw.get("hide_windows") is not None
+    ):
+        visible = False
+    transform = _obs_ui_transform(then.get("transform") or raw.get("transform"))
+    filters = _obs_ui_filters(then.get("filters") or raw.get("filters"))
+    return {
+        "enabled": bool(raw.get("enabled", True)),
+        "scene_name": scene_name,
+        "source_name": source_name,
+        "scene_item_id": _obs_ui_item_id(raw.get("scene_item_id")),
+        "when_scenes": [str(s).strip().lower() for s in (scenes or []) if s],
+        "when_windows": [str(w).strip().lower() for w in (windows or []) if w],
+        "visible": None if visible is None else bool(visible),
+        "transform": transform,
+        "filters": filters,
+    }
+
+
+def _sanitize_obs_ui_config(raw):
+    if not isinstance(raw, dict):
+        raw = {}
+    actions = []
+    for item in raw.get("actions") or []:
+        norm = _normalize_obs_ui_action(item)
+        if not norm:
+            continue
+        then = {}
+        if norm["visible"] is not None:
+            then["visible"] = norm["visible"]
+        if norm["transform"]:
+            then["transform"] = norm["transform"]
+        if norm["filters"]:
+            then["filters"] = norm["filters"]
+        actions.append({
+            "enabled": norm["enabled"],
+            "scene_name": norm["scene_name"],
+            "source_name": norm["source_name"],
+            "scene_item_id": norm["scene_item_id"],
+            "when": {
+                "scenes": norm["when_scenes"],
+                "windows": norm["when_windows"],
+            },
+            "then": then,
+        })
+    return {
+        "enabled": bool(raw.get("enabled", False)),
+        "obs_ws_url": str(raw.get("obs_ws_url") or "ws://127.0.0.1:4456").strip()
+        or "ws://127.0.0.1:4456",
+        "actions": actions,
+    }
+
+
+def load_obs_ui_actions():
+    """Load OBS If/Then rules from obs_ui_actions.json or the example file."""
+    cfg = json.loads(json.dumps(_DEFAULT_OBS_UI_ACTIONS))
+    for path in (OBS_UI_ACTIONS_FILE, OBS_UI_ACTIONS_EXAMPLE):
+        try:
+            if os.path.exists(path):
+                with open(path, encoding="utf-8") as f:
+                    user = json.load(f)
+                if isinstance(user, dict):
+                    cfg.update(user)
+                break
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"Warning: could not load {path}: {e}")
+    return _sanitize_obs_ui_config(cfg)
+
+
+obs_ui_config = load_obs_ui_actions()
+
 @app.after_request
 def add_headers(response):
     """Add headers for CORS and Private Network Access"""
@@ -249,8 +416,10 @@ def add_headers(response):
 
 # Global state
 current_game_data = {}
+last_challenges = []
 parser = SPDSaveParser(SAVE_DIRECTORY)
 data_lock = threading.Lock()
+nine_challenge_deaths_lock = threading.Lock()
 
 last_ws_update_time = 0.0   # when we last got data from game WS; parser skips overwrite if recent
 FREE_CLOCK_STALE_SEC = 3.0
@@ -280,9 +449,20 @@ def _free_clock_unavailable_reason():
         return "hero dead"
     return None
 
-# OBS inventory crop relay (direct filter control)
+# OBS inventory crop relay (direct filter control) + sibling ui_state visibility queue
 obs_layout_queue = queue.Queue()
+obs_ui_queue = queue.Queue()
 obs_layout_wakeup = threading.Event()
+last_obs_ui_state = None
+last_obs_ui_input = (None, [])
+_obs_scene_item_ids = {}
+_obs_item_id_fail_logged = set()
+_obs_transform_originals = {}
+_obs_inv_pin_targets = None
+_obs_inv_closed_pos = {}
+_obs_inv_follow_closed_pos = {}
+_OBS_ALIGN_TOP = 4
+_OBS_ALIGN_BOTTOM = 8
 snapshot_write_queue = queue.Queue(maxsize=1)
 last_obs_crop_top = None
 last_obs_mask_enabled = None
@@ -510,18 +690,18 @@ def _map_game_top_to_crop(item_top, closed, expand_most, top_for_min, top_for_cl
 def _compute_obs_crop(item_info):
     """Return (crop_top, mask_enabled) for OBS Crop/Pad and mask from game item_info bounds.
 
-    crop_top_closed / crop_top_min: OBS Crop/Pad top values (683 closed, 390 largest box).
+    crop_top_closed / crop_top_min: OBS Crop/Pad top values (683 closed, 380 largest box).
     game_top_at_crop_min: game item_info.top when crop should be crop_top_min.
     game_top_at_crop_closed: game item_info.top when crop should be crop_top_closed.
     crop_top_boost: added to OBS crop top (positive = less upward expansion).
     """
     scale = float(obs_inv_config.get("ui_to_obs_scale", 1.0))
     closed = int(obs_inv_config.get("crop_top_closed", 683))
-    expand_most = int(obs_inv_config.get("crop_top_min", 390))
+    expand_most = int(obs_inv_config.get("crop_top_min", 380))
     boost = int(obs_inv_config.get("crop_top_boost", 0))
     top_for_min = float(obs_inv_config.get("game_top_at_crop_min", 70))
     top_for_closed = float(obs_inv_config.get("game_top_at_crop_closed", 215))
-    full_expand_top = float(obs_inv_config.get("full_expand_top_max", 85))
+    full_expand_top = float(obs_inv_config.get("full_expand_top_max", 100))
     full_expand_height = float(obs_inv_config.get("full_expand_height_min", 130))
     short_height = float(obs_inv_config.get("short_box_height_max", 85))
     short_crop_add = int(obs_inv_config.get("short_box_crop_add", 250))
@@ -546,7 +726,7 @@ def _compute_obs_crop(item_info):
     crop_top = _map_game_top_to_crop(
         item_top, closed, expand_most, top_for_min, top_for_closed, boost
     )
-    # Kinetic-staff class: high on screen + tall -> full expansion (390)
+    # Kinetic-staff class: high on screen + tall -> full expansion (380)
     if item_top <= full_expand_top and height >= full_expand_height:
         crop_top = min(crop_top, expand_most)
     # Short popups (e.g. top~213 height~61): stay near closed
@@ -567,6 +747,116 @@ def _queue_obs_layout(update):
     except queue.Full:
         pass
     obs_layout_wakeup.set()
+
+
+def _queue_obs_ui(update):
+    """Keep only the latest pending OBS ui_state visibility update."""
+    try:
+        while True:
+            obs_ui_queue.get_nowait()
+    except queue.Empty:
+        pass
+    try:
+        obs_ui_queue.put_nowait(update)
+    except queue.Full:
+        pass
+    obs_layout_wakeup.set()
+
+
+def _obs_relay_wanted():
+    return bool(websocket) and (
+        obs_inv_config.get("enabled", True) or obs_ui_config.get("enabled", False)
+    )
+
+
+def _compute_obs_ui_visibility(scene, open_windows):
+    """Return desired OBS rows (visibility, transform, and/or filters) from ui_state."""
+    scene_id = str(scene or "unknown").strip().lower() or "unknown"
+    windows = open_windows if isinstance(open_windows, list) else []
+    window_set = {str(w).strip().lower() for w in windows if w}
+    items = []
+    for raw in obs_ui_config.get("actions") or []:
+        norm = _normalize_obs_ui_action(raw)
+        if not norm or not norm["enabled"]:
+            continue
+        if not norm["scene_name"] or not norm["source_name"]:
+            continue
+        if norm["visible"] is None and not norm["transform"] and not norm["filters"]:
+            continue
+        matched = scene_id in set(norm["when_scenes"]) or bool(
+            window_set & set(norm["when_windows"])
+        )
+        enabled = None
+        transform = None
+        restore_transform = False
+        filters = []
+        if matched:
+            if norm["visible"] is not None:
+                enabled = norm["visible"]
+            if norm["transform"]:
+                transform = norm["transform"]
+            if norm["filters"]:
+                filters = list(norm["filters"])
+        else:
+            if norm["visible"] is not None:
+                enabled = not norm["visible"]
+            if norm["transform"]:
+                restore_transform = True
+            if norm["filters"]:
+                filters = [
+                    {"name": f["name"], "enabled": not f["enabled"]}
+                    for f in norm["filters"]
+                ]
+        items.append({
+            "scene_name": norm["scene_name"],
+            "source_name": norm["source_name"],
+            "scene_item_id": norm["scene_item_id"],
+            "enabled": enabled,
+            "transform": transform,
+            "restore_transform": restore_transform,
+            "filters": filters,
+            "matched": matched,
+        })
+    return items
+
+
+def _apply_obs_ui_state(scene, open_windows):
+    """Queue OBS scene-item visibility/transform when ui_state changes."""
+    global last_obs_ui_state, last_obs_ui_input
+    windows = open_windows if isinstance(open_windows, list) else []
+    last_obs_ui_input = (scene, list(windows))
+    if not obs_ui_config.get("enabled", False) or not websocket:
+        return
+    items = _compute_obs_ui_visibility(scene, windows)
+    state_key = tuple(
+        (
+            row["scene_name"],
+            row["source_name"],
+            row["enabled"],
+            tuple(sorted((row["transform"] or {}).items())),
+            row["restore_transform"],
+            tuple((f.get("name"), f.get("enabled")) for f in (row.get("filters") or [])),
+        )
+        for row in items
+    )
+    if state_key == last_obs_ui_state:
+        return
+    last_obs_ui_state = state_key
+    bits = []
+    for row in items:
+        if row["enabled"] is not None:
+            bits.append(f"{row['source_name']} enabled={row['enabled']}")
+        if row["transform"]:
+            bits.append(f"{row['source_name']} transform")
+        elif row["restore_transform"]:
+            bits.append(f"{row['source_name']} restore")
+        for filt in row.get("filters") or []:
+            bits.append(
+                f"{row['source_name']} filter {filt.get('name')}="
+                f"{'on' if filt.get('enabled') else 'off'}"
+            )
+    print(f"OBS ui action: {', '.join(bits) or 'none'} (scene={scene} windows={windows})")
+    _queue_obs_ui({"items": items})
 
 
 def _enqueue_snapshot_write(data):
@@ -633,8 +923,12 @@ def _apply_obs_inv_layout(item_info, force=False, *, immediate=False):
         return
     state = "open" if is_open else "closed"
     extra = f" computed={computed}" if is_open and computed != crop_top else ""
+    pin = ""
+    if obs_inv_config.get("pin_bottom", True):
+        closed = int(obs_inv_config.get("crop_top_closed", 683))
+        pin = f" pin_up={max(0, closed - int(crop_top))}"
     print(
-        f"OBS inv crop: {state} top={crop_top} mask={mask_enabled}{extra} "
+        f"OBS inv crop: {state} top={crop_top} mask={mask_enabled}{extra}{pin} "
         f"(game top={item_info.get('top') if item_info else None} "
         f"height={item_info.get('height') if item_info else None})"
     )
@@ -678,6 +972,45 @@ def _save_score_data(data):
         print(f"Error saving streamer_chat_score: {e}")
 
 
+def _load_nine_challenge_deaths():
+    """Load the persistent career 9-challenge death count."""
+    try:
+        if os.path.exists(NINE_CHALLENGE_DEATHS_FILE):
+            with open(NINE_CHALLENGE_DEATHS_FILE, encoding='utf-8') as f:
+                data = json.load(f)
+                return {'count': max(0, int(data.get('count', 1314)))}
+    except (json.JSONDecodeError, OSError, TypeError, ValueError):
+        pass
+    return {'count': 1314}
+
+
+def _save_nine_challenge_deaths(data):
+    """Persist the career 9-challenge death count."""
+    clean = {'count': max(0, int(data.get('count', 1314)))}
+    with open(NINE_CHALLENGE_DEATHS_FILE, "w", encoding='utf-8') as f:
+        json.dump(clean, f, indent=2)
+        f.flush()
+        os.fsync(f.fileno())
+    return clean
+
+
+def _record_nine_challenge_death():
+    """Increment only when the latest full snapshot has all nine challenges."""
+    with data_lock:
+        challenge_count = len(last_challenges)
+    if challenge_count != 9:
+        print(f"9c death count unchanged (snapshot has {challenge_count} challenges)")
+        return
+    try:
+        with nine_challenge_deaths_lock:
+            data = _load_nine_challenge_deaths()
+            data['count'] += 1
+            data = _save_nine_challenge_deaths(data)
+        print(f"9c death count: {data['count']}")
+    except OSError as e:
+        print(f"Error saving 9c death count: {e}")
+
+
 def _handle_score_event(data):
     """Handle hero_died or boss_slain from game WebSocket."""
     score_data = _load_score_data()
@@ -704,7 +1037,7 @@ def _handle_score_event(data):
 
 def _game_ws_on_message(ws, message):
     """Handle message from game WebSocket: update live data (same JSON shape as inspector)."""
-    global current_game_data, last_ws_update_time, last_obs_crop_top, game_ws_received_count
+    global current_game_data, last_challenges, last_ws_update_time, last_obs_crop_top, game_ws_received_count
     try:
         data = json.loads(message)
         # Handle spawn/gold result (game reports success/failure)
@@ -818,10 +1151,15 @@ def _game_ws_on_message(ws, message):
             _vprint(f"Game {data.get('type')}: request_id={rid} success={ok}")
             return
         if data.get('type') in ('hero_died', 'boss_slain') and data.get('source') == 'shattered-pixel-dungeon':
+            if data.get('type') == 'hero_died':
+                _record_nine_challenge_death()
             _handle_score_event(data)
             return
         if data.get('type') == 'ui_layout' and data.get('source') == 'shattered-pixel-dungeon':
             _apply_obs_inv_layout(data.get('item_info'), force=True, immediate=True)
+            return
+        if data.get('type') == 'ui_state' and data.get('source') == 'shattered-pixel-dungeon':
+            _apply_obs_ui_state(data.get('scene'), data.get('open_windows'))
             return
         if data.get('source') != 'shattered-pixel-dungeon':
             global last_ignored_source_log_time
@@ -835,6 +1173,9 @@ def _game_ws_on_message(ws, message):
         last_ws_update_time = time.time()
         with data_lock:
             current_game_data = data
+            if 'challenges' in data:
+                raw_challenges = data.get('challenges')
+                last_challenges = list(raw_challenges) if isinstance(raw_challenges, list) else []
         _enqueue_snapshot_write(data)
     except Exception as e:
         print(f"Game WS message error: {e}")
@@ -924,12 +1265,360 @@ def _obs_ws_send(ws, request_type, request_data, wait_response=False):
     return None
 
 
+def _obs_lookup_scene_item_id(ws, scene_name, source_name, configured_id, quiet=False):
+    """Resolve sceneItemId for SetSceneItemEnabled; cache lookups on this socket."""
+    if configured_id is not None:
+        return configured_id
+    key = (scene_name, source_name)
+    cached = _obs_scene_item_ids.get(key)
+    if cached is not None:
+        return cached
+    resp = _obs_ws_send(ws, 'GetSceneItemId', {
+        'sceneName': scene_name,
+        'sourceName': source_name,
+    }, wait_response=True)
+    item_id = None
+    if isinstance(resp, dict):
+        item_id = (resp.get('responseData') or {}).get('sceneItemId')
+    try:
+        item_id = int(item_id)
+    except (TypeError, ValueError):
+        item_id = None
+    if item_id is None:
+        if not quiet and key not in _obs_item_id_fail_logged:
+            _obs_item_id_fail_logged.add(key)
+            print(f"OBS ui action: no scene item id for {source_name!r} in {scene_name!r}")
+        return None
+    _obs_scene_item_ids[key] = item_id
+    return item_id
+
+
+def _obs_capture_transform(ws, scene_name, source_name, item_id):
+    """Remember the source transform from before the first If/Then move."""
+    key = (scene_name, source_name)
+    if key in _obs_transform_originals:
+        return _obs_transform_originals[key]
+    resp = _obs_ws_send(ws, 'GetSceneItemTransform', {
+        'sceneName': scene_name,
+        'sceneItemId': item_id,
+    }, wait_response=True)
+    xf = None
+    if isinstance(resp, dict):
+        xf = (resp.get('responseData') or {}).get('sceneItemTransform')
+    if isinstance(xf, dict):
+        _obs_transform_originals[key] = xf
+        return xf
+    return None
+
+
+def _obs_xf_float(transform, key, default=0.0):
+    try:
+        return float((transform or {}).get(key) if (transform or {}).get(key) not in (None, "") else default)
+    except (TypeError, ValueError):
+        return default
+
+
+def _obs_inv_pin_delta(crop_top, transform):
+    """Canvas (dx, dy) that keeps the inventory edge fixed when Crop/Pad top shrinks.
+
+    Crop/Pad grows the source in local +Y. OBS is Y-down with clockwise-positive
+    rotation, so a -90° source (game top on the left) grows toward +X / the
+    visual bottom. Pin opposite that axis so the popup moves left / up.
+    """
+    closed = int(obs_inv_config.get("crop_top_closed", 683))
+    extra = max(0, closed - int(crop_top))
+    if extra <= 0 or not isinstance(transform, dict):
+        return 0.0, 0.0
+    try:
+        alignment = int(transform.get("alignment") or 5)
+    except (TypeError, ValueError):
+        alignment = 5
+    if alignment & _OBS_ALIGN_BOTTOM:
+        return 0.0, 0.0
+    delta = extra * _obs_xf_float(transform, "scaleY", 1.0)
+    if not (alignment & _OBS_ALIGN_TOP):
+        delta *= 0.5
+    rot = math.radians(_obs_xf_float(transform, "rotation", 0.0))
+    return delta * math.sin(rot), -delta * math.cos(rot)
+
+
+def _obs_inv_configured_scenes():
+    names = []
+    raw_list = obs_inv_config.get("scene_names")
+    if isinstance(raw_list, list):
+        names.extend(str(s).strip() for s in raw_list if str(s).strip())
+    one = str(obs_inv_config.get("scene_name") or "").strip()
+    if one and one not in names:
+        names.append(one)
+    return names
+
+
+def _obs_inv_resolve_pin_targets(ws):
+    """Scene items that display the cropped inv source (configured scenes or auto-discover)."""
+    global _obs_inv_pin_targets
+    if _obs_inv_pin_targets is not None:
+        return _obs_inv_pin_targets
+    source = obs_inv_config.get("source_group")
+    configured_id = _obs_ui_item_id(obs_inv_config.get("scene_item_id"))
+    targets = []
+    names = _obs_inv_configured_scenes()
+    if names:
+        for scene in names:
+            item_id = _obs_lookup_scene_item_id(ws, scene, source, configured_id)
+            if item_id is not None:
+                targets.append((scene, item_id))
+    else:
+        resp = _obs_ws_send(ws, "GetSceneList", {}, wait_response=True)
+        scenes = []
+        if isinstance(resp, dict):
+            scenes = (resp.get("responseData") or {}).get("scenes") or []
+        for row in scenes:
+            scene = (row or {}).get("sceneName")
+            if not scene:
+                continue
+            item_id = _obs_lookup_scene_item_id(ws, scene, source, None, quiet=True)
+            if item_id is not None:
+                targets.append((scene, item_id))
+        if not targets:
+            print(
+                f"OBS inv pin: no scene item for {source!r} "
+                f"(set scene_name in obs_inv_layout.json)"
+            )
+    if targets:
+        print(
+            "OBS inv pin: "
+            + ", ".join(scene for scene, _ in targets)
+        )
+    _obs_inv_pin_targets = targets
+    return targets
+
+
+def _obs_get_scene_item_transform(ws, scene_name, item_id):
+    resp = _obs_ws_send(ws, "GetSceneItemTransform", {
+        "sceneName": scene_name,
+        "sceneItemId": item_id,
+    }, wait_response=True)
+    if isinstance(resp, dict):
+        xf = (resp.get("responseData") or {}).get("sceneItemTransform")
+        if isinstance(xf, dict):
+            return xf
+    return None
+
+
+def _obs_apply_inv_pin(ws, crop_top):
+    """Keep the inventory strip's bottom edge fixed when Crop/Pad top shrinks."""
+    if not obs_inv_config.get("pin_bottom", True):
+        return
+    source = obs_inv_config.get("source_group")
+    for scene_name, item_id in _obs_inv_resolve_pin_targets(ws):
+        key = (scene_name, source)
+        xf = _obs_get_scene_item_transform(ws, scene_name, item_id)
+        if not xf:
+            continue
+        if key not in _obs_inv_closed_pos:
+            _obs_inv_closed_pos[key] = (
+                _obs_xf_float(xf, "positionX"),
+                _obs_xf_float(xf, "positionY"),
+            )
+        dx, dy = _obs_inv_pin_delta(crop_top, xf)
+        closed_x, closed_y = _obs_inv_closed_pos[key]
+        new_x = closed_x + dx
+        new_y = closed_y + dy
+        cur_x = _obs_xf_float(xf, "positionX")
+        cur_y = _obs_xf_float(xf, "positionY")
+        if abs(cur_x - new_x) < 0.5 and abs(cur_y - new_y) < 0.5:
+            continue
+        _obs_ws_send(ws, "SetSceneItemTransform", {
+            "sceneName": scene_name,
+            "sceneItemId": item_id,
+            "sceneItemTransform": {"positionX": new_x, "positionY": new_y},
+        }, wait_response=False)
+
+
+def _obs_opt_float(raw, key):
+    if not isinstance(raw, dict) or raw.get(key) in (None, ""):
+        return None
+    try:
+        return float(raw[key])
+    except (TypeError, ValueError):
+        return None
+
+
+def _obs_follow_points(item):
+    points = []
+    raw = item.get("points") if isinstance(item, dict) else None
+    if isinstance(raw, list):
+        for p in raw:
+            if not isinstance(p, dict):
+                continue
+            extra = _obs_opt_float(p, "extra")
+            x = _obs_opt_float(p, "x")
+            y = _obs_opt_float(p, "y")
+            if extra is None or x is None or y is None:
+                continue
+            points.append((extra, x, y))
+    points.sort(key=lambda row: row[0])
+    return points
+
+
+def _obs_follow_xy(points, extra):
+    if not points:
+        return None
+    if extra <= points[0][0]:
+        return points[0][1], points[0][2]
+    for i in range(1, len(points)):
+        e0, x0, y0 = points[i - 1]
+        e1, x1, y1 = points[i]
+        if extra <= e1:
+            span = e1 - e0
+            t = 1.0 if span <= 0 else (extra - e0) / span
+            return x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
+    return points[-1][1], points[-1][2]
+
+
+def _obs_inv_follow_sources():
+    raw = obs_inv_config.get("follow_sources")
+    if not isinstance(raw, list):
+        return []
+    out = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        scene = str(item.get("scene_name") or "").strip()
+        source = str(item.get("source_name") or "").strip()
+        if not scene or not source:
+            continue
+        try:
+            rotation = float(item.get("rotation", -90))
+        except (TypeError, ValueError):
+            rotation = -90.0
+        out.append({
+            "scene_name": scene,
+            "source_name": source,
+            "scene_item_id": _obs_ui_item_id(item.get("scene_item_id")),
+            "rotation": rotation,
+            "closed_x": _obs_opt_float(item, "closed_x"),
+            "closed_y": _obs_opt_float(item, "closed_y"),
+            "open_x": _obs_opt_float(item, "open_x"),
+            "open_y": _obs_opt_float(item, "open_y"),
+            "points": _obs_follow_points(item),
+        })
+    return out
+
+
+def _obs_apply_inv_follow(ws, crop_top):
+    """Move only follow_sources (webcam). Does not change INGAME - INV."""
+    closed = int(obs_inv_config.get("crop_top_closed", 683))
+    expand_most = int(obs_inv_config.get("crop_top_min", 380))
+    extra = max(0, closed - int(crop_top))
+    max_extra = max(1, closed - expand_most)
+    for row in _obs_inv_follow_sources():
+        scene_name = row["scene_name"]
+        source = row["source_name"]
+        item_id = _obs_lookup_scene_item_id(
+            ws, scene_name, source, row.get("scene_item_id")
+        )
+        if item_id is None:
+            continue
+        xf = _obs_get_scene_item_transform(ws, scene_name, item_id)
+        if not xf:
+            continue
+        key = (scene_name, source)
+        cur_x = _obs_xf_float(xf, "positionX")
+        cur_y = _obs_xf_float(xf, "positionY")
+        xy = _obs_follow_xy(row.get("points") or [], extra)
+        if xy:
+            new_x, new_y = xy
+        else:
+            closed_x = row["closed_x"]
+            closed_y = row["closed_y"]
+            if closed_x is None or closed_y is None:
+                if extra <= 0 and key not in _obs_inv_follow_closed_pos:
+                    _obs_inv_follow_closed_pos[key] = (cur_x, cur_y)
+                if key not in _obs_inv_follow_closed_pos:
+                    continue
+                cap_x, cap_y = _obs_inv_follow_closed_pos[key]
+                if closed_x is None:
+                    closed_x = cap_x
+                if closed_y is None:
+                    closed_y = cap_y
+            open_x = closed_x if row["open_x"] is None else row["open_x"]
+            open_y = closed_y if row["open_y"] is None else row["open_y"]
+            t = 0.0 if extra <= 0 else min(1.0, extra / max_extra)
+            new_x = closed_x + (open_x - closed_x) * t
+            new_y = closed_y + (open_y - closed_y) * t
+        if abs(cur_x - new_x) < 0.5 and abs(cur_y - new_y) < 0.5:
+            continue
+        _obs_ws_send(ws, "SetSceneItemTransform", {
+            "sceneName": scene_name,
+            "sceneItemId": item_id,
+            "sceneItemTransform": {"positionX": new_x, "positionY": new_y},
+        }, wait_response=False)
+        print(
+            f"OBS inv follow: {source!r} extra={extra:.0f} "
+            f"xy=({new_x:.0f},{new_y:.0f})"
+        )
+
+
+def _obs_apply_ui_update(ws, update):
+    """Send SetSceneItemEnabled / SetSceneItemTransform / SetSourceFilterEnabled."""
+    for row in update.get('items') or []:
+        needs_item = (
+            row.get('enabled') is not None
+            or row.get('transform')
+            or row.get('restore_transform')
+        )
+        item_id = None
+        if needs_item:
+            item_id = _obs_lookup_scene_item_id(
+                ws, row['scene_name'], row['source_name'], row.get('scene_item_id')
+            )
+        if item_id is not None:
+            if row.get('enabled') is not None:
+                _obs_ws_send(ws, 'SetSceneItemEnabled', {
+                    'sceneName': row['scene_name'],
+                    'sceneItemId': item_id,
+                    'sceneItemEnabled': bool(row['enabled']),
+                }, wait_response=False)
+            if row.get('transform'):
+                _obs_capture_transform(ws, row['scene_name'], row['source_name'], item_id)
+                _obs_ws_send(ws, 'SetSceneItemTransform', {
+                    'sceneName': row['scene_name'],
+                    'sceneItemId': item_id,
+                    'sceneItemTransform': row['transform'],
+                }, wait_response=False)
+            elif row.get('restore_transform'):
+                original = _obs_capture_transform(
+                    ws, row['scene_name'], row['source_name'], item_id
+                )
+                if original:
+                    _obs_ws_send(ws, 'SetSceneItemTransform', {
+                        'sceneName': row['scene_name'],
+                        'sceneItemId': item_id,
+                        'sceneItemTransform': original,
+                    }, wait_response=False)
+        for filt in row.get('filters') or []:
+            name = str(filt.get('name') or '').strip()
+            if not name or filt.get('enabled') is None:
+                continue
+            _obs_ws_send(ws, 'SetSourceFilterEnabled', {
+                'sourceName': row['source_name'],
+                'filterName': name,
+                'filterEnabled': bool(filt['enabled']),
+            }, wait_response=False)
+
+
 def obs_relay_thread():
     """Connect to OBS WebSocket and apply inventory Crop/Pad + mask from the layout queue."""
+    global _obs_scene_item_ids, _obs_transform_originals, _obs_inv_pin_targets, _obs_inv_closed_pos
+    global _obs_inv_follow_closed_pos
     last_obs_error_print = 0.0
     OBS_ERROR_THROTTLE = 60.0  # seconds
-    obs_url = obs_inv_config.get('obs_ws_url', 'ws://127.0.0.1:4455')
-    while obs_inv_config.get('enabled', True) and websocket:
+    obs_url = obs_inv_config.get('obs_ws_url') or obs_ui_config.get('obs_ws_url') or 'ws://127.0.0.1:4456'
+    while websocket:
+        if not _obs_relay_wanted():
+            time.sleep(1)
+            continue
         try:
             ws = websocket.create_connection(obs_url)
             last_obs_error_print = 0.0
@@ -947,6 +1636,11 @@ def obs_relay_thread():
                 ws.close()
                 time.sleep(5)
                 continue
+            _obs_scene_item_ids = {}
+            _obs_transform_originals = {}
+            _obs_inv_pin_targets = None
+            _obs_inv_closed_pos = {}
+            _obs_inv_follow_closed_pos = {}
             while True:
                 obs_layout_wakeup.wait(timeout=1.0)
                 obs_layout_wakeup.clear()
@@ -957,21 +1651,33 @@ def obs_relay_thread():
                         update = obs_layout_queue.get_nowait()
                 except queue.Empty:
                     pass
-                if update is None:
+                ui_update = None
+                try:
+                    ui_update = obs_ui_queue.get_nowait()
+                    while True:
+                        ui_update = obs_ui_queue.get_nowait()
+                except queue.Empty:
+                    pass
+                if update is None and ui_update is None:
                     continue
-                crop_top = update['crop_top']
-                mask_enabled = update['mask_enabled']
-                _obs_ws_send(ws, 'SetSourceFilterSettings', {
-                    'sourceName': obs_inv_config['source_group'],
-                    'filterName': obs_inv_config['filter_crop'],
-                    'filterSettings': {'top': crop_top},
-                    'overlay': True,
-                }, wait_response=False)
-                _obs_ws_send(ws, 'SetSourceFilterEnabled', {
-                    'sourceName': obs_inv_config['source_hud'],
-                    'filterName': obs_inv_config['filter_mask'],
-                    'filterEnabled': mask_enabled,
-                }, wait_response=False)
+                if update is not None:
+                    crop_top = update['crop_top']
+                    mask_enabled = update['mask_enabled']
+                    _obs_ws_send(ws, 'SetSourceFilterSettings', {
+                        'sourceName': obs_inv_config['source_group'],
+                        'filterName': obs_inv_config['filter_crop'],
+                        'filterSettings': {'top': crop_top},
+                        'overlay': True,
+                    }, wait_response=False)
+                    _obs_ws_send(ws, 'SetSourceFilterEnabled', {
+                        'sourceName': obs_inv_config['source_hud'],
+                        'filterName': obs_inv_config['filter_mask'],
+                        'filterEnabled': mask_enabled,
+                    }, wait_response=False)
+                    _obs_apply_inv_pin(ws, crop_top)
+                    _obs_apply_inv_follow(ws, crop_top)
+                if ui_update is not None:
+                    _obs_apply_ui_update(ws, ui_update)
                 try:
                     ws.settimeout(0)
                     while True:
@@ -1016,8 +1722,10 @@ def game_ws_thread():
             def on_close(conn, code, reason):
                 global last_obs_crop_top, last_obs_mask_enabled, last_open_best_crop, last_open_layout_key
                 global last_item_info_ignore_open_until, game_ws_received_count, game_ws_app
+                global last_obs_ui_state
                 last_obs_crop_top = None
                 last_obs_mask_enabled = None
+                last_obs_ui_state = None
                 last_open_best_crop = None
                 last_open_layout_key = None
                 last_item_info_ignore_open_until = 0.0
@@ -1092,6 +1800,12 @@ def points_config_page():
 def companion_settings_panel_js():
     """Companion remote-settings tab UI (loaded by points-config.html)."""
     return send_from_directory(SCRIPT_DIR, 'companion_settings_panel.js', mimetype='application/javascript')
+
+
+@app.route('/obs_ui_actions_panel.js')
+def obs_ui_actions_panel_js():
+    """OBS If/Then ui_state editor (loaded by points-config.html)."""
+    return send_from_directory(SCRIPT_DIR, 'obs_ui_actions_panel.js', mimetype='application/javascript')
 
 
 @app.route('/ws-inspect')
@@ -2055,6 +2769,39 @@ def streamer_chat_score_reset():
         return jsonify(data)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/nine-challenge-deaths', methods=['GET', 'POST', 'OPTIONS'])
+def nine_challenge_deaths():
+    """Get or manually set the persistent career 9-challenge death count."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        with nine_challenge_deaths_lock:
+            data = _load_nine_challenge_deaths()
+            if request.method == 'POST':
+                body = request.get_json(force=True, silent=True) or {}
+                if 'count' not in body:
+                    return jsonify({'error': 'count is required'}), 400
+                data['count'] = max(0, int(body['count']))
+                data = _save_nine_challenge_deaths(data)
+        return jsonify({'count': data['count'], 'display': f"9c deaths: {data['count']}"})
+    except (OSError, TypeError, ValueError) as e:
+        return jsonify({'error': str(e)}), 400
+
+
+@app.route('/api/nine-challenge-deaths/reset', methods=['POST', 'OPTIONS'])
+def nine_challenge_deaths_reset():
+    """Reset the career 9-challenge death count to its seed value."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        with nine_challenge_deaths_lock:
+            data = _save_nine_challenge_deaths({'count': 1314})
+        return jsonify({'count': data['count'], 'display': f"9c deaths: {data['count']}"})
+    except OSError as e:
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/spawn-command', methods=['POST', 'OPTIONS'])
 def spawn_command():
@@ -3469,6 +4216,33 @@ def bestiary_config_api():
         return jsonify({'error': str(e)}), 500, resp_headers
 
 
+@app.route('/api/obs-ui-actions', methods=['GET', 'POST', 'OPTIONS'])
+def obs_ui_actions_api():
+    """Get or save obs_ui_actions.json (If/Then OBS hide + transform). Hot-reloads."""
+    global obs_ui_config, last_obs_ui_state
+    if request.method == 'OPTIONS':
+        return '', 204
+    resp_headers = {'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0'}
+    try:
+        if request.method == 'GET':
+            return jsonify(_sanitize_obs_ui_config(obs_ui_config)), 200, resp_headers
+        raw = request.get_json(silent=True)
+        if not isinstance(raw, dict):
+            return jsonify({'error': 'JSON object required'}), 400, resp_headers
+        saved = _sanitize_obs_ui_config(raw)
+        with open(OBS_UI_ACTIONS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(saved, f, indent=2)
+            f.write('\n')
+        obs_ui_config = saved
+        last_obs_ui_state = None
+        scene, windows = last_obs_ui_input
+        if scene is not None:
+            _apply_obs_ui_state(scene, windows)
+        return jsonify({'ok': True, 'config': saved}), 200, resp_headers
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500, resp_headers
+
+
 def _default_companion_settings_doc():
     return {
         'revision': 0,
@@ -3913,7 +4687,7 @@ if __name__ == '__main__':
         threading.Thread(target=snapshot_writer_thread, daemon=True).start()
         threading.Thread(target=game_ws_thread, daemon=True).start()
     # OBS inventory crop relay (direct filter control from game geometry)
-    if obs_inv_config.get('enabled', True) and websocket:
+    if websocket:
         threading.Thread(target=obs_relay_thread, daemon=True).start()
     # Double points countdown for OBS (writes to double_points_countdown.txt every second)
     threading.Thread(target=double_points_countdown_thread, daemon=True).start()
@@ -3947,6 +4721,8 @@ if __name__ == '__main__':
         print(f"Game WebSocket: {GAME_WS_URL}")
     if obs_inv_config.get('enabled', True) and websocket:
         print(f"OBS Inv Layout: {obs_inv_config.get('obs_ws_url')}")
+    if obs_ui_config.get('enabled', False) and websocket:
+        print(f"OBS UI actions: {obs_ui_config.get('obs_ws_url', obs_inv_config.get('obs_ws_url'))}")
     print(f"Summon march queue: {len(summon_march_events)} events")
     print(f"Streamer vs Chat: {STREAMER_CHAT_SCORE_TXT}")
     if LOG_VERBOSE:
@@ -3959,9 +4735,11 @@ if __name__ == '__main__':
     _QUIET_PATHS = (
         '/game_summary',
         '/api/double-points-remaining',
+        '/api/nine-challenge-deaths',
         '/api/game-data',
         '/api/bestiary',
         '/api/bestiary-config',
+        '/api/obs-ui-actions',
         '/api/companion-settings',
         '/api/companion-settings/heartbeat',
         '/api/summon-march',

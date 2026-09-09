@@ -17,6 +17,10 @@ var _subtitle: Label
 
 var _queue: Array[Dictionary] = []
 var _playing: bool = false
+var _preview_pinned: bool = false
+var _preview_sample: Dictionary = {}
+var _playback_generation: int = 0
+var _active_tween: Tween
 var _rotate_idx: int = 0
 var _idle_accum: float = 0.0
 var _alerts: Node = null
@@ -93,6 +97,8 @@ func _on_cfg() -> void:
 	_apply_fonts()
 	_apply_layout()
 	_idle_accum = 0.0
+	if _preview_pinned:
+		_render_item(_preview_sample)
 
 
 func _on_alerts_busy_changed(_busy: bool) -> void:
@@ -109,6 +115,9 @@ func _command_alerts_busy() -> bool:
 
 
 func _process(delta: float) -> void:
+	if _preview_pinned:
+		_idle_accum = 0.0
+		return
 	if not CompanionConfig.custom_alerts_enabled:
 		_idle_accum = 0.0
 		return
@@ -175,11 +184,69 @@ func _enqueue(item: Dictionary) -> void:
 	while _queue.size() >= 8:
 		_queue.pop_front()
 	_queue.append(item)
-	if not _playing and not _command_alerts_busy():
+	if not _playing and not _preview_pinned and not _command_alerts_busy():
 		_play_next()
 
 
+func show_preview(sample: Dictionary, pinned: bool) -> void:
+	var item := {
+		"title": str(sample.get("title", "Preview tip")),
+		"subtitle": str(sample.get("subtitle", "Adjust the alert zone here")),
+		"hold": float(sample.get("hold", CompanionConfig.custom_alerts_hold_sec)),
+	}
+	if not pinned:
+		if _preview_pinned:
+			clear_preview()
+		_queue.push_front(item)
+		if not _playing and not _command_alerts_busy():
+			_play_next()
+		return
+	_cancel_playback()
+	_preview_pinned = true
+	_preview_sample = item
+	_playing = true
+	_render_item(_preview_sample)
+
+
+func clear_preview() -> void:
+	_cancel_playback()
+	_preview_pinned = false
+	_preview_sample.clear()
+	_playing = false
+	_hide()
+	if not _queue.is_empty() and not _command_alerts_busy():
+		_play_next()
+
+
+func is_preview_pinned() -> bool:
+	return _preview_pinned
+
+
+func _cancel_playback() -> void:
+	_playback_generation += 1
+	if _active_tween and _active_tween.is_valid():
+		_active_tween.kill()
+	_active_tween = null
+
+
+func _render_item(item: Dictionary) -> void:
+	_apply_layout()
+	_apply_chrome()
+	_apply_padding()
+	_apply_fonts()
+	_title.text = str(item.get("title", "Preview tip"))
+	_subtitle.text = str(item.get("subtitle", "Adjust the alert zone here"))
+	_title.visible = not _title.text.strip_edges().is_empty()
+	_subtitle.visible = not _subtitle.text.strip_edges().is_empty()
+	_fit_toast()
+	call_deferred("_fit_toast")
+	_row.scale = Vector2.ONE
+	_row.modulate.a = 1.0
+
+
 func _play_next() -> void:
+	if _preview_pinned:
+		return
 	if _queue.is_empty():
 		_playing = false
 		_hide()
@@ -188,6 +255,7 @@ func _play_next() -> void:
 		_playing = false
 		return
 	_playing = true
+	var generation := _playback_generation
 	_idle_accum = 0.0
 	_apply_layout()
 	_apply_chrome()
@@ -200,20 +268,29 @@ func _play_next() -> void:
 	_subtitle.visible = not _subtitle.text.strip_edges().is_empty()
 	_fit_toast()
 	await get_tree().process_frame
+	if generation != _playback_generation:
+		return
 	_fit_toast()
 	_row.pivot_offset = Vector2(roundf(_row.size.x * 0.5), roundf(_row.size.y * 0.5))
 	var fade_in := maxf(0.05, CompanionConfig.alert_fade_in_sec)
 	var hold := maxf(0.5, float(item.get("hold", CompanionConfig.custom_alerts_hold_sec)))
 	var fade_out := maxf(0.05, CompanionConfig.alert_fade_out_sec)
-	var tween := create_tween().set_parallel(true)
-	tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tween.tween_property(_row, "modulate:a", 1.0, fade_in).from(0.0)
-	tween.tween_property(_row, "scale", Vector2.ONE, fade_in).from(Vector2(0.92, 0.92))
-	await tween.finished
+	_active_tween = create_tween().set_parallel(true)
+	_active_tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_active_tween.tween_property(_row, "modulate:a", 1.0, fade_in).from(0.0)
+	_active_tween.tween_property(_row, "scale", Vector2.ONE, fade_in).from(Vector2(0.92, 0.92))
+	await _active_tween.finished
+	if generation != _playback_generation:
+		return
 	await get_tree().create_timer(hold).timeout
-	var out := create_tween()
-	out.tween_property(_row, "modulate:a", 0.0, fade_out)
-	await out.finished
+	if generation != _playback_generation:
+		return
+	_active_tween = create_tween()
+	_active_tween.tween_property(_row, "modulate:a", 0.0, fade_out)
+	await _active_tween.finished
+	if generation != _playback_generation:
+		return
+	_active_tween = null
 	_play_next()
 
 

@@ -50,7 +50,7 @@ func _on_settings_reloaded() -> void:
 
 func _on_settings_saved() -> void:
 	_apply_poll_timer()
-	if CompanionConfig._remote_apply_in_progress:
+	if CompanionConfig.is_remote_apply_in_progress():
 		return
 	if CompanionConfig.remote_settings_push_on_save and CompanionConfig.remote_settings_enabled:
 		push_now()
@@ -187,11 +187,11 @@ func _apply_server_payload(data: Dictionary, force: bool) -> void:
 		return
 	if (settings as Dictionary).is_empty() and rev <= 0:
 		return
-	CompanionConfig._remote_apply_in_progress = true
+	CompanionConfig.begin_remote_apply()
 	CompanionConfig.apply_remote_dict(settings as Dictionary)
 	CompanionConfig.remote_settings_applied_revision = rev
 	CompanionConfig.save_settings()
-	CompanionConfig._remote_apply_in_progress = false
+	CompanionConfig.end_remote_apply()
 	applied.emit(rev)
 
 

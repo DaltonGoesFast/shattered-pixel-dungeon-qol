@@ -1,0 +1,19 @@
+{
+  "enabled": false,
+  "obs_ws_url": "ws://127.0.0.1:4456",
+  "actions": [
+    {
+      "enabled": true,
+      "scene_name": "V01 LIVE - MAIN",
+      "source_name": "INGAME - INV",
+      "scene_item_id": null,
+      "when": {
+        "scenes": ["alchemy", "journal", "interlevel", "title"],
+        "windows": ["journal"]
+      },
+      "then": {
+        "visible": false
+      }
+    }
+  ]
+}

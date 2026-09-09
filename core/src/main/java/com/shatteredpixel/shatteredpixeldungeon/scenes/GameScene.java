@@ -193,7 +193,7 @@ public class GameScene extends PixelScene {
 	private BossHealthBar boss;
 
 	private GameLog log;
-	/** Solid black box behind log for OBS chroma-key masking */
+	/** Near-black #0c0c0c box behind log for OBS chroma-key masking */
 	private SkinnedBlock logBg;
 
 	private static CellSelector cellSelector;
@@ -576,7 +576,7 @@ public class GameScene extends PixelScene {
 		attack.camera = uiCamera;
 		add( attack );
 
-		logBg = new SkinnedBlock(1, 1, TextureCache.createSolid(0xFF000000));
+		logBg = new SkinnedBlock(1, 1, TextureCache.createSolid(SPDSettings.OBS_CHROMA_MASK_COLOR));
 		logBg.camera = uiCamera;
 		add(logBg);
 

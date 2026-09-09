@@ -37,6 +37,7 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.InventorySlot;
 import com.shatteredpixel.shatteredpixeldungeon.ui.QuickSlotButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RenderedTextBlock;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingUI;
 import com.watabou.noosa.Game;
 
 import java.util.ArrayList;
@@ -157,6 +158,7 @@ public class WndQuickBag extends Window {
 
 		//offset to be above the toolbar
 		offset(0, (int) (bottom/2 - 30 - height/2));
+		StreamingUI.notifyUIState();
 
 	}
 
@@ -179,6 +181,7 @@ public class WndQuickBag extends Window {
 		if (WndBag.INSTANCE == this){
 			WndBag.INSTANCE = null;
 		}
+		StreamingUI.notifyUIState();
 	}
 
 }

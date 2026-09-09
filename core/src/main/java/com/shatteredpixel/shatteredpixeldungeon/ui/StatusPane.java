@@ -50,7 +50,7 @@ import com.watabou.utils.GameMath;
 public class StatusPane extends Component {
 
 	private NinePatch bg;
-	/** Solid black box behind HP bar and buffs for OBS chroma-key masking */
+	/** Near-black #0c0c0c box behind HP bar and buffs for OBS chroma-key masking */
 	private ColorBlock obsMaskHpBuffs;
 	private Image avatar;
 	private Button heroInfo;
@@ -98,7 +98,7 @@ public class StatusPane extends Component {
 
 		this.large = large;
 
-		obsMaskHpBuffs = new ColorBlock(1, 1, 0xFF000000);
+		obsMaskHpBuffs = new ColorBlock(1, 1, SPDSettings.OBS_CHROMA_MASK_COLOR);
 		add(obsMaskHpBuffs);
 
 		if (large)  bg = new NinePatch( asset, 0, 64, 41, 39, 33, 0, 4, 0 );
@@ -338,7 +338,7 @@ public class StatusPane extends Component {
 			PixelScene.align(level);
 		}
 
-		// OBS mask: solid black behind HP bar, buffs, and turn wheel for chroma-key
+		// OBS mask: #0c0c0c behind HP bar, buffs, and turn wheel for chroma-key
 		if (large) {
 			if (flip) {
 				// Mask spans from the (left-side) turn wheel to the right edge of the HP bar.

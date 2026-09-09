@@ -41,7 +41,7 @@ public class WndInfoItem extends Window {
 
 	/** Used by streaming/overlay to detect if an item inspect/use window is open. */
 	public static boolean isOpen() {
-		return INSTANCE != null;
+		return INSTANCE != null && INSTANCE.parent != null;
 	}
 
 	/** Active window for layout streaming; game thread only. */
@@ -67,6 +67,7 @@ public class WndInfoItem extends Window {
 
 		replaceInstance();
 		INSTANCE = this;
+		StreamingUI.notifyUIState();
 
 		if (heap.type == Heap.Type.HEAP) {
 			fillFields( heap.peek() );
@@ -82,6 +83,7 @@ public class WndInfoItem extends Window {
 
 		replaceInstance();
 		INSTANCE = this;
+		StreamingUI.notifyUIState();
 		
 		fillFields( item );
 	}
@@ -108,6 +110,7 @@ public class WndInfoItem extends Window {
 		if ( INSTANCE == this ) {
 			INSTANCE = null;
 			StreamingUI.notifyItemInfoLayout();
+			StreamingUI.notifyUIState();
 		}
 		super.hide();
 	}

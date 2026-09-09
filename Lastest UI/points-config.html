@@ -165,7 +165,23 @@
     section.drag-over-bottom { background: linear-gradient(to top, rgba(var(--spd-accent-rgba), 0.3) 0%, transparent 60%); }
     section .section-drag-handle { cursor: grab; padding: 0 6px; margin-right: 4px; color: var(--spd-muted-on-surface); user-select: none; }
     section .section-drag-handle:active { cursor: grabbing; }
-    section h2 { font-size: 1rem; color: var(--spd-text-on-surface); margin: 0 0 0.75rem 0; display: flex; align-items: center; }
+    section h2 { font-size: 1rem; color: var(--spd-text-on-surface); margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.25rem; cursor: pointer; }
+    section.collapsed { padding-top: 0.7rem; padding-bottom: 0.7rem; }
+    section.collapsed > :not(h2) { display: none !important; }
+    section.collapsed > h2 { margin-bottom: 0; }
+    .section-collapse-btn {
+      margin-left: auto;
+      flex-shrink: 0;
+      background: transparent;
+      border: none;
+      color: var(--spd-muted-on-surface);
+      cursor: pointer;
+      padding: 2px 6px;
+      font-size: 0.75rem;
+      line-height: 1;
+      min-width: 1.5rem;
+    }
+    .section-collapse-btn:hover { background: transparent; color: var(--spd-accent); }
     .row {
       display: flex;
       align-items: center;
@@ -627,6 +643,49 @@
     #section-spawn_scale .ss-preview-table th,
     #section-spawn_scale .ss-preview-table td { padding: 0 8px 1px 0; text-align: left; white-space: nowrap; }
     #section-spawn_scale .ss-preview-table th { color: var(--spd-muted-on-surface); font-weight: 600; }
+    .obs-ui-rule {
+      border: 1px solid var(--spd-border);
+      border-radius: 6px;
+      padding: 0.65rem 0.75rem;
+      margin: 0.55rem 0;
+      background: var(--spd-surface-dark);
+    }
+    .obs-ui-rule-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 0.45rem; }
+    .obs-ui-scene { display: block; font-size: 0.82rem; margin: 0.15rem 0 0.35rem; }
+    .obs-ui-scene input { width: min(100%, 280px); }
+    .obs-ui-if { margin: 0.5rem 0 0.25rem; font-size: 0.8rem; color: var(--spd-muted-on-surface); }
+    .obs-ui-chips { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 0.2rem 0 0.4rem; }
+    .obs-ui-chip { min-width: 0; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 4px; }
+    .obs-ui-advanced { margin: 0.15rem 0 0.45rem; font-size: 0.8rem; }
+    .obs-ui-advanced summary { cursor: pointer; color: var(--spd-muted-on-surface); }
+    .obs-ui-advanced input { width: min(100%, 280px); margin-top: 0.3rem; }
+    .obs-ui-table { width: 100%; border-collapse: collapse; margin: 0.35rem 0 0.4rem; font-size: 0.82rem; }
+    .obs-ui-table th {
+      text-align: left; color: var(--spd-muted-on-surface); font-weight: 600;
+      padding: 0.15rem 0.4rem 0.3rem 0;
+    }
+    .obs-ui-table td { padding: 0.2rem 0.4rem 0.2rem 0; vertical-align: middle; }
+    .obs-ui-table input[data-source-name] { width: 100%; min-width: 140px; }
+    .obs-ui-table input[data-filter-name] { width: 100%; min-width: 120px; }
+    .obs-ui-table select[data-visibility],
+    .obs-ui-table select[data-filter-vis] { width: 100%; min-width: 96px; }
+    .obs-ui-src-on { width: 2.2rem; }
+    .obs-ui-src-actions { width: 1%; white-space: nowrap; }
+    .obs-ui-src-adv td { padding-bottom: 0.55rem; }
+    .obs-ui-adv-grid { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: 0.8rem; }
+    .obs-ui-xf-row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-top: 0.35rem; }
+    .obs-ui-xf { min-width: 0; font-size: 0.8rem; }
+    .obs-ui-xf input { width: 72px; }
+    .obs-ui-mini {
+      padding: 0.25rem 0.55rem;
+      font-size: 0.78rem;
+      margin: 0 0 0 0.35rem;
+      background: var(--spd-btn-secondary);
+    }
+    .obs-ui-mini:hover { background: var(--spd-btn-secondary-hover); }
+    .obs-ui-mini-danger { background: var(--spd-danger); }
+    .obs-ui-mini-danger:hover { background: var(--spd-danger-hover); }
+    .obs-ui-group > .obs-ui-mini { margin: 0.15rem 0 0; }
   </style>
 </head>
 <body>
@@ -654,6 +713,7 @@
       <span id="unsavedHint" class="hud-chip" title="Cost fields changed since last save">Costs unsaved</span>
       <span id="unsavedBestiary" class="hud-chip" title="Bestiary config changed since last save">Bestiary unsaved</span>
       <span id="unsavedCompanion" class="hud-chip" title="Companion settings changed since last save">Companion unsaved</span>
+      <span id="unsavedObsUi" class="hud-chip" title="OBS If/Then rules changed since last save">OBS rules unsaved</span>
       <button type="button" id="refresh" style="background:var(--spd-btn-secondary);">Refresh</button>
       <button type="button" id="streamModeBtn" style="background:var(--spd-btn-secondary);" title="Hide game, companion, and bestiary while streaming">Stream</button>
       <span id="msg"></span>
@@ -1039,6 +1099,12 @@
     <div id="wsOut">Connect to see game data.</div>
   </section>
 
+  <section id="section-obs-ui" data-section="obs-ui">
+    <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>OBS If/Then</h2>
+    <p class="sub" style="margin-bottom: 0.5rem;">When a <code>ui_state</code> scene or window is active, hide/show or move OBS sources that share the same trigger, or toggle a source filter (mask). Filter names must match OBS exactly. Item inspect crop stays on the existing inv-crop path. Saves to <code>obs_ui_actions.json</code>.</p>
+    <div id="obsUiActionsRoot"></div>
+  </section>
+
   <section id="section-score" data-section="score">
     <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>Streamer vs Chat Score</h2>
     <p class="sub" style="margin-bottom: 0.75rem;">Chat +1 when hero dies, Streamer +1 when boss slain. Output: streamer_chat_score.txt (OBS Read from file).</p>
@@ -1076,6 +1142,18 @@
       <button id="doublePointsExtend" style="margin:0;background:var(--spd-btn-secondary);">Extend</button>
       <button id="doublePointsStop" style="margin:0;background:var(--spd-danger);">Stop 2x</button>
       <span id="doublePointsCountdown" class="free-countdown" style="margin-left:8px;">—</span>
+    </div>
+  </section>
+  <section id="section-nine-challenge-deaths" data-section="nine-challenge-deaths">
+    <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>9-Challenge Deaths</h2>
+    <p class="sub" style="margin-bottom: 0.75rem;">Persistent career count. Only true game-over deaths with all 9 challenges active increment it.</p>
+    <div class="row">
+      <label for="nineChallengeDeaths">Count:</label>
+      <input type="number" id="nineChallengeDeaths" min="0" value="1314" style="width:90px;">
+    </div>
+    <div class="row" style="margin-top:0.75rem;">
+      <button id="nineChallengeDeathsUpdate">Update</button>
+      <button id="nineChallengeDeathsReset" style="background:var(--spd-btn-secondary);">Reset to 1314</button>
     </div>
   </section>
   <section id="section-session" data-section="session">
@@ -1197,11 +1275,20 @@
       </div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-viewer" checked> Viewer points</label></div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-game" checked> Game data (WebSocket)</label></div>
+      <div class="config-row"><label><input type="checkbox" id="cfg-section-obs-ui" checked> OBS If/Then</label></div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-score" checked> Streamer vs Chat Score</label></div>
+      <div class="config-row"><label><input type="checkbox" id="cfg-section-nine-challenge-deaths" checked> 9-Challenge Deaths</label></div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-session" checked> Session</label></div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-bestiary" checked> Bestiary</label></div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-companion" checked> Companion</label></div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-activity" checked> Activity</label></div>
+      <div class="config-row">
+        <span style="display:block;margin-bottom:0.35rem;">Collapse:</span>
+        <div class="col-options">
+          <button type="button" id="overallConfigCollapseAll" style="background:var(--spd-btn-secondary);">Collapse all</button>
+          <button type="button" id="overallConfigExpandAll" style="background:var(--spd-btn-secondary);">Expand all</button>
+        </div>
+      </div>
       <div class="btns">
         <button id="overallConfigReset">Reset</button>
         <button id="overallConfigRestoreLayout" style="background:var(--spd-btn-secondary);" title="Restore default section layout (General, Monsters | Viewer | Game, Score)">Restore layout</button>
@@ -1243,6 +1330,7 @@
 
 
   <script src="/companion_settings_panel.js"></script>
+  <script src="/obs_ui_actions_panel.js"></script>
   <script>
     const MONSTERS = [
       'rat', 'albino', 'snake', 'gnoll', 'crab', 'slime', 'swarm', 'thief',
@@ -1277,17 +1365,23 @@
     function companionIsDirty() {
       return !!(window.CompanionSettingsPanel && CompanionSettingsPanel.isDirty());
     }
+    function obsUiIsDirty() {
+      return !!(window.ObsUiActionsPanel && ObsUiActionsPanel.isDirty());
+    }
     function anyDirty() {
-      return costsDirty || bestiaryDirty || companionIsDirty();
+      return costsDirty || bestiaryDirty || companionIsDirty() || obsUiIsDirty();
     }
     function updateDirtyChips() {
       const costs = document.getElementById('unsavedHint');
       const best = document.getElementById('unsavedBestiary');
       const comp = document.getElementById('unsavedCompanion');
+      const obs = document.getElementById('unsavedObsUi');
       if (costs) costs.classList.toggle('show', costsDirty);
       if (best) best.classList.toggle('show', bestiaryDirty);
       if (comp) comp.classList.toggle('show', companionIsDirty());
+      if (obs) obs.classList.toggle('show', obsUiIsDirty());
     }
+    window.updateDirtyChips = updateDirtyChips;
     function setCostsDirty(dirty) {
       costsDirty = !!dirty;
       updateDirtyChips();
@@ -2182,6 +2276,16 @@
       document.getElementById('score_preview').textContent = `${sl}: ${s} | ${cl}: ${c}`;
     }
 
+    function loadNineChallengeDeaths() {
+      fetch('/api/nine-challenge-deaths')
+        .then(r => r.json())
+        .then(data => {
+          if (data.error) throw new Error(data.error);
+          document.getElementById('nineChallengeDeaths').value = data.count ?? 1314;
+        })
+        .catch(() => {});
+    }
+
     function save() {
       const defaultCost = parseInt(document.getElementById('default_monster_cost').value, 10) || 100;
       const costPerMonster = {};
@@ -2506,7 +2610,7 @@
       updateStreamModeBtn();
       applyOverallConfig();
     }
-    const OVERALL_CONFIG_DEFAULT = { columns: 3, sections: { general: true, monsters: true, spawn_scale: true, viewer: true, game: true, score: true, session: true, bestiary: true, companion: true, activity: true }, order: ['general', 'monsters', 'spawn_scale', 'viewer', 'companion', 'game', 'score', 'session', 'bestiary'], columnCounts: [3, 2, 4], monsterColumns: 2, viewerSectionWidth: 540 };
+    const OVERALL_CONFIG_DEFAULT = { columns: 3, sections: { general: true, monsters: true, spawn_scale: true, viewer: true, game: true, 'obs-ui': true, score: true, session: true, bestiary: true, companion: true, activity: true }, order: ['general', 'monsters', 'spawn_scale', 'viewer', 'companion', 'game', 'obs-ui', 'score', 'session', 'bestiary'], columnCounts: [3, 2, 5], monsterColumns: 2, viewerSectionWidth: 540, collapsed: {} };
     function getOverallConfig() {
       try {
         const s = localStorage.getItem(OVERALL_CONFIG_STORAGE);
@@ -2572,6 +2676,59 @@
     function saveOverallConfig(cfg) {
       try { localStorage.setItem(OVERALL_CONFIG_STORAGE, JSON.stringify(cfg)); } catch (_) {}
     }
+    function collectCollapsedState() {
+      const collapsed = {};
+      document.querySelectorAll('section[data-section]').forEach(el => {
+        collapsed[el.dataset.section] = el.classList.contains('collapsed');
+      });
+      return collapsed;
+    }
+    function updateSectionCollapseBtn(section) {
+      const btn = section && section.querySelector('.section-collapse-btn');
+      if (!btn) return;
+      const collapsed = section.classList.contains('collapsed');
+      btn.textContent = collapsed ? '▶' : '▼';
+      btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      btn.title = collapsed ? 'Expand section' : 'Collapse section';
+    }
+    function setSectionCollapsed(section, collapsed) {
+      if (!section) return;
+      section.classList.toggle('collapsed', !!collapsed);
+      updateSectionCollapseBtn(section);
+    }
+    function applyCollapsedState() {
+      const cfg = getOverallConfig();
+      const collapsed = (cfg.collapsed && typeof cfg.collapsed === 'object') ? cfg.collapsed : {};
+      document.querySelectorAll('section[data-section]').forEach(el => {
+        setSectionCollapsed(el, collapsed[el.dataset.section] === true);
+      });
+    }
+    function persistCollapsedState() {
+      const cfg = getOverallConfig();
+      cfg.collapsed = collectCollapsedState();
+      saveOverallConfig(cfg);
+    }
+    function setAllSectionsCollapsed(collapsed) {
+      document.querySelectorAll('section[data-section]').forEach(el => setSectionCollapsed(el, collapsed));
+      persistCollapsedState();
+    }
+    function initSectionCollapseToggles() {
+      document.querySelectorAll('section[data-section]').forEach(section => {
+        const h2 = section.querySelector(':scope > h2');
+        if (!h2 || h2.querySelector('.section-collapse-btn')) return;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'section-collapse-btn';
+        btn.setAttribute('aria-label', 'Collapse section');
+        btn.textContent = '▼';
+        h2.appendChild(btn);
+        h2.addEventListener('click', (e) => {
+          if (e.target.closest('.section-drag-handle, input, label, select, textarea, a')) return;
+          setSectionCollapsed(section, !section.classList.contains('collapsed'));
+          persistCollapsedState();
+        });
+      });
+    }
     function getSectionOrder() {
       const colLeft = document.getElementById('colLeft');
       const colRight = document.getElementById('colRight');
@@ -2592,12 +2749,17 @@
         grid.classList.add('col-' + Math.max(1, Math.min(3, cfg.columns)));
         applyColumnWidths();
       }
-      ['general', 'monsters', 'viewer', 'game', 'score', 'session', 'bestiary', 'companion', 'activity'].forEach(id => {
+      ['general', 'monsters', 'viewer', 'game', 'obs-ui', 'score', 'session', 'bestiary', 'companion', 'activity'].forEach(id => {
         const el = document.getElementById('section-' + id);
         if (el) el.style.display = (cfg.sections[id] !== false) ? '' : 'none';
       });
       applyStreamSectionOverlay();
-      const order = cfg.order || ['general', 'monsters', 'spawn_scale', 'viewer', 'companion', 'game', 'score', 'session', 'bestiary'];
+      const order = cfg.order || ['general', 'monsters', 'spawn_scale', 'viewer', 'companion', 'game', 'obs-ui', 'score', 'session', 'bestiary'];
+      if (!order.includes('obs-ui')) {
+        const gi = order.indexOf('game');
+        if (gi >= 0) order.splice(gi + 1, 0, 'obs-ui');
+        else order.push('obs-ui');
+      }
       const orderFiltered = order.filter(id => id !== 'activity');
       let counts = cfg.columnCounts || [2, 1, 4];
       const movable = orderFiltered.length || 7;
@@ -2633,6 +2795,7 @@
         monstersSection.style.maxWidth = '100%';
         monstersSection.style.width = 'min(' + w + 'px, 100%)';
       }
+      applyCollapsedState();
     }
     const THEME_STORAGE = 'spd_theme';
     const THEME_DARK = {
@@ -3211,8 +3374,8 @@
     document.getElementById('section-spawn_scale')?.addEventListener('input', () => updateSpawnScalePreview());
     document.getElementById('section-spawn_scale')?.addEventListener('change', () => updateSpawnScalePreview());
     document.getElementById('refresh').addEventListener('click', () => {
-      if (anyDirty() && !confirm('You have unsaved changes (costs, bestiary, and/or companion). Refresh anyway and lose them?')) return;
-      load(); loadBestiaryConfig(); if (window.CompanionSettingsPanel) CompanionSettingsPanel.load(); loadViewerPoints(); loadScoreData(); refreshLiveStatus(); showMsg('Refreshed', true); logActivity('Refreshed');
+      if (anyDirty() && !confirm('You have unsaved changes (costs, bestiary, companion, and/or OBS rules). Refresh anyway and lose them?')) return;
+      load(); loadBestiaryConfig(); if (window.CompanionSettingsPanel) CompanionSettingsPanel.load(); if (window.ObsUiActionsPanel) ObsUiActionsPanel.load(); loadViewerPoints(); loadScoreData(); loadNineChallengeDeaths(); refreshLiveStatus(); showMsg('Refreshed', true); logActivity('Refreshed');
     });
     renderActivityList();
     const activityHideGameLoadedEl = document.getElementById('activityHideGameLoaded');
@@ -3225,6 +3388,7 @@
       if (costsDirty) jobs.push(Promise.resolve(save()));
       if (bestiaryDirty) jobs.push(Promise.resolve(saveBestiaryConfig()));
       if (companionIsDirty()) jobs.push(Promise.resolve(CompanionSettingsPanel.save()));
+      if (obsUiIsDirty()) jobs.push(Promise.resolve(ObsUiActionsPanel.save()));
       if (!jobs.length) {
         save();
         return;
@@ -3527,6 +3691,32 @@
         .then(r => r.json()).then(d => { if (d.error) throw new Error(d.error); loadScoreData(); showMsg('Score reset', true); logActivity('Score reset'); })
         .catch(e => showMsg('Failed: ' + e.message, false));
     });
+    document.getElementById('nineChallengeDeathsUpdate').addEventListener('click', () => {
+      const count = Math.max(0, parseInt(document.getElementById('nineChallengeDeaths').value, 10) || 0);
+      fetch('/api/nine-challenge-deaths', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ count }),
+      })
+        .then(r => r.json()).then(d => {
+          if (d.error) throw new Error(d.error);
+          document.getElementById('nineChallengeDeaths').value = d.count;
+          showMsg('9-challenge death count updated', true);
+          logActivity('9c deaths set to ' + d.count);
+        })
+        .catch(e => showMsg('Failed: ' + e.message, false));
+    });
+    document.getElementById('nineChallengeDeathsReset').addEventListener('click', () => {
+      if (!confirm('Reset 9-challenge deaths to 1314?')) return;
+      fetch('/api/nine-challenge-deaths/reset', { method: 'POST' })
+        .then(r => r.json()).then(d => {
+          if (d.error) throw new Error(d.error);
+          document.getElementById('nineChallengeDeaths').value = d.count;
+          showMsg('9-challenge death count reset to 1314', true);
+          logActivity('9c deaths reset to 1314');
+        })
+        .catch(e => showMsg('Failed: ' + e.message, false));
+    });
     document.getElementById('deathCostReset').addEventListener('click', () => {
       if (!confirm('Reset death cost inflation to 1.0x?')) return;
       fetch('/api/death-cost/reset', { method: 'POST' })
@@ -3722,7 +3912,9 @@
       document.getElementById('cfg-section-spawn_scale').checked = cfg.sections.spawn_scale !== false;
       document.getElementById('cfg-section-viewer').checked = cfg.sections.viewer !== false;
       document.getElementById('cfg-section-game').checked = cfg.sections.game !== false;
+      document.getElementById('cfg-section-obs-ui').checked = cfg.sections['obs-ui'] !== false;
       document.getElementById('cfg-section-score').checked = cfg.sections.score !== false;
+      document.getElementById('cfg-section-nine-challenge-deaths').checked = cfg.sections['nine-challenge-deaths'] !== false;
       document.getElementById('cfg-section-session').checked = cfg.sections.session !== false;
       document.getElementById('cfg-section-bestiary').checked = cfg.sections.bestiary !== false;
       document.getElementById('cfg-section-companion').checked = cfg.sections.companion !== false;
@@ -3733,7 +3925,7 @@
       if (e.target.id === 'overallConfigModal') e.target.classList.remove('open');
     });
     document.getElementById('overallConfigApply').addEventListener('click', () => {
-      const order = getSectionOrder().length ? getSectionOrder() : ['general', 'monsters', 'spawn_scale', 'viewer', 'companion', 'game', 'score', 'session', 'bestiary'];
+      const order = getSectionOrder().length ? getSectionOrder() : ['general', 'monsters', 'spawn_scale', 'viewer', 'companion', 'game', 'score', 'nine-challenge-deaths', 'session', 'bestiary'];
       const monsterCols = document.querySelector('input[name="monsterCols"]:checked').value;
       const cfg = getOverallConfig();
       const applied = {
@@ -3744,7 +3936,9 @@
           spawn_scale: document.getElementById('cfg-section-spawn_scale').checked,
           viewer: document.getElementById('cfg-section-viewer').checked,
           game: document.getElementById('cfg-section-game').checked,
+          'obs-ui': document.getElementById('cfg-section-obs-ui').checked,
           score: document.getElementById('cfg-section-score').checked,
+          'nine-challenge-deaths': document.getElementById('cfg-section-nine-challenge-deaths').checked,
           session: document.getElementById('cfg-section-session').checked,
           bestiary: document.getElementById('cfg-section-bestiary').checked,
           companion: document.getElementById('cfg-section-companion').checked,
@@ -3753,6 +3947,7 @@
         order,
         monsterColumns: monsterCols === 'auto' ? 'auto' : parseInt(monsterCols, 10) || 2,
         monsterSectionWidth: cfg.monsterSectionWidth ?? 540,
+        collapsed: cfg.collapsed || {},
       };
       saveOverallConfig(applied);
       document.getElementById('overallConfigModal').classList.remove('open');
@@ -3766,7 +3961,9 @@
       document.getElementById('cfg-section-spawn_scale').checked = true;
       document.getElementById('cfg-section-viewer').checked = true;
       document.getElementById('cfg-section-game').checked = true;
+      document.getElementById('cfg-section-obs-ui').checked = true;
       document.getElementById('cfg-section-score').checked = true;
+      document.getElementById('cfg-section-nine-challenge-deaths').checked = true;
       document.getElementById('cfg-section-session').checked = true;
       document.getElementById('cfg-section-bestiary').checked = true;
       document.getElementById('cfg-section-companion').checked = true;
@@ -3774,7 +3971,7 @@
     });
     document.getElementById('overallConfigRestoreLayout').addEventListener('click', () => {
       const cfg = getOverallConfig();
-      cfg.order = ['general', 'monsters', 'spawn_scale', 'viewer', 'companion', 'game', 'score', 'session', 'bestiary'];
+      cfg.order = ['general', 'monsters', 'spawn_scale', 'viewer', 'companion', 'game', 'obs-ui', 'score', 'nine-challenge-deaths', 'session', 'bestiary'];
       cfg.columnCounts = [2, 2, 4];
       cfg.sections.companion = true;
       saveOverallConfig(cfg);
@@ -3789,6 +3986,9 @@
     ['vp_search', 'new_points', 'new_donation'].forEach(id => {
       document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') addViewerUser(); });
     });
+    document.getElementById('overallConfigCollapseAll')?.addEventListener('click', () => setAllSectionsCollapsed(true));
+    document.getElementById('overallConfigExpandAll')?.addEventListener('click', () => setAllSectionsCollapsed(false));
+    initSectionCollapseToggles();
     applyOverallConfig();
     updateStreamModeBtn();
     applyColumnWidths();
@@ -3798,6 +3998,18 @@
     document.getElementById('bestiaryConfigReload')?.addEventListener('click', () => {
       loadBestiaryConfig().then(() => { showMsg('Bestiary config reloaded', true); });
     });
+    (function initObsUiPanel() {
+      const root = document.getElementById('obsUiActionsRoot');
+      if (window.ObsUiActionsPanel) {
+        try { ObsUiActionsPanel.init(); }
+        catch (e) {
+          console.error(e);
+          if (root) root.innerHTML = '<p class="sub" style="color:var(--spd-error);">OBS If/Then failed to init: ' + (e && e.message ? e.message : e) + '</p>';
+        }
+      } else if (root) {
+        root.innerHTML = '<p class="sub" style="color:var(--spd-error);">Could not load <code>/obs_ui_actions_panel.js</code>. Restart <code>server.py</code> and hard-refresh (Ctrl+F5).</p>';
+      }
+    })();
     (function initCompanionPanel() {
       const root = document.getElementById('companionPanelRoot');
       if (window.CompanionSettingsPanel) {
@@ -3925,6 +4137,7 @@
       });
     })();
     loadScoreData();
+    loadNineChallengeDeaths();
     (function setupSectionDragDrop() {
       const colLeft = document.getElementById('colLeft');
       const colRight = document.getElementById('colRight');
