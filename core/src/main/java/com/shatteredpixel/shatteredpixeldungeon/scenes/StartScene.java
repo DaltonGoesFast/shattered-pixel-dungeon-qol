@@ -214,7 +214,9 @@ public class StartScene extends PixelScene {
 				}
 			} else {
 				
-				if (info.subClass != HeroSubClass.NONE){
+				if (info.customName != null && !info.customName.isEmpty()){
+					name.text(Messages.titleCase(info.customName));
+				} else if (info.subClass != HeroSubClass.NONE){
 					name.text(Messages.titleCase(info.subClass.title()));
 				} else {
 					name.text(Messages.titleCase(info.heroClass.title()));

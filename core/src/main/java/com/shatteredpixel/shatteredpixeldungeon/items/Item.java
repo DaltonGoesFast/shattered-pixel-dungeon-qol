@@ -34,7 +34,12 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Belongings;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Speck;
+import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
+import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.Artifact;
 import com.shatteredpixel.shatteredpixeldungeon.items.bags.Bag;
+import com.shatteredpixel.shatteredpixeldungeon.items.rings.Ring;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.Weapon;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.MissileWeapon;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.darts.Dart;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.darts.TippedDart;
@@ -100,6 +105,8 @@ public class Item implements Bundlable {
 	public boolean bones = false;
 
 	public int customNoteID = -1;
+	/** Optional display name for renameable equipment; empty/null means use default. */
+	public String customName = null;
 	
 	public static final Comparator<Item> itemComparator = new Comparator<Item>() {
 		@Override
@@ -500,7 +507,19 @@ public class Item implements Bundlable {
 	}
 	
 	public String name() {
+		if (customName != null && !customName.isEmpty()) {
+			return customName;
+		}
 		return trueName();
+	}
+
+	/** True if this item can be given a custom display name (non-stacking equipment). */
+	public boolean canRename() {
+		return !stackable && (this instanceof Weapon
+				|| this instanceof Armor
+				|| this instanceof Wand
+				|| this instanceof Ring
+				|| this instanceof Artifact);
 	}
 	
 	public final String trueName() {
@@ -593,6 +612,7 @@ public class Item implements Bundlable {
 	private static final String QUICKSLOT		= "quickslotpos";
 	private static final String KEPT_LOST       = "kept_lost";
 	private static final String CUSTOM_NOTE_ID = "custom_note_id";
+	private static final String CUSTOM_NAME = "custom_name";
 	
 	@Override
 	public void storeInBundle( Bundle bundle ) {
@@ -606,6 +626,7 @@ public class Item implements Bundlable {
 		}
 		bundle.put( KEPT_LOST, keptThoughLostInvent );
 		if (customNoteID != -1)     bundle.put(CUSTOM_NOTE_ID, customNoteID);
+		if (customName != null && !customName.isEmpty()) bundle.put(CUSTOM_NAME, customName);
 	}
 	
 	@Override
@@ -632,6 +653,12 @@ public class Item implements Bundlable {
 
 		keptThoughLostInvent = bundle.getBoolean( KEPT_LOST );
 		if (bundle.contains(CUSTOM_NOTE_ID))    customNoteID = bundle.getInt(CUSTOM_NOTE_ID);
+		if (bundle.contains(CUSTOM_NAME)) {
+			customName = bundle.getString(CUSTOM_NAME);
+			if (customName != null && customName.isEmpty()) customName = null;
+		} else {
+			customName = null;
+		}
 	}
 
 	public int targetingPos( Hero user, int dst ){

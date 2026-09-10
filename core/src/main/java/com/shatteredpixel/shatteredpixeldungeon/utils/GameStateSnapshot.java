@@ -179,6 +179,7 @@ public class GameStateSnapshot {
 		h.put("class", Messages.titleCase(classTitle));
 		String subTitle = hero.subClass == null || hero.subClass == HeroSubClass.NONE ? null : hero.subClass.title();
 		h.put("subclass", subTitle != null ? Messages.titleCase(subTitle) : null);
+		h.put("name", Messages.titleCase(hero.name()));
 		h.put("hp", hero.HP);
 		h.put("ht", hero.HT);
 		h.put("exp", hero.exp);

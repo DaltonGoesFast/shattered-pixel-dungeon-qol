@@ -343,6 +343,9 @@ public class MagesStaff extends MeleeWeapon {
 
 	@Override
 	public String name() {
+		if (customName != null && !customName.isEmpty()) {
+			return customName;
+		}
 		if (wand == null) {
 			return super.name();
 		} else {

@@ -102,6 +102,7 @@ public class HeroSelectScene extends PixelScene {
 		super.create();
 
 		Dungeon.hero = null;
+		GamesInProgress.pendingHeroName = null;
 
 		Badges.loadGlobal();
 		Journal.loadGlobal();
@@ -402,7 +403,9 @@ public class HeroSelectScene extends PixelScene {
 	}
 
 	private void updateOptionsColor(){
-		if (!SPDSettings.customSeed().isEmpty()){
+		if (GamesInProgress.pendingHeroName != null && !GamesInProgress.pendingHeroName.isEmpty()){
+			btnOptions.icon().hardlight(1f, 1.5f, 0.67f);
+		} else if (!SPDSettings.customSeed().isEmpty()){
 			btnOptions.icon().hardlight(1f, 1.5f, 0.67f);
 		} else if (SPDSettings.challenges() != 0){
 			btnOptions.icon().hardlight(2f, 1.33f, 0.5f);
@@ -636,6 +639,47 @@ public class HeroSelectScene extends PixelScene {
 
 			buttons = new ArrayList<>();
 			spacers = new ArrayList<>();
+
+			StyledButton nameButton = new StyledButton(Chrome.Type.BLANK, Messages.get(HeroSelectScene.class, "hero_name"), 6){
+				@Override
+				protected void onClick() {
+					String existing = GamesInProgress.pendingHeroName == null ? "" : GamesInProgress.pendingHeroName;
+					ShatteredPixelDungeon.scene().addToFront( new WndTextInput(
+							Messages.get(HeroSelectScene.class, "hero_name_title"),
+							Messages.get(HeroSelectScene.class, "hero_name_desc"),
+							existing,
+							20,
+							false,
+							Messages.get(HeroSelectScene.class, "hero_name_set"),
+							Messages.get(HeroSelectScene.class, "hero_name_clear")){
+						@Override
+						public void onSelect(boolean positive, String text) {
+							if (positive){
+								text = text == null ? "" : text.trim().replace('\n', ' ').replace('\r', ' ');
+								if (text.isEmpty()){
+									GamesInProgress.pendingHeroName = null;
+									icon.resetColor();
+								} else {
+									GamesInProgress.pendingHeroName = text;
+									icon.hardlight(1f, 1.5f, 0.67f);
+								}
+							} else {
+								GamesInProgress.pendingHeroName = null;
+								icon.resetColor();
+							}
+							updateOptionsColor();
+						}
+					});
+				}
+			};
+			nameButton.leftJustify = true;
+			nameButton.icon(Icons.get(Icons.SCROLL_COLOR));
+			if (GamesInProgress.pendingHeroName != null && !GamesInProgress.pendingHeroName.isEmpty()){
+				nameButton.icon().hardlight(1f, 1.5f, 0.67f);
+			}
+			buttons.add(nameButton);
+			add(nameButton);
+
 			StyledButton seedButton = new StyledButton(Chrome.Type.BLANK, Messages.get(HeroSelectScene.class, "custom_seed"), 6){
 				@Override
 				protected void onClick() {

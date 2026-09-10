@@ -574,6 +574,9 @@ public class Armor extends EquipableItem {
 	
 	@Override
 	public String name() {
+		if (customName != null && !customName.isEmpty()) {
+			return customName;
+		}
 		if (isEquipped(Dungeon.hero) && !hasCurseGlyph() && Dungeon.hero.buff(HolyWard.HolyArmBuff.class) != null
 			&& (Dungeon.hero.subClass != HeroSubClass.PALADIN || glyph == null)){
 				return Messages.get(HolyWard.class, "glyph_name", super.name());

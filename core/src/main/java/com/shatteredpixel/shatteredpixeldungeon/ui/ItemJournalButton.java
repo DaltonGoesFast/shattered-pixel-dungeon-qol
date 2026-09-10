@@ -28,6 +28,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Notes;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
+import com.shatteredpixel.shatteredpixeldungeon.windows.WndOptions;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndTextInput;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndTitledMessage;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndUseItem;
@@ -45,9 +46,56 @@ public class ItemJournalButton extends IconButton {
 
 	@Override
 	protected void onClick() {
+		if (item.canRename()) {
+			GameScene.show(new WndOptions(
+					Icons.JOURNAL.get(),
+					Messages.get(this, "menu_title"),
+					Messages.get(this, "menu_desc"),
+					Messages.get(this, "rename"),
+					Messages.get(this, "note")){
+				@Override
+				protected void onSelect(int index) {
+					if (index == 0) {
+						renameItem();
+					} else if (index == 1) {
+						customNote();
+					}
+				}
+			});
+		} else {
+			customNote();
+		}
+	}
 
-		customNote();
-
+	private void renameItem(){
+		String existing = item.customName == null ? "" : item.customName;
+		GameScene.show(new WndTextInput(
+				Messages.get(this, "rename_title"),
+				Messages.get(this, "rename_desc", Messages.titleCase(item.trueName())),
+				existing,
+				30,
+				false,
+				Messages.get(this, "rename_set"),
+				Messages.get(this, "rename_clear")){
+			@Override
+			public void onSelect(boolean positive, String text) {
+				if (positive){
+					text = text == null ? "" : text.trim().replace('\n', ' ').replace('\r', ' ');
+					item.customName = text.isEmpty() ? null : text;
+				} else {
+					item.customName = null;
+				}
+				Item.updateQuickslot();
+				if (parentWnd != null) {
+					Window owner = null;
+					if (parentWnd instanceof WndUseItem) {
+						owner = ((WndUseItem) parentWnd).owner;
+					}
+					parentWnd.hide();
+					GameScene.show(new WndUseItem(owner, item));
+				}
+			}
+		});
 	}
 
 	private void customNote(){

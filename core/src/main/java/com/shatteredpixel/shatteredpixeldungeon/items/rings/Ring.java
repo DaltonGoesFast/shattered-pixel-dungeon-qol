@@ -180,6 +180,9 @@ public class Ring extends KindofMisc {
 	
 	@Override
 	public String name() {
+		if (customName != null && !customName.isEmpty()) {
+			return customName;
+		}
 		return isKnown() ? super.name() : Messages.get(Ring.class, gem);
 	}
 

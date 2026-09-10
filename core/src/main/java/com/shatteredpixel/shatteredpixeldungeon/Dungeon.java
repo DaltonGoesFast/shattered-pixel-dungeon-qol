@@ -283,6 +283,10 @@ public class Dungeon {
 		Badges.reset();
 		
 		GamesInProgress.selectedClass.initHero( hero );
+		if (GamesInProgress.pendingHeroName != null && !GamesInProgress.pendingHeroName.isEmpty()) {
+			hero.customName = GamesInProgress.pendingHeroName;
+		}
+		GamesInProgress.pendingHeroName = null;
 	}
 
 	public static boolean isChallenged( int mask ) {

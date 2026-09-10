@@ -43,6 +43,8 @@ public class GamesInProgress {
 	
 	public static HeroClass selectedClass;
 	public static boolean randomizedClass = false;
+	/** Optional hero name chosen on hero select; applied in Dungeon.init then cleared. */
+	public static String pendingHeroName = null;
 	
 	private static final String GAME_FOLDER = "game%d";
 	private static final String GAME_FILE	= "game.dat";
@@ -159,6 +161,7 @@ public class GamesInProgress {
 		info.heroClass = Dungeon.hero.heroClass;
 		info.subClass = Dungeon.hero.subClass;
 		info.armorTier = Dungeon.hero.tier();
+		info.customName = Dungeon.hero.customName;
 		
 		info.goldCollected = Statistics.goldCollected;
 		info.maxDepth = Statistics.deepestFloor;
@@ -197,6 +200,7 @@ public class GamesInProgress {
 		public HeroClass heroClass;
 		public HeroSubClass subClass;
 		public int armorTier;
+		public String customName;
 		
 		public int goldCollected;
 		public int maxDepth;

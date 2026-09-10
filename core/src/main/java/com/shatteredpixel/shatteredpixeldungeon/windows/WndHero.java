@@ -161,8 +161,42 @@ public class WndHero extends WndTabbed {
 			else
 				title.label((hero.name() + "\n" + Messages.get(this, "title", hero.lvl, hero.className())).toUpperCase(Locale.ENGLISH));
 			title.color(Window.TITLE_COLOR);
-			title.setRect( 0, 0, WIDTH-16, 0 );
+			title.setRect( 0, 0, WIDTH-32, 0 );
 			add(title);
+
+			IconButton renameButton = new IconButton(Icons.get(Icons.SCROLL_COLOR)){
+				@Override
+				protected void onClick() {
+					super.onClick();
+					String existing = hero.customName == null ? "" : hero.customName;
+					GameScene.show(new WndTextInput(
+							Messages.get(WndHero.class, "rename_title"),
+							Messages.get(WndHero.class, "rename_desc"),
+							existing,
+							20,
+							false,
+							Messages.get(WndHero.class, "rename_set"),
+							Messages.get(WndHero.class, "rename_clear")){
+						@Override
+						public void onSelect(boolean positive, String text) {
+							if (positive){
+								text = text == null ? "" : text.trim().replace('\n', ' ').replace('\r', ' ');
+								hero.customName = text.isEmpty() ? null : text;
+							} else {
+								hero.customName = null;
+							}
+							initialize();
+						}
+					});
+				}
+
+				@Override
+				protected String hoverText() {
+					return Messages.titleCase(Messages.get(WndHero.class, "rename"));
+				}
+			};
+			renameButton.setRect(title.right(), 0, 16, 16);
+			add(renameButton);
 
 			IconButton infoButton = new IconButton(Icons.get(Icons.INFO)){
 				@Override
@@ -181,7 +215,7 @@ public class WndHero extends WndTabbed {
 				}
 
 			};
-			infoButton.setRect(title.right(), 0, 16, 16);
+			infoButton.setRect(renameButton.right(), 0, 16, 16);
 			add(infoButton);
 
 			pos = title.bottom() + 2*GAP;
