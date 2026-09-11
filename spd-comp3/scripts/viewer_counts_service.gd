@@ -319,18 +319,20 @@ func _handle_caster_packet(text: String) -> void:
 		_caster_peer.send_text(JSON.stringify({"type": "READY", "data": {}}))
 		return
 	var data: Variant = packet.get("data", {})
-	var count := -1
-	if packet_type == "KOI_STATICS" and typeof(data) == TYPE_DICTIONARY:
-		var statics: Dictionary = data
-		count = _extract_tiktok_count(statics.get("viewerCounts", null))
-		if count < 0 and _tiktok_explicitly_offline(statics):
+	# Chat / join / gift KOI events mention platform=TIKTOK and leftover 0 fields
+	# (upvotes, subscriber_count). Those are not viewer counts — ignore them.
+	if packet_type != "KOI_STATICS" or typeof(data) != TYPE_DICTIONARY:
+		return
+	var statics: Dictionary = data
+	var count := _extract_tiktok_count(statics.get("viewerCounts", null))
+	if count < 0:
+		if _tiktok_explicitly_offline(statics):
 			count = 0
-	elif packet_type == "KOI":
-		count = _extract_tiktok_count(data)
-		if count < 0 and _contains_tiktok(data):
-			count = _extract_count_field(data)
-	if count >= 0:
-		ViewerCountsState.set_count("tiktok", count)
+		else:
+			return
+	elif count == 0 and not _tiktok_explicitly_offline(statics) and ViewerCountsState.tiktok > 0:
+		return
+	ViewerCountsState.set_count("tiktok", count)
 
 
 func _extract_tiktok_count(value: Variant, in_tiktok: bool = false) -> int:
@@ -339,54 +341,34 @@ func _extract_tiktok_count(value: Variant, in_tiktok: bool = false) -> int:
 			return maxi(0, int(value)) if in_tiktok else -1
 		TYPE_DICTIONARY:
 			var dict: Dictionary = value
-			var platform := str(dict.get("platform", "")).to_lower()
-			var here := in_tiktok or platform == "tiktok"
 			for key in dict.keys():
-				var key_text := str(key).to_lower()
-				var child_tiktok := here or key_text == "tiktok"
-				if child_tiktok and key_text in ["count", "viewers", "viewer_count", "value"]:
-					var direct: Variant = dict[key]
+				if str(key).to_lower() != "tiktok":
+					continue
+				var found := _extract_tiktok_count(dict[key], true)
+				if found >= 0:
+					return found
+			var here := in_tiktok or str(dict.get("platform", "")).to_lower() == "tiktok"
+			if here:
+				for key in ["viewer_count", "viewercount", "viewers", "count", "value"]:
+					var direct: Variant = dict.get(key, null)
+					if direct == null:
+						for alt in dict.keys():
+							if str(alt).to_lower() == key:
+								direct = dict[alt]
+								break
 					if typeof(direct) in [TYPE_INT, TYPE_FLOAT]:
 						return maxi(0, int(direct))
-				var found := _extract_tiktok_count(dict[key], child_tiktok)
-				if found >= 0:
-					return found
-		TYPE_ARRAY:
-			for child in value as Array:
-				var found := _extract_tiktok_count(child, in_tiktok)
-				if found >= 0:
-					return found
-	return -1
-
-
-func _contains_tiktok(value: Variant) -> bool:
-	match typeof(value):
-		TYPE_STRING:
-			return str(value).to_lower() == "tiktok"
-		TYPE_DICTIONARY:
-			var dict: Dictionary = value
 			for key in dict.keys():
-				if str(key).to_lower() == "tiktok" or _contains_tiktok(dict[key]):
-					return true
+				if str(key).to_lower() == "tiktok":
+					continue
+				var found := _extract_tiktok_count(dict[key], false)
+				if found >= 0:
+					return found
 		TYPE_ARRAY:
 			for child in value as Array:
-				if _contains_tiktok(child):
-					return true
-	return false
-
-
-func _extract_count_field(value: Variant) -> int:
-	if typeof(value) != TYPE_DICTIONARY:
-		return -1
-	var dict: Dictionary = value
-	for key in ["viewer_count", "viewerCount", "viewers", "count", "value"]:
-		var direct: Variant = dict.get(key, null)
-		if typeof(direct) in [TYPE_INT, TYPE_FLOAT]:
-			return maxi(0, int(direct))
-	for child in dict.values():
-		var found := _extract_count_field(child)
-		if found >= 0:
-			return found
+				var found := _extract_tiktok_count(child, false)
+				if found >= 0:
+					return found
 	return -1
 
 

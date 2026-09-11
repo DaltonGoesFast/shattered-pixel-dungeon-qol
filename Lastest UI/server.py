@@ -1023,6 +1023,11 @@ def _handle_score_event(data):
             print(f"Death cost inflation: {deaths} death(s) -> {mult:.2f}x harmful command costs")
         except Exception as e:
             print(f"Death cost inflation update failed: {e}")
+        try:
+            from chat_command import clear_hero_name_goo_poll_flag
+            clear_hero_name_goo_poll_flag()
+        except Exception as e:
+            print(f"hero_name run flag clear failed: {e}")
     elif data.get('type') == 'boss_slain':
         score_data['streamer'] = score_data.get('streamer', 0) + 1
         try:
@@ -1031,6 +1036,17 @@ def _handle_score_event(data):
             print("Death cost inflation reset (boss slain)")
         except Exception as e:
             print(f"Death cost inflation reset failed: {e}")
+        try:
+            depth = int(data.get('depth') if data.get('depth') is not None else -1)
+        except (TypeError, ValueError):
+            depth = -1
+        if depth == 5:
+            try:
+                from chat_command import try_hero_name_goo_poll
+                result = try_hero_name_goo_poll()
+                print(f"hero_name goo poll: {result}")
+            except Exception as e:
+                print(f"hero_name goo poll failed: {e}")
     _save_score_data(score_data)
     print(f"Score event {data.get('type')}: streamer={score_data['streamer']} chat={score_data['chat']}")
 
@@ -1041,7 +1057,7 @@ def _game_ws_on_message(ws, message):
     try:
         data = json.loads(message)
         # Handle spawn/gold result (game reports success/failure)
-        if data.get('type') in ('ping_result', 'spawn_result', 'champion_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result', 'trap_result', 'plant_result', 'bomb_result', 'transmute_result', 'summon_bee_result', 'ward_result', 'heal_result', 'cleanse_result', 'dew_result', 'corrupt_ally_result', 'hex_result', 'degrade_result', 'sabotage_result', 'ring_of_wealth_result', 'streamer_debug_result'):
+        if data.get('type') in ('ping_result', 'spawn_result', 'champion_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result', 'trap_result', 'plant_result', 'bomb_result', 'transmute_result', 'summon_bee_result', 'ward_result', 'heal_result', 'cleanse_result', 'dew_result', 'corrupt_ally_result', 'hex_result', 'degrade_result', 'sabotage_result', 'ring_of_wealth_result', 'streamer_debug_result', 'set_hero_name_result'):
             rid = data.get('request_id')
             ok = data.get('success', False)
             if rid:
@@ -1146,6 +1162,10 @@ def _game_ws_on_message(ws, message):
                         if data.get('type') == 'streamer_debug_result' and data.get('detail'):
                             pending_spawns[rid]['detail'] = data.get('detail')
                         if data.get('type') == 'streamer_debug_result' and data.get('error'):
+                            pending_spawns[rid]['error'] = data.get('error')
+                        if data.get('type') == 'set_hero_name_result' and data.get('name'):
+                            pending_spawns[rid]['name'] = data.get('name')
+                        if data.get('type') == 'set_hero_name_result' and data.get('error'):
                             pending_spawns[rid]['error'] = data.get('error')
                         pending_spawns[rid]['event'].set()
             _vprint(f"Game {data.get('type')}: request_id={rid} success={ok}")
@@ -3636,6 +3656,12 @@ def streamer_debug_heal_all():
     return _forward_streamer_debug('streamer_heal_all', 'Heal-all failed')
 
 
+@app.route('/api/streamer-debug/give-bags', methods=['POST', 'OPTIONS'])
+def streamer_debug_give_bags():
+    """Streamer debug: give any missing shop bags (pouch, holder, bandolier, holster)."""
+    return _forward_streamer_debug('streamer_give_bags', 'Give bags failed')
+
+
 @app.route('/api/streamer-debug/identify-all', methods=['POST', 'OPTIONS'])
 def streamer_debug_identify_all():
     """Streamer debug: identify all inventory and equipped items."""
@@ -3736,6 +3762,87 @@ def streamer_debug_give():
             'streamer_give_item',
             'Give item failed',
             extra_payload={'item': item, 'quantity': quantity, 'level': level},
+        )
+    except (TypeError, ValueError) as e:
+        return jsonify({'ok': False, 'error': str(e)}), 400
+
+
+@app.route('/api/streamer-debug/suggest', methods=['GET', 'POST', 'OPTIONS'])
+def streamer_debug_suggest():
+    """Local item/buff name suggestions. Works without an active run."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        query = (data.get('query') or request.args.get('query') or '').strip()
+        if not query:
+            return jsonify({'ok': True, 'items': [], 'buffs': []})
+        limit = max(1, min(25, int(data.get('limit') or request.args.get('limit') or 12)))
+        from streamer_item_index import search_items_local
+        from streamer_buff_index import search_buffs_local
+        items = [{'name': name, 'hint': hint} for name, hint in search_items_local(query, limit=limit)]
+        buffs = [
+            {'name': name, 'kind': kind}
+            for _label, name, kind in search_buffs_local(query, limit=limit)
+        ]
+        return jsonify({'ok': True, 'items': items, 'buffs': buffs})
+    except (TypeError, ValueError) as e:
+        return jsonify({'ok': False, 'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 400
+
+
+@app.route('/api/streamer-debug/catalog', methods=['GET', 'OPTIONS'])
+def streamer_debug_catalog():
+    """Full local item + buff lists for autocomplete. Works without an active run."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        from streamer_item_index import list_items_local
+        from streamer_buff_index import list_buffs_local
+        items = [{'name': name, 'hint': hint} for name, hint in list_items_local()]
+        buffs = [
+            {'name': name, 'kind': kind, 'label': label}
+            for label, name, kind in list_buffs_local()
+        ]
+        return jsonify({'ok': True, 'items': items, 'buffs': buffs})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 400
+
+
+@app.route('/api/streamer-debug/set-level', methods=['POST', 'OPTIONS'])
+def streamer_debug_set_level():
+    """Streamer debug: set hero level. Body: {level}."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        if data.get('level') is None:
+            return jsonify({'ok': False, 'error': 'Missing level'}), 400
+        level = max(1, min(30, int(data.get('level'))))
+        return _forward_streamer_debug(
+            'streamer_set_hero_level',
+            'Set level failed',
+            extra_payload={'level': level},
+        )
+    except (TypeError, ValueError) as e:
+        return jsonify({'ok': False, 'error': str(e)}), 400
+
+
+@app.route('/api/streamer-debug/goto-floor', methods=['POST', 'OPTIONS'])
+def streamer_debug_goto_floor():
+    """Streamer debug: warp to dungeon floor. Body: {depth} (1–26)."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        if data.get('depth') is None:
+            return jsonify({'ok': False, 'error': 'Missing depth'}), 400
+        depth = max(1, min(26, int(data.get('depth'))))
+        return _forward_streamer_debug(
+            'streamer_goto_floor',
+            'Goto floor failed',
+            extra_payload={'depth': depth},
         )
     except (TypeError, ValueError) as e:
         return jsonify({'ok': False, 'error': str(e)}), 400
@@ -4548,6 +4655,75 @@ def chat_command_api():
     except Exception as e:
         print(f"chat-command error: {e}")
         return jsonify({"ok": False, "message": str(e), "pts": None, "earned": 0}), 500
+
+
+@app.route('/api/hero-name/poll-result', methods=['POST', 'OPTIONS'])
+def hero_name_poll_result_api():
+    """Streamer.bot N02/N03: one platform's closed poll votes for hero naming."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        from hero_name import record_poll_result
+        body = request.get_json(force=True, silent=True) or {}
+        result = record_poll_result(body)
+        print(f"hero_name poll-result: {result}")
+        return jsonify(result)
+    except Exception as e:
+        print(f"hero_name poll-result error: {e}")
+        return jsonify({"ok": False, "reason": str(e)}), 500
+
+
+@app.route('/api/hero-name/apply', methods=['POST', 'OPTIONS'])
+def hero_name_apply_api():
+    """Streamer applies the pending poll winner to the in-game hero (no chat spam)."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        from hero_name import get_pending_winner, mark_applied
+        body = request.get_json(force=True, silent=True) or {}
+        pending = get_pending_winner()
+        name = (body.get('name') or '').strip()
+        if not name and pending and pending.get('winner'):
+            name = (pending['winner'].get('name') or '').strip()
+        name = name.replace('\n', '').replace('\r', '').strip()
+        if not name:
+            return jsonify({'ok': False, 'error': 'No pending winner'}), 400
+        if len(name) > 20:
+            name = name[:20]
+        if not game_ws_app:
+            return jsonify({'ok': False, 'error': 'Game not connected'}), 503
+        request_id = str(uuid.uuid4())
+        ev = threading.Event()
+        with spawn_lock:
+            pending_spawns[request_id] = {'event': ev, 'success': False}
+        try:
+            payload = {
+                'command': 'set_hero_name',
+                'request_id': request_id,
+                'name': name,
+            }
+            _send_to_game(payload)
+        except Exception as e:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': str(e)}), 503
+        if ev.wait(timeout=SPAWN_RESULT_TIMEOUT):
+            with spawn_lock:
+                popped = pending_spawns.pop(request_id, {})
+                success = popped.get('success', False)
+                err_val = popped.get('error')
+        else:
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+            return jsonify({'ok': False, 'error': 'set_hero_name timed out'}), 504
+        if success:
+            mark_applied(name)
+            print(f"hero_name applied: {name}")
+            return jsonify({'ok': True, 'name': name})
+        return jsonify({'ok': False, 'error': err_val or 'Apply failed'}), 200
+    except Exception as e:
+        print(f"hero_name apply error: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 500
 
 
 @app.route('/api/session', methods=['GET', 'OPTIONS'])

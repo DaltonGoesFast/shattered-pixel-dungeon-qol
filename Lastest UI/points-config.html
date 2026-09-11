@@ -605,11 +605,14 @@
     #section-spawn_scale > .sub,
     #section-spawn_scale #spawnScalePushStatus { margin-bottom: 0.3rem; font-size: 0.8rem; }
     #section-spawn_scale h3 { margin: 0.4rem 0 0.15rem; font-size: 0.78rem; letter-spacing: 0.03em; text-transform: uppercase; color: var(--spd-muted-on-surface); }
-    #section-spawn_scale .ss-toolbar {
+    #section-spawn_scale .ss-toolbar,
+    #section-bestiary .ss-toolbar {
       display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-bottom: 0.2rem;
     }
     #section-spawn_scale .ss-toolbar button,
-    #section-spawn_scale .ss-toolbar select {
+    #section-spawn_scale .ss-toolbar select,
+    #section-bestiary .ss-toolbar button,
+    #section-bestiary .ss-toolbar select {
       margin-top: 0; padding: 0.2rem 0.5rem; font-size: 0.78rem; border-radius: 4px;
     }
     #section-spawn_scale .ss-grid {
@@ -643,6 +646,66 @@
     #section-spawn_scale .ss-preview-table th,
     #section-spawn_scale .ss-preview-table td { padding: 0 8px 1px 0; text-align: left; white-space: nowrap; }
     #section-spawn_scale .ss-preview-table th { color: var(--spd-muted-on-surface); font-weight: 600; }
+    #section-debug h3 {
+      margin: 0.7rem 0 0.25rem;
+      font-size: 0.78rem;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: var(--spd-muted-on-surface);
+    }
+    #section-debug h3:first-of-type { margin-top: 0.35rem; }
+    #section-debug .dbg-btns, #section-debug .dbg-floors, #section-debug .dbg-suggest {
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    }
+    #section-debug .dbg-btns button, #section-debug .dbg-floors button {
+      margin: 0; padding: 0.28rem 0.55rem; font-size: 0.82rem;
+    }
+    #section-debug .dbg-row {
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0.3rem 0;
+    }
+    #section-debug .dbg-row label { min-width: 0; font-size: 0.82rem; color: var(--spd-muted-on-surface); }
+    #section-debug .dbg-row input[type="text"] { width: min(100%, 220px); }
+    #section-debug .dbg-row input[type="number"] { width: 64px; }
+    #section-debug .dbg-ac { position: relative; flex: 1 1 220px; min-width: 180px; max-width: 320px; }
+    #section-debug .dbg-ac input[type="text"] { width: 100%; }
+    #section-debug .dbg-ac-list {
+      display: none;
+      position: absolute;
+      z-index: 30;
+      left: 0; right: 0; top: calc(100% + 2px);
+      max-height: 220px;
+      overflow-y: auto;
+      margin: 0; padding: 2px 0;
+      list-style: none;
+      background: var(--spd-surface-dark);
+      color: var(--spd-text-on-surface-dark);
+      border: 1px solid var(--spd-border);
+      border-radius: 4px;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.35);
+    }
+    #section-debug .dbg-ac-list.open { display: block; }
+    #section-debug .dbg-ac-list li {
+      padding: 0.28rem 0.55rem;
+      font-size: 0.82rem;
+      cursor: pointer;
+    }
+    #section-debug .dbg-ac-list li.active,
+    #section-debug .dbg-ac-list li:hover { background: rgba(var(--spd-accent-rgba), 0.35); }
+    #section-debug .dbg-ac-list .dbg-ac-meta {
+      color: var(--spd-muted-on-surface);
+      font-size: 0.72rem;
+      margin-left: 0.4rem;
+    }
+    #section-debug .dbg-suggest button {
+      margin: 0; padding: 0.18rem 0.45rem; font-size: 0.75rem;
+      background: var(--spd-btn-secondary);
+    }
+    #section-debug #dbgStatus {
+      min-height: 1.2em; font-size: 0.82rem; margin-top: 0.45rem;
+      color: var(--spd-muted-on-surface);
+    }
+    #section-debug #dbgStatus.ok { color: var(--spd-success); }
+    #section-debug #dbgStatus.err { color: var(--spd-error); }
     .obs-ui-rule {
       border: 1px solid var(--spd-border);
       border-radius: 6px;
@@ -1099,6 +1162,74 @@
     <div id="wsOut">Connect to see game data.</div>
   </section>
 
+  <section id="section-debug" data-section="debug">
+    <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>Debug</h2>
+    <p class="sub" style="margin-bottom: 0.5rem;">Streamer-only. Needs an active run and game WebSocket. No points spent.</p>
+    <h3>Quick</h3>
+    <div class="dbg-btns">
+      <button type="button" data-dbg="heal-all">Heal all</button>
+      <button type="button" data-dbg="identify-all">Identify</button>
+      <button type="button" data-dbg="reveal-map">Reveal map</button>
+      <button type="button" data-dbg="goto-stairs-down">Stairs ↓</button>
+      <button type="button" data-dbg="goto-stairs-up">Stairs ↑</button>
+    </div>
+    <h3>Give item</h3>
+    <div class="dbg-row">
+      <div class="dbg-ac">
+        <input type="text" id="dbgItem" placeholder="Type to search items…" autocomplete="off" spellcheck="false">
+        <ul class="dbg-ac-list" id="dbgItemList" hidden></ul>
+      </div>
+      <label for="dbgQty">x</label>
+      <input type="number" id="dbgQty" min="1" max="999" value="1">
+      <label for="dbgItemLvl">+</label>
+      <input type="number" id="dbgItemLvl" min="0" max="99" value="0">
+      <button type="button" id="dbgGive">Give</button>
+    </div>
+    <div class="dbg-suggest" style="margin-top:6px;">
+      <button type="button" data-dbg-item="Scroll of Upgrade" data-dbg-qty="1" data-dbg-lvl="0">SoU</button>
+      <button type="button" data-dbg-item="Potion of Strength" data-dbg-qty="1" data-dbg-lvl="0">PoS</button>
+      <button type="button" data-dbg-item="Potion of Experience" data-dbg-qty="1" data-dbg-lvl="0">PoE</button>
+      <button type="button" data-dbg-item="Wand of Disintegration" data-dbg-qty="1" data-dbg-lvl="99" title="Wand of Disintegration +99">+99 WoD</button>
+      <button type="button" data-dbg-item="Plate Armor" data-dbg-qty="1" data-dbg-lvl="99" title="Plate Armor +99">+99 ARM</button>
+      <button type="button" data-dbg-item="Ring of Energy" data-dbg-qty="1" data-dbg-lvl="99" title="Ring of Energy +99">+99 RoE</button>
+      <button type="button" data-dbg-item="Potion of Magical Sight" data-dbg-qty="99" data-dbg-lvl="0" title="Potion of Magical Sight x99">Sight x99</button>
+      <button type="button" data-dbg="give-bags" title="Velvet pouch, scroll holder, potion bandolier, magical holster">All bags</button>
+    </div>
+    <h3>Hero / floor</h3>
+    <div class="dbg-row">
+      <label for="dbgHeroLvl">Level</label>
+      <input type="number" id="dbgHeroLvl" min="1" max="30" value="1">
+      <button type="button" id="dbgSetLevel">Set level</button>
+      <label for="dbgFloor">Floor</label>
+      <input type="number" id="dbgFloor" min="1" max="26" value="1">
+      <button type="button" id="dbgGotoFloor">Go</button>
+    </div>
+    <div class="dbg-floors">
+      <button type="button" data-dbg-floor="1">1</button>
+      <button type="button" data-dbg-floor="5">5 Goo</button>
+      <button type="button" data-dbg-floor="6">6</button>
+      <button type="button" data-dbg-floor="10">10 Tengu</button>
+      <button type="button" data-dbg-floor="11">11</button>
+      <button type="button" data-dbg-floor="15">15 DM-300</button>
+      <button type="button" data-dbg-floor="16">16</button>
+      <button type="button" data-dbg-floor="20">20 King</button>
+      <button type="button" data-dbg-floor="21">21</button>
+      <button type="button" data-dbg-floor="26">26 Yog</button>
+    </div>
+    <h3>Buff / debuff</h3>
+    <div class="dbg-row">
+      <div class="dbg-ac">
+        <input type="text" id="dbgBuff" placeholder="Type to search buffs…" autocomplete="off" spellcheck="false">
+        <ul class="dbg-ac-list" id="dbgBuffList" hidden></ul>
+      </div>
+      <label for="dbgBuffDur">turns</label>
+      <input type="number" id="dbgBuffDur" min="0" max="9999" value="0" title="0 = default duration">
+      <button type="button" id="dbgApplyBuff">Buff</button>
+      <button type="button" id="dbgApplyDebuff" style="background:var(--spd-danger);">Debuff</button>
+    </div>
+    <div id="dbgStatus">—</div>
+  </section>
+
   <section id="section-obs-ui" data-section="obs-ui">
     <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>OBS If/Then</h2>
     <p class="sub" style="margin-bottom: 0.5rem;">When a <code>ui_state</code> scene or window is active, hide/show or move OBS sources that share the same trigger, or toggle a source filter (mask). Filter names must match OBS exactly. Item inspect crop stays on the existing inv-crop path. Saves to <code>obs_ui_actions.json</code>.</p>
@@ -1186,6 +1317,15 @@
     <div id="bestiaryGlanceHall" class="session-user-lists">—</div>
     <hr style="border:none;border-top:1px solid var(--spd-border);margin:0.75rem 0;">
     <p class="sub" style="margin-bottom: 0.5rem;">Config (<code>bestiary_config.json</code>)</p>
+    <div class="ss-toolbar">
+      <button type="button" id="bestiaryPresetDefault" style="background:var(--spd-btn-secondary);" title="Stock code defaults: slower bars (1000–2500), 3/4/5/6/6 pips. Keeps your zone names, monster lists, and exclude users. Click Save bestiary config to push.">Default</button>
+      <button type="button" id="bestiaryPresetFast" style="background:var(--spd-btn-secondary);" title="Faster stream pace: lower thresholds (500–2222), more Shatter pips. Keeps your zone names, monster lists, and exclude users. Click Save bestiary config to push.">Fast</button>
+      <button type="button" id="bestiaryPresetSlow" style="background:var(--spd-btn-secondary);" title="Long-stream grind: higher thresholds (2000–5000), fewer Shatter pips. Keeps your zone names, monster lists, and exclude users. Click Save bestiary config to push.">Slow</button>
+      <select id="bestiaryPresetsSelect" title="Your saved bestiary-config presets (this browser). Select one, then Apply, then Save bestiary config."><option value="">—</option></select>
+      <button type="button" id="bestiaryPresetSave" style="background:var(--spd-btn-secondary);" title="Save the current bestiary form as a named preset (this browser).">Save config as…</button>
+      <button type="button" id="bestiaryPresetApply" style="background:var(--spd-btn-secondary);" title="Load the selected preset into the form. Then click Save bestiary config to push.">Apply</button>
+      <button type="button" id="bestiaryPresetDelete" style="background:var(--spd-danger);" title="Delete the selected bestiary preset from this browser.">Delete</button>
+    </div>
     <div class="row"><label for="bestiary_heat_window_sec" title="Rolling heat window">Heat window (sec):</label><input type="number" id="bestiary_heat_window_sec" min="60" value="900"></div>
     <div class="row"><label for="bestiary_sprint_donor_reward" title="Donor points to sprint winner when a zone clears">Sprint donor reward:</label><input type="number" id="bestiary_sprint_donor_reward" min="0" value="100"></div>
     <div class="row"><label for="bestiary_sprint_donor_reward_per_level" title="Extra donor pts × zone level">Reward per level:</label><input type="number" id="bestiary_sprint_donor_reward_per_level" min="0" value="100"></div>
@@ -1275,6 +1415,7 @@
       </div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-viewer" checked> Viewer points</label></div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-game" checked> Game data (WebSocket)</label></div>
+      <div class="config-row"><label><input type="checkbox" id="cfg-section-debug" checked> Debug</label></div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-obs-ui" checked> OBS If/Then</label></div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-score" checked> Streamer vs Chat Score</label></div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-nine-challenge-deaths" checked> 9-Challenge Deaths</label></div>
@@ -1594,7 +1735,131 @@
       };
     }
 
+    const BESTIARY_PRESETS_STORAGE = 'spd_bestiary_presets';
+    const BESTIARY_PRESET_DEFAULT = {
+      heat_window_sec: 900,
+      sprint_donor_reward: 100,
+      sprint_donor_reward_per_level: 100,
+      per_user_bar_cap_fraction: 0,
+      repeat_mob_diminishing: false,
+      shatter_event: {
+        enabled: true,
+        duration_sec: 60,
+        jackpot_chance: 0.01,
+        rat_max_fraction: 0.25,
+        sidecar_chance_by_level: { '1': 0.8, '2': 0.88, '3': 0.94, '4': 0.98, '5': 1 },
+      },
+      soft_floor: {
+        enabled: true, top_n: 3, bonus: 0.25, min_unique_summoners: 10,
+        apply_to_bar: true, apply_to_sprint: true, apply_to_heat: true,
+      },
+      levels: [
+        { level: 1, zone: 'Sewers', bar_threshold: 1000, pip_count: 3, monsters: ['rat','albino','snake','gnoll','crab','slime','swarm','thief'] },
+        { level: 2, zone: 'Prison', bar_threshold: 1500, pip_count: 4, monsters: ['skeleton','dm100','guard','necromancer'] },
+        { level: 3, zone: 'Caves', bar_threshold: 2000, pip_count: 5, monsters: ['bat','brute','shaman','spinner','ghoul'] },
+        { level: 4, zone: 'City', bar_threshold: 2500, pip_count: 6, monsters: ['elemental','warlock','monk','golem','succubus'] },
+        { level: 5, zone: 'Halls', bar_threshold: 2500, pip_count: 6, monsters: ['eye','scorpio'] },
+      ],
+    };
+    const BESTIARY_PRESET_FAST = {
+      heat_window_sec: 900,
+      sprint_donor_reward: 100,
+      sprint_donor_reward_per_level: 100,
+      per_user_bar_cap_fraction: 0,
+      repeat_mob_diminishing: false,
+      shatter_event: {
+        enabled: true,
+        duration_sec: 60,
+        jackpot_chance: 0.01,
+        rat_max_fraction: 0.25,
+        sidecar_chance_by_level: { '1': 0.8, '2': 0.88, '3': 0.94, '4': 0.98, '5': 1 },
+      },
+      soft_floor: {
+        enabled: true, top_n: 3, bonus: 0.25, min_unique_summoners: 10,
+        apply_to_bar: true, apply_to_sprint: true, apply_to_heat: true,
+      },
+      levels: [
+        { level: 1, zone: 'Sewers', bar_threshold: 500, pip_count: 3, monsters: ['rat','albino','snake','gnoll','crab','slime','swarm'] },
+        { level: 2, zone: 'Prison', bar_threshold: 700, pip_count: 5, monsters: ['skeleton','dm100','guard','necromancer','thief'] },
+        { level: 3, zone: 'Caves', bar_threshold: 1000, pip_count: 5, monsters: ['bat','brute','shaman','spinner'] },
+        { level: 4, zone: 'Metro', bar_threshold: 1200, pip_count: 6, monsters: ['ghoul','elemental','warlock','monk','golem'] },
+        { level: 5, zone: 'Halls', bar_threshold: 2222, pip_count: 10, monsters: ['eye','scorpio','succubus'] },
+      ],
+    };
+    const BESTIARY_PRESET_SLOW = {
+      heat_window_sec: 1200,
+      sprint_donor_reward: 100,
+      sprint_donor_reward_per_level: 100,
+      per_user_bar_cap_fraction: 0.25,
+      repeat_mob_diminishing: true,
+      shatter_event: {
+        enabled: true,
+        duration_sec: 60,
+        jackpot_chance: 0.01,
+        rat_max_fraction: 0.25,
+        sidecar_chance_by_level: { '1': 0.8, '2': 0.88, '3': 0.94, '4': 0.98, '5': 1 },
+      },
+      soft_floor: {
+        enabled: true, top_n: 3, bonus: 0.25, min_unique_summoners: 10,
+        apply_to_bar: true, apply_to_sprint: true, apply_to_heat: true,
+      },
+      levels: [
+        { level: 1, zone: 'Sewers', bar_threshold: 2000, pip_count: 2, monsters: ['rat','albino','snake','gnoll','crab','slime','swarm','thief'] },
+        { level: 2, zone: 'Prison', bar_threshold: 3000, pip_count: 3, monsters: ['skeleton','dm100','guard','necromancer'] },
+        { level: 3, zone: 'Caves', bar_threshold: 4000, pip_count: 3, monsters: ['bat','brute','shaman','spinner','ghoul'] },
+        { level: 4, zone: 'City', bar_threshold: 5000, pip_count: 4, monsters: ['elemental','warlock','monk','golem','succubus'] },
+        { level: 5, zone: 'Halls', bar_threshold: 5000, pip_count: 4, monsters: ['eye','scorpio'] },
+      ],
+    };
 
+    function cloneBestiaryPreset(preset) {
+      return JSON.parse(JSON.stringify(preset || {}));
+    }
+
+    function applyBestiaryBuiltInPreset(preset) {
+      const current = collectBestiaryConfigPayload();
+      const incoming = cloneBestiaryPreset(preset);
+      const merged = { ...current, ...incoming };
+      merged.soft_floor = { ...(current.soft_floor || {}), ...(incoming.soft_floor || {}) };
+      if (Array.isArray(current.soft_floor && current.soft_floor.exclude_users)) {
+        merged.soft_floor.exclude_users = current.soft_floor.exclude_users.slice();
+      }
+      merged.shatter_event = { ...(current.shatter_event || {}), ...(incoming.shatter_event || {}) };
+      if (incoming.shatter_event && incoming.shatter_event.sidecar_chance_by_level) {
+        merged.shatter_event.sidecar_chance_by_level = incoming.shatter_event.sidecar_chance_by_level;
+      }
+      const curLevels = Array.isArray(current.levels) ? current.levels : [];
+      merged.levels = (incoming.levels || []).map(pl => {
+        const cur = curLevels.find(l => l.level === pl.level) || {};
+        const keepMonsters = Array.isArray(cur.monsters) && cur.monsters.length;
+        return {
+          ...cur,
+          ...pl,
+          zone: (cur.zone && String(cur.zone).trim()) ? cur.zone : pl.zone,
+          monsters: keepMonsters ? cur.monsters.slice() : (pl.monsters || []).slice(),
+        };
+      });
+      applyBestiaryConfigForm(merged);
+      setBestiaryDirty(true);
+    }
+
+    function getBestiaryPresets() {
+      try {
+        const arr = JSON.parse(localStorage.getItem(BESTIARY_PRESETS_STORAGE) || '[]');
+        return Array.isArray(arr) ? arr : [];
+      } catch (_) { return []; }
+    }
+    function saveBestiaryPresets(arr) {
+      try { localStorage.setItem(BESTIARY_PRESETS_STORAGE, JSON.stringify(arr)); } catch (_) {}
+    }
+    function refreshBestiaryPresetsSelect() {
+      const sel = document.getElementById('bestiaryPresetsSelect');
+      if (!sel) return;
+      const presets = getBestiaryPresets();
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">—</option>' + presets.map(p => '<option value="' + p.id + '">' + escapeHtml(p.name) + '</option>').join('');
+      if (cur && presets.some(p => String(p.id) === cur)) sel.value = cur;
+    }
 
     function loadBestiaryConfig() {
       return fetch('/api/bestiary-config')
@@ -2589,7 +2854,7 @@
     try { streamMode = localStorage.getItem(STREAM_MODE_STORAGE) === '1'; } catch (_) {}
     function applyStreamSectionOverlay() {
       if (!streamMode) return;
-      ['game', 'companion', 'bestiary'].forEach(id => {
+      ['game', 'companion', 'bestiary', 'debug'].forEach(id => {
         const el = document.getElementById('section-' + id);
         if (el) el.style.display = 'none';
       });
@@ -2601,8 +2866,8 @@
       btn.classList.toggle('stream-on', streamMode);
       document.body.classList.toggle('stream-mode', streamMode);
       btn.title = streamMode
-        ? 'Show game, companion, and bestiary sections again'
-        : 'Hide game, companion, and bestiary while streaming';
+        ? 'Show game, companion, bestiary, and debug sections again'
+        : 'Hide game, companion, bestiary, and debug while streaming';
     }
     function setStreamMode(on) {
       streamMode = !!on;
@@ -2610,7 +2875,7 @@
       updateStreamModeBtn();
       applyOverallConfig();
     }
-    const OVERALL_CONFIG_DEFAULT = { columns: 3, sections: { general: true, monsters: true, spawn_scale: true, viewer: true, game: true, 'obs-ui': true, score: true, session: true, bestiary: true, companion: true, activity: true }, order: ['general', 'monsters', 'spawn_scale', 'viewer', 'companion', 'game', 'obs-ui', 'score', 'session', 'bestiary'], columnCounts: [3, 2, 5], monsterColumns: 2, viewerSectionWidth: 540, collapsed: {} };
+    const OVERALL_CONFIG_DEFAULT = { columns: 3, sections: { general: true, monsters: true, spawn_scale: true, viewer: true, game: true, debug: true, 'obs-ui': true, score: true, session: true, bestiary: true, companion: true, activity: true }, order: ['general', 'monsters', 'spawn_scale', 'viewer', 'companion', 'game', 'debug', 'obs-ui', 'score', 'session', 'bestiary'], columnCounts: [3, 2, 6], monsterColumns: 2, viewerSectionWidth: 540, collapsed: {} };
     function getOverallConfig() {
       try {
         const s = localStorage.getItem(OVERALL_CONFIG_STORAGE);
@@ -2630,6 +2895,16 @@
               migrated = true;
             }
             let migrated = false;
+            if (c.sections.debug == null) { c.sections.debug = true; migrated = true; }
+            if (!c.order.includes('debug')) {
+              const gi = c.order.indexOf('game');
+              if (gi >= 0) c.order.splice(gi + 1, 0, 'debug');
+              else c.order.push('debug');
+              if (Array.isArray(c.columnCounts) && c.columnCounts.length === 3) {
+                c.columnCounts[2] = (c.columnCounts[2] || 0) + 1;
+              }
+              migrated = true;
+            }
             if (c.sections.companion == null) { c.sections.companion = true; migrated = true; }
             if (localStorage.getItem('overlay_companion_migrate_v2') !== '1') {
               c.sections.companion = true;
@@ -2749,12 +3024,17 @@
         grid.classList.add('col-' + Math.max(1, Math.min(3, cfg.columns)));
         applyColumnWidths();
       }
-      ['general', 'monsters', 'viewer', 'game', 'obs-ui', 'score', 'session', 'bestiary', 'companion', 'activity'].forEach(id => {
+      ['general', 'monsters', 'viewer', 'game', 'debug', 'obs-ui', 'score', 'session', 'bestiary', 'companion', 'activity'].forEach(id => {
         const el = document.getElementById('section-' + id);
         if (el) el.style.display = (cfg.sections[id] !== false) ? '' : 'none';
       });
       applyStreamSectionOverlay();
-      const order = cfg.order || ['general', 'monsters', 'spawn_scale', 'viewer', 'companion', 'game', 'obs-ui', 'score', 'session', 'bestiary'];
+      const order = cfg.order || ['general', 'monsters', 'spawn_scale', 'viewer', 'companion', 'game', 'debug', 'obs-ui', 'score', 'session', 'bestiary'];
+      if (!order.includes('debug')) {
+        const gi = order.indexOf('game');
+        if (gi >= 0) order.splice(gi + 1, 0, 'debug');
+        else order.push('debug');
+      }
       if (!order.includes('obs-ui')) {
         const gi = order.indexOf('game');
         if (gi >= 0) order.splice(gi + 1, 0, 'obs-ui');
@@ -3338,6 +3618,49 @@
     document.getElementById('presetApply').addEventListener('click', applyPreset);
     document.getElementById('presetDelete').addEventListener('click', deletePreset);
     refreshSpawnScalePresetsSelect();
+    refreshBestiaryPresetsSelect();
+    document.getElementById('bestiaryPresetDefault')?.addEventListener('click', () => {
+      applyBestiaryBuiltInPreset(BESTIARY_PRESET_DEFAULT);
+      showMsg('Default bestiary loaded (Save to push)', true);
+    });
+    document.getElementById('bestiaryPresetFast')?.addEventListener('click', () => {
+      applyBestiaryBuiltInPreset(BESTIARY_PRESET_FAST);
+      showMsg('Fast bestiary loaded (Save to push)', true);
+    });
+    document.getElementById('bestiaryPresetSlow')?.addEventListener('click', () => {
+      applyBestiaryBuiltInPreset(BESTIARY_PRESET_SLOW);
+      showMsg('Slow bestiary loaded (Save to push)', true);
+    });
+    document.getElementById('bestiaryPresetSave')?.addEventListener('click', () => {
+      const name = prompt('Bestiary preset name:');
+      if (name == null || !name.trim()) return;
+      const presets = getBestiaryPresets();
+      const id = Date.now();
+      presets.push({ id, name: name.trim(), createdAt: id, config: collectBestiaryConfigPayload() });
+      saveBestiaryPresets(presets);
+      refreshBestiaryPresetsSelect();
+      document.getElementById('bestiaryPresetsSelect').value = String(id);
+      showMsg('Bestiary preset saved', true);
+    });
+    document.getElementById('bestiaryPresetApply')?.addEventListener('click', () => {
+      const sel = document.getElementById('bestiaryPresetsSelect');
+      const id = sel && sel.value;
+      if (!id) { showMsg('Select a bestiary preset', false); return; }
+      const preset = getBestiaryPresets().find(p => String(p.id) === id);
+      if (!preset || !preset.config) { showMsg('Preset not found', false); return; }
+      applyBestiaryConfigForm(cloneBestiaryPreset(preset.config));
+      setBestiaryDirty(true);
+      showMsg('Bestiary preset applied (Save to push)', true);
+    });
+    document.getElementById('bestiaryPresetDelete')?.addEventListener('click', () => {
+      const sel = document.getElementById('bestiaryPresetsSelect');
+      const id = sel && sel.value;
+      if (!id) { showMsg('Select a bestiary preset to delete', false); return; }
+      if (!confirm('Delete this bestiary preset?')) return;
+      saveBestiaryPresets(getBestiaryPresets().filter(p => String(p.id) !== id));
+      refreshBestiaryPresetsSelect();
+      showMsg('Bestiary preset deleted', true);
+    });
     document.getElementById('spawnScaleClassic')?.addEventListener('click', () => { applySpawnScaleToForm(SPAWN_SCALE_CLASSIC); setCostsDirty(true); showMsg('Classic scaling loaded (Save to push)', true); });
     document.getElementById('spawnScaleDefault')?.addEventListener('click', () => { applySpawnScaleToForm(SPAWN_SCALE_DEFAULT); setCostsDirty(true); showMsg('Default scaling loaded (Save to push)', true); });
     document.getElementById('spawnScaleMeaner')?.addEventListener('click', () => { applySpawnScaleToForm(SPAWN_SCALE_MEANER); setCostsDirty(true); showMsg('Meaner scaling loaded (Save to push)', true); });
@@ -3912,6 +4235,7 @@
       document.getElementById('cfg-section-spawn_scale').checked = cfg.sections.spawn_scale !== false;
       document.getElementById('cfg-section-viewer').checked = cfg.sections.viewer !== false;
       document.getElementById('cfg-section-game').checked = cfg.sections.game !== false;
+      document.getElementById('cfg-section-debug').checked = cfg.sections.debug !== false;
       document.getElementById('cfg-section-obs-ui').checked = cfg.sections['obs-ui'] !== false;
       document.getElementById('cfg-section-score').checked = cfg.sections.score !== false;
       document.getElementById('cfg-section-nine-challenge-deaths').checked = cfg.sections['nine-challenge-deaths'] !== false;
@@ -3936,6 +4260,7 @@
           spawn_scale: document.getElementById('cfg-section-spawn_scale').checked,
           viewer: document.getElementById('cfg-section-viewer').checked,
           game: document.getElementById('cfg-section-game').checked,
+          debug: document.getElementById('cfg-section-debug').checked,
           'obs-ui': document.getElementById('cfg-section-obs-ui').checked,
           score: document.getElementById('cfg-section-score').checked,
           'nine-challenge-deaths': document.getElementById('cfg-section-nine-challenge-deaths').checked,
@@ -3961,6 +4286,7 @@
       document.getElementById('cfg-section-spawn_scale').checked = true;
       document.getElementById('cfg-section-viewer').checked = true;
       document.getElementById('cfg-section-game').checked = true;
+      document.getElementById('cfg-section-debug').checked = true;
       document.getElementById('cfg-section-obs-ui').checked = true;
       document.getElementById('cfg-section-score').checked = true;
       document.getElementById('cfg-section-nine-challenge-deaths').checked = true;
@@ -3971,9 +4297,10 @@
     });
     document.getElementById('overallConfigRestoreLayout').addEventListener('click', () => {
       const cfg = getOverallConfig();
-      cfg.order = ['general', 'monsters', 'spawn_scale', 'viewer', 'companion', 'game', 'obs-ui', 'score', 'nine-challenge-deaths', 'session', 'bestiary'];
+      cfg.order = ['general', 'monsters', 'spawn_scale', 'viewer', 'companion', 'game', 'debug', 'obs-ui', 'score', 'nine-challenge-deaths', 'session', 'bestiary'];
       cfg.columnCounts = [2, 2, 4];
       cfg.sections.companion = true;
+      cfg.sections.debug = true;
       saveOverallConfig(cfg);
       document.getElementById('overallConfigModal').classList.remove('open');
       applyOverallConfig();
@@ -3988,8 +4315,235 @@
     });
     document.getElementById('overallConfigCollapseAll')?.addEventListener('click', () => setAllSectionsCollapsed(true));
     document.getElementById('overallConfigExpandAll')?.addEventListener('click', () => setAllSectionsCollapsed(false));
+    function initDebugPanel() {
+      const section = document.getElementById('section-debug');
+      if (!section) return;
+      const status = document.getElementById('dbgStatus');
+      function setDbgStatus(text, ok) {
+        if (!status) return;
+        status.textContent = text || '—';
+        status.className = ok === true ? 'ok' : (ok === false ? 'err' : '');
+      }
+      function postDebug(path, body) {
+        const opts = { method: 'POST', headers: { 'Content-Type': 'application/json' } };
+        if (body) opts.body = JSON.stringify(body);
+        return fetch('/api/streamer-debug/' + path, opts)
+          .then(r => r.json().then(d => ({ http: r.status, d })))
+          .then(({ http, d }) => {
+            if (d && d.ok) {
+              const detail = d.detail || 'ok';
+              setDbgStatus(detail, true);
+              showMsg(detail, true);
+              logActivity('Debug: ' + path + ' → ' + detail);
+              return d;
+            }
+            const err = (d && d.error) || ('HTTP ' + http);
+            setDbgStatus(err, false);
+            showMsg(err, false);
+            throw new Error(err);
+          })
+          .catch(e => {
+            const msg = e.message || String(e);
+            if (status && status.textContent !== msg) {
+              setDbgStatus(msg, false);
+              showMsg(msg, false);
+            }
+          });
+      }
+      section.querySelectorAll('button[data-dbg]').forEach(btn => {
+        btn.addEventListener('click', () => postDebug(btn.getAttribute('data-dbg')));
+      });
+      function fillItem(name) {
+        const el = document.getElementById('dbgItem');
+        if (el) { el.value = name; el.focus(); }
+      }
+      section.querySelectorAll('button[data-dbg-item]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const item = btn.getAttribute('data-dbg-item');
+          const qtyEl = document.getElementById('dbgQty');
+          const lvlEl = document.getElementById('dbgItemLvl');
+          const quantity = parseInt(btn.getAttribute('data-dbg-qty') || qtyEl?.value, 10) || 1;
+          const level = parseInt(btn.getAttribute('data-dbg-lvl') || lvlEl?.value, 10) || 0;
+          fillItem(item);
+          if (qtyEl) qtyEl.value = String(quantity);
+          if (lvlEl) lvlEl.value = String(level);
+          postDebug('give', { item, quantity, level });
+        });
+      });
+      document.getElementById('dbgGive')?.addEventListener('click', () => {
+        const item = (document.getElementById('dbgItem')?.value || '').trim();
+        if (!item) { setDbgStatus('Enter an item name', false); return; }
+        const quantity = parseInt(document.getElementById('dbgQty')?.value, 10) || 1;
+        const level = parseInt(document.getElementById('dbgItemLvl')?.value, 10) || 0;
+        postDebug('give', { item, quantity, level });
+      });
+      let dbgBuffKind = '';
+      function bindDebugAutocomplete(input, listEl, getRows, onPick, onEnterEmpty) {
+        if (!input || !listEl) return;
+        let active = -1;
+        let shown = [];
+        function close() {
+          listEl.classList.remove('open');
+          listEl.hidden = true;
+          listEl.replaceChildren();
+          active = -1;
+          shown = [];
+        }
+        function setActive(i) {
+          const items = listEl.querySelectorAll('li');
+          items.forEach((li, idx) => li.classList.toggle('active', idx === i));
+          if (i >= 0 && items[i]) items[i].scrollIntoView({ block: 'nearest' });
+          active = i;
+        }
+        function open(rows) {
+          shown = rows.slice(0, 40);
+          listEl.replaceChildren();
+          if (!shown.length) { close(); return; }
+          shown.forEach((row, idx) => {
+            const li = document.createElement('li');
+            li.textContent = row.label;
+            if (row.meta) {
+              const meta = document.createElement('span');
+              meta.className = 'dbg-ac-meta';
+              meta.textContent = row.meta;
+              li.appendChild(meta);
+            }
+            li.addEventListener('mousedown', e => {
+              e.preventDefault();
+              onPick(row);
+              close();
+            });
+            li.addEventListener('mouseenter', () => setActive(idx));
+            listEl.appendChild(li);
+          });
+          listEl.hidden = false;
+          listEl.classList.add('open');
+          setActive(0);
+        }
+        function filter() {
+          const q = (input.value || '').trim().toLowerCase();
+          const qKey = q.replace(/[^a-z0-9]/g, '');
+          const rows = getRows() || [];
+          if (!qKey) {
+            open(rows);
+            return;
+          }
+          const scored = [];
+          rows.forEach(row => {
+            const label = (row.label || '').toLowerCase();
+            const value = (row.value || '').toLowerCase();
+            const key = (label + value).replace(/[^a-z0-9]/g, '');
+            let score = 0;
+            if (label === q || value === q) score = 300;
+            else if (label.startsWith(q) || value.startsWith(q)) score = 200;
+            else if (key.startsWith(qKey)) score = 160;
+            else if (label.includes(q) || value.includes(q)) score = 100;
+            else if (key.includes(qKey)) score = 80;
+            if (score) scored.push({ score, row });
+          });
+          scored.sort((a, b) => b.score - a.score || a.row.label.localeCompare(b.row.label));
+          open(scored.map(s => s.row));
+        }
+        input.addEventListener('input', filter);
+        input.addEventListener('focus', filter);
+        input.addEventListener('blur', () => setTimeout(close, 120));
+        input.addEventListener('keydown', e => {
+          const openNow = listEl.classList.contains('open') && shown.length;
+          if (e.key === 'ArrowDown' && openNow) {
+            e.preventDefault();
+            setActive(Math.min(shown.length - 1, active + 1));
+          } else if (e.key === 'ArrowUp' && openNow) {
+            e.preventDefault();
+            setActive(Math.max(0, active - 1));
+          } else if (e.key === 'Escape') {
+            if (openNow) { e.preventDefault(); close(); }
+          } else if (e.key === 'Enter') {
+            if (openNow && active >= 0 && shown[active]) {
+              e.preventDefault();
+              onPick(shown[active]);
+              close();
+            } else if (onEnterEmpty) {
+              e.preventDefault();
+              close();
+              onEnterEmpty();
+            }
+          } else if (e.key === 'Tab' && openNow && active >= 0 && shown[active]) {
+            onPick(shown[active]);
+            close();
+          }
+        });
+      }
+      const dbgCatalog = { items: [], buffs: [] };
+      fetch('/api/streamer-debug/catalog')
+        .then(r => r.json())
+        .then(d => {
+          if (!d || !d.ok) return;
+          dbgCatalog.items = (d.items || []).map(it => ({
+            label: it.name, value: it.name, meta: it.hint && it.hint !== it.name ? it.hint : '',
+          }));
+          dbgCatalog.buffs = (d.buffs || []).map(b => ({
+            label: b.name, value: b.name, meta: b.kind, kind: b.kind,
+          }));
+          const focused = document.activeElement;
+          if (focused && (focused.id === 'dbgItem' || focused.id === 'dbgBuff')) {
+            focused.dispatchEvent(new Event('input'));
+          }
+        })
+        .catch(() => {});
+      bindDebugAutocomplete(
+        document.getElementById('dbgItem'),
+        document.getElementById('dbgItemList'),
+        () => dbgCatalog.items,
+        row => {
+          const el = document.getElementById('dbgItem');
+          if (el) el.value = row.value;
+        },
+        () => document.getElementById('dbgGive')?.click()
+      );
+      bindDebugAutocomplete(
+        document.getElementById('dbgBuff'),
+        document.getElementById('dbgBuffList'),
+        () => dbgCatalog.buffs,
+        row => {
+          const el = document.getElementById('dbgBuff');
+          if (el) el.value = row.value;
+          dbgBuffKind = row.kind || '';
+        },
+        () => applyBuff(dbgBuffKind === 'debuff' ? 'debuff' : 'buff')
+      );
+      document.getElementById('dbgSetLevel')?.addEventListener('click', () => {
+        const level = parseInt(document.getElementById('dbgHeroLvl')?.value, 10);
+        if (!level) { setDbgStatus('Enter a hero level', false); return; }
+        postDebug('set-level', { level });
+      });
+      function gotoFloor(depth) {
+        const n = parseInt(depth, 10);
+        if (!n) { setDbgStatus('Enter a floor', false); return; }
+        const floorEl = document.getElementById('dbgFloor');
+        if (floorEl) floorEl.value = String(n);
+        postDebug('goto-floor', { depth: n });
+      }
+      document.getElementById('dbgGotoFloor')?.addEventListener('click', () => {
+        gotoFloor(document.getElementById('dbgFloor')?.value);
+      });
+      section.querySelectorAll('button[data-dbg-floor]').forEach(btn => {
+        btn.addEventListener('click', () => gotoFloor(btn.getAttribute('data-dbg-floor')));
+      });
+      function applyBuff(kind) {
+        const name = (document.getElementById('dbgBuff')?.value || '').trim();
+        if (!name) { setDbgStatus('Enter a buff/debuff name', false); return; }
+        const duration = parseFloat(document.getElementById('dbgBuffDur')?.value) || 0;
+        const key = kind === 'debuff' ? 'debuff' : 'buff';
+        const body = { duration };
+        body[key] = name;
+        postDebug(key, body);
+      }
+      document.getElementById('dbgApplyBuff')?.addEventListener('click', () => applyBuff('buff'));
+      document.getElementById('dbgApplyDebuff')?.addEventListener('click', () => applyBuff('debuff'));
+    }
     initSectionCollapseToggles();
     applyOverallConfig();
+    initDebugPanel();
     updateStreamModeBtn();
     applyColumnWidths();
     load();

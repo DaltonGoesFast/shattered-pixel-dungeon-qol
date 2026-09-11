@@ -30,6 +30,13 @@ def _normalize(text: str) -> str:
     return "".join(c.lower() for c in (text or "") if c.isalnum())
 
 
+def list_buffs_local() -> List[Tuple[str, str, str]]:
+    """All known streamer buffs/debuffs: [(label, class_name, kind), ...]."""
+    return [(f"{name} (buff)", name, "buff") for name in BUFFS] + [
+        (f"{name} (debuff)", name, "debuff") for name in DEBUFFS
+    ]
+
+
 def search_buffs_local(query: str, limit: int = 15) -> List[Tuple[str, str, str]]:
     """Returns [(label, class_name, kind), ...] where kind is buff or debuff."""
     q = _normalize(query)

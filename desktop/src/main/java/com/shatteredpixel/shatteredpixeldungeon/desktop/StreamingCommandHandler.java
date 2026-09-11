@@ -89,6 +89,10 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Weakness;
 import com.shatteredpixel.shatteredpixeldungeon.items.Dewdrop;
 import com.shatteredpixel.shatteredpixeldungeon.items.EquipableItem;
 import com.shatteredpixel.shatteredpixeldungeon.items.Gold;
+import com.shatteredpixel.shatteredpixeldungeon.items.bags.MagicalHolster;
+import com.shatteredpixel.shatteredpixeldungeon.items.bags.PotionBandolier;
+import com.shatteredpixel.shatteredpixeldungeon.items.bags.ScrollHolder;
+import com.shatteredpixel.shatteredpixeldungeon.items.bags.VelvetPouch;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.KindOfWeapon;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
@@ -107,6 +111,7 @@ import com.shatteredpixel.shatteredpixeldungeon.effects.FloatingText;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Speck;
 import com.shatteredpixel.shatteredpixeldungeon.effects.particles.ShaftParticle;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfHealing;
+import com.shatteredpixel.shatteredpixeldungeon.scenes.InterlevelScene;
 import com.shatteredpixel.shatteredpixeldungeon.items.trinkets.VialOfBlood;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.CharSprite;
 import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
@@ -170,6 +175,7 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.traps.WornDartTrap;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
+import com.watabou.noosa.Game;
 import com.watabou.utils.BArray;
 import com.watabou.utils.Callback;
 import com.watabou.utils.PathFinder;
@@ -1217,6 +1223,29 @@ public final class StreamingCommandHandler {
 		return "Healing";
 	}
 
+	/**
+	 * Streamer apply: set hero customName quietly (no GLog).
+	 * Returns the applied name on success, ERR:... on failure.
+	 */
+	public static String handleSetHeroName(String name) {
+		if (Dungeon.hero == null || Dungeon.level == null)
+			return "ERR:Not in an active run (title/menu)";
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+			return "ERR:Not in an active run (title/menu)";
+		if (!Dungeon.hero.isAlive())
+			return "ERR:Hero is dead";
+
+		String cleaned = name != null ? name.trim() : "";
+		cleaned = cleaned.replace("\n", "").replace("\r", "");
+		if (cleaned.isEmpty())
+			return "ERR:Empty name";
+		if (cleaned.length() > 20)
+			cleaned = cleaned.substring(0, 20);
+
+		Dungeon.hero.customName = cleaned;
+		return cleaned;
+	}
+
 	/** Chat command: remove one random negative buff. Returns buff name on success, ERR:... on failure. */
 	public static String handleChatCleanse(String username) {
 		if (Dungeon.hero == null || Dungeon.level == null)
@@ -1418,6 +1447,7 @@ public final class StreamingCommandHandler {
 			case "streamer_reveal_map": return handleStreamerRevealMap(username);
 			case "streamer_goto_stairs_down": return handleStreamerGotoStairs(username, true);
 			case "streamer_goto_stairs_up": return handleStreamerGotoStairs(username, false);
+			case "streamer_give_bags": return handleStreamerGiveBags(username);
 			default: return "ERR:Unknown streamer command: " + command;
 		}
 	}
@@ -1611,6 +1641,34 @@ public final class StreamingCommandHandler {
 		return detail;
 	}
 
+	/** Streamer debug: give any shop bags the hero does not already have. */
+	@SuppressWarnings("unchecked")
+	public static String handleStreamerGiveBags(String username) {
+		String err = streamerDebugPrecheck();
+		if (err != null) return err;
+		Hero hero = Dungeon.hero;
+		Class<? extends Item>[] bags = new Class[]{
+				VelvetPouch.class, ScrollHolder.class, PotionBandolier.class, MagicalHolster.class
+		};
+		ArrayList<String> given = new ArrayList<>();
+		for (Class<? extends Item> clazz : bags) {
+			if (hero.belongings.getItem(clazz) != null) continue;
+			Item bag = Reflection.newInstance(clazz);
+			if (bag == null) return "ERR:Failed to create bag";
+			bag.identify(false);
+			if (!bag.collect(hero.belongings.backpack)) {
+				if (given.isEmpty()) return "ERR:Inventory full";
+				return "ERR:Inventory full (delivered " + String.join(", ", given) + " only)";
+			}
+			given.add(bag.name());
+		}
+		Item.updateQuickslot();
+		if (given.isEmpty()) return "Already have all bags";
+		String detail = String.join(", ", given);
+		GLog.p(Messages.get(StreamingCommandHandler.class, "streamer_give_bags", detail));
+		return detail;
+	}
+
 	private static String streamerDebugPrecheck() {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
@@ -1745,6 +1803,36 @@ public final class StreamingCommandHandler {
 		hero.interrupt();
 		GLog.i(Messages.get(ScrollOfTeleportation.class, "tele"));
 		return stairsDown ? "Stairs down" : "Stairs up";
+	}
+
+	/** Streamer debug: set hero level (1–30). */
+	public static String handleStreamerSetHeroLevel(int level, String username) {
+		String err = streamerDebugPrecheck();
+		if (err != null) return err;
+		Hero hero = Dungeon.hero;
+		int target = Math.max(1, Math.min(level, Hero.MAX_LEVEL));
+		int from = hero.lvl;
+		if (target == from) return "Already level " + from;
+		hero.setLevelForDebug(target);
+		GLog.p(Messages.get(StreamingCommandHandler.class, "streamer_set_level", hero.lvl));
+		return "Level " + from + " → " + hero.lvl;
+	}
+
+	/** Streamer debug: warp to a dungeon floor (1–26, branch 0). */
+	public static String handleStreamerGotoFloor(int depth, String username) {
+		String err = streamerDebugPrecheck();
+		if (err != null) return err;
+		int dest = Math.max(1, Math.min(depth, 26));
+		if (dest == Dungeon.depth && Dungeon.branch == 0)
+			return "Already on floor " + dest;
+		InterlevelScene.mode = InterlevelScene.Mode.RETURN;
+		InterlevelScene.returnDepth = dest;
+		InterlevelScene.returnBranch = 0;
+		InterlevelScene.returnPos = -1;
+		InterlevelScene.debugGenerateSkipped = true;
+		GLog.i(Messages.get(StreamingCommandHandler.class, "streamer_goto_floor", dest));
+		Game.switchScene(InterlevelScene.class);
+		return "Floor " + dest;
 	}
 
 	/** Phase 2: full monster list. Returns null for unknown. */

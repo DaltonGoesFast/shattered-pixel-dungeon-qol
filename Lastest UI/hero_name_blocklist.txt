@@ -1,0 +1,26 @@
+# Hero name blocklist — one phrase per line (case-insensitive substring match).
+# Lines starting with # are ignored.
+nigger
+nigga
+faggot
+retard
+rape
+hitler
+nazi
+pedo
+paedo
+fuck
+shit
+cunt
+asshole
+bitch
+whore
+slut
+dick
+cock
+pussy
+porn
+sex
+kill yourself
+kys
+

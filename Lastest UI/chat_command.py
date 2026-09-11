@@ -91,6 +91,8 @@ def reset_session_state() -> None:
         "summon_last": {},
         "members": {},
         "stream_started_at": int(time.time()),
+        "hero_name_goo_polled": False,
+        "hero_name_goo_polled_seed": None,
     }
     _save_session_state(state)
     # Summon march + bestiary session files
@@ -107,6 +109,11 @@ def reset_session_state() -> None:
         reset_bestiary_state()
     except Exception as e:
         print(f"bestiary reset error: {e}")
+    try:
+        from hero_name import clear_winners
+        clear_winners()
+    except Exception as e:
+        print(f"hero_name winners reset error: {e}")
 
 
 def _track_member(state: dict, key: str, is_sub: bool, is_member: bool) -> None:
@@ -508,6 +515,71 @@ def handle_toppoints() -> ChatResult:
         ok=True,
         message=chat_messages.toppoints_leaderboard(entries),
         extra={"command": "toppoints", "sort": "donor"},
+    )
+
+
+def _current_run_seed() -> Optional[str]:
+    """Best-effort seed from game_summary.json (same run the overlay sees)."""
+    try:
+        if os.path.exists(GAME_SUMMARY_JSON):
+            with open(GAME_SUMMARY_JSON, encoding="utf-8") as f:
+                data = json.load(f)
+            seed = data.get("seed")
+            if seed is not None and str(seed).strip():
+                return str(seed).strip()
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        pass
+    return None
+
+
+def clear_hero_name_goo_poll_flag() -> None:
+    """Allow another post-Goo name poll (hero died / new run)."""
+    state = _load_session_state()
+    if state.get("hero_name_goo_polled") or state.get("hero_name_goo_polled_seed"):
+        state["hero_name_goo_polled"] = False
+        state["hero_name_goo_polled_seed"] = None
+        _save_session_state(state)
+
+
+def try_hero_name_goo_poll() -> dict:
+    """Once per dungeon seed after Goo: draw 4 names and DoAction N01."""
+    from hero_name import try_start_goo_poll
+
+    state = _load_session_state()
+    seed = _current_run_seed()
+    polled_seed = state.get("hero_name_goo_polled_seed")
+    # Prefer seed so a new run is not blocked by an earlier test / abandoned run.
+    if seed and polled_seed and str(polled_seed) == str(seed):
+        return {"ok": False, "reason": "already_polled_this_run", "seed": seed}
+    # Legacy boolean only blocks when we have no seed to compare.
+    if not seed and state.get("hero_name_goo_polled"):
+        return {"ok": False, "reason": "already_polled_this_run", "seed": None}
+
+    result = try_start_goo_poll()
+    if result.get("ok"):
+        state["hero_name_goo_polled"] = True
+        state["hero_name_goo_polled_seed"] = seed
+        _save_session_state(state)
+        result = dict(result)
+        result["seed"] = seed
+    return result
+
+
+def handle_name(username: str, args: list[str]) -> ChatResult:
+    """Stash viewer's last hero-name suggestion. Silent on success."""
+    from hero_name import submit_name
+
+    key = (username or "").strip().lower()
+    if not key or key == BOT_USER:
+        return ChatResult(ok=True, message=None, extra={"command": "name", "skipped": "bot"})
+    raw = " ".join(args).strip() if args else ""
+    ok, _detail = submit_name(username, raw)
+    if ok:
+        return ChatResult(ok=True, message=None, extra={"command": "name"})
+    return ChatResult(
+        ok=False,
+        message=chat_messages.name_rejected(username),
+        extra={"command": "name", "reason": _detail},
     )
 
 
@@ -1002,6 +1074,8 @@ def _dispatch_chat_command_inner(body: dict) -> ChatResult:
             result = handle_bank(username, args)
         elif cmd in ("toppoints", "leaderboard"):
             result = handle_toppoints()
+        elif cmd == "name":
+            result = handle_name(username, args)
         elif cmd == "fard":
             result = handle_fard(username, is_sub, is_member)
         elif cmd in ("doublepoints", "2x"):

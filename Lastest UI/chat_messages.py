@@ -192,6 +192,7 @@ USAGE = {
     "degrade": "Usage: !degrade (applies Degrade debuff)",
     "sabotage": "Usage: !sabotage (removes one random positive buff)",
     "doublepoints": "Usage: !doublepoints <minutes> (e.g. !doublepoints 5 for 5 minutes, max 120)",
+    "name": "Usage: !name <name> - stash a hero name for the post-Goo poll (silent if accepted).",
 }
 
 # Aliases -> USAGE key for !help <command>
@@ -208,6 +209,19 @@ HELP_ALIASES = {
     "balance": "points",
     "transfer": "givepoints",
 }
+
+
+def name_rejected(user: str) -> str:
+    """Short reject for !name — must stay brief (YouTube chat cap)."""
+    who = display_name(user)
+    return f"{who}: Name rejected." if who else "Name rejected."
+
+
+def hero_named(user: str, hero_name: str) -> str:
+    """Winner line after the post-Goo poll."""
+    who = display_name(user) or "Someone"
+    name = (hero_name or "").strip() or "?"
+    return f"{who} named hero {name}"
 
 
 def unknown_monster(name: str) -> str:

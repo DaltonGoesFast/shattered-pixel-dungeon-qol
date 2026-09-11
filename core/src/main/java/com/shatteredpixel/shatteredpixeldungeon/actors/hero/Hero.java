@@ -2326,6 +2326,28 @@ public class Hero extends Char {
 	public static int maxExp( int lvl ){
 		return 5 + lvl * 5;
 	}
+
+	/** Streamer debug: set hero level, adjusting ATK/DEF/HT. Going up uses normal level-up. */
+	public void setLevelForDebug( int target ) {
+		target = Math.max(1, Math.min(target, MAX_LEVEL));
+		if (target == lvl) {
+			exp = 0;
+			return;
+		}
+		if (target > lvl) {
+			while (lvl < target) {
+				earnExp(maxExp(), PotionOfExperience.class);
+			}
+			exp = 0;
+			return;
+		}
+		lvl = target;
+		attackSkill = 10 + (lvl - 1);
+		defenseSkill = 5 + (lvl - 1);
+		exp = 0;
+		updateHT(true);
+		Item.updateQuickslot();
+	}
 	
 	public boolean isStarving() {
 		return Buff.affect(this, Hunger.class).isStarving();

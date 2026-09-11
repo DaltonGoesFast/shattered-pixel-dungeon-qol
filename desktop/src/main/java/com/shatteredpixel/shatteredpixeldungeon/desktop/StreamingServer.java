@@ -676,6 +676,50 @@ public class StreamingServer extends WebSocketServer {
 						broadcast(resp.toString());
 					}
 				});
+			} else if ("streamer_set_hero_level".equals(cmd)) {
+				int level = 1;
+				if (obj.has("level")) {
+					try { level = obj.get("level").getAsInt(); } catch (Exception ignored) {}
+				}
+				final int levelFinal = level;
+				Gdx.app.postRunnable(() -> {
+					String result = StreamingCommandHandler.handleStreamerSetHeroLevel(levelFinal, usernameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String detail = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "streamer_debug_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (detail != null) resp.addProperty("detail", detail);
+						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
+						broadcast(resp.toString());
+					}
+				});
+			} else if ("streamer_goto_floor".equals(cmd)) {
+				int depth = 1;
+				if (obj.has("depth")) {
+					try { depth = obj.get("depth").getAsInt(); } catch (Exception ignored) {}
+				}
+				final int depthFinal = depth;
+				Gdx.app.postRunnable(() -> {
+					String result = StreamingCommandHandler.handleStreamerGotoFloor(depthFinal, usernameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String detail = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "streamer_debug_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (detail != null) resp.addProperty("detail", detail);
+						if (err != null) resp.addProperty("error", err);
+						addChatter(resp, usernameFinal);
+						broadcast(resp.toString());
+					}
+				});
 			} else if ("streamer_give_item".equals(cmd)) {
 				String itemName = obj.has("item") ? obj.get("item").getAsString() : null;
 				int quantity = 1;
@@ -703,6 +747,24 @@ public class StreamingServer extends WebSocketServer {
 						if (detail != null) resp.addProperty("detail", detail);
 						if (err != null) resp.addProperty("error", err);
 						addChatter(resp, usernameFinal);
+						broadcast(resp.toString());
+					}
+				});
+			} else if ("set_hero_name".equals(cmd)) {
+				String name = obj.has("name") ? obj.get("name").getAsString() : null;
+				String nameFinal = name != null ? name : "";
+				Gdx.app.postRunnable(() -> {
+					String result = StreamingCommandHandler.handleSetHeroName(nameFinal);
+					boolean ok = (result != null && !result.startsWith("ERR:"));
+					String applied = ok ? result : null;
+					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
+					if (requestId != null && !requestId.isEmpty()) {
+						JsonObject resp = new JsonObject();
+						resp.addProperty("type", "set_hero_name_result");
+						resp.addProperty("request_id", requestId);
+						resp.addProperty("success", ok);
+						if (applied != null) resp.addProperty("name", applied);
+						if (err != null) resp.addProperty("error", err);
 						broadcast(resp.toString());
 					}
 				});

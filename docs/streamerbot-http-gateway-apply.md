@@ -592,3 +592,116 @@ When export `0.2.0` is committed → Phase 5 complete → proceed to **Phase 6**
 - **Phase 5 (in progress):** Export `shatter-the-streamer-export-0.2.0.txt` — [README-backup.md](../Lastest%20UI/streamerbot/README-backup.md)
 - **Phase 6:** Economy v1.1 — [Chat Command Economy v1.md](Chat%20Command%20Economy%20v1.md) (server-only, after one live stream)
 
+---
+
+## Hero name poll (N01–N04)
+
+Chat stashes `!name` in Python (`hero_name.py`). After Goo (depth 5), `server.py` POSTs Streamer.bot `DoAction` with `option1`–`option4`. You apply the winner yourself (OBS `hero_name_winner.txt` or N04).
+
+### N01 — Hero Name Poll (create)
+
+**Action name (exact):** `N01 - Hero Name Poll`  
+**Triggers:** none (HTTP `DoAction` only)  
+**Enabled:** Yes
+
+Sub-actions (UI only — no create-poll C#):
+
+1. **Twitch → Polls → Create Poll**
+   - Title: `Name the hero` (or `%pollTitle%`)
+   - Choices: `%option1%`, `%option2%`, `%option3%`, `%option4%`
+   - Duration: `60` (or `%pollDuration%`)
+   - Channel points per vote: `0`
+2. **YouTube → Polls → Create Poll**
+   - Same title / duration / four `%option#%` choices
+
+Python already supplies args via:
+
+`POST http://127.0.0.1:7474/DoAction` with body `{ "action": { "name": "N01 - Hero Name Poll" }, "args": { "option1": "...", ... } }`.
+
+Requires Streamer.bot **HTTP server** on `127.0.0.1:7474`.
+
+### N02 — Twitch poll completed
+
+**Trigger:** Twitch → Poll Completed  
+**Queue:** `points` (or default)
+
+1. Optional: **Set Argument** `heroNamePollPlatform` = `twitch`
+2. **Execute C#** — paste [`ReportHeroNamePollClosed.cs`](../Lastest%20UI/streamerbot/phase2/ReportHeroNamePollClosed.cs) (writes `hero_name_poll_result_body.json` only)
+3. **Run a Program** — `curl.exe` (same pattern as R1):
+
+| Field | Value |
+|-------|--------|
+| Program | `C:\Windows\System32\curl.exe` |
+| Arguments | `-s -S -m 12 -X POST -H "Content-Type: application/json" --data-binary "@hero_name_poll_result_body.json" http://127.0.0.1:5000/api/hero-name/poll-result` |
+| Working directory | `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI` |
+| Wait | 15 s |
+
+Skips polls whose title is not `Name the hero` (C# returns false → curl should be in a True branch, or leave curl always-on and accept empty/stale body only if C# ran).
+
+**Important:** Put the curl step in an **If** `%heroNamePollResultBodyPath%` Is Not Empty (or run C# then curl only when C# returns true via Streamer.bot’s action continuation). Simplest: keep both sequential — C# returns false early for wrong titles without rewriting the body; for wrong titles, either delete the body file in the skip path or gate curl. Current C# does **not** clear the file on skip, so prefer gating:
+
+- After C#: **If** `%heroNamePollResultBodyPath%` Is Not Empty → Run curl  
+- Or set that arg only on success (already done) and clear it at action start with Set Argument empty.
+
+Skips polls whose title is not `Name the hero`.
+
+### N03 — YouTube poll closed
+
+**Trigger:** YouTube → Poll Closed  
+Same as N02: optional Set Argument `heroNamePollPlatform` = `youtube`, same C#, same curl.
+
+**Note:** YouTube **does** expose vote vars on Poll Closed (`poll.option0.text` / `poll.option0.votes`, etc.). Python waits for **both** Twitch + YouTube (or duration+grace timeout if one never reports). N03 title must be `Name the hero` or the C# skips.
+
+### N04 — Apply hero name (optional Stream Deck)
+
+**Trigger:** Stream Deck / hotkey
+
+1. **Execute C#** — paste [`ApplyHeroName.cs`](../Lastest%20UI/streamerbot/phase2/ApplyHeroName.cs)
+2. **Run a Program** — `curl.exe`:
+
+| Field | Value |
+|-------|--------|
+| Program | `C:\Windows\System32\curl.exe` |
+| Arguments | `-s -S -m 12 -X POST -H "Content-Type: application/json" --data-binary "@hero_name_apply_body.json" http://127.0.0.1:5000/api/hero-name/apply` |
+| Working directory | `Lastest UI` path (same as above) |
+| Wait | 15 s |
+
+POSTs `/api/hero-name/apply` → game WS `set_hero_name` (no GLog). Until N04 is wired, rename in-game from `Lastest UI/hero_name_winner.txt`.
+
+### N05 — Winner chat announce (required for chat line)
+
+**Action name (exact):** `N05 - Hero Name Winner`  
+**Trigger:** none (Python `DoAction` after the poll finalizes)  
+**Enabled:** Yes
+
+Sub-actions:
+
+1. **Twitch → Send Message to Channel** (or Chat → Send Message): `%announceMessage%`
+2. **YouTube → Send Message to Channel**: `%announceMessage%`
+
+Python sets args:
+
+- `%announceMessage%` → `@burnz217 named hero 6 7 Kevin`
+- `%userName%` / `%heroName%` also available
+
+Example line: `@username named hero NameHere`
+
+### Files
+
+| File | Role |
+|------|------|
+| `hero_name_pot.json` | Last `!name` per viewer |
+| `hero_name_blocklist.txt` | Editable reject list |
+| `hero_name_winners.json` | Past suggesters excluded from later draws |
+| `hero_name_pending.json` | Winner + vote split for you |
+| `hero_name_winner.txt` | OBS text source |
+| `hero_name_poll_state.json` | In-flight combine state |
+
+### Quick test
+
+1. Restart `server.py`. `!name Kesha` → silent; `!name !!!` → `@user: Name rejected.`
+2. Seed four viewers in the pot; clear `hero_name_goo_polled` in `session_state.json` if needed.
+3. Fake Goo: from Python overlay log path, or POST nothing — easiest is kill Goo in-game, or call `try_hero_name_goo_poll()` from a Python REPL in `Lastest UI`.
+4. Confirm both platform polls show the four names; vote; confirm `hero_name_winner.txt` updates.
+5. Rebuild desktop game for N04 / `set_hero_name`.
+

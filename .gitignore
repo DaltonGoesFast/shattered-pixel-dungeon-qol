@@ -93,6 +93,13 @@ Lastest UI/heat_leader.txt
 Lastest UI/bestiary_state.json
 Lastest UI/death_cost_state.json
 Lastest UI/death_cost_display.txt
+Lastest UI/hero_name_pot.json
+Lastest UI/hero_name_winners.json
+Lastest UI/hero_name_pending.json
+Lastest UI/hero_name_poll_state.json
+Lastest UI/hero_name_winner.txt
+Lastest UI/hero_name_poll_result_body.json
+Lastest UI/hero_name_apply_body.json
 Lastest UI/totalsummons.txt
 Lastest UI/totalfard.txt
 Lastest UI/spend_command.lock

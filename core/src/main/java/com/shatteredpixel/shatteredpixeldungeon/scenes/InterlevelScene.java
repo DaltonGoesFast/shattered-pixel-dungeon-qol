@@ -87,6 +87,8 @@ public class InterlevelScene extends PixelScene {
 	public static int returnDepth;
 	public static int returnBranch;
 	public static int returnPos;
+	/** When true, RETURN generates any missing prior floors first (streamer debug goto). */
+	public static boolean debugGenerateSkipped;
 
 	public static boolean fallIntoPit;
 	
@@ -717,6 +719,23 @@ public class InterlevelScene extends PixelScene {
 	private void returnTo() throws IOException {
 		Mob.holdAllies( Dungeon.level );
 		Dungeon.saveAll();
+
+		if (debugGenerateSkipped) {
+			try {
+				int destDepth = returnDepth;
+				int destBranch = returnBranch;
+				for (int i = 1; i < destDepth + (destBranch == 0 ? 0 : 1); i++){
+					if (!Dungeon.levelHasBeenGenerated(i, 0)){
+						Dungeon.depth = i;
+						Dungeon.branch = 0;
+						Dungeon.level = Dungeon.newLevel();
+						Dungeon.saveLevel(GamesInProgress.curSlot);
+					}
+				}
+			} finally {
+				debugGenerateSkipped = false;
+			}
+		}
 
 		Level level;
 		Dungeon.depth = returnDepth;

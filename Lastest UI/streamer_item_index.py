@@ -4,7 +4,9 @@ import re
 from typing import List, Tuple
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_NAME_LINE = re.compile(r"^items\.([^.]+)\.name=(.+)\s*$")
+# Nested keys too: items.wands.wandofdisintegration.name, items.armor.platearmor.name
+_NAME_LINE = re.compile(r"^items\.(.+)\.name=(.+)\s*$")
+_SKIP_SEGMENTS = frozenset({"curses", "glyphs", "enchantments"})
 
 _index_cache = None  # type: list
 
@@ -30,10 +32,11 @@ def normalize_key(text: str) -> str:
 
 
 def class_hint_from_key(key: str) -> str:
-    """Best-effort Java class simple name from properties key (e.g. stylus -> Stylus)."""
-    if not key:
+    """Best-effort Java class simple name from the last properties path segment."""
+    last = (key or "").split(".")[-1]
+    if not last:
         return key
-    return key[0].upper() + key[1:]
+    return last[0].upper() + last[1:]
 
 
 def load_index() -> List[Tuple[str, str, str]]:
@@ -54,6 +57,11 @@ def load_index() -> List[Tuple[str, str, str]]:
             if not m:
                 continue
             key, display = m.group(1), m.group(2)
+            if "$" in key:
+                continue
+            segs = key.split(".")
+            if any(s in _SKIP_SEGMENTS for s in segs):
+                continue
             entries.append((display, key, class_hint_from_key(key)))
 
     _index_cache = entries
@@ -96,6 +104,19 @@ def _score(query_key: str, display: str, key: str, class_hint: str) -> int:
     if d2 <= 4:
         return 45 - d2
     return 0
+
+
+def list_items_local() -> List[Tuple[str, str]]:
+    """All unique display names, alphabetized. Skips placeholder strings."""
+    seen = set()
+    out: List[Tuple[str, str]] = []
+    for display, _key, hint in load_index():
+        if not display or '%' in display or display in seen:
+            continue
+        seen.add(display)
+        out.append((display, hint))
+    out.sort(key=lambda row: row[0].lower())
+    return out
 
 
 def search_items_local(query: str, limit: int = 15) -> List[Tuple[str, str]]:

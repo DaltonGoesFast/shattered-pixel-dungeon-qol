@@ -13,6 +13,8 @@ Usage:
   python streamer_debug.py goto-stairs-down
   python streamer_debug.py goto-stairs-up
   python streamer_debug.py give "Scroll of Upgrade x10"
+  python streamer_debug.py set-level 15
+  python streamer_debug.py goto-floor 10
   python streamer_debug.py search stylus
   python streamer_debug.py buff Haste 30
   python streamer_debug.py debuff Blindness
@@ -44,6 +46,10 @@ COMMANDS = {
         "path": "/api/streamer-debug/identify-all",
         "desc": "Identify all bag and equipped items",
     },
+    "give-bags": {
+        "path": "/api/streamer-debug/give-bags",
+        "desc": "Give any missing bags (pouch, scroll holder, bandolier, holster)",
+    },
     "reveal-map": {
         "path": "/api/streamer-debug/reveal-map",
         "desc": "Magic mapping for the current floor",
@@ -59,6 +65,16 @@ COMMANDS = {
     "give": {
         "path": "/api/streamer-debug/give",
         "desc": 'Give item: give "Scroll of Upgrade x10" or give "Battle Axe +99"',
+        "needs_args": True,
+    },
+    "set-level": {
+        "path": "/api/streamer-debug/set-level",
+        "desc": "Set hero level 1–30: set-level 15",
+        "needs_args": True,
+    },
+    "goto-floor": {
+        "path": "/api/streamer-debug/goto-floor",
+        "desc": "Warp to dungeon floor 1–26: goto-floor 10",
         "needs_args": True,
     },
     "ping": {
@@ -177,6 +193,26 @@ def main() -> None:
 
             name, _, _ = parse_give_line(spec)
             print_suggestions_for_failed_give(name)
+    elif cmd == "set-level":
+        spec = " ".join(args[1:]).strip()
+        try:
+            level = int(spec)
+        except (TypeError, ValueError):
+            msg = "Usage: set-level <1-30>"
+            print(msg)
+            _write_result(msg)
+            sys.exit(1)
+        ok, msg = _call(COMMANDS[cmd]["path"], body={"level": level})
+    elif cmd == "goto-floor":
+        spec = " ".join(args[1:]).strip()
+        try:
+            depth = int(spec)
+        except (TypeError, ValueError):
+            msg = "Usage: goto-floor <1-26>"
+            print(msg)
+            _write_result(msg)
+            sys.exit(1)
+        ok, msg = _call(COMMANDS[cmd]["path"], body={"depth": depth})
     elif cmd == "buff":
         spec = " ".join(args[1:]).strip()
         if not spec:
