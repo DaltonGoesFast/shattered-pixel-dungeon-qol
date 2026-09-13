@@ -994,12 +994,19 @@ def _save_nine_challenge_deaths(data):
     return clean
 
 
-def _record_nine_challenge_death():
-    """Increment only when the latest full snapshot has all nine challenges."""
-    with data_lock:
-        challenge_count = len(last_challenges)
+def _record_nine_challenge_death(event=None):
+    """Increment only for a 9-challenge run. Prefer the death event's count."""
+    challenge_count = None
+    if isinstance(event, dict) and event.get('challenge_count') is not None:
+        try:
+            challenge_count = int(event.get('challenge_count'))
+        except (TypeError, ValueError):
+            challenge_count = None
+    if challenge_count is None:
+        with data_lock:
+            challenge_count = len(last_challenges)
     if challenge_count != 9:
-        print(f"9c death count unchanged (snapshot has {challenge_count} challenges)")
+        print(f"9c death count unchanged (run had {challenge_count} challenges)")
         return
     try:
         with nine_challenge_deaths_lock:
@@ -1172,7 +1179,7 @@ def _game_ws_on_message(ws, message):
             return
         if data.get('type') in ('hero_died', 'boss_slain') and data.get('source') == 'shattered-pixel-dungeon':
             if data.get('type') == 'hero_died':
-                _record_nine_challenge_death()
+                _record_nine_challenge_death(data)
             _handle_score_event(data)
             return
         if data.get('type') == 'ui_layout' and data.get('source') == 'shattered-pixel-dungeon':
@@ -1193,7 +1200,7 @@ def _game_ws_on_message(ws, message):
         last_ws_update_time = time.time()
         with data_lock:
             current_game_data = data
-            if 'challenges' in data:
+            if 'challenges' in data and data.get('hero'):
                 raw_challenges = data.get('challenges')
                 last_challenges = list(raw_challenges) if isinstance(raw_challenges, list) else []
         _enqueue_snapshot_write(data)

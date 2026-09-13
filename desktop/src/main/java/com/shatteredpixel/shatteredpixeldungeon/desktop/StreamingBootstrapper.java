@@ -78,19 +78,27 @@ public final class StreamingBootstrapper {
 					StreamingServer s = serverRef.get();
 					if (s == null) return;
 					try {
-						Map<String, Object> snapshot = GameStateSnapshot.build();
-						String json = GSON.toJson(snapshot);
-						s.setLastPayload(json);
-						s.broadcastPayload();
+						// Death/boss events first so a post-death menu snapshot cannot
+						// clear last_challenges before Lastest UI records a 9c death.
 						if (StreamingEvents.heroDiedPending) {
-							s.broadcastEvent("hero_died", null);
+							int chals = StreamingEvents.heroDiedChallengeCount;
 							StreamingEvents.heroDiedPending = false;
+							StreamingEvents.heroDiedChallengeCount = -1;
+							if (chals >= 0) {
+								s.broadcastEvent("hero_died", Map.of("challenge_count", chals));
+							} else {
+								s.broadcastEvent("hero_died", null);
+							}
 						}
 						if (StreamingEvents.bossSlainDepthPending >= 0) {
 							int depth = StreamingEvents.bossSlainDepthPending;
 							StreamingEvents.bossSlainDepthPending = -1;
 							s.broadcastEvent("boss_slain", Map.of("depth", depth));
 						}
+						Map<String, Object> snapshot = GameStateSnapshot.build();
+						String json = GSON.toJson(snapshot);
+						s.setLastPayload(json);
+						s.broadcastPayload();
 					} catch (Exception e) {
 						e.printStackTrace();
 						Map<String, Object> fallback = new LinkedHashMap<>();

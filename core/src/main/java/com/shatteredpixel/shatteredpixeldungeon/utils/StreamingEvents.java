@@ -21,6 +21,8 @@
 
 package com.shatteredpixel.shatteredpixeldungeon.utils;
 
+import com.shatteredpixel.shatteredpixeldungeon.Challenges;
+
 /**
  * Static flags for streaming events (hero death, boss slain).
  * The desktop ticker reads these and broadcasts via WebSocket.
@@ -28,10 +30,17 @@ package com.shatteredpixel.shatteredpixeldungeon.utils;
 public class StreamingEvents {
 
 	public static volatile boolean heroDiedPending = false;
+	public static volatile int heroDiedChallengeCount = -1;
 	public static volatile int bossSlainDepthPending = -1;
+
+	public static void notifyHeroDied() {
+		heroDiedPending = true;
+		heroDiedChallengeCount = Challenges.activeChallenges();
+	}
 
 	public static void clear() {
 		heroDiedPending = false;
+		heroDiedChallengeCount = -1;
 		bossSlainDepthPending = -1;
 	}
 }
