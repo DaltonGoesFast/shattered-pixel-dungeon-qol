@@ -707,15 +707,14 @@ def handle_summon(username: str, args: list[str]) -> ChatResult:
     _save_session_state(state)
 
     pres = dict(presentation_config.SUMMON_PRESENTATION) if march_ok else None
-    msg = chat_messages.summon_success(
-        username, monster, xp, soft_floor=soft_floor, xp_mult=xp_mult
-    )
-    if not march_ok:
-        msg += " (overlay server offline - XP counted, march not queued)"
+    # Routine summons stay silent (overlay + sound confirm). Chat only for
+    # level-up / Halls loop / Shatter Event / overlay-down.
     progress = chat_messages.bestiary_progress_line(bestiary)
-    if progress:
-        msg = msg + " " + progress
-    msg = msg + chat_messages.shatter_events_suffix(bestiary.get("shatter_events") or [])
+    shatter = chat_messages.shatter_events_suffix(bestiary.get("shatter_events") or [])
+    msg = (progress + shatter).strip() or None
+    if not march_ok:
+        offline = "overlay server offline - XP counted, march not queued"
+        msg = f"{msg} ({offline})" if msg else f"{username} summoned a {monster} ({offline})"
 
     return ChatResult(
         ok=True,
