@@ -850,6 +850,7 @@
     <div class="row"><label for="passive_cooldown_sec" title="Cooldown for passive earn / presence ticks">Passive cooldown (sec):</label><input type="number" id="passive_cooldown_sec" min="0" value="60"></div>
     <div class="row"><label for="first_words_bonus" title="Bonus chat pts on a viewer's first message this stream">First words bonus:</label><input type="number" id="first_words_bonus" min="0" value="5"></div>
     <div class="row"><label for="chat_point_cap">Chat cap:</label><input type="number" id="chat_point_cap" min="1" value="500"></div>
+    <div class="row"><label for="chat_cap_exempt_users" title="Comma-separated usernames with no chat point cap (community pot / raffle)">Uncapped users:</label><input type="text" id="chat_cap_exempt_users" style="width:220px;" value="bob"></div>
     <div class="row"><label for="bank_ratio_manual">Bank ratio (manual):</label><input type="number" id="bank_ratio_manual" min="0" max="1" step="0.01" value="0.10"></div>
     <div class="row"><label for="bank_ratio_auto">Bank ratio (auto):</label><input type="number" id="bank_ratio_auto" min="0" max="1" step="0.01" value="0.05"></div>
     <div class="row"><label for="bank_ratio_auto_member">Bank ratio (auto member):</label><input type="number" id="bank_ratio_auto_member" min="0" max="1" step="0.01" value="0.10"></div>
@@ -2489,6 +2490,10 @@
             ? data.cooldown_bypass_users.join(', ')
             : (data.cooldown_bypass_users || 'DaltonGoesFast');
           setIf('cooldown_bypass_users', bypass, 'DaltonGoesFast');
+          const capExempt = Array.isArray(data.chat_cap_exempt_users)
+            ? data.chat_cap_exempt_users.join(', ')
+            : (data.chat_cap_exempt_users || 'bob');
+          setIf('chat_cap_exempt_users', capExempt, 'bob');
           const deathCostEl = document.getElementById('death_cost_inflation_enabled');
           if (deathCostEl) deathCostEl.checked = data.death_cost_inflation_enabled !== false;
           applySpawnScaleToForm(data.spawn_scale);
@@ -2594,6 +2599,10 @@
         donation_multiplier_cap: parseInt(document.getElementById('donation_multiplier_cap')?.value, 10) || 4,
         reset_debounce_hours: parseFloat(document.getElementById('reset_debounce_hours')?.value) || 4,
         cooldown_bypass_users: (document.getElementById('cooldown_bypass_users')?.value || '')
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean),
+        chat_cap_exempt_users: (document.getElementById('chat_cap_exempt_users')?.value || '')
           .split(',')
           .map(s => s.trim())
           .filter(Boolean),

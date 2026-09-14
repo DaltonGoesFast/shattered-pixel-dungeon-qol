@@ -317,26 +317,32 @@ def toppoints_leaderboard(entries: list[tuple[str, int]]) -> str:
 def points_balance_v11(
     user: str,
     chat_pts: int,
-    chat_cap: int,
+    chat_cap: int | None,
     donor_pts: int,
     sprint_xp: int = 0,
     heat_xp: int = 0,
 ) -> str:
     u = display_name(user) or user
+    uncapped = chat_cap is None or int(chat_cap) <= 0
+    chat_disp = str(chat_pts) if uncapped else f"{chat_pts}/{chat_cap}"
     if is_youtube_platform():
         base = (
-            f"{u} Chat {chat_pts}/{chat_cap} | Donor {donor_pts}"
+            f"{u} Chat {chat_disp} | Donor {donor_pts}"
             f" | Sprint {sprint_xp} / heat {heat_xp} XP"
         )
         cap_note = " Cap! !bank"
-        if chat_pts >= chat_cap and len(base) + len(cap_note) <= YOUTUBE_CHAT_LIMIT:
+        if (
+            not uncapped
+            and chat_pts >= int(chat_cap)
+            and len(base) + len(cap_note) <= YOUTUBE_CHAT_LIMIT
+        ):
             base += cap_note
         return clamp_youtube_chat(base)
     base = (
-        f"{u} - Chat points: {chat_pts}/{chat_cap} | Donor points: {donor_pts}"
+        f"{u} - Chat points: {chat_disp} | Donor points: {donor_pts}"
         f" | Bestiary: sprint {sprint_xp} XP, heat {heat_xp} XP"
     )
-    if chat_pts >= chat_cap:
+    if not uncapped and chat_pts >= int(chat_cap):
         base += " - Cap reached! Use !bank to save points permanently."
     return base
 

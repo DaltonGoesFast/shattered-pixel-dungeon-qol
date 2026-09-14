@@ -54,6 +54,9 @@
   "cooldown_bypass_users": [
     "DaltonGoesFast"
   ],
+  "chat_cap_exempt_users": [
+    "bob"
+  ],
   "first_words_bonus": 50,
   "chat_point_cap": 300,
   "bank_ratio_manual": 0.1,

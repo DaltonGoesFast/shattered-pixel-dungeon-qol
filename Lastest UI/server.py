@@ -1875,6 +1875,7 @@ def points_config_api():
                 data.setdefault("reset_debounce_hours", 4)
                 data.setdefault("curse_class_kit_duration_turns", 100)
                 data.setdefault("cooldown_bypass_users", ["DaltonGoesFast"])
+                data.setdefault("chat_cap_exempt_users", ["bob"])
                 data.setdefault("death_cost_inflation_enabled", True)
                 data["spawn_scale"] = sanitize_spawn_scale(data.get("spawn_scale"))
             else:
@@ -1913,6 +1914,7 @@ def points_config_api():
                     "chat_cooldown_sec": 20,
                     "passive_cooldown_sec": 60,
                     "cooldown_bypass_users": ["DaltonGoesFast"],
+                    "chat_cap_exempt_users": ["bob"],
                     "first_words_bonus": 5,
                     "chat_point_cap": 500,
                     "bank_ratio_manual": 0.10,
@@ -1962,6 +1964,21 @@ def points_config_api():
                 if str(u).strip()
             ]
 
+        if "chat_cap_exempt_users" in data:
+            raw_exempt = data.get("chat_cap_exempt_users")
+            if isinstance(raw_exempt, str):
+                cap_exempt_users = [u.strip() for u in raw_exempt.split(",") if u.strip()]
+            elif isinstance(raw_exempt, list):
+                cap_exempt_users = [str(u).strip() for u in raw_exempt if str(u).strip()]
+            else:
+                cap_exempt_users = []
+        else:
+            cap_exempt_users = [
+                str(u).strip()
+                for u in (existing.get("chat_cap_exempt_users") or ["bob"])
+                if str(u).strip()
+            ]
+
         if "command_allowed_roles" in data:
             allowed_roles = data.get("command_allowed_roles") or {}
         else:
@@ -2002,6 +2019,7 @@ def points_config_api():
             "chat_cooldown_sec": max(0, int(data.get("chat_cooldown_sec", 20))),
             "passive_cooldown_sec": max(0, int(data.get("passive_cooldown_sec", 60))),
             "cooldown_bypass_users": bypass_users,
+            "chat_cap_exempt_users": cap_exempt_users,
             "first_words_bonus": max(0, int(data.get("first_words_bonus", 5))),
             "chat_point_cap": max(1, int(data.get("chat_point_cap", 500))),
             "bank_ratio_manual": max(0, min(1, float(data.get("bank_ratio_manual", 0.10)))),

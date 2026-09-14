@@ -21,10 +21,12 @@ from points_command import (
     SCRIPT_DIR,
     TOP_SUMMONER_FILE,
     ChatResult,
+    chat_cap_for_user,
     chat_earn_multiplier,
     chat_pts,
     effective_total,
     get_config,
+    ignores_chat_point_cap,
     ignores_command_cooldowns,
     is_double_points_active,
     points_lock,
@@ -126,7 +128,7 @@ def _apply_capped_chat_award(
     key: str,
     username: str,
     to_add: int,
-    cap: int,
+    cap: Optional[int],
     update_last: Optional[int] = None,
 ) -> tuple[int, Optional[str], int]:
     """Apply chat earn with cap. Returns (earned, cap_nudge_message, new_total)."""
@@ -136,6 +138,14 @@ def _apply_capped_chat_award(
 
     if to_add <= 0:
         return 0, None, total
+
+    if cap is None or cap <= 0:
+        actual = to_add
+        pts += actual
+        if update_last is not None:
+            last = update_last
+        data[key] = (pts, last, donation_pts, role)
+        return actual, None, effective_total(pts, donation_pts)
 
     if cur_chat >= cap:
         return 0, chat_messages.chat_cap_nudge(username, cap), total
@@ -175,6 +185,8 @@ def end_stream_session() -> dict:
         with points_lock():
             data = read_points()
             for key in list(data.keys()):
+                if ignores_chat_point_cap(key, cfg):
+                    continue
                 pts, last, donation_pts, role = _get_user_data(data, key)
                 c = chat_pts(pts, donation_pts)
                 if c <= 0:
@@ -297,7 +309,7 @@ def _award_points(username: str, base: int, is_sub: bool, is_member: bool,
     """Add chat earn points. Returns (earned, new_total)."""
     key = username.strip().lower()
     cfg = get_config()
-    cap = int(cfg.get("chat_point_cap", 500))
+    cap = chat_cap_for_user(username, cfg)
     if base <= 0:
         with points_lock():
             data = read_points()
@@ -330,7 +342,7 @@ def _maybe_award_first_words(username: str, is_sub: bool, is_member: bool) -> in
 
     cfg = get_config()
     bonus_base = int(cfg.get("first_words_bonus", 5))
-    cap = int(cfg.get("chat_point_cap", 500))
+    cap = chat_cap_for_user(username, cfg)
     if bonus_base <= 0:
         return 0
 
@@ -364,7 +376,7 @@ def handle_earn_message(username: str, is_sub: bool, is_member: bool) -> ChatRes
     cfg = get_config()
     cooldown = int(cfg.get("chat_cooldown_sec", 20))
     base = int(cfg.get("points_per_message", 2))
-    cap = int(cfg.get("chat_point_cap", 500))
+    cap = chat_cap_for_user(username, cfg)
     key = username.strip().lower()
     now = int(time.time())
 
@@ -413,7 +425,7 @@ def handle_earn_passive(username: str, is_sub: bool, is_member: bool) -> ChatRes
 
     cfg = get_config()
     cooldown = int(cfg.get("passive_cooldown_sec", 60))
-    cap = int(cfg.get("chat_point_cap", 500))
+    cap = chat_cap_for_user(username, cfg)
     base = 1
     key = username.strip().lower()
     now = int(time.time())
@@ -451,7 +463,7 @@ def handle_earn_passive(username: str, is_sub: bool, is_member: bool) -> ChatRes
 
 def handle_points_query(username: str) -> ChatResult:
     cfg = get_config()
-    cap = int(cfg.get("chat_point_cap", 500))
+    cap = chat_cap_for_user(username, cfg)
     key = username.strip().lower()
     try:
         with points_lock():

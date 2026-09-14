@@ -55,6 +55,11 @@ def test_youtube_query_replies() -> None:
     m.set_reply_platform("youtube")
     try:
         _assert_len("points cap", m.points_balance_v11(USER, 300, 300, 1234, 88, 42))
+        uncapped = m.points_balance_v11("bob", 9999, None, 0, 0, 0)
+        _assert_len("points uncapped", uncapped)
+        assert "Cap" not in uncapped
+        assert "9999/0" not in uncapped
+        assert "9999" in uncapped
         _assert_len(
             "points longname cap",
             m.points_balance_v11("x" * 30, 300, 300, 12345, 888, 420),

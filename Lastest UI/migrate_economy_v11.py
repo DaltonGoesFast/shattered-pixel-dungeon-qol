@@ -22,6 +22,7 @@ sys.path.insert(0, SCRIPT_DIR)
 from points_command import (  # noqa: E402
     chat_pts,
     get_config,
+    ignores_chat_point_cap,
     points_lock,
     read_points,
     write_points,
@@ -41,6 +42,8 @@ def migrate(*, apply: bool) -> dict:
     with points_lock():
         data = read_points()
         for key in sorted(data.keys()):
+            if ignores_chat_point_cap(key, cfg):
+                continue
             pts, last, donation_pts, role = _get_user_data(data, key)
             c = chat_pts(pts, donation_pts)
             if c <= cap:

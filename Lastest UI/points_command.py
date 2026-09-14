@@ -333,6 +333,7 @@ def load_config():
         "chat_cooldown_sec": 20,
         "passive_cooldown_sec": 60,
         "cooldown_bypass_users": ["DaltonGoesFast"],
+        "chat_cap_exempt_users": ["bob"],
         "first_words_bonus": 5,
         "chat_point_cap": 500,
         "bank_ratio_manual": 0.10,
@@ -387,6 +388,11 @@ def load_config():
                 for u in (cfg.get("cooldown_bypass_users") or defaults["cooldown_bypass_users"])
                 if str(u).strip()
             ],
+            "chat_cap_exempt_users": [
+                str(u).strip()
+                for u in (cfg.get("chat_cap_exempt_users") or defaults["chat_cap_exempt_users"])
+                if str(u).strip()
+            ],
             "first_words_bonus": max(0, int(cfg.get("first_words_bonus", defaults["first_words_bonus"]))),
             "chat_point_cap": max(1, int(cfg.get("chat_point_cap", defaults["chat_point_cap"]))),
             "bank_ratio_manual": float(cfg.get("bank_ratio_manual", defaults["bank_ratio_manual"])),
@@ -422,6 +428,26 @@ def ignores_command_cooldowns(username: str) -> bool:
         if str(u).strip().lower() == key:
             return True
     return False
+
+
+def ignores_chat_point_cap(username: str, cfg: Optional[dict] = None) -> bool:
+    """True if this user can hold unlimited chat points (community pot / raffle)."""
+    key = (username or "").strip().lower().lstrip("@")
+    if not key:
+        return False
+    src = cfg if cfg is not None else get_config()
+    for u in src.get("chat_cap_exempt_users") or []:
+        if str(u).strip().lower().lstrip("@") == key:
+            return True
+    return False
+
+
+def chat_cap_for_user(username: str, cfg: Optional[dict] = None) -> Optional[int]:
+    """Chat point cap for this user, or None if uncapped."""
+    src = cfg if cfg is not None else get_config()
+    if ignores_chat_point_cap(username, src):
+        return None
+    return max(1, int(src.get("chat_point_cap", 500)))
 
 
 def _parse_free_until_end(raw: Any) -> Optional[int]:
@@ -1023,7 +1049,7 @@ def cmd_balance(args):
         with points_lock():
             data = read_points()
             pts, _, donation_pts, _ = _get_user_data(data, username.lower())
-            cap = int(get_config().get("chat_point_cap", 500))
+            cap = chat_cap_for_user(username) or 0
             c = chat_pts(pts, donation_pts)
             return BALANCE_RESULT_FILE, f"ok|{c}|{donation_pts}|{cap}"
     except TimeoutError:
@@ -1924,7 +1950,8 @@ def cmd_transfer(args):
     """Transfer points from one viewer to another.
 
     Deduction order: chat-earned points first, then donation-backed points if needed.
-    Recipient receives chat points, clipped to remaining room under chat_point_cap.
+    Recipient receives chat points, clipped to remaining room under chat_point_cap
+    unless the target is in chat_cap_exempt_users (e.g. bob).
     """
     if len(args) != 3:
         return SPAWN_RESULT_FILE, "Usage: !givepoints <amount> <target> (example: !givepoints 50 @bob)"
@@ -1970,13 +1997,15 @@ def cmd_transfer(args):
                 return SPAWN_RESULT_FILE, f"{from_display}, not enough points. You have {from_total}."
 
             import chat_messages
-            cap = int(get_config().get("chat_point_cap", 500))
+            cap = chat_cap_for_user(to_key)
             to_chat = chat_pts(to_pts, to_donation_pts)
-            room = max(0, cap - to_chat)
-            if room <= 0:
-                return SPAWN_RESULT_FILE, chat_messages.givepoints_at_cap(to_display, cap)
-
-            credit = min(amount, room)
+            if cap is None:
+                credit = amount
+            else:
+                room = max(0, cap - to_chat)
+                if room <= 0:
+                    return SPAWN_RESULT_FILE, chat_messages.givepoints_at_cap(to_display, cap)
+                credit = min(amount, room)
             deducted = deduct_points(from_pts, from_donation_pts, credit)
             if deducted is None:
                 return SPAWN_RESULT_FILE, f"{from_display}, not enough points. You have {from_total}."
@@ -2104,7 +2133,8 @@ def legacy_to_chat_result(cmd: str, msg: str, username: str, cmd_args: list) -> 
         if cmd == "balance":
             c = int(parts[1])
             donor = int(parts[2]) if len(parts) > 2 else 0
-            cap = int(parts[3]) if len(parts) > 3 else int(get_config().get("chat_point_cap", 500))
+            raw_cap = int(parts[3]) if len(parts) > 3 else int(get_config().get("chat_point_cap", 500))
+            cap = None if raw_cap <= 0 else raw_cap
             total = c + donor
             return ChatResult(
                 ok=True,
