@@ -12,6 +12,10 @@ func _apply_window_transparency() -> void:
 	var vp := get_viewport()
 	var on := CompanionConfig.window_per_pixel_transparency_enabled
 	vp.transparent_bg = on
+	# Same as VerticalCompanionWindow: Window.transparent is what Windows honors for per-pixel alpha.
+	var win := get_window()
+	if win:
+		win.transparent = on
 	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_TRANSPARENT, on, vp.get_window_id())
 
 
