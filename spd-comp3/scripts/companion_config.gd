@@ -142,6 +142,8 @@ var live_water_top_gradient_fade_end: float = 0.0
 var live_water_top_edge_feather_v_px: int = 0
 ## When true, root viewport + window use per-pixel transparency so OBS (layer below) shows through masked regions. Default off: some Windows exports show a blank/white window with transparency on.
 var window_per_pixel_transparency_enabled: bool = false
+## Horizontal canvas only: paint the empty hole a saturated pink so OBS can Color Key BitBlt. Vertical is unchanged (feathered edges).
+var horizontal_chroma_fill_enabled: bool = false
 ## Caps redraw rate ([member Engine.max_fps]). **0** = unlimited (higher GPU). **30–60** is usually enough for overlays and lowers compositor/GPU load.
 var render_max_fps: int = 60
 ## Title/subtitle alignment: left or center.
@@ -450,7 +452,7 @@ const SCENE_PAUSE := &"pause"
 const SCENE_MAIN := &"main"
 const SCENE_OTHER := &"other"
 const SCENE_UNKNOWN := &"unknown"
-## Second OBS capture window (1080×1920). When false, VerticalCompanionWindow stays hidden.
+## Portrait pane on the atlas (1080×1920). When false, VerticalCompanionWindow stays hidden.
 var vertical_window_enabled: bool = true
 ## Zones / toggles / chrome for the vertical companion window ([code][ui_vertical][/code]).
 var vertical_layout: UiLayoutData = UiLayoutData.default_vertical()
@@ -977,6 +979,9 @@ func load_settings() -> void:
 	)
 	window_per_pixel_transparency_enabled = bool(
 		cfg.get_value("ui", "window_per_pixel_transparency_enabled", window_per_pixel_transparency_enabled)
+	)
+	horizontal_chroma_fill_enabled = bool(
+		cfg.get_value("ui", "horizontal_chroma_fill_enabled", horizontal_chroma_fill_enabled)
 	)
 	render_max_fps = clampi(int(cfg.get_value("ui", "render_max_fps", render_max_fps)), 0, 480)
 	alert_text_align = str(cfg.get_value("ui", "alert_text_align", alert_text_align))
@@ -2634,6 +2639,7 @@ func save_settings() -> void:
 	cfg.set_value("ui", "live_water_top_gradient_fade_end", live_water_top_gradient_fade_end)
 	cfg.set_value("ui", "live_water_top_edge_feather_v_px", live_water_top_edge_feather_v_px)
 	cfg.set_value("ui", "window_per_pixel_transparency_enabled", window_per_pixel_transparency_enabled)
+	cfg.set_value("ui", "horizontal_chroma_fill_enabled", horizontal_chroma_fill_enabled)
 	cfg.set_value("ui", "render_max_fps", render_max_fps)
 	cfg.set_value("ui", "alert_text_align", alert_text_align)
 	cfg.set_value("ui", "alert_chrome_style", alert_chrome_style)
@@ -2824,7 +2830,7 @@ const REMOTE_UI_KEYS: Array[String] = [
 	"live_water_gradient_fade_start", "live_water_gradient_fade_end", "live_water_edge_feather_v_px",
 	"live_water_top_bar_px", "live_water_top_gradient_fade_start", "live_water_top_gradient_fade_end",
 	"live_water_top_edge_feather_v_px",
-	"window_per_pixel_transparency_enabled", "render_max_fps",
+	"window_per_pixel_transparency_enabled", "horizontal_chroma_fill_enabled", "render_max_fps",
 	"alert_text_align", "alert_chrome_style", "alert_chrome_scale",
 	"alert_title_font_size_px", "alert_subtitle_font_size_px", "alert_padding_h_px", "alert_padding_v_px",
 	"alert_command_icon_size_px", "alert_mob_idle_anim_fps",

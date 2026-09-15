@@ -1,11 +1,12 @@
 extends Control
-## Shared stream overlay canvas (instanced under Main and VerticalCompanionWindow).
+## Shared stream overlay canvas (instanced under the 1080p and portrait atlas panes).
 
 @export var layout_profile: StringName = &"ui"
 
 ## Saturated pink for chroma key (live / non-pause layout only); toggle with F9 on main.
 const _LIVE_FILL_CHROMA_DEBUG := Color(1.0, 8.0 / 255.0, 147.0 / 255.0, 1.0)
 
+@onready var _chroma_hole_fill: ColorRect = $ChromaHoleFill
 @onready var _live_background: Control = $LiveBackground
 @onready var _chroma_overlay: ColorRect = $LiveBackground/ChromaOverlay
 @onready var _title_backdrop: Control = $TitleBackdrop
@@ -58,6 +59,16 @@ func _ready() -> void:
 
 func _on_settings_changed() -> void:
 	_apply_obs_visibility()
+	_sync_horizontal_chroma_fill()
+
+
+func _sync_horizontal_chroma_fill() -> void:
+	if _chroma_hole_fill == null:
+		return
+	var on := CompanionConfig.horizontal_chroma_fill_enabled and not is_vertical_profile()
+	_chroma_hole_fill.visible = on
+	if on:
+		_chroma_hole_fill.color = _LIVE_FILL_CHROMA_DEBUG
 
 
 func set_debug_chroma(on: bool) -> void:
@@ -167,5 +178,6 @@ func _apply_obs_visibility() -> void:
 	_viewer_counts_layer.visible = show_viewer_counts
 	_starting_soon_layer.visible = show_starting_soon
 	_sync_live_chroma_overlay()
+	_sync_horizontal_chroma_fill()
 	if show_id and _id_overlay and _id_overlay.has_method("sync_visibility_after_obs"):
 		_id_overlay.sync_visibility_after_obs()

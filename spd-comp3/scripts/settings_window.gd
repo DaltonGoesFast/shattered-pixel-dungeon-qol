@@ -179,6 +179,7 @@ var _obs_main_scene: LineEdit
 var _obs_log_scene: CheckBox
 var _obs_recon: SpinBox
 var _win_transparent: CheckBox
+var _win_chroma_h: CheckBox
 var _lw_bottom: SpinBox
 var _lw_left: SpinBox
 var _lw_left_top: SpinBox
@@ -390,6 +391,10 @@ var _vviewers_my: SpinBox
 
 func _ready() -> void:
 	title = "SPD Companion — settings"
+	if "force_native" in self:
+		set("force_native", true)
+	transient = false
+	exclusive = false
 	min_size = Vector2i(720, 480)
 	initial_position = Window.WINDOW_INITIAL_POSITION_CENTER_MAIN_WINDOW_SCREEN
 	close_requested.connect(_on_close_requested)
@@ -1115,6 +1120,7 @@ func _build_ui() -> void:
 	_obs_log_scene = CheckBox.new()
 	_obs_recon = _spin_f(0.5, 120.0, 0.5)
 	_win_transparent = CheckBox.new()
+	_win_chroma_h = CheckBox.new()
 	_lw_bottom = _spin_i(0, 4000)
 	_lw_left = _spin_i(0, 4000)
 	_lw_left_top = _spin_i(0, 4000)
@@ -1144,6 +1150,7 @@ func _build_ui() -> void:
 		obs_sc,
 		[
 			["Transparent window (OBS sees layers beneath gaps)", _win_transparent],
+			["Horizontal chroma fill (pink hole for BitBlt Color Key)", _win_chroma_h],
 			["Live water: bottom bar height (px)", _lw_bottom],
 			["Live water: top bar height (px)", _lw_top],
 			["Live water: left strip width (px)", _lw_left],
@@ -1583,7 +1590,7 @@ func _build_ui() -> void:
 		]
 	)
 
-	# --- Vertical companion (1080×1920 second window) ---
+	# --- Vertical companion (1080×1920 atlas pane) ---
 	var vert_sc := _make_scroll_vbox() as ScrollContainer
 	_add_settings_page("Vertical", vert_sc)
 	_vert_enabled = CheckBox.new()
@@ -1659,15 +1666,15 @@ func _build_ui() -> void:
 	_vviewers_my = _spin_i(0, 4000)
 	var vert_note := _section_note()
 	vert_note.text = (
-		"Second 1080×1920 window for vertical OBS (F4). Capture it separately — "
-		+ "no crop of the main companion. Per-scene show/hide for this window is under "
-		+ "Scene gates → Vertical. Master toggles below still enable/disable elements. "
-		+ "Chrome boxes for vertical are edited under UI panels → layout Vertical."
+		"Portrait pane on the single SPD Companion 3 atlas (F4). OBS Game Capture the "
+		+ "one window, then Crop/Pad clones to 1080×1920 at x=1920. Per-scene show/hide "
+		+ "is under Scene gates → Vertical. Master toggles below still enable/disable "
+		+ "elements. Chrome boxes for vertical are edited under UI panels → layout Vertical."
 	)
 	vert_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	(vert_sc.get_node("InnerVBox") as VBoxContainer).add_child(vert_note)
-	_add_section_header(vert_sc, "Window")
-	_add_rows(vert_sc, [["Enable vertical companion window", _vert_enabled]])
+	_add_section_header(vert_sc, "Pane")
+	_add_rows(vert_sc, [["Enable vertical companion pane", _vert_enabled]])
 	_add_section_header(vert_sc, "Show elements")
 	_add_rows(
 		vert_sc,
@@ -2381,6 +2388,7 @@ func _sync_from_config() -> void:
 	_obs_log_scene.button_pressed = CompanionConfig.obs_log_program_scene
 	_obs_recon.value = CompanionConfig.obs_reconnect_sec
 	_win_transparent.button_pressed = CompanionConfig.window_per_pixel_transparency_enabled
+	_win_chroma_h.button_pressed = CompanionConfig.horizontal_chroma_fill_enabled
 	_lw_bottom.value = CompanionConfig.live_water_bottom_bar_px
 	_lw_left.value = CompanionConfig.live_water_left_strip_px
 	_lw_left_top.value = CompanionConfig.live_water_left_strip_top_px
@@ -2935,6 +2943,7 @@ func _on_apply_pressed() -> void:
 	CompanionConfig.obs_log_program_scene = _obs_log_scene.button_pressed
 	CompanionConfig.obs_reconnect_sec = float(_obs_recon.value)
 	CompanionConfig.window_per_pixel_transparency_enabled = _win_transparent.button_pressed
+	CompanionConfig.horizontal_chroma_fill_enabled = _win_chroma_h.button_pressed
 	CompanionConfig.live_water_bottom_bar_px = int(_lw_bottom.value)
 	CompanionConfig.live_water_left_strip_px = int(_lw_left.value)
 	CompanionConfig.live_water_left_strip_top_px = int(_lw_left_top.value)
@@ -3123,8 +3132,8 @@ func _toast_overlay_nodes(relative_path: String) -> Array[Node]:
 	if main == null:
 		return out
 	for path in [
-		"StreamCanvas/%s" % relative_path,
-		"VerticalCompanionWindow/StreamCanvas/%s" % relative_path,
+		"HorizontalPane/SubViewport/StreamCanvas/%s" % relative_path,
+		"VerticalCompanionWindow/SubViewport/StreamCanvas/%s" % relative_path,
 	]:
 		var overlay := main.get_node_or_null(path)
 		if overlay:

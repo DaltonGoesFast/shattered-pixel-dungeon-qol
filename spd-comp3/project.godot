@@ -35,13 +35,14 @@ CompanionAudio="*res://scripts/companion_audio.gd"
 
 [display]
 
-window/size/viewport_width=1920
-window/size/viewport_height=1080
+window/size/viewport_width=3000
+window/size/viewport_height=1920
 window/size/transparent=true
 window/stretch/mode="canvas_items"
-window/stretch/aspect="expand"
+window/stretch/aspect="keep"
 window/per_pixel_transparency/allowed=true
-##RequiredsoSettings+VerticalcompanionarerealOSwindows(OBScancaptureeach),notembeddedoverlaysinsidethe1080pmainview.window/subwindows/embed_subwindows=false
+; Atlas 3000x1920: 1920x1080 at (0,0), 1080x1920 at (1920,0). Settings stays a native OS window.
+window/subwindows/embed_subwindows=false
 
 [physics]
 
