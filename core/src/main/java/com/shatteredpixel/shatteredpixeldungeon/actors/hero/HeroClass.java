@@ -328,8 +328,8 @@ public enum HeroClass {
 	}
 	
 	public boolean isUnlocked(){
-		//always unlock on debug builds
-		if (DeviceCompat.isDebug()) return true;
+		//always unlock on debug builds, and in this QoL/streaming build
+		if (DeviceCompat.isDebug() || Badges.firstWinFeaturesUnlocked()) return true;
 
 		switch (this){
 			case WARRIOR: default:

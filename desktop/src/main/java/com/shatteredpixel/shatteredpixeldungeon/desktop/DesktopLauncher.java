@@ -187,6 +187,11 @@ public class DesktopLauncher {
 
 		config.setMaximized(SPDSettings.windowMaximized());
 
+		// Windowed/maximized GLFW vsync fights DWM+VRR on a 4K OLED: torn frames
+		// (half-drawn map). Cap presents instead; window size stays maximized for OBS.
+		config.useVsync(false);
+		config.setForegroundFPS(DesktopPlatformSupport.PRESENT_FPS);
+
 		//going fullscreen on launch is a bit buggy
 		// so game always starts windowed and then switches in DesktopPlatformSupport.updateSystemUI
 		//config.setFullscreenMode(Lwjgl3ApplicationConfiguration.getDisplayMode());

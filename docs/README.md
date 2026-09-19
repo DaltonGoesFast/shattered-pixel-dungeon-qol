@@ -74,6 +74,7 @@ Import bundle: `Lastest UI/streamerbot/shatter-the-streamer-export-0.2.0` (no `.
 | [custom-surface-inventory.md](custom-surface-inventory.md) | Java QoL/streaming hooks for upstream merge (WS, buffs, settings, assets) |
 | [streaming-system-rework-plan.md](streaming-system-rework-plan.md) | Master plan; phases 0–6 complete |
 | [setpiece-commands-brainstorm.md](setpiece-commands-brainstorm.md) | Draft high-cost setpiece spends (`!mimic`, `!pedestal`, `!trial`, `!ambush`, `!greed`) |
+| [run-artifacts.md](run-artifacts.md) | RoR2-style run modifiers (Honor, Command, Sacrifice, …) — brainstorm only |
 
 ---
 

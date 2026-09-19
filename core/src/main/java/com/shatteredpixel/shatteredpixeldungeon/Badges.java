@@ -1191,6 +1191,11 @@ public class Badges {
 		}
 	}
 	
+	//this QoL/streaming build unlocks first-win gameplay without awarding badges
+	public static boolean firstWinFeaturesUnlocked() {
+		return true;
+	}
+
 	public static boolean isUnlocked( Badge badge ) {
 		return global.contains( badge );
 	}

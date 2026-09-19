@@ -37,6 +37,7 @@ public class DesktopWindowListener implements Lwjgl3WindowListener {
 		if (b){
 			SPDSettings.windowResolution(DesktopPlatformSupport.previousSizes[1]);
 		}
+		DesktopPlatformSupport.applyPresentMode();
 	}
 	
 	@Override

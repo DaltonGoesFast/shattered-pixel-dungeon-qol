@@ -278,6 +278,7 @@
       { key: 'live_water_top_edge_feather_v_px', type: 'int', label: 'Top edge feather', min: 0, max: 512 },
       { section: 'Window' },
       { key: 'window_per_pixel_transparency_enabled', type: 'bool', label: 'Transparent window' },
+      { key: 'horizontal_chroma_fill_enabled', type: 'bool', label: 'Horizontal chroma fill (pink hole)' },
       { key: 'render_max_fps', type: 'int', label: 'Max FPS (0=uncapped)', min: 0, max: 240 },
     ]),
     safe_network: applySectionMarkers([

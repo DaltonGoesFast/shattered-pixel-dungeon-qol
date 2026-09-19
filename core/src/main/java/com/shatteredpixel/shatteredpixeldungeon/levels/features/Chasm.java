@@ -27,6 +27,8 @@ import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Bleeding;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Cripple;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.GreaterHaste;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Levitation;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Speck;
@@ -53,6 +55,23 @@ public class Chasm implements Hero.Doom {
 
 	public static boolean jumpConfirmed = false;
 	private static int heroPos;
+
+	// Left-clicking a chasm (adjacent, distant, or in fog) should not start a jump.
+	// Keyboard and right-click Go Here still can.
+	public static boolean ignoreLeftClickJump(Hero hero, Integer cell) {
+		if (hero == null || cell == null || Dungeon.level == null) {
+			return false;
+		}
+		if (cell < 0 || cell >= Dungeon.level.length()) {
+			return false;
+		}
+		if (!Dungeon.level.pit[cell] || Dungeon.level.solid[cell]) {
+			return false;
+		}
+		float delay = hero.buff(GreaterHaste.class) != null ? 0 : 1;
+		return !hero.flying || (hero.buff(Levitation.class) != null
+				&& hero.buff(Levitation.class).detachesWithinDelay(delay / hero.speed()));
+	}
 	
 	public static void heroJump( final Hero hero ) {
 		heroPos = hero.pos;

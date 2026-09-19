@@ -72,6 +72,7 @@ import com.shatteredpixel.shatteredpixeldungeon.journal.Notes;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.RegularLevel;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
+import com.shatteredpixel.shatteredpixeldungeon.levels.features.Chasm;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.Room;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.secret.SecretRoom;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.Trap;
@@ -1856,6 +1857,9 @@ public class GameScene extends PixelScene {
 	public static void handleCell( int cell ) {
 		cellSelector.select( cell, PointerEvent.LEFT );
 	}
+
+	// Go Here from the right-click menu uses handleCell, which is otherwise a left-click.
+	private static boolean contextMenuCellAction = false;
 	
 	public static void selectCell( CellSelector.Listener listener ) {
 		if (cellSelector.listener != null && cellSelector.listener != defaultCellListener){
@@ -2062,6 +2066,9 @@ public class GameScene extends PixelScene {
 	private static final CellSelector.Listener defaultCellListener = new CellSelector.Listener() {
 		@Override
 		public void onSelect( Integer cell ) {
+			if (!contextMenuCellAction && Chasm.ignoreLeftClickJump(Dungeon.hero, cell)) {
+				return;
+			}
 			if (Dungeon.hero.handle( cell )) {
 				Dungeon.hero.next();
 			}
@@ -2151,7 +2158,9 @@ public class GameScene extends PixelScene {
 				@Override
 				public void onSelect(int index) {
 					if (index == 0){
+						contextMenuCellAction = true;
 						handleCell(cell);
+						contextMenuCellAction = false;
 					} else {
 						if (objects.size() == 0){
 							GameScene.show(new WndInfoCell(cell));

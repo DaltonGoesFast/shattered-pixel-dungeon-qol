@@ -43,6 +43,17 @@ public class DesktopPlatformSupport extends PlatformSupport {
 	//have to do this as updateDisplaySize is called before maximized is set =S
 	protected static Point[] previousSizes = null;
 
+	// 120Hz TV budget. Uncapped 4K maximized presents tear on VRR OLEDs.
+	static final int PRESENT_FPS = 120;
+
+	static void applyPresentMode() {
+		if (Gdx.graphics == null) {
+			return;
+		}
+		Gdx.graphics.setVSync(false);
+		Gdx.graphics.setForegroundFPS(PRESENT_FPS);
+	}
+
 	@Override
 	public void updateDisplaySize() {
 		if (previousSizes == null){
@@ -88,6 +99,7 @@ public class DesktopPlatformSupport extends PlatformSupport {
 					Point p = SPDSettings.windowResolution();
 					Gdx.graphics.setWindowedMode( p.x, p.y );
 				}
+				applyPresentMode();
 				first = false;
 			}
 		} );
