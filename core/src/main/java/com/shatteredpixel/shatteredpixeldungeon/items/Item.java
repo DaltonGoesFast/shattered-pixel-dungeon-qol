@@ -23,6 +23,7 @@ package com.shatteredpixel.shatteredpixeldungeon.items;
 
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
+import com.shatteredpixel.shatteredpixeldungeon.Command;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
@@ -102,7 +103,10 @@ public class Item implements Bundlable {
 	public boolean keptThoughLostInvent = false;
 
 	// whether an item can be included in heroes remains
-	public boolean bones = false;
+	public static boolean bones = false;
+
+	/** Dungeon/shop-generated loot eligible for the Command pact window on pickup. */
+	public boolean commandLoot = false;
 
 	public int customNoteID = -1;
 	/** Optional display name for renameable equipment; empty/null means use default. */
@@ -131,11 +135,16 @@ public class Item implements Bundlable {
 	}
 
 	public boolean doPickUp(Hero hero, int pos) {
+		boolean flagged = commandLoot;
+		int incomingQty = quantity;
 		if (collect( hero.belongings.backpack )) {
 			
 			GameScene.pickUp( this, pos );
 			Sample.INSTANCE.play( Assets.Sounds.ITEM );
 			hero.spendAndNext( pickupDelay() );
+			if (flagged) {
+				Command.offerAfterPickup( this, incomingQty );
+			}
 			return true;
 			
 		} else {
@@ -146,7 +155,9 @@ public class Item implements Bundlable {
 	public void doDrop( Hero hero ) {
 		hero.spendAndNext(TIME_TO_DROP);
 		int pos = hero.pos;
-		Dungeon.level.drop(detachAll(hero.belongings.backpack), pos).sprite.drop(pos);
+		Item dropped = detachAll(hero.belongings.backpack);
+		dropped.commandLoot = false;
+		Dungeon.level.drop(dropped, pos).sprite.drop(pos);
 	}
 
 	//resets an item's properties, to ensure consistency between runs
@@ -198,6 +209,7 @@ public class Item implements Bundlable {
 	}
 	
 	protected void onThrow( int cell ) {
+		commandLoot = false;
 		Heap heap = Dungeon.level.drop( this, cell );
 		if (!heap.isEmpty()) {
 			heap.sprite.drop( cell );
@@ -209,6 +221,7 @@ public class Item implements Bundlable {
 		if (isSimilar( other )){
 			quantity += other.quantity;
 			other.quantity = 0;
+			if (other.commandLoot) commandLoot = true;
 		}
 		return this;
 	}
@@ -538,6 +551,7 @@ public class Item implements Bundlable {
 	
 	/** True if this item has a custom note (specific or type) attached. */
 	public boolean hasNote() {
+		if (Dungeon.hero == null) return false;
 		return Notes.findCustomRecord(customNoteID) != null || Notes.findCustomRecord(getClass()) != null;
 	}
 
@@ -613,6 +627,7 @@ public class Item implements Bundlable {
 	private static final String KEPT_LOST       = "kept_lost";
 	private static final String CUSTOM_NOTE_ID = "custom_note_id";
 	private static final String CUSTOM_NAME = "custom_name";
+	private static final String COMMAND_LOOT = "command_loot";
 	
 	@Override
 	public void storeInBundle( Bundle bundle ) {
@@ -627,6 +642,7 @@ public class Item implements Bundlable {
 		bundle.put( KEPT_LOST, keptThoughLostInvent );
 		if (customNoteID != -1)     bundle.put(CUSTOM_NOTE_ID, customNoteID);
 		if (customName != null && !customName.isEmpty()) bundle.put(CUSTOM_NAME, customName);
+		if (commandLoot) bundle.put( COMMAND_LOOT, true );
 	}
 	
 	@Override
@@ -659,6 +675,7 @@ public class Item implements Bundlable {
 		} else {
 			customName = null;
 		}
+		commandLoot = bundle.contains( COMMAND_LOOT ) && bundle.getBoolean( COMMAND_LOOT );
 	}
 
 	public int targetingPos( Hero user, int dst ){

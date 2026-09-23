@@ -22,6 +22,8 @@
 package com.shatteredpixel.shatteredpixeldungeon.actors.buffs;
 
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
+import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
@@ -46,6 +48,9 @@ public abstract class AllyBuff extends Buff {
 			target.alignment = Char.Alignment.ALLY;
 			if (target.buff(PinCushion.class) != null){
 				target.buff(PinCushion.class).detach();
+			}
+			if (Dungeon.isModified(Modifiers.GLASS)){
+				Modifiers.applyGlassHT(target);
 			}
 			return true;
 		} else {

@@ -751,7 +751,7 @@ public class Toolbar extends Component {
 		
 		private static final int BGCOLOR = 0x7B8073;
 		
-		private Image base;
+		protected Image base;
 		private Image icon;
 		
 		public Tool( int x, int y, int width, int height ) {
@@ -828,9 +828,11 @@ public class Toolbar extends Component {
 		private QuickSlotButton slot;
 		private int borderLeft = 2;
 		private int borderRight = 2;
+		private final int slotNum;
 		
 		public QuickslotTool( int x, int y, int width, int height, int slotNum ) {
 			super( x, y, width, height );
+			this.slotNum = slotNum;
 
 			slot = new QuickSlotButton( slotNum );
 			add( slot );
@@ -847,6 +849,26 @@ public class Toolbar extends Component {
 			super.layout();
 			slot.setRect( x, y, width, height );
 			slot.slotMargins(borderLeft, 2, borderRight, 2);
+			applyBankShade();
+		}
+
+		@Override
+		protected void onPointerUp() {
+			if (active) {
+				applyBankShade();
+			} else {
+				super.onPointerUp();
+			}
+		}
+
+		/** Slots 7–12 use cooler, darker chrome so the second bar is obvious. */
+		private void applyBankShade() {
+			float a = base.alpha();
+			base.resetColor();
+			if (QuickSlotButton.getActualSlot(slotNum) >= QuickSlot.SLOTS_PER_SET) {
+				base.hardlight(0.68f, 0.70f, 0.76f);
+			}
+			base.alpha(a);
 		}
 
 		@Override

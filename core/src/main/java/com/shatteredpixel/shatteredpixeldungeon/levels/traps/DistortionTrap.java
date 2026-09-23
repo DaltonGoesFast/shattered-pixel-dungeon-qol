@@ -24,6 +24,7 @@ package com.shatteredpixel.shatteredpixeldungeon.levels.traps;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ChampionEnemy;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Acidic;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Albino;
@@ -139,6 +140,7 @@ public class DistortionTrap extends Trap{
 			if (mob.state != mob.PASSIVE) {
 				mob.state = mob.WANDERING;
 			}
+			ChampionEnemy.rollForChampion(mob);
 			mob.pos = point;
 			GameScene.add(mob, DELAY);
 			mobs.add(mob);

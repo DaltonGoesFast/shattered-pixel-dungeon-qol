@@ -51,8 +51,11 @@ public class CheckBox extends RedButton {
 		int size = 9;
 		while (width > 0 && text.right() > icon.x){
 			size--;
+			String label = text.text;
 			remove(text);
-			text = PixelScene.renderTextBlock(text.text, size);
+			text = PixelScene.renderTextBlock(label, size);
+			// layout may rebuild text; keep disabled greying from enable(false)
+			text.alpha(active ? 1.0f : 0.3f);
 			margin = (height - text.height()) / 2;
 			text.setPos( x + margin, y + margin);
 			PixelScene.align(text);

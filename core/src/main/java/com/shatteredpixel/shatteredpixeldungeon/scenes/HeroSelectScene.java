@@ -26,6 +26,7 @@ import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Chrome;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.GamesInProgress;
+import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
 import com.shatteredpixel.shatteredpixeldungeon.Rankings;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
@@ -48,6 +49,7 @@ import com.shatteredpixel.shatteredpixeldungeon.windows.WndHeroInfo;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndKeyBindings;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndMessage;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndOptions;
+import com.shatteredpixel.shatteredpixeldungeon.windows.WndPacts;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndTextInput;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndTitledMessage;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndVictoryCongrats;
@@ -95,6 +97,7 @@ public class HeroSelectScene extends PixelScene {
 
 	private static boolean heroWasRandomized = true;
 	private static boolean chalWasRandomized = false;
+	private static boolean pactWasRandomized = false;
 
 	@Override
 	public void create() {
@@ -236,6 +239,8 @@ public class HeroSelectScene extends PixelScene {
 		if (!Badges.firstWinFeaturesUnlocked()){
 			Dungeon.challenges = 0;
 			SPDSettings.challenges(0);
+			Dungeon.modifiers = 0;
+			SPDSettings.modifiers(0);
 			SPDSettings.customSeed("");
 		}
 
@@ -406,7 +411,7 @@ public class HeroSelectScene extends PixelScene {
 			btnOptions.icon().hardlight(1f, 1.5f, 0.67f);
 		} else if (!SPDSettings.customSeed().isEmpty()){
 			btnOptions.icon().hardlight(1f, 1.5f, 0.67f);
-		} else if (SPDSettings.challenges() != 0){
+		} else if (SPDSettings.challenges() != 0 || SPDSettings.modifiers() != 0){
 			btnOptions.icon().hardlight(2f, 1.33f, 0.5f);
 		} else {
 			btnOptions.icon().resetColor();
@@ -629,6 +634,7 @@ public class HeroSelectScene extends PixelScene {
 		private ArrayList<ColorBlock> spacers;
 
 		protected StyledButton challengeButton;
+		protected StyledButton pactButton;
 
 		@Override
 		protected void createChildren() {
@@ -864,6 +870,32 @@ public class HeroSelectScene extends PixelScene {
 			add(challengeButton);
 			buttons.add(challengeButton);
 
+			pactButton = new StyledButton(Chrome.Type.BLANK, Messages.get(WndPacts.class, "title"), 6){
+				@Override
+				protected void onClick() {
+					if (!Badges.firstWinFeaturesUnlocked()){
+						ShatteredPixelDungeon.scene().addToFront( new WndTitledMessage(
+								Icons.get(Icons.CHALLENGE_GREY),
+								Messages.get(WndPacts.class, "title"),
+								Messages.get(HeroSelectScene.class, "pacts_nowin")
+						));
+						return;
+					}
+
+					ShatteredPixelDungeon.scene().addToFront(new WndPacts(SPDSettings.modifiers(), true) {
+						public void onBackPressed() {
+							super.onBackPressed();
+							icon(Icons.get(SPDSettings.modifiers() > 0 ? Icons.CHALLENGE_COLOR : Icons.CHALLENGE_GREY));
+							updateOptionsColor();
+						}
+					} );
+				}
+			};
+			pactButton.leftJustify = true;
+			pactButton.icon(Icons.get(SPDSettings.modifiers() > 0 ? Icons.CHALLENGE_COLOR : Icons.CHALLENGE_GREY));
+			add(pactButton);
+			buttons.add(pactButton);
+
 			int unlockedCount = 0;
 			for (HeroClass cls : HeroClass.values()){
 				if (cls.isUnlocked()) unlockedCount++;
@@ -905,6 +937,8 @@ public class HeroSelectScene extends PixelScene {
 			CheckBox chkHero;
 			CheckBox chkChals;
 			OptionSlider optChals;
+			CheckBox chkPacts;
+			OptionSlider optPacts;
 
 			public WndRandomize(){
 				super();
@@ -945,6 +979,31 @@ public class HeroSelectScene extends PixelScene {
 
 				chkChals.checked(chalWasRandomized);
 
+				chkPacts = new CheckBox(Messages.get(HeroSelectScene.class, "randomize_pacts")){
+					@Override
+					public void checked(boolean value) {
+						super.checked(value);
+						optPacts.enable(value);
+						pactWasRandomized = value;
+					}
+				};
+				chkPacts.setRect(0, 64, 120, 16);
+				add(chkPacts);
+
+				int maxPacts = Modifiers.randomizableMasks().length;
+				optPacts = new OptionSlider(Messages.get(HeroSelectScene.class, "randomize_pacts_title"), "0", Integer.toString(maxPacts), 0, maxPacts) {
+					@Override
+					protected void onChange() {
+						//do nothing immediately
+					}
+				};
+				optPacts.enable(false);
+				optPacts.setSelectedValue(Modifiers.activeModifiers(Modifiers.sanitize(SPDSettings.modifiers())));
+				optPacts.setRect(0, 82, 120, 22);
+				add(optPacts);
+
+				chkPacts.checked(pactWasRandomized);
+
 				RedButton btnCancel = new RedButton(Messages.get(HeroSelectScene.class, "randomize_cancel")){
 					@Override
 					protected void onClick() {
@@ -952,7 +1011,7 @@ public class HeroSelectScene extends PixelScene {
 						hide();
 					}
 				};
-				btnCancel.setRect(61, 64, 60, 16);
+				btnCancel.setRect(61, 108, 60, 16);
 				add(btnCancel);
 
 				RedButton btnConfirm = new RedButton(Messages.get(HeroSelectScene.class, "randomize_confirm")){
@@ -977,6 +1036,22 @@ public class HeroSelectScene extends PixelScene {
 							ShatteredPixelDungeon.scene().addToFront(new WndChallenges(mask, false));
 						}
 
+						if (chkPacts.checked()){
+							int pacts = optPacts.getSelectedValue();
+							ArrayList<Integer> pactMasks = new ArrayList<>();
+							for (int m : Modifiers.randomizableMasks()){
+								pactMasks.add(m);
+							}
+							Random.shuffle(pactMasks);
+							int mask = 0;
+							for (int i = 0; i < pacts; i++){
+								mask |= pactMasks.remove(0);
+							}
+							SPDSettings.modifiers(Modifiers.sanitize(mask));
+							pactButton.icon(Icons.get(SPDSettings.modifiers() > 0 ? Icons.CHALLENGE_COLOR : Icons.CHALLENGE_GREY));
+							ShatteredPixelDungeon.scene().addToFront(new WndPacts(mask, false));
+						}
+
 						if (chkHero.checked()){
 							HeroClass randomCls;
 							do {
@@ -987,9 +1062,10 @@ public class HeroSelectScene extends PixelScene {
 						} else {
 							setSelectedHero(GamesInProgress.selectedClass);
 						}
+						updateOptionsColor();
 					}
 				};
-				btnConfirm.setRect(0, 64, 60, 16);
+				btnConfirm.setRect(0, 108, 60, 16);
 				add(btnConfirm);
 
 				resize(120, (int)btnConfirm.bottom());

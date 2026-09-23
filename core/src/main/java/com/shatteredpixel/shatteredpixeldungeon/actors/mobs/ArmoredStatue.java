@@ -23,6 +23,7 @@ package com.shatteredpixel.shatteredpixeldungeon.actors.mobs;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SwarmGen;
 import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.enchantments.Corrupting;
@@ -114,7 +115,8 @@ public class ArmoredStatue extends Statue {
 	@Override
 	public void die( Object cause ) {
 		//silently duplicated in this case, so don't drop original armor
-		if (buff(Corrupting.CorruptingTracker.class) == null) {
+		if (buff(Corrupting.CorruptingTracker.class) == null
+				&& !SwarmGen.isClone(this)) {
 			armor.identify(false);
 			Dungeon.level.drop(armor, pos).sprite.drop();
 		}

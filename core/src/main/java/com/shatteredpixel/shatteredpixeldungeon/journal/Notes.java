@@ -530,7 +530,7 @@ public class Notes {
 		}
 	}
 	
-	private static ArrayList<Record> records;
+	private static ArrayList<Record> records = new ArrayList<>();
 	
 	public static void reset() {
 		records = new ArrayList<>();

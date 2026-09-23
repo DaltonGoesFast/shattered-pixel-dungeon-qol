@@ -24,6 +24,7 @@ package com.shatteredpixel.shatteredpixeldungeon.ui;
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
 import com.shatteredpixel.shatteredpixeldungeon.SPDAction;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
@@ -36,6 +37,7 @@ import com.shatteredpixel.shatteredpixeldungeon.windows.WndChallenges;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndGame;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndJournal;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndKeyBindings;
+import com.shatteredpixel.shatteredpixeldungeon.windows.WndPacts;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndStory;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndTitledMessage;
 import com.watabou.input.GameAction;
@@ -61,6 +63,10 @@ public class MenuPane extends Component {
 	private Image challengeIcon;
 	private BitmapText challengeText;
 	private Button challengeButton;
+
+	private Image pactIcon;
+	private BitmapText pactText;
+	private Button pactButton;
 
 	private JournalButton btnJournal;
 	private MenuButton btnMenu;
@@ -145,6 +151,30 @@ public class MenuPane extends Component {
 			add(challengeButton);
 		}
 
+		if (Modifiers.activeModifiers() > 0){
+			pactIcon = Icons.get(Icons.CHAL_COUNT);
+			pactIcon.hardlight(0.5f, 1f, 2f);
+			add(pactIcon);
+
+			pactText = new BitmapText( Integer.toString( Modifiers.activeModifiers() ), PixelScene.pixelFont);
+			pactText.hardlight( 0x8ACFC2 );
+			pactText.measure();
+			add( pactText );
+
+			pactButton = new Button(){
+				@Override
+				protected void onClick() {
+					GameScene.show(new WndPacts(Dungeon.modifiers, false));
+				}
+
+				@Override
+				protected String hoverText() {
+					return Messages.get(WndPacts.class, "title");
+				}
+			};
+			add(pactButton);
+		}
+
 		btnJournal = new JournalButton();
 		add( btnJournal );
 
@@ -208,8 +238,24 @@ public class MenuPane extends Component {
 			challengeButton.setRect(challengeIcon.x, challengeIcon.y, challengeIcon.width(), challengeIcon.height() + challengeText.height());
 		}
 
-		// OBS mask: #0c0c0c behind depth/challenges for chroma-key
-		float maskLeft = (challengeIcon != null) ? challengeIcon.x - 1 : depthIcon.x - 1;
+		if (pactIcon != null){
+			float leftOf = (challengeIcon != null) ? challengeIcon.x : (btnJournal.left() - 7);
+			pactIcon.x = leftOf - 7 + (7 - pactIcon.width())/2f - 0.1f;
+			pactIcon.y = depthIcon.y;
+			PixelScene.align(pactIcon);
+
+			pactText.scale.set(PixelScene.align(0.67f));
+			pactText.x = pactIcon.x + (pactIcon.width() - pactText.width())/2f;
+			pactText.y = pactIcon.y + pactIcon.height();
+			PixelScene.align(pactText);
+
+			pactButton.setRect(pactIcon.x, pactIcon.y, pactIcon.width(), pactIcon.height() + pactText.height());
+		}
+
+		// OBS mask: #0c0c0c behind depth/challenges/pacts for chroma-key
+		float maskLeft = depthIcon.x - 1;
+		if (challengeIcon != null) maskLeft = Math.min(maskLeft, challengeIcon.x - 1);
+		if (pactIcon != null) maskLeft = Math.min(maskLeft, pactIcon.x - 1);
 		float maskRight = btnJournal.left() + 1;
 		float maskBottom = depthIcon.y + depthIcon.height() + depthText.height() + 1;
 		obsMaskDepthChallenges.x = maskLeft;

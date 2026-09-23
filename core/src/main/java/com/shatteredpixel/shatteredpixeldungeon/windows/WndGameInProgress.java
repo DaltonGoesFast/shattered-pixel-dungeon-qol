@@ -71,7 +71,7 @@ public class WndGameInProgress extends Window {
 		title.setRect( 0, 0, WIDTH, 0 );
 		add(title);
 		
-		if (info.challenges > 0) GAP -= 2;
+		if (info.challenges > 0 || info.modifiers > 0) GAP -= 2;
 		
 		pos = title.bottom() + GAP;
 		
@@ -88,6 +88,21 @@ public class WndGameInProgress extends Window {
 			add( btnChallenges );
 			
 			pos = btnChallenges.bottom() + GAP;
+		}
+
+		if (info.modifiers > 0) {
+			RedButton btnPacts = new RedButton( Messages.get(this, "pacts") ) {
+				@Override
+				protected void onClick() {
+					Game.scene().add( new WndPacts( info.modifiers, false ) );
+				}
+			};
+			btnPacts.icon(Icons.get(Icons.CHALLENGE_COLOR));
+			float btnW = btnPacts.reqWidth() + 2;
+			btnPacts.setRect( (WIDTH - btnW)/2, pos, btnW , 18 );
+			add( btnPacts );
+			
+			pos = btnPacts.bottom() + GAP;
 		}
 		
 		pos += GAP;

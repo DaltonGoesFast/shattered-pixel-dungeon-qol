@@ -274,6 +274,7 @@ class SPDSaveParser:
                 'ankhs_used': save_data.get('ankhsUsed', 0)
             },
             'challenges': self.decode_challenges(save_data.get('challenges', 0)),
+            'pacts': self.decode_pacts(save_data.get('modifiers', 0)),
             'won': save_data.get('won', False),
             'ascended': save_data.get('ascended', False),
             'seed': save_data.get('custom_seed') or self.seed_to_string(save_data.get('seed')),
@@ -310,6 +311,34 @@ class SPDSaveParser:
         if mask & 128: challenges.append("Hostile Champions")
         if mask & 256: challenges.append("Badder Bosses")
         return challenges
+
+    # Display order and bits match Modifiers.NAME_IDS / MASKS.
+    _PACTS = (
+        (4096, "Command"),
+        (8, "Death"),
+        (16, "Devotion"),
+        (256, "Dissonance"),
+        (32768, "Enigma"),
+        (512, "Evolution"),
+        (4, "Frailty"),
+        (2, "Glass"),
+        (1, "Honor"),
+        (128, "Kin"),
+        (1024, "Metamorphosis"),
+        (16384, "Rebirth"),
+        (2048, "Sacrifice"),
+        (64, "Soul"),
+        (32, "Spite"),
+        (8192, "Swarms"),
+    )
+
+    def decode_pacts(self, mask: int) -> list:
+        """Decode the run pact bitmask into readable names."""
+        try:
+            bits = int(mask)
+        except (TypeError, ValueError):
+            bits = 0
+        return [name for flag, name in self._PACTS if bits & flag]
 
     def extract_identification(self, save_data: Dict[str, Any]) -> Dict[str, Any]:
         """Extract identification status of items"""
@@ -479,6 +508,11 @@ class SPDSaveParser:
         challenges = game_info.get('challenges', [])
         if challenges:
             summary.append(f"Challenges: {', '.join(challenges)}")
+            summary.append("-" * 44)
+
+        pacts = game_info.get('pacts', [])
+        if pacts:
+            summary.append(f"Pacts: {', '.join(pacts)}")
             summary.append("-" * 44)
 
         # Inventory

@@ -23,6 +23,7 @@ package com.shatteredpixel.shatteredpixeldungeon.actors.buffs;
 
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
@@ -64,7 +65,7 @@ public abstract class ChampionEnemy extends Buff {
 	@Override
 	public void fx(boolean on) {
 		if (on) target.sprite.aura( color, rays );
-		else target.sprite.clearAura();
+		else target.sprite.clearAura( color );
 	}
 
 	public void onAttackProc(Char enemy ){
@@ -96,14 +97,16 @@ public abstract class ChampionEnemy extends Buff {
 
 		//we roll for a champion enemy even if we aren't spawning one to ensure that
 		//mobsToChampion does not affect levelgen RNG (number of calls to Random.Int() is constant)
-		Class<?extends ChampionEnemy> buffCls;
-		switch (Random.Int(6)){
-			case 0: default:    buffCls = Blazing.class;      break;
-			case 1:             buffCls = Projecting.class;   break;
-			case 2:             buffCls = AntiMagic.class;    break;
-			case 3:             buffCls = Giant.class;        break;
-			case 4:             buffCls = Blessed.class;      break;
-			case 5:             buffCls = Growing.class;      break;
+		Class<?extends ChampionEnemy> buffCls = rollChampionType();
+		// Honor runs always take a second roll so dual-champ RNG stays constant within those runs
+		Class<?extends ChampionEnemy> honorExtraCls = null;
+		if (Dungeon.isModified(Modifiers.HONOR)){
+			honorExtraCls = rollChampionType();
+		}
+
+		boolean honor = Dungeon.isModified(Modifiers.HONOR) && Modifiers.honorEligible(m);
+		if (honor){
+			applyHonorChampion(m, buffCls);
 		}
 
 		if (Dungeon.mobsToChampion <= 0 && Dungeon.isChallenged(Challenges.CHAMPION_ENEMIES)) {
@@ -114,11 +117,94 @@ public abstract class ChampionEnemy extends Buff {
 			if (m instanceof Guard && Dungeon.scalingDepth() <= 7) return;
 			if (m instanceof Bat   && Dungeon.scalingDepth() <= 9) return;
 
-			Buff.affect(m, buffCls);
+			// With Honor, challenge adds a second type (from the extra roll). Without Honor, use the primary roll.
+			Class<?extends ChampionEnemy> challengeCls = honor ? honorExtraCls : buffCls;
+			Buff.affect(m, challengeCls);
 			//numbers of mobs until a champion scales from 1/8 to 1/6 as depths increases
 			Dungeon.mobsToChampion += 8 - Math.min(20, Dungeon.scalingDepth()-1)/10f;
 			if (m.state != m.PASSIVE) {
 				m.state = m.WANDERING;
+			}
+		}
+	}
+
+	private static Class<?extends ChampionEnemy> rollChampionType(){
+		switch (Random.Int(6)){
+			case 0: default:    return Blazing.class;
+			case 1:             return Projecting.class;
+			case 2:             return AntiMagic.class;
+			case 3:             return Giant.class;
+			case 4:             return Blessed.class;
+			case 5:             return Growing.class;
+		}
+	}
+
+	private static void applyHonorChampion(Mob m, Class<?extends ChampionEnemy> buffCls){
+		if (m.state == m.PASSIVE){
+			PendingHonor pending = Buff.affect(m, PendingHonor.class);
+			pending.setChampionClass(buffCls);
+		} else {
+			Buff.affect(m, buffCls);
+			if (m.state != m.PASSIVE) {
+				m.state = m.WANDERING;
+			}
+		}
+	}
+
+	/** Applies a deferred Honor champion once a passive foe becomes active. */
+	public static void applyPendingHonor(Mob m){
+		PendingHonor pending = m.buff(PendingHonor.class);
+		if (pending != null){
+			pending.activate();
+		}
+	}
+
+	public static class PendingHonor extends Buff {
+
+		{
+			type = buffType.NEUTRAL;
+			revivePersists = true;
+		}
+
+		private Class<?extends ChampionEnemy> champCls;
+
+		public void setChampionClass(Class<?extends ChampionEnemy> cls){
+			champCls = cls;
+		}
+
+		public void activate(){
+			if (champCls != null && target != null){
+				Buff.affect(target, champCls);
+			}
+			detach();
+		}
+
+		@Override
+		public boolean act() {
+			if (target instanceof Mob){
+				Mob m = (Mob)target;
+				if (m.state != m.PASSIVE){
+					activate();
+					return true;
+				}
+			}
+			spend(TICK);
+			return true;
+		}
+
+		private static final String CHAMP = "champ";
+
+		@Override
+		public void storeInBundle(Bundle bundle) {
+			super.storeInBundle(bundle);
+			if (champCls != null) bundle.put(CHAMP, champCls);
+		}
+
+		@Override
+		public void restoreFromBundle(Bundle bundle) {
+			super.restoreFromBundle(bundle);
+			if (bundle.contains(CHAMP)){
+				champCls = bundle.getClass(CHAMP);
 			}
 		}
 	}

@@ -46,6 +46,6 @@ public class ChatSpawned extends Buff {
 	@Override
 	public void fx(boolean on) {
 		if (on) target.sprite.aura(AURA_COLOR, AURA_RAYS);
-		else target.sprite.clearAura();
+		else target.sprite.clearAura(AURA_COLOR);
 	}
 }

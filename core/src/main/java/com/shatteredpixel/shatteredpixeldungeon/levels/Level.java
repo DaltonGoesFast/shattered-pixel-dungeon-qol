@@ -24,6 +24,8 @@ package com.shatteredpixel.shatteredpixeldungeon.levels;
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
+import com.shatteredpixel.shatteredpixeldungeon.PactRoster;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
@@ -179,6 +181,9 @@ public abstract class Level implements Bundlable {
 
 	//when a boss level has become locked.
 	public boolean locked = false;
+
+	/** Sacrifice pact: how many paying deaths so far on this floor (equip curve). */
+	public int sacrificeKillIndex = 0;
 	
 	public HashSet<Mob> mobs;
 	public SparseArray<Heap> heaps;
@@ -214,11 +219,15 @@ public abstract class Level implements Bundlable {
 	private static final String MOBS		= "mobs";
 	private static final String BLOBS		= "blobs";
 	private static final String FEELING		= "feeling";
+	private static final String SACRIFICE_KILLS = "sacrifice_kills";
 
 	public void create() {
 
 		TargetedCell.cells.clear();
 		Random.pushGenerator( Dungeon.seedCurDepth() );
+
+		Modifiers.markingDungeonLoot = true;
+		try {
 
 		//TODO maybe just make this part of RegularLevel?
 		if (!Dungeon.bossLevel() && Dungeon.branch == 0) {
@@ -320,6 +329,19 @@ public abstract class Level implements Bundlable {
 		
 		createMobs();
 		createItems();
+
+		// Remains / bones are not dungeon Command loot
+		for (Heap heap : heaps.valueList()){
+			if (heap != null && heap.type == Heap.Type.REMAINS){
+				for (Item i : heap.items){
+					if (i != null) i.commandLoot = false;
+				}
+			}
+		}
+
+		} finally {
+			Modifiers.markingDungeonLoot = false;
+		}
 
 		Random.popGenerator();
 	}
@@ -457,6 +479,8 @@ public abstract class Level implements Bundlable {
 			viewDistance = Math.round(5 * viewDistance / 8f);
 		}
 
+		sacrificeKillIndex = bundle.contains(SACRIFICE_KILLS) ? bundle.getInt(SACRIFICE_KILLS) : 0;
+
 		if (bundle.contains( "mobs_to_spawn" )) {
 			for (Class<? extends Mob> mob : bundle.getClassArray("mobs_to_spawn")) {
 				if (mob != null) mobsToSpawn.add(mob);
@@ -502,6 +526,7 @@ public abstract class Level implements Bundlable {
 		bundle.put( MOBS, mobs );
 		bundle.put( BLOBS, blobs.values() );
 		bundle.put( FEELING, feeling );
+		bundle.put( SACRIFICE_KILLS, sacrificeKillIndex );
 		bundle.put( "mobs_to_spawn", mobsToSpawn.toArray(new Class[0]));
 		bundle.put( "respawner", respawner );
 		bundle.put( "targeted_cells", TargetedCell.cells.valueList() );
@@ -545,6 +570,9 @@ public abstract class Level implements Bundlable {
 		}
 
 		Mob m = Reflection.newInstance(mobsToSpawn.remove(0));
+		if (Dungeon.isModified(Modifiers.DISSONANCE)) {
+			PactRoster.applyDissonance(m);
+		}
 		ChampionEnemy.rollForChampion(m);
 		return m;
 	}
@@ -1010,6 +1038,10 @@ public abstract class Level implements Bundlable {
 	}
 
 	public Heap drop( Item item, int cell, boolean bypassChallengeItemBlock ) {
+
+		if (item != null && Modifiers.markingDungeonLoot){
+			item.commandLoot = true;
+		}
 
 		if (item == null || (!bypassChallengeItemBlock && Challenges.isItemBlocked(item))){
 

@@ -325,7 +325,9 @@ public class SPDSettings extends GameSettings {
 	}
 
 	public static boolean systemFont(){
-		return getBoolean(KEY_SYSTEMFONT, false); // English-only: default false
+		return getBoolean(KEY_SYSTEMFONT,
+				(language() == Languages.CHI_SMPL || language() == Languages.CHI_TRAD
+						|| language() == Languages.KOREAN || language() == Languages.JAPANESE));
 	}
 
 	public static void vibration(boolean value){
@@ -348,6 +350,7 @@ public class SPDSettings extends GameSettings {
 	
 	public static final String KEY_LAST_CLASS	= "last_class";
 	public static final String KEY_CHALLENGES	= "challenges";
+	public static final String KEY_MODIFIERS	= "modifiers";
 	public static final String KEY_CUSTOM_SEED	= "custom_seed";
 	public static final String KEY_LAST_DAILY	= "last_daily";
 	public static final String KEY_INTRO		= "intro";
@@ -378,6 +381,14 @@ public class SPDSettings extends GameSettings {
 	
 	public static int challenges() {
 		return getInt( KEY_CHALLENGES, 0, 0, Challenges.MAX_VALUE );
+	}
+
+	public static void modifiers( int value ) {
+		put( KEY_MODIFIERS, value );
+	}
+
+	public static int modifiers() {
+		return getInt( KEY_MODIFIERS, 0, 0, Modifiers.MAX_VALUE );
 	}
 
 	public static void customSeed( String value ){
@@ -645,16 +656,6 @@ public class SPDSettings extends GameSettings {
 
 	public static boolean transparentVoidEnabled() {
 		return getBoolean( KEY_TRANSPARENT_VOID, false );
-	}
-
-	public static final String KEY_STREAMER_BOSS_STASIS_SCROLL = "streamer_boss_stasis_scroll";
-
-	public static void streamerBossStasisScroll( boolean value ) {
-		put( KEY_STREAMER_BOSS_STASIS_SCROLL, value );
-	}
-
-	public static boolean streamerBossStasisScroll() {
-		return getBoolean( KEY_STREAMER_BOSS_STASIS_SCROLL, false );
 	}
 
 	public static final String KEY_AUTO_TALENT_PLAN = "auto_talent_plan";

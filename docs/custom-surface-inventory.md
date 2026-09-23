@@ -178,7 +178,6 @@ Common fields: `request_id`, optional `username` (echoed on results as `username
 | `streaming_port` | `5001` (5000–5010) | WS bind port |
 | `obs_chroma_masks` | `false` | StatusPane chroma helpers |
 | `transparent_void` | `false` | Transparent undiscovered void (restart) |
-| `streamer_boss_stasis_scroll` | `false` | Streamer boss/stasis scroll behavior |
 | `auto_talent_plan` | `false` | Auto talent spend plan |
 | `training_export_enabled` | `false` | ML dataset export (restart) |
 

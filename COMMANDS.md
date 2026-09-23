@@ -34,6 +34,7 @@
 | **!kesha** | OBS overlay flash + sound (~2s); 60s global / 10 min per-user cooldown |
 | **!mimic** / **!tooth** | Mimic sound if Mimic Tooth trinket is in the run |
 | **!challenge** / **!challenges** | Reply with active challenges |
+| **!pact** / **!pacts** | Reply with pacts enabled on the current run (R1 → Lastest UI, from `game_summary.json`) |
 | **!seed** | Reply with current dungeon seed |
 
 Setup: [docs/stream-info-commands.md](docs/stream-info-commands.md). C#: `Lastest UI/streamerbot/phase2/CheckMimicTooth.cs`, `ReadActiveChallenges.cs`, `ReadGameSeed.cs`.

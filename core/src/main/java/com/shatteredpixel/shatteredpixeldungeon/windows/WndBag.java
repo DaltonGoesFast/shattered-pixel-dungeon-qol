@@ -386,12 +386,17 @@ public class WndBag extends WndTabbed {
 	@Override
 	protected void onClick( Tab tab ) {
 		hide();
-		Window w = new WndBag(((BagTab) tab).bag, selector);
+		Window w = newBagWindow(((BagTab) tab).bag, selector);
 		if (Game.scene() instanceof GameScene){
 			GameScene.show(w);
 		} else {
 			Game.scene().addToFront(w);
 		}
+	}
+
+	/** Subclasses (e.g. forced Rebirth pick) can keep the same window type across bag tabs. */
+	protected WndBag newBagWindow( Bag bag, ItemSelector selector ){
+		return new WndBag( bag, selector );
 	}
 	
 	@Override
@@ -422,9 +427,9 @@ public class WndBag extends WndTabbed {
 		}
 	}
 	
-	private class BagTab extends IconTab {
+	protected class BagTab extends IconTab {
 
-		private Bag bag;
+		protected Bag bag;
 		private int index;
 		
 		public BagTab( Bag bag, int index ) {

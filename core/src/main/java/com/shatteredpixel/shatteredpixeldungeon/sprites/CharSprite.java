@@ -58,6 +58,7 @@ import com.watabou.utils.PointF;
 import com.watabou.utils.Random;
 
 import java.nio.Buffer;
+import java.util.ArrayList;
 import java.util.HashSet;
 
 public class CharSprite extends MovieClip implements Tweener.Listener, MovieClip.Listener {
@@ -113,7 +114,7 @@ public class CharSprite extends MovieClip implements Tweener.Listener, MovieClip
 	protected TorchHalo light;
 	protected ShieldHalo shield;
 	protected AlphaTweener invisible;
-	protected Flare aura;
+	protected ArrayList<Flare> auras = new ArrayList<>();
 	
 	protected EmoIcon emo;
 	protected CharHealthIndicator health;
@@ -375,14 +376,19 @@ public class CharSprite extends MovieClip implements Tweener.Listener, MovieClip
 		}
 	}
 
-	private int auraColor = 0;
-	private int auraRays = 0;
+	private final ArrayList<int[]> auraDefs = new ArrayList<>();
 
-	//Aura needs color and ray count data too
+	//Aura needs color and ray count data too. Multiple colors stack (dual champions).
 	public void aura( int color, int nRays ){
+		for (int[] def : auraDefs){
+			if (def[0] == color){
+				def[1] = nRays;
+				add(State.AURA);
+				return;
+			}
+		}
+		auraDefs.add(new int[]{color, nRays});
 		add(State.AURA);
-		auraColor = color;
-		auraRays = nRays;
 	}
 
 	protected synchronized void processStateAddition( State state ) {
@@ -452,16 +458,20 @@ public class CharSprite extends MovieClip implements Tweener.Listener, MovieClip
 				glowBlock = GlowBlock.lighten(this);
 				break;
 			case AURA:
-				if (aura != null)   aura.killAndErase();
+				killAuras();
 				float size = Math.max(width(), height());
 				size = Math.max(size+4, 16);
-				aura = new Flare(auraRays, size);
-				aura.angularSpeed = 90;
-				aura.color(auraColor, true);
-				aura.visible = visible;
-
-				if (parent != null) {
-					aura.show(this, 0);
+				for (int i = 0; i < auraDefs.size(); i++){
+					int[] def = auraDefs.get(i);
+					Flare flare = new Flare(def[1], size + i * 6);
+					flare.angularSpeed = (i % 2 == 0) ? 90 : -90;
+					flare.angle = 45 + i * 22.5f;
+					flare.color(def[0], true);
+					flare.visible = visible;
+					auras.add(flare);
+					if (parent != null) {
+						flare.show(this, 0);
+					}
 				}
 				break;
 		}
@@ -482,7 +492,31 @@ public class CharSprite extends MovieClip implements Tweener.Listener, MovieClip
 	}
 
 	public void clearAura(){
+		auraDefs.clear();
 		remove(State.AURA);
+	}
+
+	public void clearAura( int color ){
+		boolean removed = false;
+		for (int i = auraDefs.size()-1; i >= 0; i--){
+			if (auraDefs.get(i)[0] == color){
+				auraDefs.remove(i);
+				removed = true;
+			}
+		}
+		if (!removed) return;
+		if (auraDefs.isEmpty()){
+			remove(State.AURA);
+		} else {
+			add(State.AURA);
+		}
+	}
+
+	private void killAuras(){
+		for (Flare flare : auras){
+			flare.killAndErase();
+		}
+		auras.clear();
 	}
 
 	protected synchronized void processStateRemoval( State state ) {
@@ -563,10 +597,7 @@ public class CharSprite extends MovieClip implements Tweener.Listener, MovieClip
 				}
 				break;
 			case AURA:
-				if (aura != null){
-					aura.killAndErase();
-					aura = null;
-				}
+				killAuras();
 				break;
 		}
 	}
@@ -623,12 +654,12 @@ public class CharSprite extends MovieClip implements Tweener.Listener, MovieClip
 			hearts.visible = visible;
 		}
 		//shield fx updates its own visibility
-		if (aura != null) {
-			if (aura.parent == null) {
-				aura.show(this, 0);
+		for (Flare flare : auras) {
+			if (flare.parent == null) {
+				flare.show(this, 0);
 			}
-			aura.visible = visible;
-			aura.point(center());
+			flare.visible = visible;
+			flare.point(center());
 		}
 		if (glowBlock != null){
 			glowBlock.visible =visible;

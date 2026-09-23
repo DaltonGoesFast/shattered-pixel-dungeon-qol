@@ -24,6 +24,8 @@ package com.shatteredpixel.shatteredpixeldungeon.levels;
 import com.shatteredpixel.shatteredpixeldungeon.Bones;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
+import com.shatteredpixel.shatteredpixeldungeon.Sacrifice;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
@@ -300,8 +302,16 @@ public abstract class RegularLevel extends Level {
 						mobsToSpawn--;
 						mobs.add(mob);
 						mob = null;
+					} else {
+						// large / awkward mob could not fit — drop this spawn slot
+						mobsToSpawn--;
+						mob = null;
 					}
 				}
+			} else {
+				// large / awkward mob could not fit — drop this spawn slot
+				mobsToSpawn--;
+				mob = null;
 			}
 		}
 
@@ -383,15 +393,22 @@ public abstract class RegularLevel extends Level {
 			nItems += 2;
 		}
 		
+		boolean sacrifice = Dungeon.isModified(Modifiers.SACRIFICE);
+
 		for (int i=0; i < nItems; i++) {
 
-			Item toDrop = Generator.random();
+			Item toDrop = sacrifice ? Sacrifice.randomFloorItem() : Generator.random();
 			if (toDrop == null) continue;
 
 			int cell = randomDropCell();
 			if (map[cell] == Terrain.HIGH_GRASS || map[cell] == Terrain.FURROWED_GRASS) {
 				map[cell] = Terrain.GRASS;
 				losBlocking[cell] = false;
+			}
+
+			if (sacrifice){
+				drop(toDrop, cell).type = Heap.Type.HEAP;
+				continue;
 			}
 
 			Heap.Type type = null;
@@ -688,6 +705,9 @@ public abstract class RegularLevel extends Level {
 				drop( Generator.randomUsingDefaults(), cell).hidden = true;
 			}
 		Random.popGenerator();
+
+		//Sacrifice: key-locked special rooms pay gold instead of gear (secrets keep loot)
+		Sacrifice.convertLockedRoomLoot(this);
 
 	}
 

@@ -25,6 +25,7 @@ import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.PactRoster;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
@@ -185,9 +186,7 @@ import com.watabou.utils.Reflection;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 
 /**
  * Handles spawn commands received via the streaming WebSocket (e.g. from chat).
@@ -198,17 +197,9 @@ public final class StreamingCommandHandler {
 	private static final float SPAWN_DELAY = 0f;  // 0 = spawn immediately (was 2f)
 	private static final int SPAWN_RADIUS = 4;  // tiles away from hero (1–4)
 
-	/** Earliest depth each monster appears (from MobSpawner). Used to scale HP when spawned in earlier areas. */
-	private static final Map<String, Integer> NATIVE_DEPTH = new HashMap<>();
-	static {
-		NATIVE_DEPTH.put("rat", 1);       NATIVE_DEPTH.put("albino", 1);   NATIVE_DEPTH.put("snake", 1);
-		NATIVE_DEPTH.put("gnoll", 2);     NATIVE_DEPTH.put("crab", 3);     NATIVE_DEPTH.put("slime", 4);
-		NATIVE_DEPTH.put("swarm", 3);     NATIVE_DEPTH.put("thief", 4);    NATIVE_DEPTH.put("skeleton", 6);
-		NATIVE_DEPTH.put("dm100", 7);     NATIVE_DEPTH.put("guard", 7);   NATIVE_DEPTH.put("necromancer", 8);
-		NATIVE_DEPTH.put("bat", 11);      NATIVE_DEPTH.put("brute", 11);  NATIVE_DEPTH.put("shaman", 11);
-		NATIVE_DEPTH.put("spinner", 12);  NATIVE_DEPTH.put("ghoul", 14);  NATIVE_DEPTH.put("elemental", 16);
-		NATIVE_DEPTH.put("warlock", 16); NATIVE_DEPTH.put("monk", 17);    NATIVE_DEPTH.put("golem", 18);
-		NATIVE_DEPTH.put("succubus", 19); NATIVE_DEPTH.put("eye", 21);    NATIVE_DEPTH.put("scorpio", 23);
+	/** Earliest depth each monster appears — see {@link PactRoster#nativeDepthForChatName}. */
+	private static Integer nativeDepthForChat(String monsterName) {
+		return PactRoster.nativeDepthForChatName(monsterName);
 	}
 
 	/**
@@ -331,7 +322,7 @@ public final class StreamingCommandHandler {
 
 		Buff.affect(mob, ChatSpawned.class);
 
-		Integer nativeDepth = NATIVE_DEPTH.get(monsterName);
+		Integer nativeDepth = nativeDepthForChat(monsterName);
 		applyChatSpawnParalysis(mob, nativeDepth);
 		applyChatSpawnStatScaling(mob, mobClass, nativeDepth);
 
@@ -398,7 +389,7 @@ public final class StreamingCommandHandler {
 		Buff.affect(mob, ChatSpawned.class);
 		Buff.affect(mob, Random.element(CHAMPION_TYPES));
 
-		Integer nativeDepth = NATIVE_DEPTH.get(monsterName);
+		Integer nativeDepth = nativeDepthForChat(monsterName);
 		applyChatSpawnParalysis(mob, nativeDepth);
 		applyChatSpawnStatScaling(mob, mobClass, nativeDepth);
 

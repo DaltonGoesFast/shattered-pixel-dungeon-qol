@@ -162,7 +162,7 @@ public class WndSettings extends WndTabbed {
 		langs = new LangsTab();
 		langs.setSize(width, 0);
 		height = Math.max(height, langs.height());
-		//add( langs ); // disabled for English-only build
+		add( langs );
 
 		IconTab langsTab = new IconTab(Icons.get(Icons.LANGS)){
 			@Override
@@ -188,13 +188,12 @@ public class WndSettings extends WndTabbed {
 			}
 
 		};
-		//add( langsTab ); // disabled for English-only build
+		add( langsTab );
 
 		resize(width, (int)Math.ceil(height));
 
 		layoutTabs();
 
-		if (last_index >= tabs.size()) last_index = tabs.size() - 1;
 		if (tabs.size() == 5 && last_index >= 3){
 			//input tab isn't visible
 			select(last_index-1);
@@ -953,7 +952,6 @@ public class WndSettings extends WndTabbed {
 		OptionSlider optStreamingPort;
 		CheckBox chkObsChromaMasks;
 		CheckBox chkTransparentVoid;
-		CheckBox chkStreamerBossStasisScroll;
 		CheckBox chkTrainingExport;
 
 		@Override
@@ -1052,15 +1050,6 @@ public class WndSettings extends WndTabbed {
 				};
 				chkTransparentVoid.checked(SPDSettings.transparentVoidEnabled());
 				add(chkTransparentVoid);
-				chkStreamerBossStasisScroll = new CheckBox(Messages.get(this, "streamer_boss_stasis_scroll")) {
-					@Override
-					protected void onClick() {
-						super.onClick();
-						SPDSettings.streamerBossStasisScroll(checked());
-					}
-				};
-				chkStreamerBossStasisScroll.checked(SPDSettings.streamerBossStasisScroll());
-				add(chkStreamerBossStasisScroll);
 				chkTrainingExport = new CheckBox(Messages.get(this, "training_export_enable")) {
 					@Override
 					protected void onClick() {
@@ -1115,8 +1104,6 @@ public class WndSettings extends WndTabbed {
 				pos = chkObsChromaMasks.bottom();
 				chkTransparentVoid.setRect(0, pos + GAP, width, BTN_HEIGHT);
 				pos = chkTransparentVoid.bottom();
-				chkStreamerBossStasisScroll.setRect(0, pos + GAP, width, BTN_HEIGHT);
-				pos = chkStreamerBossStasisScroll.bottom();
 				if (chkTrainingExport != null) {
 					chkTrainingExport.setRect(0, pos + GAP, width, BTN_HEIGHT);
 					pos = chkTrainingExport.bottom();

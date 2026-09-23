@@ -33,6 +33,7 @@ FREE COMMANDS (no points):
 - !kesha - OBS meme flash + sound (~2s)
 - !mimic / !tooth - Mimic sound if Mimic Tooth trinket is in the run
 - !challenge / !challenges - Active run challenges (live game data)
+- !pact / !pacts - Pacts enabled this run (live game data)
 - !seed - Current dungeon seed
 
 COMMANDS (points):

@@ -63,8 +63,8 @@ public class SpinnerSprite extends MobSprite {
 		super.link(ch);
 		if (parent != null) {
 			parent.sendToBack(this);
-			if (aura != null){
-				parent.sendToBack(aura);
+			for (int i = 0; i < auras.size(); i++){
+				parent.sendToBack(auras.get(i));
 			}
 		}
 		renderShadow = false;

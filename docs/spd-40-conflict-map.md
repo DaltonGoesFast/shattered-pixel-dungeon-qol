@@ -138,7 +138,7 @@ Cite [custom-surface-inventory.md](custom-surface-inventory.md) §B. Every liste
 
 ### Fork types not in the §A table (restore with §A)
 
-These are in the 27 repo-only classes. Treat as **safe copy** unless noted: `ChatClassKitCurse`, `TimedAllyDuration`, `TimeFreeze`, `ScrollOfTimeFreeze`, `ScrollOfStasis`, `StreamerBossScroll`, `HudEditMode`, `HudLayout`, `HudRegion`, `HudSlot`, `ItemInfoLayout`, `TrainingSnapshot`. HUD layout is hosted from `GameScene` (**expect rewrite**). `TimeFreeze` is a fork class; 4.0 still has `TimekeepersHourglass$timeFreeze` and cleric `Stasis` — different types.
+These are in the 27 repo-only classes. Treat as **safe copy** unless noted: `ChatClassKitCurse`, `TimedAllyDuration`, `TimeFreeze`, `HudEditMode`, `HudLayout`, `HudRegion`, `HudSlot`, `ItemInfoLayout`, `TrainingSnapshot`. HUD layout is hosted from `GameScene` (**expect rewrite**). `TimeFreeze` is a fork class; 4.0 still has `TimekeepersHourglass$timeFreeze` and cleric `Stasis` — different types.
 
 `WndImp` is **replace tester**, not owned.
 

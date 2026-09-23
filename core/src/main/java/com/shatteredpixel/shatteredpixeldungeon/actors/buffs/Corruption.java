@@ -21,6 +21,8 @@
 
 package com.shatteredpixel.shatteredpixeldungeon.actors.buffs;
 
+import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.effects.FloatingText;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.CharSprite;
@@ -38,6 +40,9 @@ public class Corruption extends AllyBuff implements Buff.DOTbuff {
 
 	//corrupted enemies are usually fully healed and cleansed of most debuffs
 	public static void corruptionHeal(Char target){
+		if (Dungeon.isModified(Modifiers.GLASS)){
+			Modifiers.applyGlassHT(target);
+		}
 		target.HP = target.HT;
 		target.sprite.showStatusWithIcon(CharSprite.POSITIVE, Integer.toString(target.HT), FloatingText.HEALING);
 		for (Buff buff : target.buffs()) {
@@ -59,6 +64,11 @@ public class Corruption extends AllyBuff implements Buff.DOTbuff {
 
 	@Override
 	public boolean act() {
+		if (Dungeon.isModified(Modifiers.DEVOTION) && Modifiers.isDevotionAlly(target)){
+			spend(TICK);
+			return true;
+		}
+
 		partialDamage += target.HT/100f;
 
 		int damage = (int)partialDamage;

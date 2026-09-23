@@ -24,6 +24,7 @@ package com.shatteredpixel.shatteredpixeldungeon.utils;
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
@@ -108,6 +109,7 @@ public class GameStateSnapshot {
 		out.put("identification", buildIdentification());
 		out.put("stats", buildStats());
 		out.put("challenges", buildChallenges());
+		out.put("pacts", buildPacts());
 		out.put("hud", buildHud());
 		out.put("won", Statistics.gameWon);
 		out.put("ascended", Statistics.ascended);
@@ -348,6 +350,18 @@ public class GameStateSnapshot {
 		for (int i = 0; i < Challenges.MASKS.length; i++) {
 			if ((mask & Challenges.MASKS[i]) != 0) {
 				list.add(Messages.get(Challenges.class, Challenges.NAME_IDS[i]));
+			}
+		}
+		return list;
+	}
+
+	/** Enabled pact display names, same order as the pact window. */
+	private static List<String> buildPacts() {
+		List<String> list = new ArrayList<>();
+		int mask = Dungeon.modifiers;
+		for (int i = 0; i < Modifiers.MASKS.length; i++) {
+			if ((mask & Modifiers.MASKS[i]) != 0) {
+				list.add(Messages.get(Modifiers.class, Modifiers.NAME_IDS[i]));
 			}
 		}
 		return list;

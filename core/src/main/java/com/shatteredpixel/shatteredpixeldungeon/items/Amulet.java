@@ -24,6 +24,8 @@ package com.shatteredpixel.shatteredpixeldungeon.items;
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
+import com.shatteredpixel.shatteredpixeldungeon.Rebirth;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
@@ -33,6 +35,7 @@ import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.AmuletScene;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSpriteSheet;
 import com.watabou.noosa.Game;
+import com.watabou.utils.Callback;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -86,7 +89,16 @@ public class Amulet extends Item {
 					@Override
 					protected boolean act() {
 						Actor.remove(this);
-						showAmuletScene( true );
+						if (Dungeon.isModified(Modifiers.REBIRTH)){
+							Rebirth.offerOnAmuletPickup(new Callback() {
+								@Override
+								public void call() {
+									showAmuletScene( true );
+								}
+							});
+						} else {
+							showAmuletScene( true );
+						}
 						return false;
 					}
 				});

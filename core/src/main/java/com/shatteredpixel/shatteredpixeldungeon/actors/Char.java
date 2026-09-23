@@ -24,6 +24,7 @@ package com.shatteredpixel.shatteredpixeldungeon.actors;
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Electricity;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.StormCloud;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.ToxicGas;
@@ -104,6 +105,7 @@ import com.shatteredpixel.shatteredpixeldungeon.effects.Splash;
 import com.shatteredpixel.shatteredpixeldungeon.effects.particles.ShadowParticle;
 import com.shatteredpixel.shatteredpixeldungeon.items.BrokenSeal;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
+import com.shatteredpixel.shatteredpixeldungeon.items.KindOfWeapon;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.curses.Bulk;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.glyphs.AntiMagic;
@@ -423,6 +425,21 @@ public abstract class Char extends Actor {
 
 			dmg = dmg*dmgMulti;
 
+			// Glass pact: 5x melee damage for hero and allies
+			if (Dungeon.isModified(Modifiers.GLASS)
+					&& (this == Dungeon.hero || alignment == Alignment.ALLY)){
+				boolean melee = true;
+				if (this instanceof Hero){
+					KindOfWeapon wep = ((Hero)this).belongings.attackingWeapon();
+					if (wep instanceof MissileWeapon){
+						melee = false;
+					}
+				}
+				if (melee){
+					dmg *= 5f;
+				}
+			}
+
 			//flat damage bonus is affected by multipliers
 			dmg += dmgBonus;
 
@@ -675,6 +692,9 @@ public abstract class Char extends Actor {
 		for (ChampionEnemy buff : attacker.buffs(ChampionEnemy.class)){
 			acuRoll *= buff.evasionAndAccuracyFactor();
 		}
+		if (Modifiers.evolutionEligible(attacker)){
+			acuRoll *= Modifiers.evolutionMultiplier();
+		}
 		acuRoll *= AscensionChallenge.statModifier(attacker);
 		if (Dungeon.hero.heroClass != HeroClass.CLERIC
 				&& Dungeon.hero.hasTalent(Talent.BLESS)
@@ -690,6 +710,9 @@ public abstract class Char extends Actor {
 		if (defender.buff( Daze.class) != null) defRoll *= 0.5f;
 		for (ChampionEnemy buff : defender.buffs(ChampionEnemy.class)){
 			defRoll *= buff.evasionAndAccuracyFactor();
+		}
+		if (Modifiers.evolutionEligible(defender)){
+			defRoll *= Modifiers.evolutionMultiplier();
 		}
 		defRoll *= AscensionChallenge.statModifier(defender);
 		if (Dungeon.hero.heroClass != HeroClass.CLERIC
@@ -887,6 +910,10 @@ public abstract class Char extends Actor {
 		//temporarily assign to a float to avoid rounding a bunch
 		float damage = dmg;
 
+		if (src instanceof Char && Modifiers.evolutionEligible((Char) src)) {
+			damage *= Modifiers.evolutionMultiplier();
+		}
+
 		//if dmg is from a character we already reduced it in Char.attack
 		if (!(src instanceof Char)) {
 			if (Dungeon.hero.alignment == alignment
@@ -960,6 +987,9 @@ public abstract class Char extends Actor {
 		// most important vs. giant champions in the earlygame
 		for (ChampionEnemy buff : buffs(ChampionEnemy.class)){
 			dmg = (int) Math.ceil(dmg * buff.damageTakenFactor());
+		}
+		if (Modifiers.evolutionEligible(this)){
+			dmg = (int) Math.ceil(dmg / Modifiers.evolutionMultiplier());
 		}
 		
 		//TODO improve this when I have proper damage source logic

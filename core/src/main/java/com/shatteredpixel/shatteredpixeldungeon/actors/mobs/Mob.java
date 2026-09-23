@@ -25,6 +25,8 @@ import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
+import com.shatteredpixel.shatteredpixeldungeon.Sacrifice;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
@@ -33,8 +35,10 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.AllyBuff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Amok;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.AscensionChallenge;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Burning;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ChampionEnemy;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Charm;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ChatSpawned;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Corruption;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Dread;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.GreaterHaste;
@@ -42,10 +46,12 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Hunger;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Invisibility;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.MindVision;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.MonkEnergy;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Poison;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Preparation;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Sleep;
-import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ChatSpawned;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SoulMark;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SpawnScaled;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SwarmGen;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SwarmIntelTracker;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Terror;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
@@ -62,11 +68,14 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.spells.Stasis;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.DirectableAlly;
 import com.shatteredpixel.shatteredpixeldungeon.effects.CellEmitter;
 import com.shatteredpixel.shatteredpixeldungeon.effects.FloatingText;
+import com.shatteredpixel.shatteredpixeldungeon.effects.Pushing;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Surprise;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Wound;
 import com.shatteredpixel.shatteredpixeldungeon.effects.particles.ShadowParticle;
 import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
+import com.shatteredpixel.shatteredpixeldungeon.items.Gold;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
+import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.MasterThievesArmband;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.TalismanOfForesight;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.TimekeepersHourglass;
@@ -859,7 +868,80 @@ public abstract class Mob extends Char {
 			}
 		}
 
+		if (Dungeon.isModified(Modifiers.SWARMS)) {
+			trySwarmsSplit( damage );
+		}
+
 		return super.defenseProc(enemy, damage);
+	}
+
+	private static final float SWARMS_SPLIT_DELAY = 1f;
+
+	/** Swarms pact: split like a fly, but also halve max HP. */
+	protected void trySwarmsSplit( int damage ) {
+		if (!SwarmGen.canSplit( this )) return;
+		if (HP < damage + 2) return;
+
+		ArrayList<Integer> candidates = new ArrayList<>();
+		int[] neighbours = {pos + 1, pos - 1, pos + Dungeon.level.width(), pos - Dungeon.level.width()};
+		for (int n : neighbours) {
+			if (!Dungeon.level.solid[n]
+					&& Actor.findChar( n ) == null
+					&& (Dungeon.level.passable[n] || Dungeon.level.avoid[n])
+					&& (!properties().contains(Property.LARGE) || Dungeon.level.openSpace[n])) {
+				candidates.add( n );
+			}
+		}
+		if (candidates.isEmpty()) return;
+
+		Mob clone = Reflection.newInstance( getClass() );
+		if (clone == null) return;
+
+		clone.pos = Random.element( candidates );
+		clone.state = clone.HUNTING;
+		clone.EXP = 0;
+		clone.lootChance = 0;
+
+		if (this instanceof Statue && clone instanceof Statue) {
+			((Statue) clone).weapon = ((Statue) this).weapon;
+			((Statue) clone).levelGenStatue = false;
+			if (this instanceof ArmoredStatue && clone instanceof ArmoredStatue) {
+				((ArmoredStatue) clone).armor = ((ArmoredStatue) this).armor;
+			}
+		}
+
+		GameScene.add( clone, SWARMS_SPLIT_DELAY ); // add before HP due to ascension
+
+		int cloneHT = HT / 2;
+		int cloneHP = (HP - damage) / 2;
+		HT -= cloneHT;
+		HP -= cloneHP;
+		clone.HT = cloneHT;
+		clone.HP = cloneHP;
+
+		SwarmGen.set( clone, SwarmGen.generation( this ) + 1 );
+
+		SpawnScaled parentScale = buff( SpawnScaled.class );
+		if (parentScale != null) {
+			SpawnScaled.affect( clone, parentScale );
+		}
+		if (buff( ChatSpawned.class ) != null) {
+			Buff.affect( clone, ChatSpawned.class );
+		}
+		if (buff( Burning.class ) != null) {
+			Buff.affect( clone, Burning.class ).reignite( clone );
+		}
+		if (buff( Poison.class ) != null) {
+			Buff.affect( clone, Poison.class ).set( 2 );
+		}
+		for (Buff b : buffs()) {
+			if (b.revivePersists) {
+				Buff.affect( clone, b.getClass() );
+			}
+		}
+
+		Actor.add( new Pushing( clone, pos, clone.pos ) );
+		Dungeon.level.occupyCell( clone );
 	}
 
 	@Override
@@ -887,6 +969,7 @@ public abstract class Mob extends Char {
 		if (state != PASSIVE){
 			state = HUNTING;
 		}
+		ChampionEnemy.applyPendingHonor(this);
 	}
 
 	public void clearEnemy(){
@@ -905,6 +988,9 @@ public abstract class Mob extends Char {
 		if (!isInvulnerable(src.getClass())) {
 			if (state == SLEEPING) {
 				state = WANDERING;
+			}
+			if (state != PASSIVE){
+				ChampionEnemy.applyPendingHonor(this);
 			}
 			if (!(src instanceof Corruption) && state != FLEEING) {
 				if (state != HUNTING) {
@@ -1023,6 +1109,10 @@ public abstract class Mob extends Char {
 
 		}
 
+		if (Dungeon.isModified(Modifiers.SPITE)){
+			dropSpiteBomb(cause);
+		}
+
 		if (Dungeon.hero.isAlive() && !Dungeon.level.heroFOV[pos]) {
 			GLog.i( Messages.get(this, "died") );
 		}
@@ -1030,6 +1120,13 @@ public abstract class Mob extends Char {
 		boolean soulMarked = buff(SoulMark.class) != null;
 
 		super.die( cause );
+
+		if (Dungeon.isModified(Modifiers.SOUL)
+				&& alignment == Alignment.ENEMY
+				&& !(this instanceof Wraith)
+				&& cause != Chasm.class){
+			Wraith.spawnAt(pos, Wraith.class);
+		}
 
 		if (!(this instanceof Wraith)
 				&& soulMarked
@@ -1042,6 +1139,22 @@ public abstract class Mob extends Char {
 					Sample.INSTANCE.play(Assets.Sounds.CURSED);
 				}
 			}
+		}
+	}
+
+	private void dropSpiteBomb( Object cause ){
+		Bomb bomb;
+		if (properties.contains(Property.BOSS)){
+			ArrayList<Class<? extends Bomb>> crafted = new ArrayList<>(Bomb.EnhanceBomb.validIngredients.values());
+			bomb = Reflection.newInstance(Random.element(crafted));
+		} else {
+			bomb = new Bomb();
+		}
+		if (cause == Chasm.class){
+			Dungeon.dropToChasm(bomb);
+		} else if (Dungeon.level != null){
+			bomb.startFuseAfterDrop(pos);
+			Dungeon.level.drop(bomb, pos).sprite.drop();
 		}
 	}
 
@@ -1067,15 +1180,31 @@ public abstract class Mob extends Char {
 	}
 	
 	public void rollToDropLoot(){
-		if (Dungeon.hero.lvl > maxLvl + 2) return;
+		boolean sacrifice = Dungeon.isModified(Modifiers.SACRIFICE);
+		if (!sacrifice && SwarmGen.isClone( this )) return;
+		if (!sacrifice && Dungeon.hero.lvl > maxLvl + 2) return;
 
 		MasterThievesArmband.StolenTracker stolen = buff(MasterThievesArmband.StolenTracker.class);
 		if (stolen == null || !stolen.itemWasStolen()) {
+			// Sacrifice still uses lootChance (LimitedDrops), but overlevel/clone gates stay off.
 			if (Random.Float() < lootChance()) {
 				Item loot = createLoot();
 				if (loot != null) {
+					if (sacrifice && Sacrifice.replaceNativeWithGold()) {
+						loot = Sacrifice.floorGold();
+					} else if (!(loot instanceof Gold)) {
+						Modifiers.markCommandLoot(loot);
+					}
 					Dungeon.level.drop(loot, pos).sprite.drop();
 				}
+			}
+		}
+
+		if (sacrifice && Random.Float() < Sacrifice.nextEquipChance()) {
+			Item gear = Sacrifice.genEquipment();
+			if (gear != null) {
+				Modifiers.markCommandLoot(gear);
+				Dungeon.level.drop(gear, pos).sprite.drop();
 			}
 		}
 		
@@ -1086,14 +1215,19 @@ public abstract class Mob extends Char {
 			else if (properties.contains(Property.MINIBOSS)) rolls = 5;
 			ArrayList<Item> bonus = RingOfWealth.tryForBonusDrop(Dungeon.hero, rolls);
 			if (bonus != null && !bonus.isEmpty()) {
-				for (Item b : bonus) Dungeon.level.drop(b, pos).sprite.drop();
+				for (Item b : bonus) {
+					Modifiers.markCommandLoot(b);
+					Dungeon.level.drop(b, pos).sprite.drop();
+				}
 				RingOfWealth.showFlareForBonusDrop(sprite);
 			}
 		}
 		
 		//lucky enchant logic
 		if (buff(Lucky.LuckProc.class) != null){
-			Dungeon.level.drop(buff(Lucky.LuckProc.class).genLoot(), pos).sprite.drop();
+			Item luckyLoot = buff(Lucky.LuckProc.class).genLoot();
+			Modifiers.markCommandLoot(luckyLoot);
+			Dungeon.level.drop(luckyLoot, pos).sprite.drop();
 			Lucky.showFlare(sprite);
 		}
 
@@ -1696,6 +1830,10 @@ public abstract class Mob extends Char {
 	public static void holdAllies( Level level, int holdFromPos ){
 		heldAllies.clear();
 		for (Mob mob : level.mobs.toArray( new Mob[0] )) {
+			// Devotion: allies stay on their floor and do not follow between depths
+			if (Dungeon.isModified(Modifiers.DEVOTION) && Modifiers.isDevotionAlly(mob)){
+				continue;
+			}
 			//preserve directable allies or empowered intelligent allies no matter where they are
 			if (mob instanceof DirectableAlly
 				|| (mob.intelligentAlly && PowerOfMany.getPoweredAlly() == mob)) {

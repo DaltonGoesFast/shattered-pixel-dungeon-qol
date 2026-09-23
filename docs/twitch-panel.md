@@ -30,6 +30,8 @@ Spend points to mess with the run! Earn up to **500 chat points per stream** (2 
 
 **!challenge** / **!challenges** — Lists active run challenges (from live game data).
 
+**!pact** / **!pacts** — Lists pacts enabled on this run (from live game data).
+
 **!seed** — Shows the current dungeon seed.
 
 *Setup:* separate Streamer.bot command actions (not the points router). See [stream-info-commands.md](stream-info-commands.md).

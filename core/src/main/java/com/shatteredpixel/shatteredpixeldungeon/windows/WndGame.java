@@ -74,6 +74,18 @@ public class WndGame extends Window {
 			curBtn.icon(Icons.get(Icons.CHALLENGE_COLOR));
 		}
 
+		// Pacts window
+		if (Dungeon.modifiers > 0) {
+			addButton( curBtn = new RedButton( Messages.get(this, "pacts") ) {
+				@Override
+				protected void onClick() {
+					hide();
+					GameScene.show( new WndPacts( Dungeon.modifiers, false ) );
+				}
+			} );
+			curBtn.icon(Icons.get(Icons.CHALLENGE_COLOR));
+		}
+
 		// Restart
 		if (Dungeon.hero == null || !Dungeon.hero.isAlive()) {
 

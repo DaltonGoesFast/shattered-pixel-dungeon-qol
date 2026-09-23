@@ -28,6 +28,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.StenchGas;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Ooze;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SwarmGen;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Ghost;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.FetidRatSprite;
@@ -87,7 +88,9 @@ public class FetidRat extends Rat {
 	public void die( Object cause ) {
 		super.die( cause );
 
-		Ghost.Quest.process();
+		if (!SwarmGen.isClone(this)) {
+			Ghost.Quest.process();
+		}
 	}
 
 	protected class Wandering extends Mob.Wandering{

@@ -34,6 +34,7 @@ Do **not** add toggle logic to R1. Do **not** reuse `spend_disabled.txt` or `R8 
 | **!kesha** | Free | OBS `kesha` overlay flash (HUD + V-HUD) + `tik-tok-button.mp3` (~2s). No chat reply. **Cooldown:** 60s global, 10 min per user. |
 | **!mimic** / **!tooth** | Free | If hero has **Mimic Tooth** trinket (bag or equipped), play `mimic.mp3`. No chat reply. |
 | **!challenge** / **!challenges** | Free | Chat reply: active run challenges from `game_summary.json`. |
+| **!pact** / **!pacts** | Free | Chat reply: pacts enabled this run, from `game_summary.json` `pacts`. Goes through R1 (no separate Command action). |
 | **!seed** | Free | Chat reply: current dungeon seed from `game_summary.json`. |
 
 **Stream Deck toggle:** Use **Set Command State** to enable/disable the `Kesha` and `Seed` Command entries (see [Toggling !kesha / !seed](#toggling-kesha--seed-set-command-state)). `!mimic` and `!challenge` are unaffected.
@@ -177,6 +178,16 @@ Canonical C#: [Lastest UI/streamerbot/phase2/ReadActiveChallenges.cs](../Lastest
 
 ---
 
+## !pact / !pacts
+
+**Trigger:** R1 posts `!pact` / `!pacts` to `POST /api/chat-command` (do not add a separate Command action, and do not add these to the R1 stream-info skip).
+
+Lastest UI reads `pacts` from `game_summary.json` (live game export). Reply: `Current Active Pacts: …`. All 16 on → `All Pacts Active (16 Pacts)`; none → `None`.
+
+The game only writes `pacts` during a live run. Restart the game after this change so the export includes the field.
+
+---
+
 ## !seed
 
 **Trigger:** Command `seed` (`!seed`)  
@@ -194,8 +205,8 @@ Canonical C#: [Lastest UI/streamerbot/phase2/ReadGameSeed.cs](../Lastest%20UI/st
 ## Coexistence with R1
 
 - **Command triggers** (native) handle `!kesha`, `!mimic`, `!challenge`, `!seed` in their **own** actions. Toggle kesha/seed with **Set Command State** — R1 is untouched.
-- **R1** handles all **points** commands (`!spawn`, `!bank`, `!fard`, etc.).
-- **R1 must not POST** stream-info commands — `BuildChatCommandBody.cs` returns `false` for `!kesha`, `!mimic`, `!tooth`, `!seed`, `!challenge`, `!challenges` so curl/parse/reply sub-actions are skipped. Re-paste that file into R1 step **1a** if you still see `Unknown command !kesha` in chat.
+- **R1** handles all **points** commands (`!spawn`, `!bank`, `!fard`, etc.) and **`!pact` / `!pacts`**.
+- **R1 must not POST** the native stream-info commands — `BuildChatCommandBody.cs` returns `false` for `!kesha`, `!mimic`, `!tooth`, `!seed`, `!challenge`, `!challenges` so curl/parse/reply sub-actions are skipped. Leave `!pact` / `!pacts` off that skip list. Re-paste that file into R1 step **1a** if you still see `Unknown command !kesha` in chat.
 
 Keep these four as **enabled Command actions** after gateway cutover. They are listed in [youtube-description.md](youtube-description.md) and [twitch-panel.md](twitch-panel.md) under **Stream / info commands**.
 

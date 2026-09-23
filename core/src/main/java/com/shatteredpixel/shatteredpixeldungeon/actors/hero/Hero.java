@@ -26,6 +26,8 @@ import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Bones;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.GamesInProgress;
+import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
+import com.shatteredpixel.shatteredpixeldungeon.Rebirth;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
@@ -275,19 +277,31 @@ public class Hero extends Char {
 	
 	public void updateHT( boolean boostHP ){
 		int curHT = HT;
-		
-		HT = 20 + 5*(lvl-1) + HTBoost;
-		float multiplier = RingOfMight.HTMultiplier(this);
-		HT = Math.round(multiplier * HT);
-		
-		if (buff(ElixirOfMight.HTBoost.class) != null){
-			HT += buff(ElixirOfMight.HTBoost.class).boost();
+
+		if (Dungeon.isModified(Modifiers.GLASS)){
+			Modifiers.applyGlassHT(this);
+		} else {
+			HT = 20 + 5*(lvl-1) + HTBoost;
+			float multiplier = RingOfMight.HTMultiplier(this);
+			HT = Math.round(multiplier * HT);
+
+			if (buff(ElixirOfMight.HTBoost.class) != null){
+				HT += buff(ElixirOfMight.HTBoost.class).boost();
+			}
 		}
-		
+
 		if (boostHP){
 			HP += Math.max(HT - curHT, 0);
 		}
 		HP = Math.min(HP, HT);
+
+		if (Dungeon.isModified(Modifiers.GLASS) && Dungeon.level != null){
+			for (Mob mob : Dungeon.level.mobs.toArray(new Mob[0])){
+				if (mob.alignment == Alignment.ALLY){
+					Modifiers.applyGlassHT(mob);
+				}
+			}
+		}
 	}
 
 	public int STR() {
@@ -2410,9 +2424,11 @@ public class Hero extends Char {
 		Ankh ankh = null;
 
 		//look for ankhs in player inventory, prioritize ones which are blessed.
-		for (Ankh i : belongings.getAllItems(Ankh.class)){
-			if (ankh == null || i.isBlessed()) {
-				ankh = i;
+		if (!Dungeon.isModified(Modifiers.DEATH)) {
+			for (Ankh i : belongings.getAllItems(Ankh.class)) {
+				if (ankh == null || i.isBlessed()) {
+					ankh = i;
+				}
 			}
 		}
 
@@ -2495,6 +2511,7 @@ public class Hero extends Char {
 		}
 		
 		Bones.leave();
+		Rebirth.onRunFailed();
 		
 		Dungeon.observe();
 		GameScene.updateFog();

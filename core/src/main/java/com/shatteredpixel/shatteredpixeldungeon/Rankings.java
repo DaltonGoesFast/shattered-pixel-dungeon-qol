@@ -260,6 +260,7 @@ public enum Rankings {
 	public static final String BADGES       = "badges";
 	public static final String HANDLERS     = "handlers";
 	public static final String CHALLENGES   = "challenges";
+	public static final String MODIFIERS    = "modifiers";
 	public static final String GAME_VERSION = "game_version";
 	public static final String SEED         = "seed";
 	public static final String CUSTOM_SEED	= "custom_seed";
@@ -328,8 +329,9 @@ public enum Rankings {
 		//restore items now that we're done saving
 		belongings.backpack.items = allItems;
 		
-		//save challenges
+		//save challenges and modifiers (pacts)
 		rec.gameData.put( CHALLENGES, Dungeon.challenges );
+		rec.gameData.put( MODIFIERS, Dungeon.modifiers );
 
 		rec.gameData.put( GAME_VERSION, Dungeon.initialVersion );
 
@@ -365,6 +367,7 @@ public enum Rankings {
 		Statistics.restoreFromBundle(data.getBundle(STATS));
 		
 		Dungeon.challenges = data.getInt(CHALLENGES);
+		Dungeon.modifiers = data.contains(MODIFIERS) ? data.getInt(MODIFIERS) : 0;
 
 		Dungeon.initialVersion = data.getInt(GAME_VERSION);
 

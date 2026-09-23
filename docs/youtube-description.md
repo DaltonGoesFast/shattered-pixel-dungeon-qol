@@ -22,6 +22,7 @@ Stream Commands:
 !kesha — free meme alert: OBS flash + sound (~2s); 60s global / 10 min per user
 !mimic / !tooth — free: mimic sound if you have Mimic Tooth this run
 !challenge / !challenges — free: lists active run challenges
+!pact / !pacts — free: lists pacts enabled this run
 !seed — free: shows current dungeon seed
 
 DaltonGoesFast Streaming VERTICAL and HORIZONTAL on YouTube!
@@ -40,7 +41,7 @@ Earn up to 500 chat pts per stream (2 pts/msg, 20s CD). !bank saves 10% as perma
 - Sprint titles: each Bestiary level-up crowns a winner (!topsummoner / !summonhall)
 - Sub/member 2×
 
-FREE: !fard, !summon, !bestiary, !summonlevel, !topsummoner, !heat, !hot, !summonhall, !mysummons, !kesha, !mimic, !challenge, !seed — see Stream Commands above.
+FREE: !fard, !summon, !bestiary, !summonlevel, !topsummoner, !heat, !hot, !summonhall, !mysummons, !kesha, !mimic, !challenge, !pact, !seed — see Stream Commands above.
 
 COMMANDS:
 - !points — Chat, donor, and Bestiary sprint/heat XP (free)

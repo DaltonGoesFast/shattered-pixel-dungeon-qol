@@ -167,6 +167,7 @@ USAGE = {
     "kesha": "Usage: !kesha - OBS overlay flash + sound (~2s); 60s global / 10 min per-user cooldown.",
     "mimic": "Usage: !mimic / !tooth - mimic sound if Mimic Tooth trinket is in the run.",
     "challenge": "Usage: !challenge / !challenges - reply with active challenges.",
+    "pact": "Usage: !pact / !pacts - reply with pacts enabled on this run.",
     "seed": "Usage: !seed - reply with current dungeon seed.",
     "spawn": "Usage: !spawn <monster> (e.g. !spawn rat)",
     "champion": "Usage: !champion <monster> (e.g. !champion rat). Costs 2x zone-adjusted spawn cost.",
@@ -204,6 +205,7 @@ HELP_ALIASES = {
     "summonlevel": "bestiary",
     "leaderboard": "toppoints",
     "challenges": "challenge",
+    "pacts": "pact",
     "tooth": "mimic",
     "corrupt_ally": "corruptally",
     "balance": "points",
@@ -287,6 +289,11 @@ def game_seed(seed: str) -> str:
 
 def active_challenges(text: str) -> str:
     msg = f"Current Active Challenges: {text}"
+    return clamp_youtube_chat(msg) if is_youtube_platform() else msg
+
+
+def active_pacts(text: str) -> str:
+    msg = f"Current Active Pacts: {text}"
     return clamp_youtube_chat(msg) if is_youtube_platform() else msg
 
 

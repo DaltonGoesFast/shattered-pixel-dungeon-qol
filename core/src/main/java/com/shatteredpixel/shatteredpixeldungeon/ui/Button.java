@@ -50,6 +50,9 @@ public class Button extends Component {
 	protected float pressTime;
 	protected boolean clickReady;
 
+	/** Drags pass through to a parent {@link ScrollPane} instead of counting as a click. */
+	private boolean scrollPassthrough;
+
 	@Override
 	protected void createChildren() {
 		hotArea = new PointerArea( 0, 0, 0, 0 ) {
@@ -129,6 +132,19 @@ public class Button extends Component {
 			@Override
 			protected void onHoverEnd(PointerEvent event) {
 				killTooltip();
+			}
+
+			@Override
+			protected void onDrag( PointerEvent event ) {
+				// Same threshold as ScrollPane: a drag should scroll, not activate the button.
+				if (scrollPassthrough && clickReady
+						&& PointF.distance( event.current, event.start ) > PixelScene.defaultZoom * 8) {
+					clickReady = false;
+					if (pressedButton == Button.this) {
+						pressedButton = null;
+					}
+					Button.this.onPointerUp();
+				}
 			}
 		};
 		add( hotArea );
@@ -325,6 +341,11 @@ public class Button extends Component {
 
 	public void givePointerPriority(){
 		hotArea.givePointerPriority();
+	}
+
+	public void enableScrollPassthrough(){
+		scrollPassthrough = true;
+		hotArea.blockLevel = PointerArea.NEVER_BLOCK;
 	}
 	
 }

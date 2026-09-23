@@ -24,6 +24,7 @@ package com.shatteredpixel.shatteredpixeldungeon.levels.features;
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Bleeding;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Cripple;
@@ -49,6 +50,7 @@ import com.watabou.noosa.Game;
 import com.watabou.noosa.Image;
 import com.watabou.noosa.audio.Sample;
 import com.watabou.utils.Callback;
+import com.watabou.utils.DeviceCompat;
 import com.watabou.utils.Random;
 
 public class Chasm implements Hero.Doom {
@@ -56,9 +58,12 @@ public class Chasm implements Hero.Doom {
 	public static boolean jumpConfirmed = false;
 	private static int heroPos;
 
-	// Left-clicking a chasm (adjacent, distant, or in fog) should not start a jump.
-	// Keyboard and right-click Go Here still can.
+	// Desktop left-click on a chasm should not start a jump. Keyboard and Go Here still can.
+	// Android/iOS tap keeps the original jump prompt (no right-click).
 	public static boolean ignoreLeftClickJump(Hero hero, Integer cell) {
+		if (!DeviceCompat.isDesktop()) {
+			return false;
+		}
 		if (hero == null || cell == null || Dungeon.level == null) {
 			return false;
 		}
@@ -156,6 +161,11 @@ public class Chasm implements Hero.Doom {
 		if (b != null){
 			hero.sprite.emitter().burst( Speck.factory( Speck.JET ), 20);
 			b.processFall();
+			return;
+		}
+
+		if (Dungeon.isModified(Modifiers.FRAILTY)){
+			hero.die( new Chasm() );
 			return;
 		}
 		

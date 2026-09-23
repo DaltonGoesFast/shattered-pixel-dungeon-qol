@@ -7,8 +7,6 @@ package com.shatteredpixel.shatteredpixeldungeon.desktop;
 import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
 import com.shatteredpixel.shatteredpixeldungeon.items.Gold;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
-import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfStasis;
-import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.exotic.ScrollOfTimeFreeze;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Catalog;
 import com.badlogic.gdx.utils.reflect.ClassReflection;
 import com.watabou.utils.Reflection;
@@ -98,8 +96,6 @@ public class StreamerItemResolver {
 				registerIfItem(raw);
 			}
 		}
-		registerClass(ScrollOfStasis.class);
-		registerClass(ScrollOfTimeFreeze.class);
 	}
 
 	@SuppressWarnings("unchecked")

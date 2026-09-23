@@ -5,11 +5,35 @@
     {
       "enabled": true,
       "scene_name": "V01 LIVE - MAIN",
-      "source_name": "INGAME - INV",
+      "source_name": "INGAME - TITLE",
       "scene_item_id": null,
       "when": {
         "scenes": [
-          "alchemy"
+          "interlevel",
+          "title",
+          "start",
+          "hero_select",
+          "rankings"
+        ],
+        "windows": []
+      },
+      "then": {
+        "visible": true
+      }
+    },
+    {
+      "enabled": true,
+      "scene_name": "V01 LIVE - MAIN",
+      "source_name": "INGAME - GAME",
+      "scene_item_id": null,
+      "when": {
+        "scenes": [
+          "alchemy",
+          "interlevel",
+          "title",
+          "start",
+          "hero_select",
+          "rankings"
         ],
         "windows": []
       },
@@ -20,11 +44,76 @@
     {
       "enabled": true,
       "scene_name": "V01 LIVE - MAIN",
-      "source_name": "INGAME - GAME",
+      "source_name": "INGAME - INV",
       "scene_item_id": null,
       "when": {
         "scenes": [
-          "alchemy"
+          "alchemy",
+          "interlevel",
+          "title",
+          "start",
+          "hero_select",
+          "rankings"
+        ],
+        "windows": []
+      },
+      "then": {
+        "visible": false
+      }
+    },
+    {
+      "enabled": true,
+      "scene_name": "V01 LIVE - MAIN",
+      "source_name": "INGAME - LOG",
+      "scene_item_id": null,
+      "when": {
+        "scenes": [
+          "alchemy",
+          "interlevel",
+          "title",
+          "start",
+          "hero_select",
+          "rankings"
+        ],
+        "windows": []
+      },
+      "then": {
+        "visible": false
+      }
+    },
+    {
+      "enabled": true,
+      "scene_name": "V01 LIVE - MAIN",
+      "source_name": "INGAME - CHAL",
+      "scene_item_id": null,
+      "when": {
+        "scenes": [
+          "alchemy",
+          "interlevel",
+          "title",
+          "start",
+          "hero_select",
+          "rankings"
+        ],
+        "windows": []
+      },
+      "then": {
+        "visible": false
+      }
+    },
+    {
+      "enabled": true,
+      "scene_name": "V01 LIVE - MAIN",
+      "source_name": "INGAME - STATUS",
+      "scene_item_id": null,
+      "when": {
+        "scenes": [
+          "alchemy",
+          "interlevel",
+          "title",
+          "start",
+          "hero_select",
+          "rankings"
         ],
         "windows": []
       },
@@ -50,28 +139,11 @@
     {
       "enabled": true,
       "scene_name": "V01 LIVE - MAIN",
-      "source_name": "INGAME - CHAL",
-      "scene_item_id": null,
-      "when": {
-        "scenes": [
-          "alchemy"
-        ],
-        "windows": []
-      },
-      "then": {
-        "visible": false
-      }
-    },
-    {
-      "enabled": true,
-      "scene_name": "V01 LIVE - MAIN",
       "source_name": "INGAME - GAME",
       "scene_item_id": null,
       "when": {
         "scenes": [],
-        "windows": [
-          "journal"
-        ]
+        "windows": []
       },
       "then": {
         "filters": [

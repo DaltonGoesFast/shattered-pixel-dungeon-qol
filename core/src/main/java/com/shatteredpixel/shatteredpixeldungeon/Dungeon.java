@@ -180,6 +180,7 @@ public class Dungeon {
 	}
 
 	public static int challenges;
+	public static int modifiers;
 	public static float mobsToChampion;
 
 	public static Hero hero;
@@ -234,6 +235,7 @@ public class Dungeon {
 
 		initialVersion = version = Game.versionCode;
 		challenges = SPDSettings.challenges();
+		modifiers = Modifiers.stripSeedBanned( SPDSettings.modifiers() );
 		mobsToChampion = 1;
 
 		Actor.clear();
@@ -287,10 +289,28 @@ public class Dungeon {
 			hero.customName = GamesInProgress.pendingHeroName;
 		}
 		GamesInProgress.pendingHeroName = null;
+
+		FirstDescent.reset();
+		Command.reset();
+		Command.initForRun();
+
+		if (isModified(Modifiers.GLASS)){
+			hero.updateHT(false);
+			hero.HP = hero.HT;
+		}
+
+		Modifiers.ensureEvolutionTracker(hero);
+
+		Rebirth.reset();
+		Rebirth.deliverIfNeeded();
 	}
 
 	public static boolean isChallenged( int mask ) {
 		return (challenges & mask) != 0;
+	}
+
+	public static boolean isModified( int mask ) {
+		return (modifiers & mask) != 0;
 	}
 
 	public static boolean levelHasBeenGenerated(int depth, int branch){
@@ -387,6 +407,7 @@ public class Dungeon {
 
 			if (depth > Statistics.deepestFloor && branch == 0) {
 				Statistics.deepestFloor = depth;
+				FirstDescent.pending = true;
 
 				if (Statistics.qualifiedForNoKilling) {
 					Statistics.completedWithNoKilling = true;
@@ -610,6 +631,7 @@ public class Dungeon {
 	private static final String DAILY_REPLAY= "daily_replay";
 	private static final String LAST_PLAYED = "last_played";
 	private static final String CHALLENGES	= "challenges";
+	private static final String MODIFIERS	= "modifiers";
 	private static final String MOBS_TO_CHAMPION	= "mobs_to_champion";
 	private static final String HERO		= "hero";
 	private static final String DEPTH		= "depth";
@@ -637,6 +659,10 @@ public class Dungeon {
 			bundle.put( DAILY_REPLAY, dailyReplay );
 			bundle.put( LAST_PLAYED, lastPlayed = Game.realTime);
 			bundle.put( CHALLENGES, challenges );
+			bundle.put( MODIFIERS, modifiers );
+			FirstDescent.store( bundle );
+			Command.store( bundle );
+			Rebirth.store( bundle );
 			bundle.put( MOBS_TO_CHAMPION, mobsToChampion );
 			bundle.put( HERO, hero );
 			bundle.put( DEPTH, depth );
@@ -743,6 +769,10 @@ public class Dungeon {
 		QuickSlotButton.reset();
 
 		Dungeon.challenges = bundle.getInt( CHALLENGES );
+		Dungeon.modifiers = bundle.contains( MODIFIERS ) ? bundle.getInt( MODIFIERS ) : 0;
+		FirstDescent.restore( bundle );
+		Command.restore( bundle );
+		Rebirth.restore( bundle );
 		Dungeon.mobsToChampion = bundle.getFloat( MOBS_TO_CHAMPION );
 		
 		Dungeon.level = null;
@@ -824,6 +854,8 @@ public class Dungeon {
 		Statistics.restoreFromBundle( bundle );
 		Generator.restoreFromBundle( bundle );
 
+		Modifiers.ensureEvolutionTracker( hero );
+
 	}
 	
 	public static Level loadLevel( int save ) throws IOException {
@@ -862,6 +894,7 @@ public class Dungeon {
 		info.depth = bundle.getInt( DEPTH );
 		info.version = bundle.getInt( VERSION );
 		info.challenges = bundle.getInt( CHALLENGES );
+		info.modifiers = bundle.contains( MODIFIERS ) ? bundle.getInt( MODIFIERS ) : 0;
 		info.seed = bundle.getLong( SEED );
 		info.customSeed = bundle.getString( CUSTOM_SEED );
 		info.daily = bundle.getBoolean( DAILY );

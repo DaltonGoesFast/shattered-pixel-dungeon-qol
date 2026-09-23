@@ -48,10 +48,15 @@ _dedupe_lock = threading.Lock()
 _spend_inflight: set[str] = set()
 _spend_recent: dict[str, float] = {}
 
-# Handled by separate Streamer.bot Command actions; R1 should skip POST (BuildChatCommandBody).
+# kesha/mimic/tooth/seed/challenge are native Streamer.bot actions; R1 skips those.
+# pact/pacts stay here so R1's POST is answered from game_summary.json — do not skip them.
 STREAM_INFO_COMMANDS = frozenset({
     "kesha", "mimic", "tooth", "seed", "challenge", "challenges",
+    "pact", "pacts",
 })
+
+# Modifiers.MASKS.length — "all pacts" reply when every pact is on.
+PACT_TOTAL = 16
 
 COMMANDS_DOC_URL = (
     "https://github.com/DaltonGoesFast/shattered-pixel-dungeon-qol/blob/master/COMMANDS.md"
@@ -864,8 +869,17 @@ def _format_challenges(challenges: list) -> str:
     return "None"
 
 
+def _format_pacts(pacts: list) -> str:
+    names = [str(p) for p in pacts if p]
+    if len(names) == PACT_TOTAL:
+        return f"All Pacts Active ({PACT_TOTAL} Pacts)"
+    if names:
+        return ", ".join(names)
+    return "None"
+
+
 def handle_stream_info(cmd: str) -> ChatResult:
-    """Silent ok for OBS/sound commands; chat replies for seed/challenges."""
+    """Silent ok for OBS/sound commands; chat replies for seed/challenges/pacts."""
     if cmd in ("kesha", "mimic", "tooth"):
         return ChatResult(ok=True, message=None, extra={"command": cmd, "stream_info": True})
     data = _load_game_summary()
@@ -882,6 +896,14 @@ def handle_stream_info(cmd: str) -> ChatResult:
         return ChatResult(
             ok=True,
             message=chat_messages.active_challenges(text),
+            extra={"command": cmd, "stream_info": True},
+        )
+    if cmd in ("pact", "pacts"):
+        raw = data.get("pacts") or []
+        text = _format_pacts(raw if isinstance(raw, list) else [])
+        return ChatResult(
+            ok=True,
+            message=chat_messages.active_pacts(text),
             extra={"command": cmd, "stream_info": True},
         )
     return ChatResult(ok=True, message=None, extra={"command": cmd, "stream_info": True})
