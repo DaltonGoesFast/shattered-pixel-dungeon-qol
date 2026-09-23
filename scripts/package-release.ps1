@@ -52,7 +52,7 @@ if (-not (Test-Path -LiteralPath $jarSrc)) {
 if (-not $jarSrc -or -not (Test-Path -LiteralPath $jarSrc)) {
     throw "Desktop JAR not found (expected desktop-$ver.jar under desktop/build/libs)"
 }
-$jarDst = Join-Path $releaseDir "$slug-desktop.jar"
+$jarDst = Join-Path $releaseDir "JAVA-$slug.jar"
 Copy-Item -LiteralPath $jarSrc -Destination $jarDst -Force
 Write-Host "OK JAR -> $jarDst"
 
@@ -63,7 +63,7 @@ if (-not $SkipJpackage) {
     if (-not (Test-Path -LiteralPath $exe)) {
         throw "Windows EXE not found at: $exe (run desktop:jpackageImage on Windows)"
     }
-    $zipDst = Join-Path $releaseDir "$slug-windows-x64.zip"
+    $zipDst = Join-Path $releaseDir "WINDOWS-$slug-x64.zip"
     if (Test-Path -LiteralPath $zipDst) { Remove-Item -LiteralPath $zipDst -Force }
     Compress-Archive -LiteralPath $jpackageDir -DestinationPath $zipDst -CompressionLevel Optimal
     Write-Host "OK ZIP -> $zipDst"
@@ -73,7 +73,7 @@ if (-not $SkipJpackage) {
 if (-not $SkipAndroid) {
     $apkSrc = Join-Path $Root 'android\build\outputs\apk\release\android-release.apk'
     if (-not (Test-Path -LiteralPath $apkSrc)) { throw "APK not found at $apkSrc" }
-    $apkDst = Join-Path $releaseDir "$slug-android.apk"
+    $apkDst = Join-Path $releaseDir "ANDROID-$slug.apk"
     Copy-Item -LiteralPath $apkSrc -Destination $apkDst -Force
     Write-Host "OK APK -> $apkDst"
 }

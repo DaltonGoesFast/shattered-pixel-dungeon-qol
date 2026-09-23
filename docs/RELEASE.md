@@ -37,9 +37,9 @@ This runs Gradle, then copies artifacts into **`release/`** (gitignored):
 
 | Output | Source |
 |--------|--------|
-| `Shattered-Pixel-Dungeon-QoL-<ver>-desktop.jar` | `desktop/build/libs/desktop-<ver>.jar` |
-| `Shattered-Pixel-Dungeon-QoL-<ver>-windows-x64.zip` | `desktop/build/jpackage/Shattered Pixel Dungeon QoL/` |
-| `Shattered-Pixel-Dungeon-QoL-<ver>-android.apk` | `android/build/outputs/apk/release/android-release.apk` |
+| `JAVA-Shattered-Pixel-Dungeon-QoL-<ver>.jar` | `desktop/build/libs/desktop-<ver>.jar` |
+| `WINDOWS-Shattered-Pixel-Dungeon-QoL-<ver>-x64.zip` | `desktop/build/jpackage/Shattered Pixel Dungeon QoL/` |
+| `ANDROID-Shattered-Pixel-Dungeon-QoL-<ver>.apk` | `android/build/outputs/apk/release/android-release.apk` |
 
 Options:
 
