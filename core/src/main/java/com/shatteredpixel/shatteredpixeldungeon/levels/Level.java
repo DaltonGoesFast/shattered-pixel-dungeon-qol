@@ -184,6 +184,8 @@ public abstract class Level implements Bundlable {
 
 	/** Sacrifice pact: how many paying deaths so far on this floor (equip curve). */
 	public int sacrificeKillIndex = 0;
+	/** Sacrifice pact: kill-paid gear already dropped on this floor. */
+	public int sacrificeEquipDrops = 0;
 	
 	public HashSet<Mob> mobs;
 	public SparseArray<Heap> heaps;
@@ -220,6 +222,7 @@ public abstract class Level implements Bundlable {
 	private static final String BLOBS		= "blobs";
 	private static final String FEELING		= "feeling";
 	private static final String SACRIFICE_KILLS = "sacrifice_kills";
+	private static final String SACRIFICE_DROPS = "sacrifice_drops";
 
 	public void create() {
 
@@ -480,6 +483,7 @@ public abstract class Level implements Bundlable {
 		}
 
 		sacrificeKillIndex = bundle.contains(SACRIFICE_KILLS) ? bundle.getInt(SACRIFICE_KILLS) : 0;
+		sacrificeEquipDrops = bundle.contains(SACRIFICE_DROPS) ? bundle.getInt(SACRIFICE_DROPS) : 0;
 
 		if (bundle.contains( "mobs_to_spawn" )) {
 			for (Class<? extends Mob> mob : bundle.getClassArray("mobs_to_spawn")) {
@@ -527,6 +531,7 @@ public abstract class Level implements Bundlable {
 		bundle.put( BLOBS, blobs.values() );
 		bundle.put( FEELING, feeling );
 		bundle.put( SACRIFICE_KILLS, sacrificeKillIndex );
+		bundle.put( SACRIFICE_DROPS, sacrificeEquipDrops );
 		bundle.put( "mobs_to_spawn", mobsToSpawn.toArray(new Class[0]));
 		bundle.put( "respawner", respawner );
 		bundle.put( "targeted_cells", TargetedCell.cells.valueList() );

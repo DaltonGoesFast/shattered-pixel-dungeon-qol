@@ -2511,7 +2511,7 @@ public class Hero extends Char {
 		}
 		
 		Bones.leave();
-		Rebirth.onRunFailed();
+		if (!Dungeon.isModified(Modifiers.LEGACY)) Rebirth.onRunFailed();
 		
 		Dungeon.observe();
 		GameScene.updateFog();

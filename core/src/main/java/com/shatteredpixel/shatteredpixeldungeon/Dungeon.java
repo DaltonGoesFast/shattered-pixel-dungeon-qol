@@ -234,8 +234,14 @@ public class Dungeon {
 	public static void init() {
 
 		initialVersion = version = Game.versionCode;
-		challenges = SPDSettings.challenges();
-		modifiers = Modifiers.stripSeedBanned( SPDSettings.modifiers() );
+		boolean looping = Legacy.loopPending();
+		if (looping){
+			challenges = Legacy.carriedChallenges();
+			modifiers = Legacy.carriedModifiers();
+		} else {
+			challenges = SPDSettings.challenges();
+			modifiers = Modifiers.stripSeedBanned( SPDSettings.modifiers() );
+		}
 		mobsToChampion = 1;
 
 		Actor.clear();
@@ -256,6 +262,7 @@ public class Dungeon {
 		Random.resetGenerators();
 		
 		Statistics.reset();
+		Legacy.initForRun();
 		Notes.reset();
 
 		quickslot.reset();
@@ -290,6 +297,8 @@ public class Dungeon {
 		}
 		GamesInProgress.pendingHeroName = null;
 
+		Legacy.deliverCarry( hero );
+
 		FirstDescent.reset();
 		Command.reset();
 		Command.initForRun();
@@ -302,7 +311,7 @@ public class Dungeon {
 		Modifiers.ensureEvolutionTracker(hero);
 
 		Rebirth.reset();
-		Rebirth.deliverIfNeeded();
+		if (!looping) Rebirth.deliverIfNeeded();
 	}
 
 	public static boolean isChallenged( int mask ) {
@@ -408,6 +417,7 @@ public class Dungeon {
 			if (depth > Statistics.deepestFloor && branch == 0) {
 				Statistics.deepestFloor = depth;
 				FirstDescent.pending = true;
+				Legacy.onNewDeepestFloor();
 
 				if (Statistics.qualifiedForNoKilling) {
 					Statistics.completedWithNoKilling = true;
@@ -663,6 +673,7 @@ public class Dungeon {
 			FirstDescent.store( bundle );
 			Command.store( bundle );
 			Rebirth.store( bundle );
+			Legacy.store( bundle );
 			bundle.put( MOBS_TO_CHAMPION, mobsToChampion );
 			bundle.put( HERO, hero );
 			bundle.put( DEPTH, depth );
@@ -773,6 +784,7 @@ public class Dungeon {
 		FirstDescent.restore( bundle );
 		Command.restore( bundle );
 		Rebirth.restore( bundle );
+		Legacy.restore( bundle );
 		Dungeon.mobsToChampion = bundle.getFloat( MOBS_TO_CHAMPION );
 		
 		Dungeon.level = null;

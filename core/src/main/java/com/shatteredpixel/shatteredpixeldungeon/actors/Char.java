@@ -692,8 +692,8 @@ public abstract class Char extends Actor {
 		for (ChampionEnemy buff : attacker.buffs(ChampionEnemy.class)){
 			acuRoll *= buff.evasionAndAccuracyFactor();
 		}
-		if (Modifiers.evolutionEligible(attacker)){
-			acuRoll *= Modifiers.evolutionMultiplier();
+		if (Modifiers.growthEligible(attacker)){
+			acuRoll *= Modifiers.growthMultiplier();
 		}
 		acuRoll *= AscensionChallenge.statModifier(attacker);
 		if (Dungeon.hero.heroClass != HeroClass.CLERIC
@@ -711,8 +711,8 @@ public abstract class Char extends Actor {
 		for (ChampionEnemy buff : defender.buffs(ChampionEnemy.class)){
 			defRoll *= buff.evasionAndAccuracyFactor();
 		}
-		if (Modifiers.evolutionEligible(defender)){
-			defRoll *= Modifiers.evolutionMultiplier();
+		if (Modifiers.growthEligible(defender)){
+			defRoll *= Modifiers.growthMultiplier();
 		}
 		defRoll *= AscensionChallenge.statModifier(defender);
 		if (Dungeon.hero.heroClass != HeroClass.CLERIC
@@ -910,8 +910,8 @@ public abstract class Char extends Actor {
 		//temporarily assign to a float to avoid rounding a bunch
 		float damage = dmg;
 
-		if (src instanceof Char && Modifiers.evolutionEligible((Char) src)) {
-			damage *= Modifiers.evolutionMultiplier();
+		if (src instanceof Char && Modifiers.growthEligible((Char) src)) {
+			damage *= Modifiers.growthMultiplier();
 		}
 
 		//if dmg is from a character we already reduced it in Char.attack
@@ -988,8 +988,9 @@ public abstract class Char extends Actor {
 		for (ChampionEnemy buff : buffs(ChampionEnemy.class)){
 			dmg = (int) Math.ceil(dmg * buff.damageTakenFactor());
 		}
-		if (Modifiers.evolutionEligible(this)){
-			dmg = (int) Math.ceil(dmg / Modifiers.evolutionMultiplier());
+		// Phase-2 Dwarf King waves advance on exact HT/12 or HT/18 chips. Shrinking those stalls the fight.
+		if (Modifiers.growthEligible(this) && !(src instanceof DwarfKing.KingDamager)){
+			dmg = (int) Math.ceil(dmg / Modifiers.growthMultiplier());
 		}
 		
 		//TODO improve this when I have proper damage source logic

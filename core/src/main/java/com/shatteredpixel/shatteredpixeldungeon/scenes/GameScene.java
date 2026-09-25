@@ -28,6 +28,7 @@ import com.shatteredpixel.shatteredpixeldungeon.Chrome;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.FirstDescent;
 import com.shatteredpixel.shatteredpixeldungeon.GamesInProgress;
+import com.shatteredpixel.shatteredpixeldungeon.Legacy;
 import com.shatteredpixel.shatteredpixeldungeon.Rankings;
 import com.shatteredpixel.shatteredpixeldungeon.Rebirth;
 import com.shatteredpixel.shatteredpixeldungeon.SPDAction;
@@ -345,6 +346,7 @@ public class GameScene extends PixelScene {
 		Rebirth.claimStrayCurrency();
 		FirstDescent.applyIfPending();
 		hero.updateArmor();
+		Legacy.resumeIfPending();
 		
 		for (Mob mob : Dungeon.level.mobs) {
 			addMobSprite( mob );

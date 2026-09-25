@@ -237,6 +237,9 @@ public class Heap implements Bundlable {
 				replace( item, ChargrilledMeat.cook( item.quantity ) );
 				burnt = true;
 			} else if (item instanceof Bomb) {
+				if (((Bomb) item).ignoresFire()) {
+					continue;
+				}
 				items.remove( item );
 				((Bomb) item).explode( pos );
 				if (((Bomb) item).explodesDestructively()) {

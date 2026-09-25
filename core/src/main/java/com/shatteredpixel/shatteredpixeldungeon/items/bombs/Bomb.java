@@ -76,6 +76,9 @@ public class Bomb extends Item {
 
 	public Fuse fuse;
 
+	/** Game time before which {@link com.shatteredpixel.shatteredpixeldungeon.items.Heap#burn()} will not detonate this bomb. */
+	private float fireproofUntil = 0;
+
 	//FIXME using a static variable for this is kinda gross, should be a better way
 	private static boolean lightingFuse = false;
 
@@ -115,6 +118,15 @@ public class Bomb extends Item {
 
 	protected Fuse createFuse(){
 		return new Fuse();
+	}
+
+	/** Spite drops use this so champion flames on the death tile do not detonate the bomb on the turn it lands. */
+	public void ignoreFireFor( float turns ) {
+		fireproofUntil = Actor.now() + turns;
+	}
+
+	public boolean ignoresFire() {
+		return Actor.now() < fireproofUntil;
 	}
 
 	/** Start the lit fuse (same delay as a thrown lit bomb). For floor drops, call **before** {@link com.shatteredpixel.shatteredpixeldungeon.levels.Level#drop(Item, int)} so the heap {@link com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSprite} picks up {@link #glowing()}. Skips ignition on chasm. */
@@ -264,11 +276,16 @@ public class Bomb extends Item {
 	}
 
 	private static final String FUSE = "fuse";
+	private static final String FIREPROOF = "fireproof";
 
 	@Override
 	public void storeInBundle(Bundle bundle) {
 		super.storeInBundle(bundle);
 		bundle.put( FUSE, fuse );
+		// Actor time is zeroed on save, so store time remaining rather than an absolute deadline.
+		if (fireproofUntil > Actor.now()) {
+			bundle.put( FIREPROOF, fireproofUntil - Actor.now() );
+		}
 	}
 
 	@Override
@@ -276,6 +293,8 @@ public class Bomb extends Item {
 		super.restoreFromBundle(bundle);
 		if (bundle.contains( FUSE ))
 			Actor.add( fuse = ((Fuse)bundle.get(FUSE)).ignite(this) );
+		if (bundle.contains( FIREPROOF ))
+			fireproofUntil = Actor.now() + bundle.getFloat( FIREPROOF );
 	}
 
 	//used to track the death from friendly magic badge, if an explosion was conjured by magic

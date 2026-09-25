@@ -159,7 +159,7 @@ public class Rebirth {
 		if (MODE_SACRIFICE.equals(mode) && bundle.contains(ITEM)){
 			gift = (Item) bundle.get(ITEM);
 		} else if (MODE_CONSOLATION.equals(mode)){
-			gift = Generator.random();
+			gift = consolationItem();
 		}
 
 		if (gift == null) return;
@@ -186,6 +186,18 @@ public class Rebirth {
 			e.detachAll(Dungeon.hero.belongings.backpack);
 			Dungeon.energy += e.quantity();
 		}
+	}
+
+	/**
+	 * Gold is the heaviest {@link Generator} category (10/35). Paying that out as coins
+	 * leaves the backpack unchanged, which reads as a missed gift on repeated deaths.
+	 */
+	private static Item consolationItem(){
+		Item gift = Generator.random();
+		if (gift == null || gift instanceof Gold || gift instanceof EnergyCrystal || gift.quantity() <= 0){
+			gift = Generator.random(Generator.Category.SCROLL);
+		}
+		return gift;
 	}
 
 	private static void giveGift( Item gift ){

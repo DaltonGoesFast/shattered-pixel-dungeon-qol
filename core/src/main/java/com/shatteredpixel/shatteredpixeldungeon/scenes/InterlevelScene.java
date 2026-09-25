@@ -25,6 +25,7 @@ import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Chrome;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.GamesInProgress;
+import com.shatteredpixel.shatteredpixeldungeon.Legacy;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
@@ -625,7 +626,9 @@ public class InterlevelScene extends PixelScene {
 
 		if (Dungeon.hero == null) {
 			Mob.clearHeldAllies();
+			boolean looping = Legacy.loopPending();
 			Dungeon.init();
+			if (looping) Legacy.deleteFloorFiles( GamesInProgress.curSlot );
 			GameLog.wipe();
 
 			//When debugging, we may start a game at a later depth to quickly test something

@@ -139,7 +139,7 @@ public class SPDSettings extends GameSettings {
 		return getInt( KEY_SCREEN_SHAKE, 2, 0, 4 );
 	}
 
-	/** 0–100: chance each region uses {@code 01-}prefixed tiles at run start; 0 = never, 100 = always; in-between follows saved run flags unless clamped by 0/100. */
+	/** 0–100: chance each region uses {@code 01-}prefixed tiles at run start; 0 = never (default), 100 = always. Deprecated. */
 	public static final String KEY_ALT_TILESET_CHANCE = "alt_tileset_chance";
 
 	/** Legacy boolean; migrated once into {@link #KEY_ALT_TILESET_CHANCE}. */
@@ -151,7 +151,7 @@ public class SPDSettings extends GameSettings {
 		if (legacyAltTilesetPrefsChecked) return;
 		legacyAltTilesetPrefsChecked = true;
 		if (!contains(KEY_ALT_TILESET_CHANCE) && contains(LEGACY_FORCE_ALT_TILESETS)) {
-			put(KEY_ALT_TILESET_CHANCE, getBoolean(LEGACY_FORCE_ALT_TILESETS, false) ? 100 : 50);
+			put(KEY_ALT_TILESET_CHANCE, getBoolean(LEGACY_FORCE_ALT_TILESETS, false) ? 100 : 0);
 		}
 	}
 
@@ -161,7 +161,7 @@ public class SPDSettings extends GameSettings {
 
 	public static int altTilesetChance() {
 		migrateLegacyAltTilesetPrefsIfNeeded();
-		return getInt(KEY_ALT_TILESET_CHANCE, 50, 0, 100);
+		return getInt(KEY_ALT_TILESET_CHANCE, 0, 0, 100);
 	}
 
 	/**
@@ -186,6 +186,7 @@ public class SPDSettings extends GameSettings {
 	public static final String KEY_FLIPSTATUSPANE = "flip_status_pane";
 	public static final String KEY_CENTER_ON_CYCLE_NO_ENEMIES = "center_on_cycle_no_enemies";
 	public static final String KEY_BOSS_BAR_ALL_ENEMIES = "boss_bar_all_enemies";
+	public static final String KEY_AUGMENT_ICONS = "augment_icons";
 	public static final String KEY_BARMODE		= "toolbar_mode";
 	public static final String KEY_SLOTWATERSKIN= "quickslot_waterskin";
 	public static final String KEY_SYSTEMFONT	= "system_font";
@@ -243,6 +244,12 @@ public class SPDSettings extends GameSettings {
 	}
 	
 	public static boolean flipTags(){ return getBoolean(KEY_FLIPTAGS, false); }
+
+	public static void augmentIcons( boolean value ) {
+		put( KEY_AUGMENT_ICONS, value );
+	}
+
+	public static boolean augmentIcons(){ return getBoolean(KEY_AUGMENT_ICONS, true); }
 
 	public static void flipStatusPane( boolean value ) {
 		put( KEY_FLIPSTATUSPANE, value );

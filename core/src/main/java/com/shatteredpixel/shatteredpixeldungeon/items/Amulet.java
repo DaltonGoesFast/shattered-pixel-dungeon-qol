@@ -24,6 +24,7 @@ package com.shatteredpixel.shatteredpixeldungeon.items;
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Legacy;
 import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
 import com.shatteredpixel.shatteredpixeldungeon.Rebirth;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
@@ -67,7 +68,11 @@ public class Amulet extends Item {
 		super.execute( hero, action );
 
 		if (action.equals(AC_END)) {
-			showAmuletScene( false );
+			if (Legacy.active() && !Statistics.amuletObtained){
+				Legacy.offer( this );
+			} else {
+				showAmuletScene( false );
+			}
 		}
 	}
 	
@@ -76,7 +81,8 @@ public class Amulet extends Item {
 		if (super.doPickUp( hero, pos )) {
 			
 			if (!Statistics.amuletObtained) {
-				Statistics.amuletObtained = true;
+				final boolean legacy = Legacy.active();
+				if (!legacy) Statistics.amuletObtained = true;
 				hero.spend(-hero.cooldown());
 
 				//delay with an actor here so pickup behaviour can fully process.
@@ -89,15 +95,10 @@ public class Amulet extends Item {
 					@Override
 					protected boolean act() {
 						Actor.remove(this);
-						if (Dungeon.isModified(Modifiers.REBIRTH)){
-							Rebirth.offerOnAmuletPickup(new Callback() {
-								@Override
-								public void call() {
-									showAmuletScene( true );
-								}
-							});
+						if (legacy){
+							Legacy.offer( Amulet.this );
 						} else {
-							showAmuletScene( true );
+							claim();
 						}
 						return false;
 					}
@@ -107,6 +108,20 @@ public class Amulet extends Item {
 			return true;
 		} else {
 			return false;
+		}
+	}
+
+	/** Cash out: Rebirth sacrifice (if on), then the ending. */
+	public void claim() {
+		if (Dungeon.isModified(Modifiers.REBIRTH)){
+			Rebirth.offerOnAmuletPickup(new Callback() {
+				@Override
+				public void call() {
+					showAmuletScene( true );
+				}
+			});
+		} else {
+			showAmuletScene( true );
 		}
 	}
 	

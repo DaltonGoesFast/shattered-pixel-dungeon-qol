@@ -210,17 +210,20 @@ public class FirstDescent {
 	}
 
 	private static Item remakeGear( Item item ){
+		Item result;
 		if (item instanceof Armor){
-			return remakeArmor((Armor) item);
+			result = remakeArmor((Armor) item);
 		} else if (item instanceof Weapon){
-			Item result = ScrollOfTransmutation.changeItem(item);
+			result = ScrollOfTransmutation.changeItem(item);
 			if (result instanceof Weapon){
 				rerollWeaponEnchant((Weapon) result, item.cursed);
 			}
-			return result;
 		} else {
-			return ScrollOfTransmutation.changeItem(item);
+			result = ScrollOfTransmutation.changeItem(item);
 		}
+		// Legacy kit pieces stay in the kit after a remake
+		if (result != null && item.legacyKit) result.legacyKit = true;
+		return result;
 	}
 
 	private static Armor remakeArmor( Armor old ){

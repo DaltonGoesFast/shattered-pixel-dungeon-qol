@@ -55,17 +55,20 @@ public class Modifiers {
 	public static final int SWARMS          = 8192;
 	public static final int REBIRTH         = 16384;
 	public static final int ENIGMA          = 32768;
+	public static final int LEGACY          = 65536;
 
-	public static final int MAX_VALUE       = 65535;
+	/** Settings clamp; bits 0–30 are storable. */
+	public static final int MAX_VALUE       = Integer.MAX_VALUE;
 
 	/** Bits that have gameplay this build. */
 	public static final int[] IMPLEMENTED_MASKS = {
 			HONOR, GLASS, FRAILTY, DEATH, DEVOTION, SPITE, SOUL,
-			KIN, DISSONANCE, METAMORPHOSIS, COMMAND, ENIGMA, REBIRTH, SWARMS, SACRIFICE, EVOLUTION
+			KIN, DISSONANCE, METAMORPHOSIS, COMMAND, ENIGMA, REBIRTH, SWARMS, SACRIFICE, EVOLUTION,
+			LEGACY
 	};
 
 	/** Bits forbidden on daily / custom-seed runs (seed comparability). */
-	public static final int SEED_BANNED_MASK = COMMAND | REBIRTH;
+	public static final int SEED_BANNED_MASK = COMMAND | REBIRTH | LEGACY;
 
 	/** While true, Level/Heap drops mark items as dungeon Command loot. */
 	public static boolean markingDungeonLoot = false;
@@ -73,7 +76,7 @@ public class Modifiers {
 	/** Suppresses Command window during replacement collect(). */
 	public static boolean suppressCommandWindow = false;
 
-	/** Daily and custom-seed runs forbid Command and Rebirth (seed comparability). */
+	/** Daily and custom-seed runs forbid Command, Rebirth, and Legacy (seed comparability). */
 	public static boolean seedBanned(){
 		return Dungeon.daily || (Dungeon.customSeedText != null && !Dungeon.customSeedText.isEmpty());
 	}
@@ -108,7 +111,7 @@ public class Modifiers {
 		return mask;
 	}
 
-	/** Display order: implemented A–Z, then not-yet-available A–Z. */
+	/** Ids parallel to {@link #MASKS}. The pact window groups these into tabs. */
 	public static final String[] NAME_IDS = {
 			"command",
 			"death",
@@ -120,6 +123,7 @@ public class Modifiers {
 			"glass",
 			"honor",
 			"kin",
+			"legacy",
 			"metamorphosis",
 			"rebirth",
 			"sacrifice",
@@ -139,6 +143,7 @@ public class Modifiers {
 			GLASS,
 			HONOR,
 			KIN,
+			LEGACY,
 			METAMORPHOSIS,
 			REBIRTH,
 			SACRIFICE,
@@ -146,6 +151,26 @@ public class Modifiers {
 			SPITE,
 			SWARMS
 	};
+
+	/** Pact window: rules on you and your side. */
+	public static final int[] HERO_PACTS = { DEATH, FRAILTY, GLASS, DEVOTION };
+
+	/** Pact window: who is in the dungeon and what they do. */
+	public static final int[] FOES_PACTS = {
+			HONOR, EVOLUTION, DISSONANCE, KIN, SWARMS, SPITE, SOUL
+	};
+
+	/** Pact window: items and what carries between runs. */
+	public static final int[] SPOILS_PACTS = {
+			COMMAND, ENIGMA, METAMORPHOSIS, SACRIFICE, REBIRTH, LEGACY
+	};
+
+	public static String idForMask( int mask ){
+		for (int i = 0; i < MASKS.length; i++){
+			if (MASKS[i] == mask) return NAME_IDS[i];
+		}
+		return null;
+	}
 
 	public static boolean isImplemented( int mask ){
 		for (int m : IMPLEMENTED_MASKS){
@@ -244,6 +269,18 @@ public class Modifiers {
 		if (!Dungeon.isModified(EVOLUTION)) return 1f;
 		int deepest = Math.max(1, Statistics.deepestFloor);
 		return 1f + Math.min(0.50f, 0.02f * (deepest - 1));
+	}
+
+	/** Hostiles only when Evolution or Legacy growth is on. */
+	public static boolean growthEligible( Char ch ){
+		return ch != null
+				&& ch.alignment == Char.Alignment.ENEMY
+				&& (Dungeon.isModified(EVOLUTION) || Legacy.multiplier() > 1f);
+	}
+
+	/** Evolution times Legacy; combat reads this one factor. */
+	public static float growthMultiplier(){
+		return evolutionMultiplier() * Legacy.multiplier();
 	}
 
 	/** Display-only hero buff; combat reads {@link #evolutionMultiplier()} directly. */

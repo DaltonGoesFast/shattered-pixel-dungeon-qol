@@ -1150,6 +1150,7 @@ public abstract class Mob extends Char {
 		} else {
 			bomb = new Bomb();
 		}
+		bomb.ignoreFireFor(1f);
 		if (cause == Chasm.class){
 			Dungeon.dropToChasm(bomb);
 		} else if (Dungeon.level != null){
@@ -1200,9 +1201,10 @@ public abstract class Mob extends Char {
 			}
 		}
 
-		if (sacrifice && Random.Float() < Sacrifice.nextEquipChance()) {
+		if (sacrifice && Sacrifice.paysEquipment(this) && Random.Float() < Sacrifice.nextEquipChance()) {
 			Item gear = Sacrifice.genEquipment();
 			if (gear != null) {
+				Sacrifice.noteEquipDrop();
 				Modifiers.markCommandLoot(gear);
 				Dungeon.level.drop(gear, pos).sprite.drop();
 			}

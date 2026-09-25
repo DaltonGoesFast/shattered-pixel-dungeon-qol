@@ -31,7 +31,9 @@ import com.watabou.utils.Bundle;
 public class SpawnScaled extends Buff {
 
 	{
-		type = buffType.NEGATIVE;
+		// Neutral so passive foes (gnoll exile, statue, mimic) and sleepers
+		// do not treat spawn scaling as a hostile debuff and wake up.
+		type = buffType.NEUTRAL;
 		announced = false;
 	}
 

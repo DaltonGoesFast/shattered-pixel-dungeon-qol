@@ -108,6 +108,9 @@ public class Item implements Bundlable {
 	/** Dungeon/shop-generated loot eligible for the Command pact window on pickup. */
 	public boolean commandLoot = false;
 
+	/** Kept in the Legacy pact kit; returns on every later loop while still held. */
+	public boolean legacyKit = false;
+
 	public int customNoteID = -1;
 	/** Optional display name for renameable equipment; empty/null means use default. */
 	public String customName = null;
@@ -222,6 +225,7 @@ public class Item implements Bundlable {
 			quantity += other.quantity;
 			other.quantity = 0;
 			if (other.commandLoot) commandLoot = true;
+			if (other.legacyKit) legacyKit = true;
 		}
 		return this;
 	}
@@ -628,6 +632,7 @@ public class Item implements Bundlable {
 	private static final String CUSTOM_NOTE_ID = "custom_note_id";
 	private static final String CUSTOM_NAME = "custom_name";
 	private static final String COMMAND_LOOT = "command_loot";
+	private static final String LEGACY_KIT = "legacy_kit";
 	
 	@Override
 	public void storeInBundle( Bundle bundle ) {
@@ -643,6 +648,7 @@ public class Item implements Bundlable {
 		if (customNoteID != -1)     bundle.put(CUSTOM_NOTE_ID, customNoteID);
 		if (customName != null && !customName.isEmpty()) bundle.put(CUSTOM_NAME, customName);
 		if (commandLoot) bundle.put( COMMAND_LOOT, true );
+		if (legacyKit) bundle.put( LEGACY_KIT, true );
 	}
 	
 	@Override
@@ -676,6 +682,7 @@ public class Item implements Bundlable {
 			customName = null;
 		}
 		commandLoot = bundle.contains( COMMAND_LOOT ) && bundle.getBoolean( COMMAND_LOOT );
+		legacyKit = bundle.contains( LEGACY_KIT ) && bundle.getBoolean( LEGACY_KIT );
 	}
 
 	public int targetingPos( Hero user, int dst ){

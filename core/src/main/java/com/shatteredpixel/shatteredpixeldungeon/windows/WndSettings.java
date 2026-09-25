@@ -36,6 +36,8 @@ import com.shatteredpixel.shatteredpixeldungeon.sprites.CharSprite;
 import com.shatteredpixel.shatteredpixeldungeon.ui.CheckBox;
 import com.shatteredpixel.shatteredpixeldungeon.ui.GameLog;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Icons;
+import com.shatteredpixel.shatteredpixeldungeon.ui.InventoryPane;
+import com.shatteredpixel.shatteredpixeldungeon.ui.QuickSlotButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.OptionSlider;
 import com.shatteredpixel.shatteredpixeldungeon.ui.HudLayout;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RedButton;
@@ -67,12 +69,17 @@ public class WndSettings extends WndTabbed {
 
 	private DisplayTab  display;
 	private UITab       ui;
+	private QoLTab      qol;
 	private InputTab    input;
 	private DataTab     data;
+	private AdvancedTab advanced;
 	private AudioTab    audio;
 	private LangsTab    langs;
 
 	public static int last_index = 0;
+
+	/** Quickslot-swap chip on the QoL tab; the toolbar popup enables it with the swapper. */
+	private static CheckBox quickslotSwapBox;
 
 	public WndSettings() {
 		super();
@@ -109,11 +116,26 @@ public class WndSettings extends WndTabbed {
 			}
 		});
 
+		qol = new QoLTab();
+		qol.setSize(width, 0);
+		height = Math.max(height, qol.height());
+		add( qol );
+
+		add( new IconTab(Icons.get(Icons.TALENT)){
+			@Override
+			protected void select(boolean value) {
+				super.select(value);
+				qol.visible = qol.active = value;
+				if (value) last_index = 2;
+			}
+		});
+
 		input = new InputTab();
 		input.setSize(width, 0);
 		height = Math.max(height, input.height());
 
-		if (DeviceCompat.hasHardKeyboard() || ControllerHandler.isControllerConnected()) {
+		final boolean inputShown = DeviceCompat.hasHardKeyboard() || ControllerHandler.isControllerConnected();
+		if (inputShown) {
 			add( input );
 			Image icon;
 			if (ControllerHandler.controllerActive || !DeviceCompat.hasHardKeyboard()){
@@ -126,7 +148,7 @@ public class WndSettings extends WndTabbed {
 				protected void select(boolean value) {
 					super.select(value);
 					input.visible = input.active = value;
-					if (value) last_index = 2;
+					if (value) last_index = 3;
 				}
 			});
 		}
@@ -141,7 +163,21 @@ public class WndSettings extends WndTabbed {
 			protected void select(boolean value) {
 				super.select(value);
 				data.visible = data.active = value;
-				if (value) last_index = 3;
+				if (value) last_index = 4;
+			}
+		});
+
+		advanced = new AdvancedTab();
+		advanced.setSize(width, 0);
+		height = Math.max(height, advanced.height());
+		add( advanced );
+
+		add( new IconTab(Icons.get(Icons.INFO)){
+			@Override
+			protected void select(boolean value) {
+				super.select(value);
+				advanced.visible = advanced.active = value;
+				if (value) last_index = 5;
 			}
 		});
 
@@ -155,7 +191,7 @@ public class WndSettings extends WndTabbed {
 			protected void select(boolean value) {
 				super.select(value);
 				audio.visible = audio.active = value;
-				if (value) last_index = 4;
+				if (value) last_index = 6;
 			}
 		});
 
@@ -169,7 +205,7 @@ public class WndSettings extends WndTabbed {
 			protected void select(boolean value) {
 				super.select(value);
 				langs.visible = langs.active = value;
-				if (value) last_index = 5;
+				if (value) last_index = 7;
 			}
 
 			@Override
@@ -194,17 +230,21 @@ public class WndSettings extends WndTabbed {
 
 		layoutTabs();
 
-		if (tabs.size() == 5 && last_index >= 3){
-			//input tab isn't visible
-			select(last_index-1);
-		} else {
-			select(last_index);
+		int index = last_index;
+		if (!inputShown && index >= 4){
+			//input tab isn't visible, so stored indexes after it shift left
+			index--;
 		}
+		if (index < 0 || index >= tabs.size()){
+			index = 0;
+		}
+		select(index);
 
 	}
 
 	@Override
 	public void hide() {
+		quickslotSwapBox = null;
 		super.hide();
 		//resets generators because there's no need to retain chars for languages not selected
 		ShatteredPixelDungeon.seamlessResetScene(new Game.SceneChangeCallback() {
@@ -225,14 +265,11 @@ public class WndSettings extends WndTabbed {
 		ColorBlock sep1;
 		CheckBox chkFullscreen;
 		CheckBox chkLandscape;
-		OptionSlider optAndroidEdgeZoom;
 		ColorBlock sep2;
 		OptionSlider optBrightness;
 		OptionSlider optVisGrid;
-		CheckBox chkTileIndicator;
 		OptionSlider optFollowIntensity;
 		OptionSlider optScreenShake;
-		OptionSlider optAltTilesetChance;
 
 		@Override
 		protected void createChildren() {
@@ -274,19 +311,6 @@ public class WndSettings extends WndTabbed {
 				};
 				chkLandscape.checked(SPDSettings.landscape());
 				add(chkLandscape);
-
-				optAndroidEdgeZoom = new OptionSlider(
-						Messages.get(this, "edge_zoom_gesture"),
-						Messages.get(this, "edge_zoom_off"),
-						Messages.get(this, "edge_zoom_right"),
-						0, 2) {
-					@Override
-					protected void onChange() {
-						SPDSettings.androidEdgeZoomSide(getSelectedValue());
-					}
-				};
-				optAndroidEdgeZoom.setSelectedValue(SPDSettings.androidEdgeZoomSide());
-				add(optAndroidEdgeZoom);
 			}
 
 			sep2 = new ColorBlock(1, 1, 0xFF000000);
@@ -312,16 +336,6 @@ public class WndSettings extends WndTabbed {
 			optVisGrid.setSelectedValue(SPDSettings.visualGrid());
 			add(optVisGrid);
 
-			chkTileIndicator = new CheckBox(Messages.get(this, "tile_indicator")) {
-				@Override
-				protected void onClick() {
-					super.onClick();
-					SPDSettings.tileIndicator(checked());
-				}
-			};
-			chkTileIndicator.checked(SPDSettings.tileIndicator());
-			add(chkTileIndicator);
-
 			optFollowIntensity = new OptionSlider(Messages.get(this, "camera_follow"),
 					Messages.get(this, "low"), Messages.get(this, "high"), 1, 4) {
 				@Override
@@ -341,23 +355,6 @@ public class WndSettings extends WndTabbed {
 			};
 			optScreenShake.setSelectedValue(SPDSettings.screenShake());
 			add(optScreenShake);
-
-			optAltTilesetChance = new OptionSlider(
-					Messages.get(this, "alt_tileset_chance"),
-					Messages.get(this, "alt_tilesets_min"),
-					Messages.get(this, "alt_tilesets_max"),
-					0, 10) {
-				@Override
-				protected void onChange() {
-					SPDSettings.altTilesetChance(getSelectedValue() * 10);
-					if (ShatteredPixelDungeon.scene() instanceof GameScene) {
-						ShatteredPixelDungeon.seamlessResetScene();
-					}
-				}
-			};
-			int altStep = Math.round(SPDSettings.altTilesetChance() / 10f);
-			optAltTilesetChance.setSelectedValue(Math.max(0, Math.min(10, altStep)));
-			add(optAltTilesetChance);
 
 		}
 
@@ -380,11 +377,6 @@ public class WndSettings extends WndTabbed {
 				bottom = chkLandscape.bottom();
 			}
 
-			if (optAndroidEdgeZoom != null) {
-				optAndroidEdgeZoom.setRect(0, bottom + GAP, width, SLIDER_HEIGHT);
-				bottom = optAndroidEdgeZoom.bottom();
-			}
-
 			sep2.size(width, 1);
 			sep2.y = bottom + GAP;
 			bottom = sep2.y + 1;
@@ -393,23 +385,17 @@ public class WndSettings extends WndTabbed {
 				optBrightness.setRect(0, bottom + GAP, width/2-GAP/2, SLIDER_HEIGHT);
 				optVisGrid.setRect(optBrightness.right() + GAP, optBrightness.top(), width/2-GAP/2, SLIDER_HEIGHT);
 
-				chkTileIndicator.setRect(0, optVisGrid.bottom() + GAP, width, BTN_HEIGHT);
-
-				optFollowIntensity.setRect(0, chkTileIndicator.bottom() + GAP, width/2-GAP/2, SLIDER_HEIGHT);
+				optFollowIntensity.setRect(0, optVisGrid.bottom() + GAP, width/2-GAP/2, SLIDER_HEIGHT);
 				optScreenShake.setRect(optFollowIntensity.right() + GAP, optFollowIntensity.top(), width/2-GAP/2, SLIDER_HEIGHT);
 			} else {
 				optBrightness.setRect(0, bottom + GAP, width, SLIDER_HEIGHT);
 				optVisGrid.setRect(0, optBrightness.bottom() + GAP, width, SLIDER_HEIGHT);
 
-				chkTileIndicator.setRect(0, optVisGrid.bottom() + GAP, width, BTN_HEIGHT);
-
-				optFollowIntensity.setRect(0, chkTileIndicator.bottom() + GAP, width, SLIDER_HEIGHT);
+				optFollowIntensity.setRect(0, optVisGrid.bottom() + GAP, width, SLIDER_HEIGHT);
 				optScreenShake.setRect(0, optFollowIntensity.bottom() + GAP, width, SLIDER_HEIGHT);
 			}
 
-			float afterSliders = Math.max( optFollowIntensity.bottom(), optScreenShake.bottom() );
-			optAltTilesetChance.setRect(0, afterSliders + GAP, width, SLIDER_HEIGHT);
-			height = optAltTilesetChance.bottom();
+			height = Math.max( optFollowIntensity.bottom(), optScreenShake.bottom() );
 		}
 
 	}
@@ -422,16 +408,10 @@ public class WndSettings extends WndTabbed {
 		OptionSlider optUIMode;
 		OptionSlider optUIScale;
 		RedButton btnToolbarSettings;
-		CheckBox chkShowQuickslotSwapButton;
 		CheckBox chkFlipTags;
-		CheckBox chkFlipStatusPane;
-		CheckBox chkCenterOnCycleNoEnemies;
-		CheckBox chkBossBarAllEnemies;
-		CheckBox chkAutoTalentPlan;
 		ColorBlock sep2;
 		CheckBox chkFont;
 		CheckBox chkVibrate;
-		RedButton btnResetHudLayout;
 
 		@Override
 		protected void createChildren() {
@@ -543,30 +523,20 @@ public class WndSettings extends WndTabbed {
 								}
 								add(btnCentered);
 
-								CheckBox chkShowSwapChip = new CheckBox(Messages.get(WndSettings.UITab.this, "quickslot_swap_button")) {
-									@Override
-									protected void onClick() {
-										super.onClick();
-										SPDSettings.showQuickslotSwapButton(checked());
-										Toolbar.updateLayout();
-									}
-								};
-								chkShowSwapChip.checked(SPDSettings.showQuickslotSwapButton());
-
 								chkQuickSwapper = new CheckBox(Messages.get(WndSettings.UITab.this, "quickslot_swapper")) {
 									@Override
 									protected void onClick() {
 										super.onClick();
 										SPDSettings.quickSwapper(checked());
-										chkShowSwapChip.enable(checked());
+										if (quickslotSwapBox != null) {
+											quickslotSwapBox.enable(checked());
+										}
 										Toolbar.updateLayout();
 									}
 								};
 								chkQuickSwapper.checked(SPDSettings.quickSwapper());
-								chkShowSwapChip.enable(SPDSettings.quickSwapper());
 
 								add(chkQuickSwapper);
-								add(chkShowSwapChip);
 
 								swapperDesc = PixelScene.renderTextBlock(Messages.get(WndSettings.UITab.this, "swapper_desc"), 5);
 								swapperDesc.hardlight(0x888888);
@@ -607,10 +577,8 @@ public class WndSettings extends WndTabbed {
 
 								chkQuickSwapper.setRect(0, btnGrouped.bottom() + GAP, width, BTN_HEIGHT);
 
-								chkShowSwapChip.setRect(0, chkQuickSwapper.bottom() + 1, width, BTN_HEIGHT);
-
 								swapperDesc.maxWidth(width);
-								swapperDesc.setPos(0, chkShowSwapChip.bottom() + 1);
+								swapperDesc.setPos(0, chkQuickSwapper.bottom() + 1);
 
 								if (width > 200) {
 									chkFlipToolbar.setRect(0, swapperDesc.bottom() + GAP, width / 2 - 1, BTN_HEIGHT);
@@ -641,73 +609,7 @@ public class WndSettings extends WndTabbed {
 				chkFlipTags.checked(SPDSettings.flipTags());
 				add(chkFlipTags);
 
-				if (HudLayout.isActive()) {
-					chkFlipStatusPane = new CheckBox(Messages.get(this, "flip_status_pane")) {
-						@Override
-						protected void onClick() {
-							super.onClick();
-							SPDSettings.flipStatusPane(checked());
-							GameScene.layoutHud();
-						}
-					};
-					chkFlipStatusPane.checked(SPDSettings.flipStatusPane());
-					add(chkFlipStatusPane);
-
-					btnResetHudLayout = new RedButton(Messages.get(this, "reset_hud_layout"), 9) {
-						@Override
-						protected void onClick() {
-							HudLayout.reset();
-						}
-					};
-					add(btnResetHudLayout);
-				}
-
-				chkShowQuickslotSwapButton = new CheckBox(Messages.get(this, "quickslot_swap_button")) {
-					@Override
-					protected void onClick() {
-						super.onClick();
-						SPDSettings.showQuickslotSwapButton(checked());
-						Toolbar.updateLayout();
-					}
-				};
-				chkShowQuickslotSwapButton.checked(SPDSettings.showQuickslotSwapButton());
-				chkShowQuickslotSwapButton.enable(SPDSettings.quickSwapper());
-				add(chkShowQuickslotSwapButton);
-
 			}
-
-			chkCenterOnCycleNoEnemies = new CheckBox(Messages.get(this, "center_on_cycle_no_enemies")) {
-				@Override
-				protected void onClick() {
-					super.onClick();
-					SPDSettings.centerOnCycleNoEnemies(checked());
-				}
-			};
-			chkCenterOnCycleNoEnemies.checked(SPDSettings.centerOnCycleNoEnemies());
-			add(chkCenterOnCycleNoEnemies);
-
-			chkBossBarAllEnemies = new CheckBox(Messages.get(this, "boss_bar_all_enemies")) {
-				@Override
-				protected void onClick() {
-					super.onClick();
-					SPDSettings.bossBarAllEnemies(checked());
-				}
-			};
-			chkBossBarAllEnemies.checked(SPDSettings.bossBarAllEnemies());
-			add(chkBossBarAllEnemies);
-
-			chkAutoTalentPlan = new CheckBox(Messages.get(this, "auto_talent_plan")) {
-				@Override
-				protected void onClick() {
-					super.onClick();
-					SPDSettings.autoTalentPlan(checked());
-					if (checked() && Dungeon.hero != null && Dungeon.hero.isAlive()) {
-						TalentAutoPlan.tryApply( Dungeon.hero );
-					}
-				}
-			};
-			chkAutoTalentPlan.checked(SPDSettings.autoTalentPlan());
-			add(chkAutoTalentPlan);
 
 			sep2 = new ColorBlock(1, 1, 0xFF000000);
 			add(sep2);
@@ -779,26 +681,7 @@ public class WndSettings extends WndTabbed {
 			} else {
 				chkFlipTags.setRect(0, height + GAP, width, BTN_HEIGHT);
 				height = chkFlipTags.bottom();
-				if (chkFlipStatusPane != null) {
-					chkFlipStatusPane.setRect(0, height + GAP, width, BTN_HEIGHT);
-					height = chkFlipStatusPane.bottom();
-				}
-				if (btnResetHudLayout != null) {
-					btnResetHudLayout.setRect(0, height + GAP, width, BTN_HEIGHT);
-					height = btnResetHudLayout.bottom();
-				}
-				chkShowQuickslotSwapButton.setRect(0, height + GAP, width, BTN_HEIGHT);
-				height = chkShowQuickslotSwapButton.bottom();
 			}
-
-			chkCenterOnCycleNoEnemies.setRect(0, height + GAP, width, BTN_HEIGHT);
-			height = chkCenterOnCycleNoEnemies.bottom();
-
-			chkBossBarAllEnemies.setRect(0, height + GAP, width, BTN_HEIGHT);
-			height = chkBossBarAllEnemies.bottom();
-
-			chkAutoTalentPlan.setRect(0, height + GAP, width, BTN_HEIGHT);
-			height = chkAutoTalentPlan.bottom();
 
 			sep2.size(width, 1);
 			sep2.y = height + GAP;
@@ -947,12 +830,6 @@ public class WndSettings extends WndTabbed {
 		CheckBox chkUpdates;
 		CheckBox chkBetas;
 		CheckBox chkWifi;
-		ColorBlock sepStreaming;
-		CheckBox chkStreaming;
-		OptionSlider optStreamingPort;
-		CheckBox chkObsChromaMasks;
-		CheckBox chkTransparentVoid;
-		CheckBox chkTrainingExport;
 
 		@Override
 		protected void createChildren() {
@@ -1011,55 +888,6 @@ public class WndSettings extends WndTabbed {
 				chkWifi.checked(SPDSettings.WiFi());
 				add(chkWifi);
 			}
-
-			if (DeviceCompat.isDesktop()) {
-				sepStreaming = new ColorBlock(1, 1, 0xFF000000);
-				add(sepStreaming);
-				chkStreaming = new CheckBox(Messages.get(this, "streaming_enable")) {
-					@Override
-					protected void onClick() {
-						super.onClick();
-						SPDSettings.streamingEnabled(checked());
-					}
-				};
-				chkStreaming.checked(SPDSettings.streamingEnabled());
-				add(chkStreaming);
-				optStreamingPort = new OptionSlider(Messages.get(this, "streaming_port"), "5000", "5010", 5000, 5010) {
-					@Override
-					protected void onChange() {
-						SPDSettings.streamingPort(getSelectedValue());
-					}
-				};
-				optStreamingPort.setSelectedValue(SPDSettings.streamingPort());
-				add(optStreamingPort);
-				chkObsChromaMasks = new CheckBox(Messages.get(this, "obs_chroma_masks")) {
-					@Override
-					protected void onClick() {
-						super.onClick();
-						SPDSettings.obsChromaMasks(checked());
-					}
-				};
-				chkObsChromaMasks.checked(SPDSettings.obsChromaMasks());
-				add(chkObsChromaMasks);
-				chkTransparentVoid = new CheckBox(Messages.get(this, "transparent_void")) {
-					@Override
-					protected void onClick() {
-						super.onClick();
-						SPDSettings.transparentVoidEnabled(checked());
-					}
-				};
-				chkTransparentVoid.checked(SPDSettings.transparentVoidEnabled());
-				add(chkTransparentVoid);
-				chkTrainingExport = new CheckBox(Messages.get(this, "training_export_enable")) {
-					@Override
-					protected void onClick() {
-						super.onClick();
-						SPDSettings.trainingExportEnabled(checked());
-					}
-				};
-				chkTrainingExport.checked(SPDSettings.trainingExportEnabled());
-				add(chkTrainingExport);
-			}
 		}
 
 		@Override
@@ -1092,6 +920,290 @@ public class WndSettings extends WndTabbed {
 				pos = chkWifi.bottom();
 			}
 
+			height = pos;
+
+		}
+	}
+
+	private static class QoLTab extends Component {
+
+		RenderedTextBlock title;
+		ColorBlock sep1;
+		OptionSlider optAndroidEdgeZoom;
+		CheckBox chkTileIndicator;
+		CheckBox chkFlipStatusPane;
+		RedButton btnResetHudLayout;
+		CheckBox chkShowQuickslotSwapButton;
+		CheckBox chkCenterOnCycleNoEnemies;
+		CheckBox chkBossBarAllEnemies;
+		CheckBox chkAugmentIcons;
+		CheckBox chkAutoTalentPlan;
+
+		@Override
+		protected void createChildren() {
+			title = PixelScene.renderTextBlock(Messages.get(this, "title"), 9);
+			title.hardlight(TITLE_COLOR);
+			add(title);
+
+			sep1 = new ColorBlock(1, 1, 0xFF000000);
+			add(sep1);
+
+			if (DeviceCompat.isAndroid()) {
+				optAndroidEdgeZoom = new OptionSlider(
+						Messages.get(DisplayTab.class, "edge_zoom_gesture"),
+						Messages.get(DisplayTab.class, "edge_zoom_off"),
+						Messages.get(DisplayTab.class, "edge_zoom_right"),
+						0, 2) {
+					@Override
+					protected void onChange() {
+						SPDSettings.androidEdgeZoomSide(getSelectedValue());
+					}
+				};
+				optAndroidEdgeZoom.setSelectedValue(SPDSettings.androidEdgeZoomSide());
+				add(optAndroidEdgeZoom);
+			}
+
+			chkTileIndicator = new CheckBox(Messages.get(DisplayTab.class, "tile_indicator")) {
+				@Override
+				protected void onClick() {
+					super.onClick();
+					SPDSettings.tileIndicator(checked());
+				}
+			};
+			chkTileIndicator.checked(SPDSettings.tileIndicator());
+			add(chkTileIndicator);
+
+			if (HudLayout.isActive()) {
+				chkFlipStatusPane = new CheckBox(Messages.get(UITab.class, "flip_status_pane")) {
+					@Override
+					protected void onClick() {
+						super.onClick();
+						SPDSettings.flipStatusPane(checked());
+						GameScene.layoutHud();
+					}
+				};
+				chkFlipStatusPane.checked(SPDSettings.flipStatusPane());
+				add(chkFlipStatusPane);
+
+				btnResetHudLayout = new RedButton(Messages.get(UITab.class, "reset_hud_layout"), 9) {
+					@Override
+					protected void onClick() {
+						HudLayout.reset();
+					}
+				};
+				add(btnResetHudLayout);
+			}
+
+			chkShowQuickslotSwapButton = new CheckBox(Messages.get(UITab.class, "quickslot_swap_button")) {
+				@Override
+				protected void onClick() {
+					super.onClick();
+					SPDSettings.showQuickslotSwapButton(checked());
+					Toolbar.updateLayout();
+				}
+			};
+			chkShowQuickslotSwapButton.checked(SPDSettings.showQuickslotSwapButton());
+			chkShowQuickslotSwapButton.enable(SPDSettings.quickSwapper());
+			quickslotSwapBox = chkShowQuickslotSwapButton;
+			add(chkShowQuickslotSwapButton);
+
+			chkCenterOnCycleNoEnemies = new CheckBox(Messages.get(UITab.class, "center_on_cycle_no_enemies")) {
+				@Override
+				protected void onClick() {
+					super.onClick();
+					SPDSettings.centerOnCycleNoEnemies(checked());
+				}
+			};
+			chkCenterOnCycleNoEnemies.checked(SPDSettings.centerOnCycleNoEnemies());
+			add(chkCenterOnCycleNoEnemies);
+
+			chkBossBarAllEnemies = new CheckBox(Messages.get(UITab.class, "boss_bar_all_enemies")) {
+				@Override
+				protected void onClick() {
+					super.onClick();
+					SPDSettings.bossBarAllEnemies(checked());
+				}
+			};
+			chkBossBarAllEnemies.checked(SPDSettings.bossBarAllEnemies());
+			add(chkBossBarAllEnemies);
+
+			chkAugmentIcons = new CheckBox(Messages.get(UITab.class, "augment_icons")) {
+				@Override
+				protected void onClick() {
+					super.onClick();
+					SPDSettings.augmentIcons(checked());
+					if (Dungeon.hero != null) {
+						InventoryPane.refresh();
+						QuickSlotButton.refresh();
+					}
+				}
+			};
+			chkAugmentIcons.checked(SPDSettings.augmentIcons());
+			add(chkAugmentIcons);
+
+			chkAutoTalentPlan = new CheckBox(Messages.get(UITab.class, "auto_talent_plan")) {
+				@Override
+				protected void onClick() {
+					super.onClick();
+					SPDSettings.autoTalentPlan(checked());
+					if (checked() && Dungeon.hero != null && Dungeon.hero.isAlive()) {
+						TalentAutoPlan.tryApply( Dungeon.hero );
+					}
+				}
+			};
+			chkAutoTalentPlan.checked(SPDSettings.autoTalentPlan());
+			add(chkAutoTalentPlan);
+		}
+
+		@Override
+		protected void layout() {
+			title.setPos((width - title.width())/2, y + GAP);
+			sep1.size(width, 1);
+			sep1.y = title.bottom() + 3*GAP;
+
+			float pos = sep1.y + 1;
+
+			if (optAndroidEdgeZoom != null) {
+				optAndroidEdgeZoom.setRect(0, pos + GAP, width, SLIDER_HEIGHT);
+				pos = optAndroidEdgeZoom.bottom();
+			}
+
+			chkTileIndicator.setRect(0, pos + GAP, width, BTN_HEIGHT);
+			pos = chkTileIndicator.bottom();
+
+			if (chkFlipStatusPane != null) {
+				chkFlipStatusPane.setRect(0, pos + GAP, width, BTN_HEIGHT);
+				pos = chkFlipStatusPane.bottom();
+			}
+			if (btnResetHudLayout != null) {
+				btnResetHudLayout.setRect(0, pos + GAP, width, BTN_HEIGHT);
+				pos = btnResetHudLayout.bottom();
+			}
+
+			chkShowQuickslotSwapButton.setRect(0, pos + GAP, width, BTN_HEIGHT);
+			pos = chkShowQuickslotSwapButton.bottom();
+
+			chkCenterOnCycleNoEnemies.setRect(0, pos + GAP, width, BTN_HEIGHT);
+			pos = chkCenterOnCycleNoEnemies.bottom();
+
+			chkBossBarAllEnemies.setRect(0, pos + GAP, width, BTN_HEIGHT);
+			pos = chkBossBarAllEnemies.bottom();
+
+			chkAugmentIcons.setRect(0, pos + GAP, width, BTN_HEIGHT);
+			pos = chkAugmentIcons.bottom();
+
+			chkAutoTalentPlan.setRect(0, pos + GAP, width, BTN_HEIGHT);
+			height = chkAutoTalentPlan.bottom();
+		}
+	}
+
+	private static class AdvancedTab extends Component {
+
+		RenderedTextBlock title;
+		ColorBlock sep1;
+		OptionSlider optAltTilesetChance;
+		RenderedTextBlock altDeprecated;
+		ColorBlock sepStreaming;
+		CheckBox chkStreaming;
+		OptionSlider optStreamingPort;
+		CheckBox chkObsChromaMasks;
+		CheckBox chkTransparentVoid;
+		CheckBox chkTrainingExport;
+
+		@Override
+		protected void createChildren() {
+			title = PixelScene.renderTextBlock(Messages.get(this, "title"), 9);
+			title.hardlight(TITLE_COLOR);
+			add(title);
+
+			sep1 = new ColorBlock(1, 1, 0xFF000000);
+			add(sep1);
+
+			optAltTilesetChance = new OptionSlider(
+					Messages.get(DisplayTab.class, "alt_tileset_chance"),
+					Messages.get(DisplayTab.class, "alt_tilesets_min"),
+					Messages.get(DisplayTab.class, "alt_tilesets_max"),
+					0, 10) {
+				@Override
+				protected void onChange() {
+					SPDSettings.altTilesetChance(getSelectedValue() * 10);
+					if (ShatteredPixelDungeon.scene() instanceof GameScene) {
+						ShatteredPixelDungeon.seamlessResetScene();
+					}
+				}
+			};
+			int altStep = Math.round(SPDSettings.altTilesetChance() / 10f);
+			optAltTilesetChance.setSelectedValue(Math.max(0, Math.min(10, altStep)));
+			add(optAltTilesetChance);
+
+			altDeprecated = PixelScene.renderTextBlock(Messages.get(this, "alt_tileset_deprecated"), 6);
+			altDeprecated.hardlight(0x888888);
+			add(altDeprecated);
+
+			if (DeviceCompat.isDesktop()) {
+				sepStreaming = new ColorBlock(1, 1, 0xFF000000);
+				add(sepStreaming);
+				chkStreaming = new CheckBox(Messages.get(DataTab.class, "streaming_enable")) {
+					@Override
+					protected void onClick() {
+						super.onClick();
+						SPDSettings.streamingEnabled(checked());
+					}
+				};
+				chkStreaming.checked(SPDSettings.streamingEnabled());
+				add(chkStreaming);
+				optStreamingPort = new OptionSlider(Messages.get(DataTab.class, "streaming_port"), "5000", "5010", 5000, 5010) {
+					@Override
+					protected void onChange() {
+						SPDSettings.streamingPort(getSelectedValue());
+					}
+				};
+				optStreamingPort.setSelectedValue(SPDSettings.streamingPort());
+				add(optStreamingPort);
+				chkObsChromaMasks = new CheckBox(Messages.get(DataTab.class, "obs_chroma_masks")) {
+					@Override
+					protected void onClick() {
+						super.onClick();
+						SPDSettings.obsChromaMasks(checked());
+					}
+				};
+				chkObsChromaMasks.checked(SPDSettings.obsChromaMasks());
+				add(chkObsChromaMasks);
+				chkTransparentVoid = new CheckBox(Messages.get(DataTab.class, "transparent_void")) {
+					@Override
+					protected void onClick() {
+						super.onClick();
+						SPDSettings.transparentVoidEnabled(checked());
+					}
+				};
+				chkTransparentVoid.checked(SPDSettings.transparentVoidEnabled());
+				add(chkTransparentVoid);
+				chkTrainingExport = new CheckBox(Messages.get(DataTab.class, "training_export_enable")) {
+					@Override
+					protected void onClick() {
+						super.onClick();
+						SPDSettings.trainingExportEnabled(checked());
+					}
+				};
+				chkTrainingExport.checked(SPDSettings.trainingExportEnabled());
+				add(chkTrainingExport);
+			}
+		}
+
+		@Override
+		protected void layout() {
+			title.setPos((width - title.width())/2, y + GAP);
+			sep1.size(width, 1);
+			sep1.y = title.bottom() + 3*GAP;
+
+			float pos = sep1.y + 1;
+			optAltTilesetChance.setRect(0, pos + GAP, width, SLIDER_HEIGHT);
+			pos = optAltTilesetChance.bottom();
+
+			altDeprecated.maxWidth((int)width);
+			altDeprecated.setPos(0, pos + GAP);
+			pos = altDeprecated.bottom();
+
 			if (chkStreaming != null) {
 				sepStreaming.size(width, 1);
 				sepStreaming.y = pos + GAP;
@@ -1104,14 +1216,11 @@ public class WndSettings extends WndTabbed {
 				pos = chkObsChromaMasks.bottom();
 				chkTransparentVoid.setRect(0, pos + GAP, width, BTN_HEIGHT);
 				pos = chkTransparentVoid.bottom();
-				if (chkTrainingExport != null) {
-					chkTrainingExport.setRect(0, pos + GAP, width, BTN_HEIGHT);
-					pos = chkTrainingExport.bottom();
-				}
+				chkTrainingExport.setRect(0, pos + GAP, width, BTN_HEIGHT);
+				pos = chkTrainingExport.bottom();
 			}
 
 			height = pos;
-
 		}
 	}
 

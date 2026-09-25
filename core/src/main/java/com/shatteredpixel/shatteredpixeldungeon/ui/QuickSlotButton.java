@@ -114,6 +114,10 @@ public class QuickSlotButton extends Button {
 		super.createChildren();
 		
 		slot = new ItemSlot() {
+			{
+				showThrownAugment = true;
+			}
+
 			@Override
 			protected void onClick() {
 				if (!Dungeon.hero.isAlive() || !Dungeon.hero.ready){

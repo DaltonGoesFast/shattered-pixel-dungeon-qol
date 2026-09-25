@@ -23,12 +23,15 @@ package com.shatteredpixel.shatteredpixeldungeon.ui;
 
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.Ring;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.SpiritBow;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.Weapon;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.MagesStaff;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.MissileWeapon;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
@@ -59,9 +62,13 @@ public class ItemSlot extends Button {
 	protected BitmapText extra;
 	protected Image      itemIcon;
 	protected Image      noteIcon;
+	protected Image      augIcon;
 	protected BitmapText level;
 
 	private static final int NOTE_ICON_SIZE = 8;
+	private static final float AUG_ICON_SCALE = 0.75f;
+
+	protected boolean showThrownAugment = false;
 	
 	private static final String TXT_STRENGTH	= ":%d";
 	private static final String TXT_TYPICAL_STR	= "%d?";
@@ -127,7 +134,11 @@ public class ItemSlot extends Button {
 	protected void layout() {
 		super.layout();
 		
-		sprite.x = x + margin.left + (width - sprite.width - (margin.left + margin.right)) / 2f;
+		if (augIcon != null) {
+			sprite.x = x + width - sprite.width - margin.right;
+		} else {
+			sprite.x = x + margin.left + (width - sprite.width - (margin.left + margin.right)) / 2f;
+		}
 		sprite.y = y + margin.top + (height - sprite.height - (margin.top + margin.bottom)) / 2f;
 		PixelScene.align(sprite);
 		
@@ -183,6 +194,12 @@ public class ItemSlot extends Button {
 			PixelScene.align(level);
 		}
 
+		if (augIcon != null) {
+			augIcon.x = x + margin.left;
+			augIcon.y = y + height - margin.bottom - level.baseLine() - 1 - augIcon.height();
+			PixelScene.align(augIcon);
+		}
+
 	}
 
 	public void alpha( float value ){
@@ -193,6 +210,32 @@ public class ItemSlot extends Button {
 		if (itemIcon != null)   itemIcon.alpha(value);
 		if (noteIcon != null)   noteIcon.alpha(value);
 		if (level != null)      level.alpha(value);
+		augAlpha(value);
+	}
+
+	private void augAlpha( float value ){
+		if (augIcon != null) augIcon.alpha(value);
+	}
+
+	private int augmentIcon(){
+		if (Dungeon.hero == null || !SPDSettings.augmentIcons()) return -1;
+		boolean show = item instanceof MagesStaff || item instanceof SpiritBow || item.isEquipped(Dungeon.hero)
+				|| (showThrownAugment && item instanceof MissileWeapon);
+		if (!show) return -1;
+		if (item instanceof Weapon) {
+			switch (((Weapon) item).augment) {
+				case SPEED:     return ItemSpriteSheet.Icons.RING_FUROR;
+				case DAMAGE:    return ItemSpriteSheet.Icons.RING_FORCE;
+				default:        return -1;
+			}
+		} else if (item instanceof Armor) {
+			switch (((Armor) item).augment) {
+				case DEFENSE:   return ItemSpriteSheet.Icons.RING_TENACITY;
+				case EVASION:   return ItemSpriteSheet.Icons.RING_EVASION;
+				default:        return -1;
+			}
+		}
+		return -1;
 	}
 
 	public void clear(){
@@ -243,6 +286,11 @@ public class ItemSlot extends Button {
 			noteIcon = null;
 		}
 
+		if (augIcon != null) {
+			remove(augIcon);
+			augIcon = null;
+		}
+
 		if (item == null){
 			status.visible = extra.visible = level.visible = false;
 			return;
@@ -253,6 +301,15 @@ public class ItemSlot extends Button {
 		if (item.hasNote()) {
 			noteIcon = new Image(Assets.Interfaces.NOTE_ICON);
 			add(noteIcon);
+		}
+
+		int aug = augmentIcon();
+		if (aug != -1) {
+			augIcon = new Image(Assets.Sprites.ITEM_ICONS);
+			augIcon.frame(ItemSpriteSheet.Icons.film.get(aug));
+			augIcon.scale.set(AUG_ICON_SCALE);
+			add(augIcon);
+			augAlpha(active ? ENABLED : DISABLED);
 		}
 
 		status.text( item.status() );
@@ -346,6 +403,7 @@ public class ItemSlot extends Button {
 		level.alpha( alpha );
 		if (itemIcon != null) itemIcon.alpha( alpha );
 		if (noteIcon != null) noteIcon.alpha( alpha );
+		augAlpha( alpha );
 	}
 
 	public void showExtraInfo( boolean show ){

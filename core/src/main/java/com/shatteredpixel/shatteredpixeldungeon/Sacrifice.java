@@ -21,8 +21,10 @@
 
 package com.shatteredpixel.shatteredpixeldungeon;
 
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SwarmGen;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mimic;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Wraith;
 import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
 import com.shatteredpixel.shatteredpixeldungeon.items.Gold;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
@@ -48,7 +50,8 @@ import java.util.ListIterator;
 /**
  * Sacrifice pact: no random floor equipment / chests / mimics / gold piles;
  * key-locked special rooms replace gear with gold (catalyst kept; secrets untouched);
- * kills pay native loot (with LimitedDrops) and equipment on a per-floor decaying curve.
+ * kills pay native loot (with LimitedDrops). Real enemies also roll equipment on a short
+ * per-floor curve (50% / 25% / 10% / 0) capped at two drops, using vanilla upgrade odds.
  * About 1/3 of successful native drops become a normal floor gold pile instead.
  */
 public class Sacrifice {
@@ -140,20 +143,40 @@ public class Sacrifice {
 		return door != null && door.type == Room.Door.Type.LOCKED;
 	}
 
+	/** Successful kill-paid gear pieces allowed on one floor. */
+	public static final int MAX_EQUIP_DROPS = 2;
+
 	/**
-	 * Chance for kill-paid gear on this floor's next paying death.
-	 * Advances {@link com.shatteredpixel.shatteredpixeldungeon.levels.Level#sacrificeKillIndex}.
+	 * Clones, wraiths, zero-exp spawns, and overleveled kills do not pay equipment.
+	 * Native loot is unchanged.
 	 */
-	public static float nextEquipChance(){
-		int killIndex = Dungeon.level.sacrificeKillIndex;
-		Dungeon.level.sacrificeKillIndex++;
-		if (killIndex == 0) return 1f;
-		if (killIndex == 1) return 0.5f;
-		if (killIndex == 2) return 0.25f;
-		return 0.1f;
+	public static boolean paysEquipment( Mob mob ){
+		if (mob == null) return false;
+		if (SwarmGen.isClone(mob)) return false;
+		if (mob instanceof Wraith) return false;
+		if (mob.EXP <= 0) return false;
+		return Dungeon.hero == null || Dungeon.hero.lvl <= mob.maxLvl + 2;
 	}
 
-	/** Weapon / armor / thrown / wand / ring / artifact, upgrade ladder up to +3. */
+	/**
+	 * Chance for kill-paid gear on this floor's next paying death.
+	 * 50% / 25% / 10%, then nothing. Does not advance once the floor cap is hit.
+	 */
+	public static float nextEquipChance(){
+		if (Dungeon.level.sacrificeEquipDrops >= MAX_EQUIP_DROPS) return 0f;
+		int killIndex = Dungeon.level.sacrificeKillIndex;
+		Dungeon.level.sacrificeKillIndex++;
+		if (killIndex == 0) return 0.5f;
+		if (killIndex == 1) return 0.25f;
+		if (killIndex == 2) return 0.1f;
+		return 0f;
+	}
+
+	public static void noteEquipDrop(){
+		Dungeon.level.sacrificeEquipDrops++;
+	}
+
+	/** Weapon / armor / thrown / wand / ring / artifact, vanilla upgrade odds. */
 	public static Item genEquipment(){
 		for (int tries = 0; tries < 20; tries++){
 			Generator.Category cat = rollGearCategory();
@@ -178,17 +201,6 @@ public class Sacrifice {
 			if (item instanceof Bomb) continue;
 			// Artifacts stay even though they are not upgradable.
 			if (!item.isUpgradable() && !(item instanceof Artifact)) continue;
-
-			if (item.isUpgradable()){
-				int n = rollUpgradeLevel();
-				if (item instanceof Wand){
-					Wand w = (Wand) item;
-					w.level(n);
-					w.curCharges = w.maxCharges;
-				} else {
-					item.level(n);
-				}
-			}
 
 			return item;
 		}
@@ -215,15 +227,6 @@ public class Sacrifice {
 		}
 		Generator.Category cat = Random.chances(probs);
 		return cat != null ? cat : Generator.Category.WEAPON;
-	}
-
-	/** +0 50%, +1 30%, +2 15%, +3 5%. */
-	private static int rollUpgradeLevel(){
-		float roll = Random.Float();
-		if (roll < 0.50f) return 0;
-		if (roll < 0.80f) return 1;
-		if (roll < 0.95f) return 2;
-		return 3;
 	}
 
 }

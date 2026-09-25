@@ -32,31 +32,36 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.IconButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Icons;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RenderedTextBlock;
 import com.shatteredpixel.shatteredpixeldungeon.ui.ScrollPane;
-import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
 import com.watabou.noosa.audio.Sample;
 import com.watabou.noosa.ui.Component;
 
 import java.util.ArrayList;
 
-public class WndPacts extends Window {
+public class WndPacts extends WndTabbed {
 
 	private static final int WIDTH		= 120;
-	private static final int HEIGHT		= 180;
 	private static final int TTL_HEIGHT = 16;
 	private static final int BTN_HEIGHT = 16;
 	private static final int GAP        = 1;
 
+	private static int lastIdx = 0;
+
 	private boolean editable;
 	private ArrayList<CheckBox> boxes;
 	private ArrayList<Integer> boxMasks;
+
+	private ScrollPane pane;
+	private Component[] pages;
+	private float listTop;
+	private float listH;
 
 	public WndPacts( int checked, boolean editable ) {
 
 		super();
 
 		this.editable = editable;
-
-		resize( WIDTH, HEIGHT );
+		boxes = new ArrayList<>();
+		boxMasks = new ArrayList<>();
 
 		RenderedTextBlock title = PixelScene.renderTextBlock( Messages.get(this, "title"), 12 );
 		title.hardlight( TITLE_COLOR );
@@ -67,31 +72,91 @@ public class WndPacts extends Window {
 		PixelScene.align(title);
 		add( title );
 
-		ScrollPane pane = new ScrollPane(new Component()){
+		RenderedTextBlock intro = PixelScene.renderTextBlock( Messages.get(this, "intro"), 6 );
+		intro.maxWidth(WIDTH);
+		intro.setPos(0, TTL_HEIGHT);
+		PixelScene.align(intro);
+		add(intro);
+
+		listTop = intro.bottom() + 4;
+
+		// Scroll pane first so its listener sits under the checkboxes.
+		// Pointer dispatch is newest-first; a later pane swallows taps.
+		Component content = new Component();
+		pane = new ScrollPane(content){
 			@Override
 			public void onClick(float x, float y) {
 				// click handled by checkboxes / info buttons
 			}
 		};
 		add(pane);
-		pane.setRect(0, TTL_HEIGHT, WIDTH, HEIGHT - TTL_HEIGHT);
 
-		Component content = pane.content();
-		boxes = new ArrayList<>();
-		boxMasks = new ArrayList<>();
+		pages = new Component[]{
+				buildPage(Modifiers.HERO_PACTS, checked),
+				buildPage(Modifiers.FOES_PACTS, checked),
+				buildPage(Modifiers.SPOILS_PACTS, checked)
+		};
 
+		float tallest = 0;
+		for (Component page : pages) {
+			page.visible = page.active = false;
+			content.add(page);
+			if (page.height() > tallest) tallest = page.height();
+		}
+
+		int maxH = (int)(PixelScene.uiCamera.height - chrome.marginVer() - tabHeight() - 8);
+		int height = (int)Math.ceil(listTop + tallest);
+		if (height > maxH) height = maxH;
+		resize( WIDTH, height );
+		listH = height - listTop;
+		pane.setRect(0, listTop, WIDTH, listH);
+
+		add( new LabeledTab( Messages.get(this, "hero") ){
+			@Override
+			protected void select( boolean value ) {
+				super.select( value );
+				if (selected) showPage( 0 );
+			}
+		} );
+		add( new LabeledTab( Messages.get(this, "foes") ){
+			@Override
+			protected void select( boolean value ) {
+				super.select( value );
+				if (selected) showPage( 1 );
+			}
+		} );
+		add( new LabeledTab( Messages.get(this, "spoils") ){
+			@Override
+			protected void select( boolean value ) {
+				super.select( value );
+				if (selected) showPage( 2 );
+			}
+		} );
+
+		layoutTabs();
+
+		if (lastIdx < 0 || lastIdx >= tabs.size()) lastIdx = 0;
+		select( lastIdx );
+	}
+
+	private void showPage( int index ) {
+		lastIdx = index;
+		for (int i = 0; i < pages.length; i++) {
+			pages[i].visible = pages[i].active = i == index;
+		}
+		pane.content().setSize( WIDTH, pages[index].height() );
+		pane.setRect( 0, listTop, WIDTH, listH );
+		pane.scrollTo( 0, 0 );
+	}
+
+	private Component buildPage( int[] masks, int checked ) {
+		Component page = new Component();
 		float pos = 0;
 
-		RenderedTextBlock intro = PixelScene.renderTextBlock( Messages.get(this, "intro"), 6 );
-		intro.maxWidth(WIDTH);
-		intro.setPos(0, pos);
-		content.add(intro);
-		pos = intro.bottom() + 4;
+		for (int i = 0; i < masks.length; i++) {
 
-		for (int i=0; i < Modifiers.NAME_IDS.length; i++) {
-
-			final String pact = Modifiers.NAME_IDS[i];
-			final int mask = Modifiers.MASKS[i];
+			final int mask = masks[i];
+			final String pact = Modifiers.idForMask( mask );
 			boolean implemented = Modifiers.isImplemented(mask);
 			boolean seedBanned = (mask & Modifiers.SEED_BANNED_MASK) != 0 && Modifiers.seedBannedAtSelect();
 
@@ -131,7 +196,7 @@ public class WndPacts extends Window {
 				cb.enable(false);
 			}
 
-			content.add( cb );
+			page.add( cb );
 			boxes.add( cb );
 			boxMasks.add( mask );
 
@@ -154,13 +219,13 @@ public class WndPacts extends Window {
 			if (!implemented){
 				info.icon().alpha(0.3f);
 			}
-			content.add(info);
+			page.add(info);
 
 			pos = cb.bottom();
 		}
 
-		content.setSize(WIDTH, pos);
-		pane.scrollTo(0, 0);
+		page.setSize( WIDTH, pos );
+		return page;
 	}
 
 	@Override

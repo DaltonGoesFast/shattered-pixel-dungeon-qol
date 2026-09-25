@@ -355,7 +355,7 @@ public class GameStateSnapshot {
 		return list;
 	}
 
-	/** Enabled pact display names, same order as the pact window. */
+	/** Enabled pact display names, in {@link Modifiers#NAME_IDS} order. */
 	private static List<String> buildPacts() {
 		List<String> list = new ArrayList<>();
 		int mask = Dungeon.modifiers;
