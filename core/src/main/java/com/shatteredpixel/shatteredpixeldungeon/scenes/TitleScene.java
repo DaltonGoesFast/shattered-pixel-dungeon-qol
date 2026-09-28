@@ -243,7 +243,7 @@ public class TitleScene extends PixelScene {
 			btnAbout.setRect(btnSettings.right()+2, btnSettings.top(), btnSettings.width(), BTN_HEIGHT);
 		}
 
-		version = new BitmapText( "v" + Game.version + (Game.version.endsWith("-QoL") ? "" : "-QoL"), pixelFont);
+		version = new BitmapText( "v" + Game.version + (Game.version.contains("-QoL") ? "" : "-QoL"), pixelFont);
 		version.measure();
 		version.hardlight( 0x888888 );
 		version.x = insets.left + w - version.width() - (DeviceCompat.isDesktop() ? 4 : 8);

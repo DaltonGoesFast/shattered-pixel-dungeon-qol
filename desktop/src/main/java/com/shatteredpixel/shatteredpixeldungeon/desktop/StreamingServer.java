@@ -147,7 +147,7 @@ public class StreamingServer extends WebSocketServer {
 					resp.addProperty("request_id", requestId);
 					resp.addProperty("success", true);
 					String ver = Game.version != null ? Game.version : "unknown";
-					resp.addProperty("version", ver.endsWith("-QoL") ? ver : "QoL-" + ver);
+					resp.addProperty("version", ver.contains("-QoL") ? ver : "QoL-" + ver);
 					addChatter(resp, usernameFinal);
 					broadcast(resp.toString());
 				}

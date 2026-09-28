@@ -91,7 +91,7 @@ public class MenuPane extends Component {
 		versionOverflowBG = new NinePatch(bg.texture, 1, 22, 6, 8, 3, 0, 2, 0);
 		add(versionOverflowBG);
 
-		version = new BitmapText( "v" + Game.version + (Game.version.endsWith("-QoL") ? "" : "-QoL") , PixelScene.pixelFont);
+		version = new BitmapText( "v" + Game.version + (Game.version.contains("-QoL") ? "" : "-QoL") , PixelScene.pixelFont);
 		version.hardlight( 0xCACFC2 );
 		add(version);
 
