@@ -24,6 +24,7 @@ package com.shatteredpixel.shatteredpixeldungeon.actors.hero;
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Bones;
+import com.shatteredpixel.shatteredpixeldungeon.Command;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.GamesInProgress;
 import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
@@ -1336,6 +1337,47 @@ public class Hero extends Char {
 	// so that the hero spends a turn even if the fail to pick up an item
 	public boolean waitOrPickup = false;
 
+	/** Pickup log shared by normal pickup and a confirmed Command choice. */
+	public void notePickupResult( Item item, boolean collected ) {
+		if (item == null) return;
+		if (collected) {
+			//TODO this statement is getting silly, might be better to handle this as a propery of items
+			if (item instanceof Dewdrop
+					|| (item instanceof DwarfToken && Imp.Quest.mirrorUsed)
+					|| item instanceof TimekeepersHourglass.sandBag
+					|| item instanceof DriedRose.Petal
+					|| item instanceof Key
+					|| item instanceof Guidebook
+					|| (item instanceof MissileWeapon && !MissileWeapon.UpgradedSetTracker.pickupValid(this, (MissileWeapon) item))) {
+				//Do Nothing
+			} else if (item instanceof DarkGold) {
+				DarkGold existing = belongings.getItem(DarkGold.class);
+				if (existing != null){
+					if (existing.quantity() >= 40) {
+						GLog.p(Messages.get(DarkGold.class, "you_now_have", existing.quantity()));
+					} else {
+						GLog.i(Messages.get(DarkGold.class, "you_now_have", existing.quantity()));
+					}
+				}
+			} else {
+
+				boolean important = item.unique && item.isIdentified() &&
+						(item instanceof Scroll || item instanceof Potion);
+				if (important) {
+					GLog.p( Messages.capitalize(Messages.get(this, "you_now_have", item.name())) );
+				} else {
+					GLog.i( Messages.capitalize(Messages.get(this, "you_now_have", item.name())) );
+				}
+			}
+		} else if (!(item instanceof Dewdrop
+				|| item instanceof TimekeepersHourglass.sandBag
+				|| item instanceof DriedRose.Petal
+				|| item instanceof Key)) {
+			GLog.newLine();
+			GLog.n(Messages.capitalize(Messages.get(this, "you_cant_have", item.name())));
+		}
+	}
+
 	private boolean actPickUp( HeroAction.PickUp action ) {
 		int dst = action.dst;
 		if (pos == dst) {
@@ -1343,38 +1385,13 @@ public class Hero extends Char {
 			Heap heap = Dungeon.level.heaps.get( pos );
 			if (heap != null) {
 				Item item = heap.peek();
+				if (Command.deferGroundPickup( heap )) {
+					ready();
+					return false;
+				}
 				if (item.doPickUp( this )) {
 					heap.pickUp();
-
-					//TODO this statement is getting silly, might be better to handle this as a propery of items
-					if (item instanceof Dewdrop
-							|| (item instanceof DwarfToken && Imp.Quest.mirrorUsed)
-							|| item instanceof TimekeepersHourglass.sandBag
-							|| item instanceof DriedRose.Petal
-							|| item instanceof Key
-							|| item instanceof Guidebook
-							|| (item instanceof MissileWeapon && !MissileWeapon.UpgradedSetTracker.pickupValid(this, (MissileWeapon) item))) {
-						//Do Nothing
-					} else if (item instanceof DarkGold) {
-						DarkGold existing = belongings.getItem(DarkGold.class);
-						if (existing != null){
-							if (existing.quantity() >= 40) {
-								GLog.p(Messages.get(DarkGold.class, "you_now_have", existing.quantity()));
-							} else {
-								GLog.i(Messages.get(DarkGold.class, "you_now_have", existing.quantity()));
-							}
-						}
-					} else {
-
-						boolean important = item.unique && item.isIdentified() &&
-								(item instanceof Scroll || item instanceof Potion);
-						if (important) {
-							GLog.p( Messages.capitalize(Messages.get(this, "you_now_have", item.name())) );
-						} else {
-							GLog.i( Messages.capitalize(Messages.get(this, "you_now_have", item.name())) );
-						}
-					}
-					
+					notePickupResult( item, true );
 					curAction = null;
 				} else {
 
@@ -1389,15 +1406,7 @@ public class Hero extends Char {
 						heap.sprite.drop();
 					}
 
-					if (item instanceof Dewdrop
-							|| item instanceof TimekeepersHourglass.sandBag
-							|| item instanceof DriedRose.Petal
-							|| item instanceof Key) {
-						//Do Nothing
-					} else {
-						GLog.newLine();
-						GLog.n(Messages.capitalize(Messages.get(this, "you_cant_have", item.name())));
-					}
+					notePickupResult( item, false );
 
 					ready();
 				}

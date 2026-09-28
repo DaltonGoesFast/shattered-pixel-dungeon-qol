@@ -21,212 +21,130 @@
 
 package com.shatteredpixel.shatteredpixeldungeon;
 
-import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SwarmGen;
+import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mimic;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
-import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Wraith;
-import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
 import com.shatteredpixel.shatteredpixeldungeon.items.Gold;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
-import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
-import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.Artifact;
-import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
-import com.shatteredpixel.shatteredpixeldungeon.items.rings.Ring;
-import com.shatteredpixel.shatteredpixeldungeon.items.trinkets.TrinketCatalyst;
-import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
-import com.shatteredpixel.shatteredpixeldungeon.items.weapon.Weapon;
+import com.shatteredpixel.shatteredpixeldungeon.items.Torch;
+import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.DriedRose;
+import com.shatteredpixel.shatteredpixeldungeon.items.journal.DocumentPage;
+import com.shatteredpixel.shatteredpixeldungeon.items.journal.Guidebook;
+import com.shatteredpixel.shatteredpixeldungeon.items.keys.Key;
+import com.shatteredpixel.shatteredpixeldungeon.items.quest.CeremonialCandle;
 import com.shatteredpixel.shatteredpixeldungeon.levels.RegularLevel;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.Room;
-import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.secret.SecretRoom;
-import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.CrystalChoiceRoom;
-import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.CrystalVaultRoom;
-import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.SpecialRoom;
+import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.connection.ConnectionRoom;
+import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.standard.StandardRoom;
 import com.watabou.utils.Random;
 
-import java.util.LinkedHashMap;
-import java.util.ListIterator;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
 
 /**
- * Sacrifice pact: no random floor equipment / chests / mimics / gold piles;
- * key-locked special rooms replace gear with gold (catalyst kept; secrets untouched);
- * kills pay native loot (with LimitedDrops). Real enemies also roll equipment on a short
- * per-floor curve (50% / 25% / 10% / 0) capped at two drops, using vanilla upgrade odds.
- * About 1/3 of successful native drops become a normal floor gold pile instead.
+ * Sacrifice pact: ungated floor loot is generated normally, then taken off the ground and
+ * carried by enemies on that floor. Killing a carrier drops its cargo alongside native loot.
+ * Special, secret, and quest rooms, tombs, crystal chests, and shops keep their loot.
  */
 public class Sacrifice {
 
-	/** Chance a successful native drop is replaced by floor-scale gold. */
-	public static final float NATIVE_TO_GOLD = 1/3f;
-
-	/** Potion / scroll / seed / stone / food — no equipment or gold decks burned. */
-	public static Item randomFloorItem(){
-		LinkedHashMap<Generator.Category, Float> probs = new LinkedHashMap<>();
-		probs.put(Generator.Category.POTION, 8f);
-		probs.put(Generator.Category.SCROLL, 8f);
-		probs.put(Generator.Category.SEED, 1f);
-		probs.put(Generator.Category.STONE, 1f);
-		probs.put(Generator.Category.FOOD, 1f);
-		Generator.Category cat = Random.chances(probs);
-		if (cat == null){
-			return Generator.random(Generator.Category.POTION);
-		}
-		if (cat == Generator.Category.SEED){
-			return Generator.randomUsingDefaults(cat);
-		}
-		return Generator.random(cat);
+	/** Main dungeon regular floors only; boss floors, vault, and mines are untouched. */
+	public static boolean active(){
+		return Dungeon.isModified(Modifiers.SACRIFICE) && Dungeon.branch == 0;
 	}
 
-	/** A normal depth-scaled gold pile (replaces some native drops; no floor gold piles). */
-	public static Gold floorGold(){
-		Gold gold = new Gold();
-		gold.random();
-		return gold;
+	/** Keys, torches, quest items, and journal pages stay on the floor. */
+	public static boolean isCarriable(Item item){
+		return item != null
+				&& !(item instanceof Key)
+				&& !(item instanceof Torch)
+				&& !(item instanceof CeremonialCandle)
+				&& !(item instanceof Guidebook)
+				&& !(item instanceof DocumentPage)
+				&& !(item instanceof DriedRose.Petal);
 	}
 
-	/** True when this native drop should become gold instead. */
-	public static boolean replaceNativeWithGold(){
-		return Random.Float() < NATIVE_TO_GOLD;
+	/** Standard or connection rooms, excluding quest rooms that extend StandardRoom. */
+	private static boolean isOpenRoom(Room room){
+		if (!(room instanceof StandardRoom) && !(room instanceof ConnectionRoom)) return false;
+		return !room.getClass().getName().contains(".rooms.quest.");
 	}
 
-	/**
-	 * After levelgen: in iron-key special rooms, replace weapons/armor/wands/rings/artifacts
-	 * with gold. Trinket catalyst, crystal vault/choice rooms, and secret rooms keep their loot.
-	 */
-	public static void convertLockedRoomLoot(RegularLevel level){
-		if (!Dungeon.isModified(Modifiers.SACRIFICE)) return;
+	/** Removes walk-up loot (heaps, chests, suspicious-chest mimics) from open rooms. */
+	public static ArrayList<Item> takeOpenRoomLoot(RegularLevel level){
+		ArrayList<Item> taken = new ArrayList<>();
 
 		for (Heap heap : level.heaps.valueList()){
-			// Crystal chests and crystal puzzle rooms keep their prizes
-			if (heap.type == Heap.Type.CRYSTAL_CHEST) continue;
-			if (!shouldConvertLockedRoom(level.room(heap.pos))) continue;
-			ListIterator<Item> it = heap.items.listIterator();
+			if (heap.type != Heap.Type.HEAP
+					&& heap.type != Heap.Type.CHEST
+					&& heap.type != Heap.Type.SKELETON) continue;
+			if (!isOpenRoom(level.room(heap.pos))) continue;
+			Iterator<Item> it = heap.items.iterator();
 			while (it.hasNext()){
 				Item item = it.next();
-				if (isReplaceableRoomGear(item)){
-					it.set(floorGold());
+				if (isCarriable(item)){
+					taken.add(item);
+					it.remove();
 				}
+			}
+			if (heap.items.isEmpty()){
+				level.heaps.remove(heap.pos);
 			}
 		}
 
-		for (Mob mob : level.mobs){
+		Iterator<Mob> mobs = level.mobs.iterator();
+		while (mobs.hasNext()){
+			Mob mob = mobs.next();
 			if (!(mob instanceof Mimic)) continue;
 			Mimic mimic = (Mimic) mob;
-			if (mimic.items == null || !shouldConvertLockedRoom(level.room(mimic.pos))) continue;
-			ListIterator<Item> it = mimic.items.listIterator();
+			if (mimic.items == null || !isOpenRoom(level.room(mimic.pos))) continue;
+			Iterator<Item> it = mimic.items.iterator();
 			while (it.hasNext()){
 				Item item = it.next();
-				if (isReplaceableRoomGear(item)){
-					it.set(floorGold());
+				if (isCarriable(item)){
+					taken.add(item);
+					it.remove();
 				}
 			}
-		}
-	}
-
-	/** Weapon / armor / wand / ring / artifact — not catalyst, bombs, or consumables. */
-	public static boolean isReplaceableRoomGear(Item item){
-		if (item == null || item instanceof TrinketCatalyst) return false;
-		return item instanceof Weapon
-				|| item instanceof Armor
-				|| item instanceof Wand
-				|| item instanceof Ring
-				|| item instanceof Artifact;
-	}
-
-	/**
-	 * Iron-key locked specials only. Secrets, crystal vault/choice, and crystal-door pits keep gear.
-	 */
-	private static boolean shouldConvertLockedRoom(Room room){
-		if (!(room instanceof SpecialRoom) || room instanceof SecretRoom) return false;
-		if (room instanceof CrystalVaultRoom || room instanceof CrystalChoiceRoom) return false;
-		Room.Door door = ((SpecialRoom) room).entrance();
-		return door != null && door.type == Room.Door.Type.LOCKED;
-	}
-
-	/** Successful kill-paid gear pieces allowed on one floor. */
-	public static final int MAX_EQUIP_DROPS = 2;
-
-	/**
-	 * Clones, wraiths, zero-exp spawns, and overleveled kills do not pay equipment.
-	 * Native loot is unchanged.
-	 */
-	public static boolean paysEquipment( Mob mob ){
-		if (mob == null) return false;
-		if (SwarmGen.isClone(mob)) return false;
-		if (mob instanceof Wraith) return false;
-		if (mob.EXP <= 0) return false;
-		return Dungeon.hero == null || Dungeon.hero.lvl <= mob.maxLvl + 2;
-	}
-
-	/**
-	 * Chance for kill-paid gear on this floor's next paying death.
-	 * 50% / 25% / 10%, then nothing. Does not advance once the floor cap is hit.
-	 */
-	public static float nextEquipChance(){
-		if (Dungeon.level.sacrificeEquipDrops >= MAX_EQUIP_DROPS) return 0f;
-		int killIndex = Dungeon.level.sacrificeKillIndex;
-		Dungeon.level.sacrificeKillIndex++;
-		if (killIndex == 0) return 0.5f;
-		if (killIndex == 1) return 0.25f;
-		if (killIndex == 2) return 0.1f;
-		return 0f;
-	}
-
-	public static void noteEquipDrop(){
-		Dungeon.level.sacrificeEquipDrops++;
-	}
-
-	/** Weapon / armor / thrown / wand / ring / artifact, vanilla upgrade odds. */
-	public static Item genEquipment(){
-		for (int tries = 0; tries < 20; tries++){
-			Generator.Category cat = rollGearCategory();
-			Item item;
-			if (cat == Generator.Category.WEAPON){
-				item = Generator.randomWeapon();
-			} else if (cat == Generator.Category.ARMOR){
-				item = Generator.randomArmor();
-			} else if (cat == Generator.Category.MISSILE){
-				item = Generator.randomMissile();
-			} else if (cat == Generator.Category.ARTIFACT){
-				item = Generator.random(Generator.Category.ARTIFACT);
-				if (item == null){
-					item = Generator.randomUsingDefaults(Generator.Category.RING);
-				}
-			} else {
-				item = Generator.random(cat);
+			if (mimic.items.isEmpty()){
+				mobs.remove();
 			}
-
-			if (item == null) continue;
-			if (Challenges.isItemBlocked(item)) continue;
-			if (item instanceof Bomb) continue;
-			// Artifacts stay even though they are not upgradable.
-			if (!item.isUpgradable() && !(item instanceof Artifact)) continue;
-
-			return item;
 		}
-		return null;
+
+		return taken;
 	}
 
-	/** Matches Generator two-deck weights for gear categories. */
-	private static Generator.Category rollGearCategory(){
-		LinkedHashMap<Generator.Category, Float> probs = new LinkedHashMap<>();
-		if (Random.Int(2) == 0){
-			probs.put(Generator.Category.WEAPON, 2f);
-			probs.put(Generator.Category.ARMOR, 2f);
-			probs.put(Generator.Category.MISSILE, 1f);
-			probs.put(Generator.Category.WAND, 1f);
-			probs.put(Generator.Category.RING, 1f);
-			probs.put(Generator.Category.ARTIFACT, 0f);
-		} else {
-			probs.put(Generator.Category.WEAPON, 2f);
-			probs.put(Generator.Category.ARMOR, 1f);
-			probs.put(Generator.Category.MISSILE, 2f);
-			probs.put(Generator.Category.WAND, 1f);
-			probs.put(Generator.Category.RING, 0f);
-			probs.put(Generator.Category.ARTIFACT, 1f);
+	private static boolean canCarry(RegularLevel level, Mob mob){
+		if (mob.alignment != Char.Alignment.ENEMY) return false;
+		if (mob instanceof Mimic) return false;
+		if (Char.hasProp(mob, Char.Property.BOSS) || Char.hasProp(mob, Char.Property.MINIBOSS)) return false;
+		return isOpenRoom(level.room(mob.pos));
+	}
+
+	/**
+	 * Deals the hoard one item per carrier, wrapping around when items outnumber carriers.
+	 * Returns items that found no carrier.
+	 */
+	public static ArrayList<Item> assignToCarriers(RegularLevel level, ArrayList<Item> hoard){
+		ArrayList<Mob> carriers = new ArrayList<>();
+		for (Mob mob : level.mobs){
+			if (canCarry(level, mob)) carriers.add(mob);
 		}
-		Generator.Category cat = Random.chances(probs);
-		return cat != null ? cat : Generator.Category.WEAPON;
+		if (carriers.isEmpty() || hoard.isEmpty()){
+			return hoard;
+		}
+
+		// mobs is a HashSet; sort first so seeded levelgen deals the same way every time
+		Collections.sort(carriers, (a, b) -> Integer.compare(a.pos, b.pos));
+		Random.shuffle(carriers);
+		for (int i = 0; i < hoard.size(); i++){
+			Item item = hoard.get(i);
+			if (!(item instanceof Gold)) Modifiers.markCommandLoot(item);
+			carriers.get(i % carriers.size()).addSacrificeCargo(item);
+		}
+		return new ArrayList<>();
 	}
 
 }

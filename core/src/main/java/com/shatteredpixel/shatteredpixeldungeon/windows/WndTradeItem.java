@@ -21,6 +21,7 @@
 
 package com.shatteredpixel.shatteredpixeldungeon.windows;
 
+import com.shatteredpixel.shatteredpixeldungeon.Command;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
@@ -151,7 +152,6 @@ public class WndTradeItem extends WndInfoItem {
 		RedButton btnBuy = new RedButton( Messages.get(this, "buy", price) ) {
 			@Override
 			protected void onClick() {
-				TrainingExport.logShop("shop_buy", item.getClass().getSimpleName());
 				hide();
 				buy( heap );
 			}
@@ -295,10 +295,17 @@ public class WndTradeItem extends WndInfoItem {
 	}
 	
 	private void buy( Heap heap ) {
-		
+
+		Item peeked = heap.peek();
+		if (peeked != null && Command.deferShopPurchase( heap, Shopkeeper.sellPrice( peeked ) )) {
+			return;
+		}
+
 		Item item = heap.pickUp();
 		if (item == null) return;
-		
+
+		TrainingExport.logShop("shop_buy", item.getClass().getSimpleName());
+
 		int price = Shopkeeper.sellPrice( item );
 		Dungeon.gold -= price;
 		Catalog.countUses(Gold.class, price);

@@ -79,6 +79,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Shaman;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Skeleton;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Slime;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Snake;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.SoulWraith;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.SpectralNecromancer;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Spinner;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Statue;
@@ -271,6 +272,7 @@ public enum Bestiary {
 	private static final HashMap<Class<?>, Class<?>> classConversions = new HashMap<>();
 	static {
 		classConversions.put(CorpseDust.DustWraith.class,       Wraith.class);
+		classConversions.put(SoulWraith.class,                  Wraith.class);
 
 		classConversions.put(Necromancer.NecroSkeleton.class,   Skeleton.class);
 

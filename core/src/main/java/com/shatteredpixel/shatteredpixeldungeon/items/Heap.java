@@ -34,6 +34,7 @@ import com.shatteredpixel.shatteredpixeldungeon.effects.particles.ElmoParticle;
 import com.shatteredpixel.shatteredpixeldungeon.effects.particles.ShadowParticle;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.Artifact;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
+import com.shatteredpixel.shatteredpixeldungeon.items.bombs.SpiteBomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.ChargrilledMeat;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.FrozenCarpaccio;
 import com.shatteredpixel.shatteredpixeldungeon.items.food.MysteryMeat;
@@ -303,6 +304,9 @@ public class Heap implements Bundlable {
 					items.remove(item);
 					((Honeypot.ShatteredPot) item).destroyPot(pos);
 
+				} else if (item instanceof SpiteBomb) {
+					continue;
+
 				} else if (item instanceof Bomb) {
 					items.remove( item );
 					((Bomb) item).explode(pos);
@@ -340,6 +344,8 @@ public class Heap implements Bundlable {
 				items.remove(item);
 				((Potion) item).shatter(pos);
 				frozen = true;
+			} else if (item instanceof SpiteBomb) {
+				continue;
 			} else if (item instanceof Bomb && ((Bomb) item).fuse != null){
 				frozen = frozen || ((Bomb) item).fuse.freeze();
 			}

@@ -31,6 +31,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.DwarfKing;
 import com.shatteredpixel.shatteredpixeldungeon.effects.MagicMissile;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
+import com.shatteredpixel.shatteredpixeldungeon.items.bombs.SpiteBomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.LiquidMetal;
 import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
@@ -111,6 +112,13 @@ public class TelekineticGrab extends TargetedSpell {
 
 				while (!h.isEmpty()) {
 					Item item = h.peek();
+					if (item instanceof SpiteBomb) {
+						if (totalpickupTime == 0) {
+							GLog.w(Messages.get(this, "cant_grab"));
+							h.sprite.drop();
+						}
+						break;
+					}
 					if (item.doPickUp(hero, h.pos)) {
 						h.pickUp();
 						totalpickupTime += item.pickupDelay();

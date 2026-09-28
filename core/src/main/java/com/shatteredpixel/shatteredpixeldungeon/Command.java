@@ -21,10 +21,13 @@
 
 package com.shatteredpixel.shatteredpixeldungeon;
 
+import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.items.EquipableItem;
 import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
+import com.shatteredpixel.shatteredpixeldungeon.items.Gold;
+import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.KindOfWeapon;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
@@ -57,8 +60,10 @@ import com.shatteredpixel.shatteredpixeldungeon.journal.Catalog;
 import com.shatteredpixel.shatteredpixeldungeon.plants.Plant;
 import com.shatteredpixel.shatteredpixeldungeon.plants.Rotberry;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
+import com.shatteredpixel.shatteredpixeldungeon.utils.TrainingExport;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndCommand;
 import com.watabou.noosa.Game;
+import com.watabou.noosa.audio.Sample;
 import com.watabou.utils.Bundle;
 import com.watabou.utils.Random;
 import com.watabou.utils.Reflection;
@@ -70,7 +75,8 @@ import java.util.LinkedList;
 import java.util.Map;
 
 /**
- * Command pact: after claiming dungeon/shop loot, pick any item of the same kind.
+ * Command pact: choose any item of the same kind before dungeon or shop loot is taken.
+ * Pickup and its turn happen on confirm. Cancel leaves the item where it is.
  */
 public class Command {
 
@@ -83,7 +89,24 @@ public class Command {
 		}
 	}
 
+	private static final class Deferred {
+		enum Kind { GROUND, SHOP }
+
+		final Kind kind;
+		final int pos;
+		final Item item;
+		final int price;
+
+		Deferred( Kind kind, Heap heap, Item item, int price ){
+			this.kind = kind;
+			this.pos = heap.pos;
+			this.item = item;
+			this.price = price;
+		}
+	}
+
 	private static final LinkedList<PendingChoice> pending = new LinkedList<>();
+	private static Deferred deferred;
 	private static boolean windowOpen = false;
 
 	private static final String POTION_LAYOUT = "command_potion_layout";
@@ -97,6 +120,7 @@ public class Command {
 
 	public static void reset(){
 		pending.clear();
+		deferred = null;
 		windowOpen = false;
 		potionLayout = null;
 		scrollLayout = null;
@@ -118,6 +142,7 @@ public class Command {
 
 	public static void restore( Bundle bundle ){
 		pending.clear();
+		deferred = null;
 		windowOpen = false;
 		potionLayout = loadLayout(bundle, POTION_LAYOUT);
 		scrollLayout = loadLayout(bundle, SCROLL_LAYOUT);
@@ -197,6 +222,61 @@ public class Command {
 	public static void onWindowClosed(){
 		windowOpen = false;
 		tryShowNext();
+	}
+
+	/**
+	 * Ground pickup of Command loot. The item stays on the ground, and no turn is spent,
+	 * until the player confirms a choice.
+	 */
+	public static boolean deferGroundPickup( Heap heap ){
+		if (!canDefer( heap, Heap.Type.HEAP )) return false;
+		deferred = new Deferred( Deferred.Kind.GROUND, heap, heap.peek(), 0 );
+		showDeferredWindow();
+		return true;
+	}
+
+	/**
+	 * Shop purchase of Command loot. Gold is not spent until the player confirms.
+	 */
+	public static boolean deferShopPurchase( Heap heap, int price ){
+		if (!canDefer( heap, Heap.Type.FOR_SALE )) return false;
+		deferred = new Deferred( Deferred.Kind.SHOP, heap, heap.peek(), price );
+		showDeferredWindow();
+		return true;
+	}
+
+	private static boolean canDefer( Heap heap, Heap.Type type ){
+		if (heap == null || heap.type != type) return false;
+		if (windowOpen || deferred != null) return false;
+		if (!Dungeon.isModified(Modifiers.COMMAND) || Modifiers.suppressCommandWindow) return false;
+		if (Dungeon.hero == null || !Dungeon.hero.isAlive()) return false;
+		Item item = heap.peek();
+		if (item == null || !item.commandLoot) return false;
+		ArrayList<Class<?>> choices = choicesFor( item );
+		return choices != null && !choices.isEmpty();
+	}
+
+	private static void showDeferredWindow(){
+		Deferred d = deferred;
+		if (d == null || d.item == null) return;
+		ArrayList<Class<?>> choices = choicesFor( d.item );
+		if (choices == null || choices.isEmpty()){
+			deferred = null;
+			return;
+		}
+		windowOpen = true;
+		final Item toShow = d.item;
+		final int qty = d.item.quantity();
+		final ArrayList<Class<?>> opts = choices;
+		Game.runOnRenderThread(() -> GameScene.show(new WndCommand(toShow, opts, qty)));
+	}
+
+	public static void confirmChoice( Item original, Class<?> chosen, int qty ){
+		if (deferred != null && deferred.item == original){
+			completeDeferred( chosen );
+			return;
+		}
+		applyChoice( original, chosen, qty );
 	}
 
 	public static ArrayList<Class<?>> choicesFor( Item item ){
@@ -454,7 +534,101 @@ public class Command {
 	}
 
 	public static void cancel( Item original ){
+		if (deferred != null && (original == null || deferred.item == original)){
+			deferred = null;
+			return;
+		}
 		clearLootIfIdle(original);
+	}
+
+	private static void completeDeferred( Class<?> chosen ){
+		Deferred d = deferred;
+		deferred = null;
+		if (d == null || chosen == null || Dungeon.hero == null || !Dungeon.hero.isAlive()) return;
+		if (Dungeon.level == null) return;
+
+		Heap heap = Dungeon.level.heaps.get( d.pos );
+		if (heap == null || heap.items == null || !heap.items.contains( d.item )) return;
+		if (d.kind == Deferred.Kind.SHOP && Dungeon.gold < d.price) return;
+
+		Item incoming = d.item;
+		boolean replace = chosen != incoming.getClass();
+		Item toPick = incoming;
+		Long missileId = null;
+		Integer previousThreshold = null;
+		boolean hadThreshold = false;
+		if (replace && incoming instanceof MissileWeapon && incoming.isUpgradable()){
+			missileId = ((MissileWeapon) incoming).setID;
+			MissileWeapon.UpgradedSetTracker tracker = Dungeon.hero.buff( MissileWeapon.UpgradedSetTracker.class );
+			if (tracker != null && tracker.levelThresholds.containsKey( missileId )){
+				hadThreshold = true;
+				previousThreshold = tracker.levelThresholds.get( missileId );
+			}
+		}
+		if (replace){
+			toPick = buildReplacement( incoming, chosen );
+			if (toPick == null) return;
+			toPick.commandLoot = false;
+		} else {
+			incoming.commandLoot = false;
+		}
+
+		int from = d.kind == Deferred.Kind.SHOP ? Dungeon.hero.pos : d.pos;
+		Modifiers.suppressCommandWindow = true;
+		boolean picked;
+		try {
+			if (replace){
+				// collect(), not doPickUp(): pickup validation would dust an upgraded
+				// thrown weapon because buildReplacement already marked that set taken.
+				picked = toPick.collect( Dungeon.hero.belongings.backpack );
+				if (picked){
+					GameScene.pickUp( toPick, from );
+					Sample.INSTANCE.play( Assets.Sounds.ITEM );
+					Dungeon.hero.spendAndNext( toPick.pickupDelay() );
+				}
+			} else {
+				picked = toPick.doPickUp( Dungeon.hero, from );
+			}
+		} finally {
+			Modifiers.suppressCommandWindow = false;
+		}
+
+		if (!picked){
+			if (!replace) incoming.commandLoot = true;
+			if (missileId != null){
+				MissileWeapon.UpgradedSetTracker tracker = Dungeon.hero.buff( MissileWeapon.UpgradedSetTracker.class );
+				if (tracker != null){
+					if (hadThreshold) tracker.levelThresholds.put( missileId, previousThreshold );
+					else tracker.levelThresholds.remove( missileId );
+				}
+			}
+			Dungeon.hero.notePickupResult( toPick, false );
+			return;
+		}
+
+		takeFromHeap( heap, incoming );
+
+		if (d.kind == Deferred.Kind.SHOP){
+			Dungeon.gold -= d.price;
+			Catalog.countUses( Gold.class, d.price );
+			TrainingExport.logShop( "shop_buy", incoming.getClass().getSimpleName() );
+		} else {
+			Dungeon.hero.notePickupResult( toPick, true );
+		}
+	}
+
+	private static void takeFromHeap( Heap heap, Item item ){
+		if (heap == null || item == null || heap.items == null || !heap.items.contains( item )) return;
+		if (heap.peek() == item){
+			heap.pickUp();
+			return;
+		}
+		heap.items.remove( item );
+		if (heap.isEmpty()){
+			heap.destroy();
+		} else if (heap.sprite != null){
+			heap.sprite.view( heap ).place( heap.pos );
+		}
 	}
 
 	private static Item buildReplacement( Item original, Class<?> chosenClass ){

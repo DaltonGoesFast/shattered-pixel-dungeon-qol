@@ -26,7 +26,6 @@ import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
-import com.shatteredpixel.shatteredpixeldungeon.Sacrifice;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
@@ -74,8 +73,9 @@ import com.shatteredpixel.shatteredpixeldungeon.effects.Wound;
 import com.shatteredpixel.shatteredpixeldungeon.effects.particles.ShadowParticle;
 import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
 import com.shatteredpixel.shatteredpixeldungeon.items.Gold;
+import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
-import com.shatteredpixel.shatteredpixeldungeon.items.bombs.Bomb;
+import com.shatteredpixel.shatteredpixeldungeon.items.bombs.SpiteBomb;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.MasterThievesArmband;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.TalismanOfForesight;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.TimekeepersHourglass;
@@ -105,6 +105,7 @@ import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.CharSprite;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
 import com.watabou.noosa.audio.Sample;
+import com.watabou.utils.Bundlable;
 import com.watabou.utils.Bundle;
 import com.watabou.utils.GameMath;
 import com.watabou.utils.PathFinder;
@@ -174,6 +175,8 @@ public abstract class Mob extends Char {
 	private static final String INVEST_TURNS = "invest_turns";
 	private static final String WANDER_POSITIONS = "wander_positions";
 	private static final String WANDER_POS_IDX = "wander_pos_idx";
+
+	private static final String SACRIFICE_CARGO = "sacrifice_cargo";
 	
 	@Override
 	public void storeInBundle( Bundle bundle ) {
@@ -211,6 +214,10 @@ public abstract class Mob extends Char {
 				bundle.put(WANDER_POS_IDX, wanderPosIdx);
 			}
 		}
+
+		if (sacrificeCargo != null && !sacrificeCargo.isEmpty()){
+			bundle.put( SACRIFICE_CARGO, sacrificeCargo );
+		}
 	}
 	
 	@Override
@@ -244,6 +251,13 @@ public abstract class Mob extends Char {
 		}
 
 		enemySeen = bundle.getBoolean( SEEN );
+
+		if (bundle.contains( SACRIFICE_CARGO )){
+			sacrificeCargo = new ArrayList<>();
+			for (Bundlable b : bundle.getCollection( SACRIFICE_CARGO )){
+				if (b != null) sacrificeCargo.add( (Item) b );
+			}
+		}
 
 		target = bundle.getInt( TARGET );
 
@@ -1086,6 +1100,8 @@ public abstract class Mob extends Char {
 			EXP /= 2;
 		}
 
+		dropSacrificeCargo(cause);
+
 		if (alignment == Alignment.ENEMY){
 			if (buff(Trap.HazardAssistTracker.class) != null){
 				Statistics.hazardAssistedKills++;
@@ -1110,7 +1126,7 @@ public abstract class Mob extends Char {
 		}
 
 		if (Dungeon.isModified(Modifiers.SPITE)){
-			dropSpiteBomb(cause);
+			dropSpiteBomb();
 		}
 
 		if (Dungeon.hero.isAlive() && !Dungeon.level.heroFOV[pos]) {
@@ -1125,7 +1141,7 @@ public abstract class Mob extends Char {
 				&& alignment == Alignment.ENEMY
 				&& !(this instanceof Wraith)
 				&& cause != Chasm.class){
-			Wraith.spawnAt(pos, Wraith.class);
+			Wraith.spawnAt(pos, SoulWraith.class);
 		}
 
 		if (!(this instanceof Wraith)
@@ -1142,21 +1158,81 @@ public abstract class Mob extends Char {
 		}
 	}
 
-	private void dropSpiteBomb( Object cause ){
-		Bomb bomb;
-		if (properties.contains(Property.BOSS)){
-			ArrayList<Class<? extends Bomb>> crafted = new ArrayList<>(Bomb.EnhanceBomb.validIngredients.values());
-			bomb = Reflection.newInstance(Random.element(crafted));
-		} else {
-			bomb = new Bomb();
+	private void dropSpiteBomb(){
+		if (alignment != Alignment.ENEMY || Dungeon.level == null) return;
+
+		int count = spiteBombCount();
+		boolean[] used = new boolean[Dungeon.level.length()];
+		for (int i = 0; i < count; i++) {
+			int cell = spiteLandingCell(pos, used);
+			if (cell < 0) break;
+			used[cell] = true;
+			SpiteBomb bomb = new SpiteBomb();
+			bomb.startFuseAfterDrop(cell);
+			Dungeon.level.drop(bomb, cell).sprite.drop();
 		}
-		bomb.ignoreFireFor(1f);
-		if (cause == Chasm.class){
-			Dungeon.dropToChasm(bomb);
-		} else if (Dungeon.level != null){
-			bomb.startFuseAfterDrop(pos);
-			Dungeon.level.drop(bomb, pos).sprite.drop();
+	}
+
+	/**
+	 * Weak foes usually leave 2 or 3, and only sometimes 1.
+	 * A typical halls enemy leaves about 9. Bosses leave more.
+	 */
+	private int spiteBombCount() {
+		int depth = Math.max(1, Dungeon.scalingDepth());
+		float depthScale = 0.45f + 0.55f * Math.min(1f, (depth - 1) / 20f);
+		float extraHP = Math.max(0, HT - 8);
+		float strength = extraHP / (extraHP + 92f);
+		int bombs = 2 + Math.round(16f * strength * depthScale);
+		int roll = Random.Int(5);
+		if (roll == 0) bombs--;
+		else if (roll >= 3) bombs++;
+		return Math.max(1, bombs);
+	}
+
+	/** 60% on the corpse, 30% one tile away, 10% two tiles away. Later bombs fill empty cells first. */
+	private int spiteLandingCell( int origin, boolean[] used ) {
+		int roll = Random.Int(10);
+		int preferred = roll < 6 ? 0 : roll < 9 ? 1 : 2;
+		for (int dist = preferred; dist >= 0; dist--) {
+			int cell = randomSpiteCell(origin, dist, used, false);
+			if (cell >= 0) return cell;
 		}
+		for (int dist = preferred + 1; dist <= 2; dist++) {
+			int cell = randomSpiteCell(origin, dist, used, false);
+			if (cell >= 0) return cell;
+		}
+		for (int dist = 0; dist <= 2; dist++) {
+			int cell = randomSpiteCell(origin, dist, used, true);
+			if (cell >= 0) return cell;
+		}
+		return -1;
+	}
+
+	private int randomSpiteCell( int origin, int dist, boolean[] used, boolean allowUsed ) {
+		int w = Dungeon.level.width();
+		int h = Dungeon.level.height();
+		int ox = origin % w;
+		int oy = origin / w;
+		ArrayList<Integer> candidates = new ArrayList<>();
+		for (int y = Math.max(0, oy - dist); y <= Math.min(h - 1, oy + dist); y++) {
+			for (int x = Math.max(0, ox - dist); x <= Math.min(w - 1, ox + dist); x++) {
+				if (Math.max(Math.abs(x - ox), Math.abs(y - oy)) != dist) continue;
+				int cell = x + y * w;
+				if (!canLandSpiteBomb(cell)) continue;
+				if (!allowUsed && used[cell]) continue;
+				candidates.add(cell);
+			}
+		}
+		if (candidates.isEmpty()) return -1;
+		return Random.element(candidates);
+	}
+
+	private boolean canLandSpiteBomb( int cell ) {
+		Level level = Dungeon.level;
+		if (cell < 0 || cell >= level.length()) return false;
+		if (level.solid[cell] || level.pit[cell]) return false;
+		Heap heap = level.heaps.get(cell);
+		return heap == null || heap.type == Heap.Type.HEAP;
 	}
 
 	public float lootChance(){
@@ -1181,32 +1257,19 @@ public abstract class Mob extends Char {
 	}
 	
 	public void rollToDropLoot(){
-		boolean sacrifice = Dungeon.isModified(Modifiers.SACRIFICE);
-		if (!sacrifice && SwarmGen.isClone( this )) return;
-		if (!sacrifice && Dungeon.hero.lvl > maxLvl + 2) return;
+		if (SwarmGen.isClone( this )) return;
+		if (Dungeon.hero.lvl > maxLvl + 2) return;
 
 		MasterThievesArmband.StolenTracker stolen = buff(MasterThievesArmband.StolenTracker.class);
 		if (stolen == null || !stolen.itemWasStolen()) {
-			// Sacrifice still uses lootChance (LimitedDrops), but overlevel/clone gates stay off.
 			if (Random.Float() < lootChance()) {
 				Item loot = createLoot();
 				if (loot != null) {
-					if (sacrifice && Sacrifice.replaceNativeWithGold()) {
-						loot = Sacrifice.floorGold();
-					} else if (!(loot instanceof Gold)) {
+					if (!(loot instanceof Gold)) {
 						Modifiers.markCommandLoot(loot);
 					}
 					Dungeon.level.drop(loot, pos).sprite.drop();
 				}
-			}
-		}
-
-		if (sacrifice && Sacrifice.paysEquipment(this) && Random.Float() < Sacrifice.nextEquipChance()) {
-			Item gear = Sacrifice.genEquipment();
-			if (gear != null) {
-				Sacrifice.noteEquipDrop();
-				Modifiers.markCommandLoot(gear);
-				Dungeon.level.drop(gear, pos).sprite.drop();
 			}
 		}
 		
@@ -1241,6 +1304,26 @@ public abstract class Mob extends Char {
 
 	}
 	
+	/** Sacrifice pact: floor loot this mob carries, dropped on death. */
+	public ArrayList<Item> sacrificeCargo = null;
+
+	public void addSacrificeCargo( Item item ){
+		if (sacrificeCargo == null) sacrificeCargo = new ArrayList<>();
+		sacrificeCargo.add( item );
+	}
+
+	private void dropSacrificeCargo( Object cause ){
+		if (sacrificeCargo == null || Dungeon.level == null) return;
+		for (Item item : sacrificeCargo){
+			if (cause == Chasm.class){
+				Dungeon.dropToChasm( item );
+			} else {
+				Dungeon.level.drop( item, pos ).sprite.drop();
+			}
+		}
+		sacrificeCargo = null;
+	}
+
 	protected Object loot = null;
 	protected float lootChance = 0;
 	

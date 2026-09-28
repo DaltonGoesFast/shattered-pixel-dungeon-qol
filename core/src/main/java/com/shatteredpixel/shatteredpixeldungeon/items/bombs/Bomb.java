@@ -93,6 +93,11 @@ public class Bomb extends Item {
 		return true;
 	}
 
+	/** Regular bombs delete heaps caught in the blast. Spite bombs do not. */
+	protected boolean destroysItems(){
+		return true;
+	}
+
 	protected int explosionRange(){
 		return 1;
 	}
@@ -120,7 +125,7 @@ public class Bomb extends Item {
 		return new Fuse();
 	}
 
-	/** Spite drops use this so champion flames on the death tile do not detonate the bomb on the turn it lands. */
+	/** Skip {@link com.shatteredpixel.shatteredpixeldungeon.items.Heap#burn()} until this much game time has passed. */
 	public void ignoreFireFor( float turns ) {
 		fireproofUntil = Actor.now() + turns;
 	}
@@ -200,7 +205,7 @@ public class Bomb extends Item {
 
 				//destroys items / triggers bombs caught in the blast.
 				Heap heap = Dungeon.level.heaps.get(i);
-				if (heap != null) {
+				if (heap != null && destroysItems()) {
 					heap.explode();
 				}
 			}

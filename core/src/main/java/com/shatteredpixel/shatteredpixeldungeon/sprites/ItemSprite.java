@@ -28,6 +28,7 @@ import com.shatteredpixel.shatteredpixeldungeon.effects.Speck;
 import com.shatteredpixel.shatteredpixeldungeon.items.Gold;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
+import com.shatteredpixel.shatteredpixeldungeon.items.bombs.SpiteBomb;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
@@ -176,10 +177,18 @@ public class ItemSprite extends MovieClip {
 		speed.set( 0, -100 );
 		acc.set(0, -speed.y / DROP_INTERVAL * 2);
 		
-		if (heap != null && heap.seen && heap.peek() instanceof Gold) {
+		if (heap != null && heap.seen && heap.peek() instanceof Gold && !spiteCoversHeap()) {
 			CellEmitter.center( heap.pos ).burst( Speck.factory( Speck.COIN ), 5 );
 			Sample.INSTANCE.play( Assets.Sounds.GOLD, 1, 1, Random.Float( 0.9f, 1.1f ) );
 		}
+	}
+
+	private boolean spiteCoversHeap() {
+		if (heap == null) return false;
+		for (Item piled : heap.items) {
+			if (piled instanceof SpiteBomb) return true;
+		}
+		return false;
 	}
 	
 	public void drop( int from ) {
@@ -199,7 +208,16 @@ public class ItemSprite extends MovieClip {
 	}
 
 	public ItemSprite view( Item item ){
-		view(item.image(), item.glowing());
+		if (item instanceof SpiteBomb) {
+			if (this.emitter != null) this.emitter.killAndErase();
+			emitter = null;
+			texture(Assets.Sprites.SPITE);
+			frame(0, 0, 10, 13);
+			perspectiveRaise = 5 / 16f;
+			glow(item.glowing());
+		} else {
+			view(item.image(), item.glowing());
+		}
 		Emitter emitter = item.emitter();
 		if (emitter != null && parent != null) {
 			emitter.pos( this );
@@ -215,8 +233,17 @@ public class ItemSprite extends MovieClip {
 		}
 
 		switch (heap.type) {
-			case HEAP: case FOR_SALE:
-				view( heap.peek() ); break;
+			case HEAP: case FOR_SALE: {
+				Item show = heap.peek();
+				for (Item piled : heap.items) {
+					if (piled instanceof SpiteBomb) {
+						show = piled;
+						break;
+					}
+				}
+				view( show );
+				break;
+			}
 			case CHEST:
 				view( ItemSpriteSheet.CHEST, null ); break;
 			case LOCKED_CHEST:
@@ -247,6 +274,7 @@ public class ItemSprite extends MovieClip {
 	}
 
 	public void frame( int image ){
+		texture( Assets.Sprites.ITEMS );
 		frame( ItemSpriteSheet.film.get( image ));
 
 		float height = ItemSpriteSheet.film.height( image );

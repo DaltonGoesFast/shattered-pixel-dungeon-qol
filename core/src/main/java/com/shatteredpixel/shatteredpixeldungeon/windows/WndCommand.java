@@ -21,6 +21,7 @@
 
 package com.shatteredpixel.shatteredpixeldungeon.windows;
 
+import com.shatteredpixel.shatteredpixeldungeon.Chrome;
 import com.shatteredpixel.shatteredpixeldungeon.Command;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.Potion;
@@ -34,8 +35,10 @@ import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSprite;
 import com.shatteredpixel.shatteredpixeldungeon.ui.ItemButton;
+import com.shatteredpixel.shatteredpixeldungeon.ui.RedButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RenderedTextBlock;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
+import com.watabou.noosa.NinePatch;
 import com.watabou.utils.Reflection;
 
 import java.util.ArrayList;
@@ -49,10 +52,13 @@ public class WndCommand extends Window {
 
 	private static final int WIDTH = 120;
 	private static final int BTN = 19;
+	private static final int BTN_HEIGHT = 16;
 	private static final int GAP = 2;
 
 	private final Item original;
 	private final int qty;
+	private final ArrayList<ChoiceButton> choiceButtons = new ArrayList<>();
+	private Class<?> selected;
 	private boolean resolved = false;
 
 	public WndCommand( Item original, ArrayList<Class<?>> choices, int qty ){
@@ -60,6 +66,7 @@ public class WndCommand extends Window {
 
 		this.original = original;
 		this.qty = qty;
+		this.selected = original.getClass();
 
 		IconTitle titlebar = new IconTitle();
 		titlebar.icon(new ItemSprite(original.image(), original.glowing()));
@@ -80,27 +87,13 @@ public class WndCommand extends Window {
 			if (real == null) continue;
 
 			Item display = commandDisplay(real);
-			final Class<?> chosen = cls;
-			final boolean isOriginal = cls == original.getClass();
 
-			ItemButton btn = new ItemButton(){
-				@Override
-				protected void onClick() {
-					select(chosen);
-				}
-
-				@Override
-				protected void layout() {
-					super.layout();
-					if (isOriginal && bg != null){
-						bg.hardlight(0.6f, 1f, 0.6f);
-					}
-				}
-			};
+			ChoiceButton btn = new ChoiceButton(cls, cls == original.getClass());
 			btn.item(display);
 			btn.slot().textVisible(false);
 			btn.setRect(left, top, BTN, BTN);
 			add(btn);
+			choiceButtons.add(btn);
 
 			left += BTN + 1;
 			if (left >= WIDTH - BTN){
@@ -113,7 +106,26 @@ public class WndCommand extends Window {
 			top += BTN + 1;
 		}
 
-		resize(WIDTH, top);
+		int btnTop = top + GAP;
+		RedButton btnConfirm = new RedButton(Messages.get(WndCommand.class, "confirm")){
+			@Override
+			protected void onClick() {
+				commit(selected);
+			}
+		};
+		btnConfirm.setRect(0, btnTop, (WIDTH - GAP) / 2f, BTN_HEIGHT);
+		add(btnConfirm);
+
+		RedButton btnCancel = new RedButton(Messages.get(WndCommand.class, "cancel")){
+			@Override
+			protected void onClick() {
+				onBackPressed();
+			}
+		};
+		btnCancel.setRect(btnConfirm.right() + GAP, btnTop, WIDTH - btnConfirm.right() - GAP, BTN_HEIGHT);
+		add(btnCancel);
+
+		resize(WIDTH, (int)Math.ceil(btnCancel.bottom()));
 	}
 
 	/**
@@ -185,20 +197,79 @@ public class WndCommand extends Window {
 		return real;
 	}
 
-	private void select( Class<?> chosen ){
-		if (resolved) return;
+	private void commit( Class<?> chosen ){
+		if (resolved || chosen == null) return;
 		resolved = true;
-		Command.applyChoice(original, chosen, qty);
+		Command.confirmChoice(original, chosen, qty);
 		hide();
 	}
 
 	@Override
 	public void onBackPressed() {
+		// Back and clicks outside the window both land here.
 		if (!resolved){
 			resolved = true;
 			Command.cancel(original);
 		}
 		super.onBackPressed();
+	}
+
+	private class ChoiceButton extends ItemButton {
+
+		private final Class<?> chosen;
+		private final boolean isOriginal;
+		private boolean greyBg;
+
+		private ChoiceButton( Class<?> chosen, boolean isOriginal ){
+			this.chosen = chosen;
+			this.isOriginal = isOriginal;
+		}
+
+		@Override
+		protected void onClick() {
+			selected = chosen;
+			for (ChoiceButton btn : choiceButtons){
+				btn.applyHighlight();
+			}
+		}
+
+		@Override
+		public void update() {
+			super.update();
+			applyHighlight();
+		}
+
+		@Override
+		protected void layout() {
+			super.layout();
+			applyHighlight();
+		}
+
+		private void applyHighlight(){
+			if (bg == null) return;
+			// Red chrome stays red no matter the tint. Swap to grey so gold/green actually show.
+			boolean wantGrey = chosen == selected || isOriginal;
+			if (wantGrey != greyBg){
+				NinePatch next = Chrome.get(wantGrey ? Chrome.Type.GREY_BUTTON : Chrome.Type.RED_BUTTON);
+				if (replace(bg, next) == null){
+					remove(bg);
+					addToBack(next);
+				}
+				bg.destroy();
+				bg = next;
+				bg.x = x;
+				bg.y = y;
+				bg.size(width, height);
+				greyBg = wantGrey;
+			}
+			if (chosen == selected){
+				bg.hardlight(1.7f, 1.35f, 0.15f);
+			} else if (isOriginal){
+				bg.hardlight(0.25f, 1.45f, 0.35f);
+			} else {
+				bg.resetColor();
+			}
+		}
 	}
 
 	@Override

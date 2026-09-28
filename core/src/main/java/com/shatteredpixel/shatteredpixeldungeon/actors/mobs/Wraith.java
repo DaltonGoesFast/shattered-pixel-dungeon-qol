@@ -93,6 +93,11 @@ public class Wraith extends Mob {
 		return 0f;
 	}
 
+	/** Turns before the first action. Soul-pact wraiths act immediately. */
+	protected float spawnDelay() {
+		return SPAWN_DELAY;
+	}
+
 	@Override
 	public boolean reset() {
 		state = WANDERING;
@@ -154,7 +159,7 @@ public class Wraith extends Mob {
 			w.adjustStats( Dungeon.scalingDepth() );
 			w.pos = pos;
 			w.state = w.HUNTING;
-			GameScene.add( w, SPAWN_DELAY );
+			GameScene.add( w, w.spawnDelay() );
 			Dungeon.level.occupyCell(w);
 
 			w.sprite.alpha( 0 );

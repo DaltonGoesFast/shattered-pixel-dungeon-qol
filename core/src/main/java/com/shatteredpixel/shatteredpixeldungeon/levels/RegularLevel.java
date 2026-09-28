@@ -24,7 +24,6 @@ package com.shatteredpixel.shatteredpixeldungeon.levels;
 import com.shatteredpixel.shatteredpixeldungeon.Bones;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
-import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
 import com.shatteredpixel.shatteredpixeldungeon.Sacrifice;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
@@ -393,22 +392,23 @@ public abstract class RegularLevel extends Level {
 			nItems += 2;
 		}
 		
-		boolean sacrifice = Dungeon.isModified(Modifiers.SACRIFICE);
+		boolean sacrifice = Sacrifice.active();
+		ArrayList<Item> hoard = sacrifice ? Sacrifice.takeOpenRoomLoot(this) : null;
 
 		for (int i=0; i < nItems; i++) {
 
-			Item toDrop = sacrifice ? Sacrifice.randomFloorItem() : Generator.random();
+			Item toDrop = Generator.random();
 			if (toDrop == null) continue;
+
+			if (sacrifice){
+				hoard.add(toDrop);
+				continue;
+			}
 
 			int cell = randomDropCell();
 			if (map[cell] == Terrain.HIGH_GRASS || map[cell] == Terrain.FURROWED_GRASS) {
 				map[cell] = Terrain.GRASS;
 				losBlocking[cell] = false;
-			}
-
-			if (sacrifice){
-				drop(toDrop, cell).type = Heap.Type.HEAP;
-				continue;
 			}
 
 			Heap.Type type = null;
@@ -465,6 +465,10 @@ public abstract class RegularLevel extends Level {
 		}
 
 		for (Item item : itemsToSpawn) {
+			if (sacrifice && Sacrifice.isCarriable(item)){
+				hoard.add(item);
+				continue;
+			}
 			int cell = randomDropCell();
 			if (item instanceof TrinketCatalyst){
 				drop( item, cell ).type = Heap.Type.LOCKED_CHEST;
@@ -697,6 +701,10 @@ public abstract class RegularLevel extends Level {
 		Random.pushGenerator(Random.Long());
 			int items = (int)(Random.Float() + CrackedSpyglass.extraLootChance());
 			for (int i = 0; i < items; i++){
+				if (sacrifice){
+					hoard.add(Generator.randomUsingDefaults());
+					continue;
+				}
 				int cell = randomDropCell();
 				if (map[cell] == Terrain.HIGH_GRASS || map[cell] == Terrain.FURROWED_GRASS) {
 					map[cell] = Terrain.GRASS;
@@ -706,8 +714,11 @@ public abstract class RegularLevel extends Level {
 			}
 		Random.popGenerator();
 
-		//Sacrifice: key-locked special rooms pay gold instead of gear (secrets keep loot)
-		Sacrifice.convertLockedRoomLoot(this);
+		if (sacrifice){
+			for (Item item : Sacrifice.assignToCarriers(this, hoard)){
+				drop(item, randomDropCell()).type = Heap.Type.HEAP;
+			}
+		}
 
 	}
 
