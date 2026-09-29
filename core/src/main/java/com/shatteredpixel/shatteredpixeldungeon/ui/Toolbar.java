@@ -71,8 +71,8 @@ public class Toolbar extends Component {
 	private boolean lastEnabled = true;
 	public boolean examining = false;
 
-	/** 0 unset, 1 quickswapper narrow (3 slots), 2 quickswapper wide (6 slots); crossing resets {@link QuickSlotButton#quickSlotPage}. */
-	private int swapperToolbarLayoutKind;
+	/** 0 unset, otherwise the last quickswapper page size; changing it resets {@link QuickSlotButton#quickSlotPage}. */
+	private int swapperPageSize;
 
 	private static Toolbar instance;
 
@@ -521,29 +521,34 @@ public class Toolbar extends Component {
 		int quickslotsToShow = 4;
 		if (PixelScene.uiCamera.width > 152) quickslotsToShow ++;
 		if (PixelScene.uiCamera.width > 170) quickslotsToShow ++;
-		int naturalQuickslots = quickslotsToShow;
+		int fixedQuickslots = SPDSettings.quickslotsShown();
+		if (fixedQuickslots > 0) quickslotsToShow = fixedQuickslots;
 
 		int startingSlot;
 		if (SPDSettings.quickSwapper()) {
-			int kind = naturalQuickslots >= QuickSlot.SLOTS_PER_SET ? 2 : 1;
-			if (swapperToolbarLayoutKind != 0 && swapperToolbarLayoutKind != kind) {
+			int pageSize;
+			if (fixedQuickslots > 0) {
+				pageSize = fixedQuickslots;
+			} else {
+				pageSize = quickslotsToShow >= QuickSlot.SLOTS_PER_SET
+						? QuickSlot.SLOTS_PER_SET
+						: QuickSlotButton.QUICKSWAPPER_PAGE_SIZE;
+			}
+			if (swapperPageSize != 0 && swapperPageSize != pageSize) {
 				QuickSlotButton.quickSlotPage = 0;
 			}
-			swapperToolbarLayoutKind = kind;
+			swapperPageSize = pageSize;
+			QuickSlotButton.pageSize = pageSize;
+			QuickSlotButton.quickSlotPage %= QuickSlotButton.pageCount();
 
-			if (naturalQuickslots >= QuickSlot.SLOTS_PER_SET) {
-				quickslotsToShow = QuickSlot.SLOTS_PER_SET;
-				QuickSlotButton.lastVisible = QuickSlot.SLOTS_PER_SET;
-			} else {
-				quickslotsToShow = QuickSlotButton.QUICKSWAPPER_PAGE_SIZE;
-				QuickSlotButton.lastVisible = QuickSlotButton.QUICKSWAPPER_PAGE_SIZE;
-			}
+			quickslotsToShow = Math.min(pageSize, QuickSlot.SIZE - QuickSlotButton.quickSlotPage * pageSize);
+			QuickSlotButton.lastVisible = quickslotsToShow;
 			startingSlot = 0;
 			boolean showSwapChip = SPDSettings.showQuickslotSwapButton();
 			btnSwap.visible = showSwapChip;
 			btnSwap.active = lastEnabled && showSwapChip;
 		} else {
-			swapperToolbarLayoutKind = 0;
+			swapperPageSize = 0;
 			startingSlot = 0;
 			btnSwap.visible = btnSwap.active = false;
 			btnSwap.setPos(0, PixelScene.uiCamera.height);
@@ -921,21 +926,17 @@ public class Toolbar extends Component {
 				add(icons[0]);
 			}
 
-			int base;
-			if (QuickSlotButton.lastVisible >= QuickSlot.SLOTS_PER_SET) {
-				int nextBank = (QuickSlotButton.quickSlotPage + 1) % QuickSlotButton.QUICKSWAPPER_WIDE_BANK_COUNT;
-				base = nextBank * QuickSlot.SLOTS_PER_SET;
-			} else {
-				int nextPage = (QuickSlotButton.quickSlotPage + 1) % QuickSlotButton.QUICKSWAPPER_PAGE_COUNT;
-				base = nextPage * QuickSlotButton.QUICKSWAPPER_PAGE_SIZE;
-			}
+			int nextPage = (QuickSlotButton.quickSlotPage + 1) % QuickSlotButton.pageCount();
+			int base = nextPage * QuickSlotButton.pageSize;
+			int pageEnd = Math.min(base + QuickSlotButton.pageSize, QuickSlot.SIZE);
 
 			for (int i = 1; i < 4; i++){
 				int slot = base + (i - 1);
-				if (items[i] == Dungeon.quickslot.getItem(slot)) {
+				Item next = slot < pageEnd ? Dungeon.quickslot.getItem(slot) : null;
+				if (items[i] == next) {
 					continue;
 				}
-				items[i] = Dungeon.quickslot.getItem(slot);
+				items[i] = next;
 				if (icons[i] != null){
 					icons[i].killAndErase();
 					icons[i] = null;

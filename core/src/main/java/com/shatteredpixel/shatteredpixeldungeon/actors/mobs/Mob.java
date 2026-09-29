@@ -1386,7 +1386,18 @@ public abstract class Mob extends Char {
 			desc += "\n\n_" + Messages.titleCase(b.name()) + "_\n" + b.desc();
 		}
 
+		ChampionEnemy.PendingHonor pending = buff(ChampionEnemy.PendingHonor.class);
+		if (pending != null){
+			String preview = pending.previewText();
+			if (preview != null) desc += preview;
+		}
+
 		return desc;
+	}
+
+	/** When true, a deferred Honor champion is shown before this mob leaves its passive state. */
+	public boolean previewHonorChampion(){
+		return false;
 	}
 	
 	public void notice() {

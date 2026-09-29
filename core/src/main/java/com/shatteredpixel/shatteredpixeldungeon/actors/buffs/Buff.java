@@ -95,6 +95,11 @@ public class Buff extends Actor {
 		return BuffIndicator.NONE;
 	}
 
+	//buffs drawn from a sheet other than the buff icon sheets set the icon up here and return true
+	public boolean customIcon( Image icon, boolean large ){
+		return false;
+	}
+
 	//some buffs may want to tint the base texture color of their icon
 	public void tintIcon( Image icon ){
 		//do nothing by default

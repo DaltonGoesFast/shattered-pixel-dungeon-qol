@@ -10,6 +10,7 @@ import com.google.gson.GsonBuilder;
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
+import com.shatteredpixel.shatteredpixeldungeon.utils.DebugItemResolver;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.Weapon;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.MeleeWeapon;
@@ -55,7 +56,7 @@ final class ItemShowcaseExportRunner {
 		TextureCache.get(Assets.Sprites.ITEMS);
 		TextureCache.get(Assets.Sprites.ITEM_ICONS);
 
-		Class<? extends Item> clazz = StreamerItemResolver.resolveClass(parsed.itemId);
+		Class<? extends Item> clazz = DebugItemResolver.resolveClass(parsed.itemId);
 		if (clazz == null) {
 			throw new ExportException("Unknown or ambiguous item: '" + parsed.itemId + "'", 3);
 		}
@@ -240,9 +241,9 @@ final class ItemShowcaseExportRunner {
 	}
 
 	private static Class<?> findClass(String name, String[] packages, List<Class<?>> known) {
-		String key = StreamerItemResolver.normalizeKey(name);
+		String key = DebugItemResolver.normalizeKey(name);
 		for (Class<?> c : known) {
-			if (StreamerItemResolver.normalizeKey(c.getSimpleName()).equals(key)) {
+			if (DebugItemResolver.normalizeKey(c.getSimpleName()).equals(key)) {
 				return c;
 			}
 		}

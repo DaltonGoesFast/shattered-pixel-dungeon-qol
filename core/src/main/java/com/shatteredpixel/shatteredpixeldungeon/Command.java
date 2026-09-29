@@ -112,7 +112,17 @@ public class Command {
 	private static final String POTION_LAYOUT = "command_potion_layout";
 	private static final String SCROLL_LAYOUT = "command_scroll_layout";
 	private static final String RING_LAYOUT = "command_ring_layout";
+	private static final String SOU_ADJUSTMENT = "command_sou_adjustment";
 	private static final long LAYOUT_SEED = 0xC0A11A70L;
+
+	/** 3 upgrade scrolls per chapter across 5 chapters. Matches {@link Dungeon#souNeeded()}. */
+	private static final int UPGRADE_SCROLLS_SCHEDULED = 15;
+
+	/**
+	 * Extra upgrade scrolls minted by Command, minus upgrade scrolls Command turned into something else.
+	 * Forbidden Runes already keeps only the odd scheduled drops, so 0 means that half is the whole budget.
+	 */
+	private static int souAdjustment;
 
 	private static ArrayList<Class<?>> potionLayout;
 	private static ArrayList<Class<?>> scrollLayout;
@@ -125,6 +135,7 @@ public class Command {
 		potionLayout = null;
 		scrollLayout = null;
 		ringLayout = null;
+		souAdjustment = 0;
 	}
 
 	public static void initForRun(){
@@ -138,6 +149,7 @@ public class Command {
 		if (potionLayout != null) bundle.put(POTION_LAYOUT, potionLayout.toArray(new Class[0]));
 		if (scrollLayout != null) bundle.put(SCROLL_LAYOUT, scrollLayout.toArray(new Class[0]));
 		if (ringLayout != null) bundle.put(RING_LAYOUT, ringLayout.toArray(new Class[0]));
+		bundle.put(SOU_ADJUSTMENT, souAdjustment);
 	}
 
 	public static void restore( Bundle bundle ){
@@ -147,6 +159,7 @@ public class Command {
 		potionLayout = loadLayout(bundle, POTION_LAYOUT);
 		scrollLayout = loadLayout(bundle, SCROLL_LAYOUT);
 		ringLayout = loadLayout(bundle, RING_LAYOUT);
+		souAdjustment = bundle != null && bundle.contains(SOU_ADJUSTMENT) ? bundle.getInt(SOU_ADJUSTMENT) : 0;
 	}
 
 	public static void offerAfterPickup( Item picked, int incomingQty ){
@@ -164,7 +177,7 @@ public class Command {
 			return;
 		}
 
-		ArrayList<Class<?>> choices = choicesFor(subject);
+		ArrayList<Class<?>> choices = choicesFor(subject, incomingQty);
 		if (choices == null || choices.isEmpty()){
 			subject.commandLoot = false;
 			return;
@@ -206,7 +219,7 @@ public class Command {
 			tryShowNext();
 			return;
 		}
-		ArrayList<Class<?>> choices = choicesFor(next.item);
+		ArrayList<Class<?>> choices = choicesFor(next.item, next.qty);
 		if (choices == null || choices.isEmpty()){
 			clearLootIfIdle(next.item);
 			tryShowNext();
@@ -252,14 +265,14 @@ public class Command {
 		if (Dungeon.hero == null || !Dungeon.hero.isAlive()) return false;
 		Item item = heap.peek();
 		if (item == null || !item.commandLoot) return false;
-		ArrayList<Class<?>> choices = choicesFor( item );
+		ArrayList<Class<?>> choices = choicesFor( item, item.quantity() );
 		return choices != null && !choices.isEmpty();
 	}
 
 	private static void showDeferredWindow(){
 		Deferred d = deferred;
 		if (d == null || d.item == null) return;
-		ArrayList<Class<?>> choices = choicesFor( d.item );
+		ArrayList<Class<?>> choices = choicesFor( d.item, d.item.quantity() );
 		if (choices == null || choices.isEmpty()){
 			deferred = null;
 			return;
@@ -280,6 +293,10 @@ public class Command {
 	}
 
 	public static ArrayList<Class<?>> choicesFor( Item item ){
+		return choicesFor(item, item == null ? 1 : Math.max(1, item.quantity()));
+	}
+
+	public static ArrayList<Class<?>> choicesFor( Item item, int qty ){
 		if (item == null) return null;
 
 		// Hero/quest uniques stay un-Commandable; SoU/SoStr/trinkets/etc. are unique but allowed
@@ -346,6 +363,9 @@ public class Command {
 		} else if (item instanceof Runestone){
 			addAll(list, Generator.Category.STONE.classes);
 		} else if (item instanceof Food){
+			if (Dungeon.isChallenged(Challenges.NO_FOOD)){
+				return null;
+			}
 			addAll(list, Catalog.FOOD.items().toArray(new Class[0]));
 		} else if (item instanceof Bomb){
 			addAll(list, Catalog.BOMBS.items().toArray(new Class[0]));
@@ -363,8 +383,46 @@ public class Command {
 			return sample != null && Challenges.isItemBlocked(sample);
 		});
 
+		limitUpgradeScrolls(item, list, qty);
+
 		applyRunLayout(item, list);
 		return list.isEmpty() ? null : list;
+	}
+
+	/**
+	 * Forbidden Runes keeps the odd scheduled upgrade scrolls (8 of 15). Those fill the budget.
+	 * Command can pick another upgrade scroll only after one of those was commanded into something else.
+	 */
+	private static int forbiddenUpgradeScrolls(){
+		int kept = 0;
+		for (int slot = 1; slot <= UPGRADE_SCROLLS_SCHEDULED; slot++){
+			if (slot % 2 != 0) kept++;
+		}
+		return kept;
+	}
+
+	private static int upgradeScrollPicksLeft(){
+		int allowance = forbiddenUpgradeScrolls();
+		int reservedByLevelgen = allowance;
+		return allowance - reservedByLevelgen - souAdjustment;
+	}
+
+	private static void limitUpgradeScrolls( Item item, ArrayList<Class<?>> list, int qty ){
+		if (!Dungeon.isChallenged(Challenges.NO_SCROLLS)) return;
+		if (item instanceof ScrollOfUpgrade) return;
+		if (!(item instanceof Scroll)) return;
+		if (upgradeScrollPicksLeft() < Math.max(1, qty)){
+			list.remove(ScrollOfUpgrade.class);
+		}
+	}
+
+	private static void recordUpgradeScrollChoice( Item original, Class<?> chosen, int qty ){
+		if (!Dungeon.isChallenged(Challenges.NO_SCROLLS)) return;
+		if (original == null || chosen == null || qty <= 0) return;
+		boolean was = original instanceof ScrollOfUpgrade;
+		boolean now = chosen == ScrollOfUpgrade.class;
+		if (was == now) return;
+		souAdjustment += now ? qty : -qty;
 	}
 
 	private static boolean commandableUnique( Item item ){
@@ -486,6 +544,7 @@ public class Command {
 			return;
 		}
 
+		int convertedQty = slice.quantity();
 		Hero hero = Dungeon.hero;
 		int slot = sliced ? -1 : Dungeon.quickslot.getSlot(original);
 
@@ -526,6 +585,8 @@ public class Command {
 		} finally {
 			Modifiers.suppressCommandWindow = false;
 		}
+
+		recordUpgradeScrollChoice(original, chosenClass, convertedQty);
 
 		if (result.isIdentified()){
 			Catalog.setSeen(result.getClass());
@@ -605,6 +666,8 @@ public class Command {
 			Dungeon.hero.notePickupResult( toPick, false );
 			return;
 		}
+
+		recordUpgradeScrollChoice(incoming, chosen, incoming.quantity());
 
 		takeFromHeap( heap, incoming );
 

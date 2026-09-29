@@ -223,6 +223,7 @@ public class FirstDescent {
 		}
 		// Legacy kit pieces stay in the kit after a remake
 		if (result != null && item.legacyKit) result.legacyKit = true;
+		if (result != null && item.rebirthGift) result.rebirthGift = true;
 		return result;
 	}
 
@@ -376,6 +377,7 @@ public class FirstDescent {
 		}
 
 		result.quantity(item.quantity());
+		if (item.rebirthGift) result.rebirthGift = true;
 		return result;
 	}
 
@@ -389,7 +391,14 @@ public class FirstDescent {
 				((KindOfWeapon) result).equipSecondary(hero);
 			} else if (item instanceof EquipableItem && result instanceof EquipableItem){
 				((EquipableItem) item).doUnequip(hero, false);
-				((EquipableItem) result).doEquip(hero);
+				// Floor 1 cloth always remakes into a heavier tier. Leave it in the bag.
+				if (item instanceof Armor && Dungeon.depth == 1){
+					if (!result.collect()){
+						Dungeon.level.drop(result, hero.pos).sprite.drop();
+					}
+				} else {
+					((EquipableItem) result).doEquip(hero);
+				}
 			} else {
 				((EquipableItem) item).doUnequip(hero, false);
 				if (!result.collect()){

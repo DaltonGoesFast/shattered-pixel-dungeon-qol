@@ -46,6 +46,9 @@ public class ShatteredPixelDungeon extends Game {
 
 	//starting here we are doing 2 version codes per public update, so use code-1 to get both
 	public static final int v4_0_0 = 909;
+
+	//player debug mode for this process; changing the setting only takes effect after a restart
+	public static boolean debugSession = false;
 	
 	public ShatteredPixelDungeon( PlatformSupport platform ) {
 		super( sceneClass == null ? WelcomeScene.class : sceneClass, platform );
@@ -72,6 +75,8 @@ public class ShatteredPixelDungeon extends Game {
 	@Override
 	public void create() {
 		super.create();
+
+		debugSession = SPDSettings.playerDebug();
 
 		updateSystemUI();
 		SPDAction.loadBindings();

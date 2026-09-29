@@ -2520,7 +2520,8 @@ public class Hero extends Char {
 		}
 		
 		Bones.leave();
-		if (!Dungeon.isModified(Modifiers.LEGACY)) Rebirth.onRunFailed();
+		// Death ends the run. Legacy only carries gear across an amulet loop, so it still owes a gift.
+		Rebirth.onRunFailed();
 		
 		Dungeon.observe();
 		GameScene.updateFog();

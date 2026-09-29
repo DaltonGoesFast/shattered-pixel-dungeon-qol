@@ -131,6 +131,17 @@ public class WndGameInProgress extends Window {
 		}
 		
 		pos += GAP;
+
+		final boolean debugMismatch = info.debugRun != ShatteredPixelDungeon.debugSession;
+		if (debugMismatch) {
+			RenderedTextBlock blocked = PixelScene.renderTextBlock(
+					Messages.get(this, info.debugRun ? "debug_blocked_debug_run" : "debug_blocked_normal_run"), 6);
+			blocked.hardlight(Window.TITLE_COLOR);
+			blocked.maxWidth(WIDTH);
+			blocked.setPos(0, pos);
+			add(blocked);
+			pos = blocked.bottom() + GAP;
+		}
 		
 		RedButton cont = new RedButton(Messages.get(this, "continue")){
 			@Override
@@ -170,6 +181,7 @@ public class WndGameInProgress extends Window {
 
 		cont.icon(Icons.get(Icons.ENTER));
 		cont.setRect(0, pos, WIDTH/2 -1, 20);
+		cont.enable(!debugMismatch);
 		add(cont);
 
 		erase.icon(Icons.get(Icons.CLOSE));

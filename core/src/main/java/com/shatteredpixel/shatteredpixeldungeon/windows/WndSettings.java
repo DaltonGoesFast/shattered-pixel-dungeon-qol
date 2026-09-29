@@ -44,6 +44,7 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.RedButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RenderedTextBlock;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Toolbar;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
+import com.shatteredpixel.shatteredpixeldungeon.utils.PlayerDebugActions;
 import com.shatteredpixel.shatteredpixeldungeon.utils.TalentAutoPlan;
 import com.watabou.input.ControllerHandler;
 import com.watabou.noosa.ColorBlock;
@@ -51,6 +52,7 @@ import com.watabou.noosa.Game;
 import com.watabou.noosa.Image;
 import com.watabou.noosa.audio.Sample;
 import com.watabou.noosa.ui.Component;
+import com.watabou.utils.Callback;
 import com.watabou.utils.DeviceCompat;
 import com.watabou.utils.Random;
 
@@ -75,6 +77,7 @@ public class WndSettings extends WndTabbed {
 	private AdvancedTab advanced;
 	private AudioTab    audio;
 	private LangsTab    langs;
+	private DebugTab    debug;
 
 	public static int last_index = 0;
 
@@ -225,6 +228,20 @@ public class WndSettings extends WndTabbed {
 
 		};
 		add( langsTab );
+
+		debug = new DebugTab();
+		debug.setSize(width, 0);
+		height = Math.max(height, debug.height());
+		add( debug );
+
+		add( new IconTab(Icons.getDebugRun(null)){
+			@Override
+			protected void select(boolean value) {
+				super.select(value);
+				debug.visible = debug.active = value;
+				if (value) last_index = 8;
+			}
+		});
 
 		resize(width, (int)Math.ceil(height));
 
@@ -933,6 +950,8 @@ public class WndSettings extends WndTabbed {
 		CheckBox chkTileIndicator;
 		CheckBox chkFlipStatusPane;
 		RedButton btnResetHudLayout;
+		OptionSlider optQuickslotsShown;
+		RenderedTextBlock txtQuickslotsShown;
 		CheckBox chkShowQuickslotSwapButton;
 		CheckBox chkCenterOnCycleNoEnemies;
 		CheckBox chkBossBarAllEnemies;
@@ -993,6 +1012,26 @@ public class WndSettings extends WndTabbed {
 				};
 				add(btnResetHudLayout);
 			}
+
+			optQuickslotsShown = new OptionSlider(
+					Messages.get(this, "quickslots_shown"),
+					Messages.get(this, "quickslots_auto"),
+					"6",
+					0, 6) {
+				@Override
+				protected void onChange() {
+					SPDSettings.quickslotsShown(getSelectedValue());
+					updateQuickslotsShownText();
+					Toolbar.updateLayout();
+				}
+			};
+			optQuickslotsShown.setSelectedValue(SPDSettings.quickslotsShown());
+			add(optQuickslotsShown);
+
+			txtQuickslotsShown = PixelScene.renderTextBlock(6);
+			txtQuickslotsShown.hardlight(0x888888);
+			add(txtQuickslotsShown);
+			updateQuickslotsShownText();
 
 			chkShowQuickslotSwapButton = new CheckBox(Messages.get(UITab.class, "quickslot_swap_button")) {
 				@Override
@@ -1055,6 +1094,12 @@ public class WndSettings extends WndTabbed {
 			add(chkAutoTalentPlan);
 		}
 
+		private void updateQuickslotsShownText() {
+			int n = SPDSettings.quickslotsShown();
+			txtQuickslotsShown.text(Messages.get(this, "quickslots_showing",
+					n == 0 ? Messages.get(this, "quickslots_auto") : Integer.toString(n)));
+		}
+
 		@Override
 		protected void layout() {
 			title.setPos((width - title.width())/2, y + GAP);
@@ -1079,6 +1124,13 @@ public class WndSettings extends WndTabbed {
 				btnResetHudLayout.setRect(0, pos + GAP, width, BTN_HEIGHT);
 				pos = btnResetHudLayout.bottom();
 			}
+
+			optQuickslotsShown.setRect(0, pos + GAP, width, SLIDER_HEIGHT);
+			pos = optQuickslotsShown.bottom();
+
+			txtQuickslotsShown.maxWidth((int)width);
+			txtQuickslotsShown.setPos((width - txtQuickslotsShown.width())/2f, pos + 1);
+			pos = txtQuickslotsShown.bottom();
 
 			chkShowQuickslotSwapButton.setRect(0, pos + GAP, width, BTN_HEIGHT);
 			pos = chkShowQuickslotSwapButton.bottom();
@@ -1218,6 +1270,150 @@ public class WndSettings extends WndTabbed {
 				pos = chkTransparentVoid.bottom();
 				chkTrainingExport.setRect(0, pos + GAP, width, BTN_HEIGHT);
 				pos = chkTrainingExport.bottom();
+			}
+
+			height = pos;
+		}
+	}
+
+	private static class DebugTab extends Component {
+
+		RenderedTextBlock title;
+		ColorBlock sep1;
+		CheckBox chkDebug;
+		RenderedTextBlock restartNote;
+		ColorBlock sep2;
+		RenderedTextBlock actionsNote;
+		//assigned in createChildren, which Component's constructor calls before field initializers run
+		ArrayList<RedButton> actions;
+		RenderedTextBlock status;
+
+		private static boolean actionsAvailable(){
+			return ShatteredPixelDungeon.debugSession && Dungeon.debugRun
+					&& PlayerDebugActions.precheck() == null;
+		}
+
+		@Override
+		protected void createChildren() {
+			actions = new ArrayList<>();
+
+			title = PixelScene.renderTextBlock(Messages.get(this, "title"), 9);
+			title.hardlight(TITLE_COLOR);
+			add(title);
+
+			sep1 = new ColorBlock(1, 1, 0xFF000000);
+			add(sep1);
+
+			chkDebug = new CheckBox(Messages.get(this, "enable")) {
+				@Override
+				protected void onClick() {
+					super.onClick();
+					SPDSettings.playerDebug(checked());
+				}
+			};
+			chkDebug.checked(SPDSettings.playerDebug());
+			add(chkDebug);
+
+			restartNote = PixelScene.renderTextBlock(Messages.get(this,
+					ShatteredPixelDungeon.debugSession ? "restart_note_on" : "restart_note_off"), 6);
+			restartNote.hardlight(0x888888);
+			add(restartNote);
+
+			if (!ShatteredPixelDungeon.debugSession) return;
+
+			sep2 = new ColorBlock(1, 1, 0xFF000000);
+			add(sep2);
+
+			if (!actionsAvailable()) {
+				actionsNote = PixelScene.renderTextBlock(Messages.get(this, "actions_need_run"), 6);
+				add(actionsNote);
+				return;
+			}
+
+			addAction("heal", new Callback() { public void call() { report(PlayerDebugActions.healAll()); } });
+			addAction("identify", new Callback() { public void call() { report(PlayerDebugActions.identifyAll()); } });
+			addAction("bags", new Callback() { public void call() { report(PlayerDebugActions.giveBags()); } });
+			addAction("reveal", new Callback() { public void call() { report(PlayerDebugActions.revealMap()); } });
+			addAction("stairs_up", new Callback() { public void call() { report(PlayerDebugActions.gotoStairs(false)); } });
+			addAction("stairs_down", new Callback() { public void call() { report(PlayerDebugActions.gotoStairs(true)); } });
+			addAction("give_item", new Callback() { public void call() {
+				ShatteredPixelDungeon.scene().addToFront(new WndPlayerDebugGiveItem());
+			} });
+			addAction("set_level", new Callback() { public void call() {
+				ShatteredPixelDungeon.scene().addToFront(WndPlayerDebugValue.heroLevel());
+			} });
+			addAction("goto_floor", new Callback() { public void call() {
+				ShatteredPixelDungeon.scene().addToFront(WndPlayerDebugValue.floor());
+			} });
+
+			status = PixelScene.renderTextBlock(6);
+			add(status);
+		}
+
+		private void addAction(String key, final Callback onClick){
+			RedButton btn = new RedButton(Messages.get(this, key), 7){
+				@Override
+				protected void onClick() {
+					super.onClick();
+					onClick.call();
+				}
+			};
+			actions.add(btn);
+			add(btn);
+		}
+
+		private void report(String result){
+			if (status == null) return;
+			if (PlayerDebugActions.isError(result)) {
+				status.text(result.substring(4));
+				status.hardlight(CharSprite.NEGATIVE);
+			} else {
+				status.text(result);
+				status.hardlight(CharSprite.POSITIVE);
+			}
+			layout();
+		}
+
+		@Override
+		protected void layout() {
+			title.setPos((width - title.width())/2, y + GAP);
+			sep1.size(width, 1);
+			sep1.y = title.bottom() + 3*GAP;
+
+			float pos = sep1.y + 1;
+			chkDebug.setRect(0, pos + GAP, width, BTN_HEIGHT);
+			pos = chkDebug.bottom();
+
+			restartNote.maxWidth((int)width);
+			restartNote.setPos(0, pos + GAP);
+			pos = restartNote.bottom();
+
+			if (sep2 != null) {
+				sep2.size(width, 1);
+				sep2.y = pos + 2*GAP;
+				pos = sep2.y + 1;
+			}
+
+			if (actionsNote != null) {
+				actionsNote.maxWidth((int)width);
+				actionsNote.setPos(0, pos + GAP);
+				pos = actionsNote.bottom();
+			}
+
+			if (!actions.isEmpty()) {
+				int cols = width > 150 ? 3 : 2;
+				float btnW = (width - (cols - 1)) / cols;
+				for (int i = 0; i < actions.size(); i++) {
+					int col = i % cols;
+					if (col == 0) pos += GAP;
+					actions.get(i).setRect(col * (btnW + 1), pos, btnW, BTN_HEIGHT);
+					if (col == cols - 1 || i == actions.size() - 1) pos = actions.get(i).bottom();
+				}
+
+				status.maxWidth((int)width);
+				status.setPos(0, pos + GAP);
+				//room for a two-line result so the window does not need to grow
+				pos = Math.max(status.bottom(), pos + GAP + 16);
 			}
 
 			height = pos;

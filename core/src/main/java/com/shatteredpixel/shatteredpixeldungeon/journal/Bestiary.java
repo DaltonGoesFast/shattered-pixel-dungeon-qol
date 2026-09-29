@@ -22,6 +22,7 @@
 package com.shatteredpixel.shatteredpixeldungeon.journal;
 
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
+import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.abilities.cleric.PowerOfMany;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.abilities.huntress.SpiritHawk;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.abilities.rogue.ShadowClone;
@@ -305,6 +306,7 @@ public enum Bestiary {
 	}
 
 	public static void setSeen(Class<?> cls){
+		if (Dungeon.debugRun) return;
 		if (classConversions.containsKey(cls)){
 			cls = classConversions.get(cls);
 		}
@@ -334,7 +336,7 @@ public enum Bestiary {
 	}
 
 	public static void countEncounters(Class<?> cls, int encounters){
-		if (skipCountingEncounters){
+		if (skipCountingEncounters || Dungeon.debugRun){
 			return;
 		}
 		if (classConversions.containsKey(cls)){

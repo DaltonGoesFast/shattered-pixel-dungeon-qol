@@ -23,6 +23,7 @@ package com.shatteredpixel.shatteredpixeldungeon;
 
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroClass;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroSubClass;
+import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.watabou.utils.Bundle;
 import com.watabou.utils.FileUtils;
@@ -151,6 +152,8 @@ public class GamesInProgress {
 		info.customSeed = Dungeon.customSeedText;
 		info.daily = Dungeon.daily;
 		info.dailyReplay = Dungeon.dailyReplay;
+		info.debugRun = Dungeon.debugRun;
+		info.feeling = Dungeon.level != null ? Dungeon.level.feeling : Level.Feeling.NONE;
 		
 		info.level = Dungeon.hero.lvl;
 		info.str = Dungeon.hero.STR;
@@ -190,6 +193,8 @@ public class GamesInProgress {
 		public String customSeed;
 		public boolean daily;
 		public boolean dailyReplay;
+		public boolean debugRun;
+		public Level.Feeling feeling = Level.Feeling.NONE;
 		public long lastPlayed;
 
 		public int level;

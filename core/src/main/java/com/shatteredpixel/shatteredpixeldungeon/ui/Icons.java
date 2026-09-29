@@ -484,6 +484,14 @@ public enum Icons {
 		}
 	}
 
+	//debugrun.png follows the depth icon layout: a 6px glyph, then 7px glyphs on an 8px step, in Level.Feeling order
+	public static Image getDebugRun(Level.Feeling feeling){
+		int i = feeling == null ? 0 : feeling.ordinal();
+		Image icon = new Image( Assets.Interfaces.DEBUG_RUN );
+		icon.frame( icon.texture.uvRectBySize( i * 8, 0, i == 0 ? 6 : 7, 7 ) );
+		return icon;
+	}
+
 	public static Image get(Level.Feeling feeling){
 		switch (feeling){
 			case NONE: default:

@@ -4,6 +4,7 @@
 
 package com.shatteredpixel.shatteredpixeldungeon.desktop;
 
+import com.shatteredpixel.shatteredpixeldungeon.utils.DebugItemResolver;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Adrenaline;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Barrier;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Blindness;
@@ -50,7 +51,7 @@ public class StreamerBuffResolver {
 
 		Entry(Class<? extends Buff> clazz, boolean debuff) {
 			this.clazz = clazz;
-			this.classKey = StreamerItemResolver.normalizeKey(clazz.getSimpleName());
+			this.classKey = DebugItemResolver.normalizeKey(clazz.getSimpleName());
 			this.debuff = debuff;
 		}
 	}
@@ -68,7 +69,7 @@ public class StreamerBuffResolver {
 
 	private static void register(Class<? extends Buff> clazz, boolean debuff) {
 		registry.add(new Entry(clazz, debuff));
-		String key = StreamerItemResolver.normalizeKey(clazz.getSimpleName());
+		String key = DebugItemResolver.normalizeKey(clazz.getSimpleName());
 		addAlias(key, clazz);
 	}
 
@@ -97,7 +98,7 @@ public class StreamerBuffResolver {
 		if (input == null || input.trim().isEmpty()) return null;
 		ensureRegistry();
 		String trimmed = input.trim();
-		String key = StreamerItemResolver.normalizeKey(trimmed);
+		String key = DebugItemResolver.normalizeKey(trimmed);
 
 		List<Class<? extends Buff>> exact = byKey.get(key);
 		if (exact != null) {
@@ -157,7 +158,7 @@ public class StreamerBuffResolver {
 	public static List<String> suggestLabels(String input, int maxResults, Boolean debuffOnly) {
 		if (input == null || input.trim().isEmpty() || maxResults <= 0) return Collections.emptyList();
 		ensureRegistry();
-		String key = StreamerItemResolver.normalizeKey(input.trim());
+		String key = DebugItemResolver.normalizeKey(input.trim());
 		ArrayList<Scored> scored = new ArrayList<>();
 		for (Entry e : registry) {
 			if (debuffOnly != null && e.debuff != debuffOnly) continue;

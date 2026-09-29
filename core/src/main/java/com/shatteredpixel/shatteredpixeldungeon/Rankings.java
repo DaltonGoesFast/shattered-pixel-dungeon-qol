@@ -81,6 +81,8 @@ public enum Rankings {
 
 	public void submit( boolean win, Object cause ) {
 
+		if (Dungeon.debugRun) return;
+
 		load();
 		
 		Record rec = new Record();
@@ -347,6 +349,7 @@ public enum Rankings {
 		Actor.clear();
 		Dungeon.hero = null;
 		Dungeon.level = null;
+		Dungeon.debugRun = false;
 		Generator.fullReset();
 		Notes.reset();
 		Dungeon.quickslot.reset();

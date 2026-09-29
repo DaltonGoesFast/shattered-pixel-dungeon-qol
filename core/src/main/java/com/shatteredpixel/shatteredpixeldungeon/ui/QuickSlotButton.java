@@ -47,19 +47,19 @@ public class QuickSlotButton extends Button {
 	public static int activeSet = 0;
 
 	/**
-	 * When {@link SPDSettings#quickSwapper()} is on: narrow toolbar cycles four disjoint triplets (0–2 … 9–11);
-	 * wide toolbar toggles two disjoint six-slot banks (0–5 vs 6–11).
+	 * When {@link SPDSettings#quickSwapper()} is on: the 12 slots are split into disjoint pages of {@link #pageSize}
+	 * (auto: triplets on narrow toolbars, six-slot banks on wide ones; otherwise the fixed quickslot count).
 	 */
 	public static final int QUICKSWAPPER_PAGE_SIZE = 3;
-	public static final int QUICKSWAPPER_PAGE_COUNT = QuickSlot.SIZE / QUICKSWAPPER_PAGE_SIZE;
-	public static final int QUICKSWAPPER_WIDE_BANK_COUNT = QuickSlot.SIZE / QuickSlot.SLOTS_PER_SET;
+	public static int pageSize = QuickSlot.SLOTS_PER_SET;
 	public static int quickSlotPage = 0;
 
+	public static int pageCount() {
+		return (QuickSlot.SIZE + pageSize - 1) / pageSize;
+	}
+
 	public static void advanceQuickSwapperPage() {
-		int span = lastVisible >= QuickSlot.SLOTS_PER_SET
-				? QUICKSWAPPER_WIDE_BANK_COUNT
-				: QUICKSWAPPER_PAGE_COUNT;
-		quickSlotPage = (quickSlotPage + 1) % span;
+		quickSlotPage = (quickSlotPage + 1) % pageCount();
 	}
 
 	private static QuickSlotButton[] instance = new QuickSlotButton[QuickSlot.SLOTS_PER_SET];
@@ -77,11 +77,9 @@ public class QuickSlotButton extends Button {
 	/** Actual quickslot storage index (0-11) for the given toolbar slot index (0-5). */
 	public static int getActualSlot(int displaySlot) {
 		if (SPDSettings.quickSwapper()) {
-			if (lastVisible >= QuickSlot.SLOTS_PER_SET) {
-				int bank = quickSlotPage % QUICKSWAPPER_WIDE_BANK_COUNT;
-				return displaySlot + bank * QuickSlot.SLOTS_PER_SET;
-			}
-			return (displaySlot % QUICKSWAPPER_PAGE_SIZE) + quickSlotPage * QUICKSWAPPER_PAGE_SIZE;
+			int page = quickSlotPage % pageCount();
+			// hidden buttons past the end of a short last page must still map to a real slot
+			return Math.min((displaySlot % pageSize) + page * pageSize, QuickSlot.SIZE - 1);
 		}
 		return displaySlot + activeSet * QuickSlot.SLOTS_PER_SET;
 	}

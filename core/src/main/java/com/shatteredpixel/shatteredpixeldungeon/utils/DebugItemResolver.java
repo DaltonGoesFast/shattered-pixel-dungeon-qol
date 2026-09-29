@@ -1,8 +1,8 @@
 /*
- * Streamer debug: resolve friendly or class item names to Item classes.
+ * Debug tools (player debug mode and streamer debug): resolve friendly or class item names to Item classes.
  */
 
-package com.shatteredpixel.shatteredpixeldungeon.desktop;
+package com.shatteredpixel.shatteredpixeldungeon.utils;
 
 import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
 import com.shatteredpixel.shatteredpixeldungeon.items.Gold;
@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class StreamerItemResolver {
+public class DebugItemResolver {
 
 	private static final String ITEM_PKG = "com.shatteredpixel.shatteredpixeldungeon.items.";
 
@@ -267,6 +267,23 @@ public class StreamerItemResolver {
 
 	/** Search labels for streamer list/search (display name + class). */
 	public static List<String> suggestLabels(String input, int maxResults) {
+		ArrayList<String> out = new ArrayList<>();
+		for (Entry e : scoredEntries(input, maxResults)) {
+			out.add(formatLabel(e));
+		}
+		return out;
+	}
+
+	/** Best-matching item classes for a search term, best first. */
+	public static List<Class<? extends Item>> search(String input, int maxResults) {
+		ArrayList<Class<? extends Item>> out = new ArrayList<>();
+		for (Entry e : scoredEntries(input, maxResults)) {
+			out.add(e.clazz);
+		}
+		return out;
+	}
+
+	private static List<Entry> scoredEntries(String input, int maxResults) {
 		if (input == null || input.trim().isEmpty() || maxResults <= 0) return Collections.emptyList();
 		ensureRegistry();
 		String key = normalizeKey(input.trim());
@@ -283,9 +300,9 @@ public class StreamerItemResolver {
 			}
 		});
 
-		ArrayList<String> out = new ArrayList<>();
+		ArrayList<Entry> out = new ArrayList<>();
 		for (int i = 0; i < scored.size() && out.size() < maxResults; i++) {
-			out.add(formatLabel(scored.get(i).entry));
+			out.add(scored.get(i).entry);
 		}
 		return out;
 	}

@@ -345,6 +345,7 @@ public class GameScene extends PixelScene {
 
 		Rebirth.claimStrayCurrency();
 		FirstDescent.applyIfPending();
+		Rebirth.announceGift();
 		hero.updateArmor();
 		Legacy.resumeIfPending();
 		

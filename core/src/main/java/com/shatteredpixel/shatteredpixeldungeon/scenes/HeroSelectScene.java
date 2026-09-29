@@ -765,7 +765,7 @@ public class HeroSelectScene extends PixelScene {
 					}
 
 					for (GamesInProgress.Info game : GamesInProgress.checkAll()){
-						if (game.daily){
+						if (game.daily && !game.debugRun){
 							ShatteredPixelDungeon.scene().addToFront(new WndMessage(Messages.get(HeroSelectScene.class, "daily_existing")));
 							return;
 						}
@@ -785,6 +785,7 @@ public class HeroSelectScene extends PixelScene {
 						@Override
 						protected void onSelect(int index) {
 							if (index == 0){
+								long dailyTime = SPDSettings.lastDaily();
 								if (diff <= 0) {
 									long time = Game.realTime - (Game.realTime % DAY);
 
@@ -792,7 +793,10 @@ public class HeroSelectScene extends PixelScene {
 									//which is 20,544 days after Jan 1 1970
 									time = Math.max(time, 20_544 * DAY);
 
-									SPDSettings.lastDaily(time);
+									if (!ShatteredPixelDungeon.debugSession) {
+										SPDSettings.lastDaily(time);
+									}
+									dailyTime = time;
 									Dungeon.dailyReplay = false;
 								} else {
 									Dungeon.dailyReplay = true;
@@ -800,7 +804,7 @@ public class HeroSelectScene extends PixelScene {
 
 								Dungeon.hero = null;
 								Dungeon.daily = true;
-								Dungeon.initSeed();
+								Dungeon.initSeed(dailyTime);
 								ActionIndicator.clearAction();
 								InterlevelScene.mode = InterlevelScene.Mode.DESCEND;
 

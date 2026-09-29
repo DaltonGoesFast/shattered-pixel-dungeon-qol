@@ -64,7 +64,7 @@ public final class TrainingExport {
 	}
 
 	public static boolean isEnabled() {
-		return SPDSettings.trainingExportEnabled() && listener != null;
+		return SPDSettings.trainingExportEnabled() && listener != null && !Dungeon.debugRun;
 	}
 
 	public static void onRunStartIfNeeded() {

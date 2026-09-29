@@ -111,6 +111,9 @@ public class Item implements Bundlable {
 	/** Kept in the Legacy pact kit; returns on every later loop while still held. */
 	public boolean legacyKit = false;
 
+	/** This stack is the Rebirth gift for the run that just started. Cleared once announced. */
+	public boolean rebirthGift = false;
+
 	public int customNoteID = -1;
 	/** Optional display name for renameable equipment; empty/null means use default. */
 	public String customName = null;
@@ -226,6 +229,7 @@ public class Item implements Bundlable {
 			other.quantity = 0;
 			if (other.commandLoot) commandLoot = true;
 			if (other.legacyKit) legacyKit = true;
+			if (other.rebirthGift) rebirthGift = true;
 		}
 		return this;
 	}
@@ -633,6 +637,7 @@ public class Item implements Bundlable {
 	private static final String CUSTOM_NAME = "custom_name";
 	private static final String COMMAND_LOOT = "command_loot";
 	private static final String LEGACY_KIT = "legacy_kit";
+	private static final String REBIRTH_GIFT = "rebirth_gift";
 	
 	@Override
 	public void storeInBundle( Bundle bundle ) {
@@ -649,6 +654,7 @@ public class Item implements Bundlable {
 		if (customName != null && !customName.isEmpty()) bundle.put(CUSTOM_NAME, customName);
 		if (commandLoot) bundle.put( COMMAND_LOOT, true );
 		if (legacyKit) bundle.put( LEGACY_KIT, true );
+		if (rebirthGift) bundle.put( REBIRTH_GIFT, true );
 	}
 	
 	@Override
@@ -683,6 +689,7 @@ public class Item implements Bundlable {
 		}
 		commandLoot = bundle.contains( COMMAND_LOOT ) && bundle.getBoolean( COMMAND_LOOT );
 		legacyKit = bundle.contains( LEGACY_KIT ) && bundle.getBoolean( LEGACY_KIT );
+		rebirthGift = bundle.contains( REBIRTH_GIFT ) && bundle.getBoolean( REBIRTH_GIFT );
 	}
 
 	public int targetingPos( Hero user, int dst ){

@@ -26,6 +26,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Amok;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.AscensionChallenge;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Awareness;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.DebugRunMark;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Dread;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Light;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.MagicalSight;
@@ -210,18 +211,25 @@ public class Dungeon {
 
 	public static boolean daily;
 	public static boolean dailyReplay;
+	//stamped from ShatteredPixelDungeon.debugSession when a run starts, never changed afterward
+	public static boolean debugRun;
 	public static String customSeedText = "";
 	public static long seed;
 	public static long lastPlayed;
 
 	//we initialize the seed separately so that things like interlevelscene can access it early
 	public static void initSeed(){
+		initSeed( SPDSettings.lastDaily() );
+	}
+
+	//dailyTime is passed in so a debug daily can use today's seed without consuming the daily
+	public static void initSeed( long dailyTime ){
 		if (daily) {
 			//Ensures that daily seeds are not in the range of user-enterable seeds
-			seed = SPDSettings.lastDaily() + DungeonSeed.TOTAL_SEEDS;
+			seed = dailyTime + DungeonSeed.TOTAL_SEEDS;
 			DateFormat format = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT);
 			format.setTimeZone(TimeZone.getTimeZone("UTC"));
-			customSeedText = format.format(new Date(SPDSettings.lastDaily()));
+			customSeedText = format.format(new Date(dailyTime));
 		} else if (!SPDSettings.customSeed().isEmpty()){
 			customSeedText = SPDSettings.customSeed();
 			seed = DungeonSeed.convertFromText(customSeedText);
@@ -234,6 +242,7 @@ public class Dungeon {
 	public static void init() {
 
 		initialVersion = version = Game.versionCode;
+		debugRun = ShatteredPixelDungeon.debugSession;
 		boolean looping = Legacy.loopPending();
 		if (looping){
 			challenges = Legacy.carriedChallenges();
@@ -309,6 +318,7 @@ public class Dungeon {
 		}
 
 		Modifiers.ensureEvolutionTracker(hero);
+		DebugRunMark.ensureOn(hero);
 
 		Rebirth.reset();
 		if (!looping) Rebirth.deliverIfNeeded();
@@ -639,6 +649,8 @@ public class Dungeon {
 	private static final String CUSTOM_SEED	= "custom_seed";
 	private static final String DAILY	    = "daily";
 	private static final String DAILY_REPLAY= "daily_replay";
+	private static final String DEBUG_RUN   = "debug_run";
+	private static final String FEELING     = "feeling";
 	private static final String LAST_PLAYED = "last_played";
 	private static final String CHALLENGES	= "challenges";
 	private static final String MODIFIERS	= "modifiers";
@@ -667,6 +679,8 @@ public class Dungeon {
 			bundle.put( CUSTOM_SEED, customSeedText );
 			bundle.put( DAILY, daily );
 			bundle.put( DAILY_REPLAY, dailyReplay );
+			bundle.put( DEBUG_RUN, debugRun );
+			if (level != null) bundle.put( FEELING, level.feeling );
 			bundle.put( LAST_PLAYED, lastPlayed = Game.realTime);
 			bundle.put( CHALLENGES, challenges );
 			bundle.put( MODIFIERS, modifiers );
@@ -772,6 +786,7 @@ public class Dungeon {
 		customSeedText = bundle.getString( CUSTOM_SEED );
 		daily = bundle.getBoolean( DAILY );
 		dailyReplay = bundle.getBoolean( DAILY_REPLAY );
+		debugRun = bundle.getBoolean( DEBUG_RUN );
 
 		Actor.clear();
 		Actor.restoreNextID( bundle );
@@ -867,6 +882,7 @@ public class Dungeon {
 		Generator.restoreFromBundle( bundle );
 
 		Modifiers.ensureEvolutionTracker( hero );
+		DebugRunMark.ensureOn( hero );
 
 	}
 	
@@ -911,6 +927,8 @@ public class Dungeon {
 		info.customSeed = bundle.getString( CUSTOM_SEED );
 		info.daily = bundle.getBoolean( DAILY );
 		info.dailyReplay = bundle.getBoolean( DAILY_REPLAY );
+		info.debugRun = bundle.getBoolean( DEBUG_RUN );
+		info.feeling = bundle.contains( FEELING ) ? bundle.getEnum( FEELING, Level.Feeling.class ) : Level.Feeling.NONE;
 		info.lastPlayed = bundle.getLong( LAST_PLAYED );
 
 		Hero.preview( info, bundle.getBundle( HERO ) );

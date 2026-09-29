@@ -29,6 +29,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SwarmGen;
 import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
+import com.shatteredpixel.shatteredpixeldungeon.items.Gold;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.GnollExileSprite;
@@ -114,7 +115,10 @@ public class GnollExile extends Gnoll {
 			int ofs;
 			do {
 				ofs = PathFinder.NEIGHBOURS9[Random.Int(9)];
-			} while (Dungeon.level.solid[pos + ofs] && !Dungeon.level.passable[pos + ofs]);
+			} 			while (Dungeon.level.solid[pos + ofs] && !Dungeon.level.passable[pos + ofs]);
+			if (!(item instanceof Gold)) {
+				Modifiers.markCommandLoot(item);
+			}
 			Dungeon.level.drop( item, pos + ofs ).sprite.drop( pos );
 		}
 
@@ -130,6 +134,11 @@ public class GnollExile extends Gnoll {
 		} else if (seenNotifyCooldown <= 0){
 			target = cell;
 		}
+	}
+
+	@Override
+	public boolean previewHonorChampion() {
+		return true;
 	}
 
 	@Override

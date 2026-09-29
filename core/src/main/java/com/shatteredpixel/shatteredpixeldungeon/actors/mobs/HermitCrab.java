@@ -25,6 +25,7 @@ import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SwarmGen;
 import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
+import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.HermitCrabSprite;
 
 public class HermitCrab extends Crab {
@@ -45,7 +46,9 @@ public class HermitCrab extends Crab {
 		super.rollToDropLoot();
 
 		if (Dungeon.isModified(Modifiers.SACRIFICE) || Dungeon.hero.lvl <= maxLvl + 2){
-			Dungeon.level.drop(Generator.randomArmor(), pos).sprite.drop();
+			Item armor = Generator.randomArmor();
+			Modifiers.markCommandLoot(armor);
+			Dungeon.level.drop(armor, pos).sprite.drop();
 		}
 	}
 

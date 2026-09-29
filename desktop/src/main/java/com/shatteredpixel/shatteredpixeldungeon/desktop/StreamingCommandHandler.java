@@ -175,7 +175,9 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.traps.WeakeningTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.WornDartTrap;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
+import com.shatteredpixel.shatteredpixeldungeon.utils.DebugItemResolver;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
+import com.shatteredpixel.shatteredpixeldungeon.utils.PlayerDebugActions;
 import com.watabou.noosa.Game;
 import com.watabou.utils.BArray;
 import com.watabou.utils.Callback;
@@ -1449,7 +1451,7 @@ public final class StreamingCommandHandler {
 			return "ERR:Enter a search term";
 		limit = Math.max(1, Math.min(limit, 25));
 		ArrayList<String> labels = new ArrayList<>();
-		for (String s : StreamerItemResolver.suggestLabels(query, limit)) {
+		for (String s : DebugItemResolver.suggestLabels(query, limit)) {
 			labels.add("[item] " + s);
 		}
 		int remaining = limit - labels.size();
@@ -1563,111 +1565,16 @@ public final class StreamingCommandHandler {
 
 	/** Streamer debug: give item by display or class name. */
 	public static String handleStreamerGiveItem(String itemName, int quantity, int level, String username) {
-		String err = streamerDebugPrecheck();
-		if (err != null) return err;
-		if (itemName == null || itemName.trim().isEmpty())
-			return "ERR:No item name";
-
-		String ambig = StreamerItemResolver.ambiguousMessage(itemName);
-		if (ambig != null) return "ERR:" + ambig;
-
-		Class<? extends Item> clazz = StreamerItemResolver.resolveClass(itemName);
-		if (clazz == null)
-			return "ERR:" + StreamerItemResolver.unknownMessage(itemName);
-
-		Hero hero = Dungeon.hero;
-		quantity = Math.max(1, Math.min(quantity, 999));
-		level = Math.max(0, Math.min(level, 99));
-
-		if (clazz == Gold.class) {
-			Dungeon.gold += quantity;
-			Statistics.goldCollected += quantity;
-			Badges.validateGoldCollected();
-			hero.sprite.showStatusWithIcon(CharSprite.NEUTRAL, Integer.toString(quantity), FloatingText.GOLD);
-			Sample.INSTANCE.play(Assets.Sounds.GOLD, 1, 1, Random.Float(0.9f, 1.1f));
-			String detail = quantity + " gold";
-			GLog.p(Messages.get(StreamingCommandHandler.class, "streamer_give_item", detail));
-			return detail;
-		}
-
-		int remaining = quantity;
-		String lastTitle = null;
-		while (remaining > 0) {
-			Item item = Reflection.newInstance(clazz);
-			if (item == null) return "ERR:Failed to create item";
-
-			if (level > 0) {
-				item.level(level);
-				item.levelKnown = true;
-			}
-			item.identify(false);
-			item.cursed = false;
-			item.cursedKnown = true;
-
-			if (item instanceof Wand) {
-				((Wand) item).updateLevel();
-			}
-
-			int stackAmt = 1;
-			if (item.stackable) {
-				stackAmt = Math.min(remaining, 20);
-				item.quantity(stackAmt);
-				remaining -= stackAmt;
-			} else {
-				remaining--;
-			}
-
-			if (!item.collect(hero.belongings.backpack)) {
-				if (lastTitle == null)
-					return "ERR:Inventory full";
-				return "ERR:Inventory full (delivered " + lastTitle + " only)";
-			}
-			lastTitle = item.title();
-		}
-
-		Item.updateQuickslot();
-		String detail = lastTitle != null ? lastTitle : clazz.getSimpleName();
-		if (quantity > 1) detail += " x" + quantity;
-		GLog.p(Messages.get(StreamingCommandHandler.class, "streamer_give_item", detail));
-		return detail;
+		return PlayerDebugActions.giveItem(itemName, quantity, level);
 	}
 
 	/** Streamer debug: give any shop bags the hero does not already have. */
-	@SuppressWarnings("unchecked")
 	public static String handleStreamerGiveBags(String username) {
-		String err = streamerDebugPrecheck();
-		if (err != null) return err;
-		Hero hero = Dungeon.hero;
-		Class<? extends Item>[] bags = new Class[]{
-				VelvetPouch.class, ScrollHolder.class, PotionBandolier.class, MagicalHolster.class
-		};
-		ArrayList<String> given = new ArrayList<>();
-		for (Class<? extends Item> clazz : bags) {
-			if (hero.belongings.getItem(clazz) != null) continue;
-			Item bag = Reflection.newInstance(clazz);
-			if (bag == null) return "ERR:Failed to create bag";
-			bag.identify(false);
-			if (!bag.collect(hero.belongings.backpack)) {
-				if (given.isEmpty()) return "ERR:Inventory full";
-				return "ERR:Inventory full (delivered " + String.join(", ", given) + " only)";
-			}
-			given.add(bag.name());
-		}
-		Item.updateQuickslot();
-		if (given.isEmpty()) return "Already have all bags";
-		String detail = String.join(", ", given);
-		GLog.p(Messages.get(StreamingCommandHandler.class, "streamer_give_bags", detail));
-		return detail;
+		return PlayerDebugActions.giveBags();
 	}
 
 	private static String streamerDebugPrecheck() {
-		if (Dungeon.hero == null || Dungeon.level == null)
-			return "ERR:Not in an active run (title/menu)";
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
-			return "ERR:Not in an active run (title/menu)";
-		if (!Dungeon.hero.isAlive())
-			return "ERR:Hero is dead";
-		return null;
+		return PlayerDebugActions.precheck();
 	}
 
 	/**
@@ -1675,155 +1582,32 @@ public final class StreamingCommandHandler {
 	 * cleanses curses on equipped and inventory gear, satisfies hunger, heals to full.
 	 */
 	public static String handleStreamerHealAll(String username) {
-		String err = streamerDebugPrecheck();
-		if (err != null) return err;
-		Hero hero = Dungeon.hero;
-
-		ArrayList<Buff> negatives = new ArrayList<>();
-		for (Buff b : hero.buffs()) {
-			if (b.type == Buff.buffType.NEGATIVE) negatives.add(b);
-		}
-		for (Buff b : negatives) b.detach();
-
-		PotionOfHealing.cure(hero);
-
-		Degrade degrade = hero.buff(Degrade.class);
-		if (degrade != null) degrade.detach();
-
-		ArrayList<Item> uncursables = new ArrayList<>();
-		for (Item item : hero.belongings) {
-			if (ScrollOfRemoveCurse.uncursable(item)) uncursables.add(item);
-		}
-		if (!uncursables.isEmpty()) {
-			ScrollOfRemoveCurse.uncurse(hero, uncursables.toArray(new Item[0]));
-		} else {
-			hero.belongings.uncurseEquipped();
-		}
-
-		Sample.INSTANCE.play(Assets.Sounds.DRINK);
-		hero.buff(Hunger.class).satisfy(Hunger.STARVING);
-
-		if (VialOfBlood.delayBurstHealing()) {
-			Healing healing = Buff.affect(hero, Healing.class);
-			healing.setHeal(hero.HT, 0, VialOfBlood.maxHealPerTurn(), true);
-		} else {
-			hero.HP = hero.HT;
-			hero.sprite.emitter().start(Speck.factory(Speck.HEALING), 0.4f, 4);
-			hero.sprite.showStatusWithIcon(CharSprite.POSITIVE, Integer.toString(hero.HT), FloatingText.HEALING);
-		}
-
-		CellEmitter.get(hero.pos).start(ShaftParticle.FACTORY, 0.2f, 3);
-		hero.interrupt();
-		hero.updateHT(false);
-
-		GLog.p(Messages.get(WaterOfHealth.class, "procced"));
-		return "Well of healing";
+		return PlayerDebugActions.healAll();
 	}
 
 	/** Streamer debug: identify all items in inventory and equipment. */
 	public static String handleStreamerIdentifyAll(String username) {
-		String err = streamerDebugPrecheck();
-		if (err != null) return err;
-		Hero hero = Dungeon.hero;
-		int count = 0;
-		for (Item item : hero.belongings) {
-			if (item != null && !item.isIdentified()) {
-				ScrollOfIdentify.IDItem(item);
-				count++;
-			}
-		}
-		Item.updateQuickslot();
-		if (count == 0) {
-			GLog.i(Messages.get(StreamingCommandHandler.class, "streamer_identify_none"));
-			return "Nothing to identify";
-		}
-		GLog.p(Messages.get(StreamingCommandHandler.class, "streamer_identify_all", count));
-		return "Identified " + count + " item(s)";
+		return PlayerDebugActions.identifyAll();
 	}
 
 	/** Streamer debug: magic mapping for the current floor (like scroll of magic mapping). */
 	public static String handleStreamerRevealMap(String username) {
-		String err = streamerDebugPrecheck();
-		if (err != null) return err;
-		Hero hero = Dungeon.hero;
-
-		int length = Dungeon.level.length();
-		int[] map = Dungeon.level.map;
-		boolean[] mapped = Dungeon.level.mapped;
-		boolean[] discoverable = Dungeon.level.discoverable;
-		boolean noticed = false;
-
-		for (int i = 0; i < length; i++) {
-			int terr = map[i];
-			if (discoverable[i]) {
-				mapped[i] = true;
-				if ((Terrain.flags[terr] & Terrain.SECRET) != 0) {
-					Dungeon.level.discover(i);
-					if (Dungeon.level.heroFOV[i]) {
-						GameScene.discoverTile(i, terr);
-						ScrollOfMagicMapping.discover(i);
-						noticed = true;
-					}
-				}
-			}
-		}
-		GameScene.updateFog();
-		GLog.i(Messages.get(ScrollOfMagicMapping.class, "layout"));
-		if (noticed) {
-			Sample.INSTANCE.play(Assets.Sounds.SECRET);
-		}
-		SpellSprite.show(hero, SpellSprite.MAP);
-		Sample.INSTANCE.play(Assets.Sounds.READ);
-		hero.interrupt();
-		return "Map revealed";
+		return PlayerDebugActions.revealMap();
 	}
 
 	/** Streamer debug: teleport to floor exit (down) or entrance (up). */
 	public static String handleStreamerGotoStairs(String username, boolean stairsDown) {
-		String err = streamerDebugPrecheck();
-		if (err != null) return err;
-		Hero hero = Dungeon.hero;
-
-		int cell = stairsDown ? Dungeon.level.exit() : Dungeon.level.entrance();
-		if (cell <= 0) {
-			return stairsDown ? "ERR:No stairs down on this level" : "ERR:No stairs up on this level";
-		}
-		if (!ScrollOfTeleportation.teleportToLocation(hero, cell)) {
-			return "ERR:Cannot reach stairs (blocked)";
-		}
-		hero.interrupt();
-		GLog.i(Messages.get(ScrollOfTeleportation.class, "tele"));
-		return stairsDown ? "Stairs down" : "Stairs up";
+		return PlayerDebugActions.gotoStairs(stairsDown);
 	}
 
 	/** Streamer debug: set hero level (1–30). */
 	public static String handleStreamerSetHeroLevel(int level, String username) {
-		String err = streamerDebugPrecheck();
-		if (err != null) return err;
-		Hero hero = Dungeon.hero;
-		int target = Math.max(1, Math.min(level, Hero.MAX_LEVEL));
-		int from = hero.lvl;
-		if (target == from) return "Already level " + from;
-		hero.setLevelForDebug(target);
-		GLog.p(Messages.get(StreamingCommandHandler.class, "streamer_set_level", hero.lvl));
-		return "Level " + from + " → " + hero.lvl;
+		return PlayerDebugActions.setHeroLevel(level);
 	}
 
 	/** Streamer debug: warp to a dungeon floor (1–26, branch 0). */
 	public static String handleStreamerGotoFloor(int depth, String username) {
-		String err = streamerDebugPrecheck();
-		if (err != null) return err;
-		int dest = Math.max(1, Math.min(depth, 26));
-		if (dest == Dungeon.depth && Dungeon.branch == 0)
-			return "Already on floor " + dest;
-		InterlevelScene.mode = InterlevelScene.Mode.RETURN;
-		InterlevelScene.returnDepth = dest;
-		InterlevelScene.returnBranch = 0;
-		InterlevelScene.returnPos = -1;
-		InterlevelScene.debugGenerateSkipped = true;
-		GLog.i(Messages.get(StreamingCommandHandler.class, "streamer_goto_floor", dest));
-		Game.switchScene(InterlevelScene.class);
-		return "Floor " + dest;
+		return PlayerDebugActions.gotoFloor(depth);
 	}
 
 	/** Phase 2: full monster list. Returns null for unknown. */

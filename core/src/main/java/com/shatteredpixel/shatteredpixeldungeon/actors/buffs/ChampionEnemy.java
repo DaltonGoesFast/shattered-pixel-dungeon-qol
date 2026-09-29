@@ -41,6 +41,7 @@ import com.watabou.utils.BArray;
 import com.watabou.utils.Bundle;
 import com.watabou.utils.PathFinder;
 import com.watabou.utils.Random;
+import com.watabou.utils.Reflection;
 
 public abstract class ChampionEnemy extends Buff {
 
@@ -167,16 +168,88 @@ public abstract class ChampionEnemy extends Buff {
 		}
 
 		private Class<?extends ChampionEnemy> champCls;
+		private ChampionEnemy preview;
 
 		public void setChampionClass(Class<?extends ChampionEnemy> cls){
 			champCls = cls;
+			preview = null;
+			if (target != null && target.sprite != null){
+				fx(true);
+			}
 		}
 
 		public void activate(){
-			if (champCls != null && target != null){
-				Buff.affect(target, champCls);
-			}
+			Class<?extends ChampionEnemy> cls = champCls;
 			detach();
+			if (cls != null && target != null){
+				Buff.affect(target, cls);
+			}
+		}
+
+		/** Examine text for a champion type that is visible but not yet active. */
+		public String previewText(){
+			ChampionEnemy shown = shownPreview();
+			if (shown == null) return null;
+			return "\n\n_" + Messages.titleCase(shown.name()) + "_\n" + shown.desc();
+		}
+
+		private ChampionEnemy preview(){
+			if (champCls == null) return null;
+			if (preview == null || preview.getClass() != champCls){
+				preview = Reflection.newInstance(champCls);
+			}
+			return preview;
+		}
+
+		private boolean showsType(){
+			if (champCls == null || !(target instanceof Mob)) return false;
+			if (!((Mob)target).previewHonorChampion()) return false;
+			return target.buff(champCls) == null;
+		}
+
+		private ChampionEnemy shownPreview(){
+			return showsType() ? preview() : null;
+		}
+
+		@Override
+		public int icon() {
+			return showsType() ? BuffIndicator.CORRUPT : BuffIndicator.NONE;
+		}
+
+		@Override
+		public void tintIcon(Image icon) {
+			ChampionEnemy shown = shownPreview();
+			if (shown != null) icon.hardlight(shown.color);
+		}
+
+		@Override
+		public String name() {
+			ChampionEnemy shown = shownPreview();
+			return shown != null ? shown.name() : super.name();
+		}
+
+		@Override
+		public String desc() {
+			ChampionEnemy shown = shownPreview();
+			return shown != null ? shown.desc() : super.desc();
+		}
+
+		@Override
+		public void fx(boolean on) {
+			ChampionEnemy shown = shownPreview();
+			if (shown == null || target == null || target.sprite == null) return;
+			if (on){
+				target.sprite.aura(shown.color, shown.rays);
+			} else {
+				boolean kept = false;
+				for (ChampionEnemy champ : target.buffs(ChampionEnemy.class)){
+					if (champ.color == shown.color){
+						kept = true;
+						break;
+					}
+				}
+				if (!kept) target.sprite.clearAura(shown.color);
+			}
 		}
 
 		@Override

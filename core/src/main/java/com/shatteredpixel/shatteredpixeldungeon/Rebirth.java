@@ -31,8 +31,10 @@ import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.ClassArmor;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.Artifact;
 import com.shatteredpixel.shatteredpixeldungeon.items.bags.Bag;
+import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfHealing;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
+import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndBag;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndRebirth;
 import com.watabou.noosa.Game;
@@ -194,10 +196,35 @@ public class Rebirth {
 	 */
 	private static Item consolationItem(){
 		Item gift = Generator.random();
-		if (gift == null || gift instanceof Gold || gift instanceof EnergyCrystal || gift.quantity() <= 0){
-			gift = Generator.random(Generator.Category.SCROLL);
+		if (!isLootGift(gift)){
+			gift = Generator.randomUsingDefaults(Generator.Category.SCROLL);
+		}
+		if (!isLootGift(gift)){
+			gift = Generator.randomUsingDefaults(Generator.Category.POTION);
+		}
+		if (!isLootGift(gift)){
+			gift = new PotionOfHealing();
 		}
 		return gift;
+	}
+
+	private static boolean isLootGift( Item gift ){
+		return eligible(gift) && gift.quantity() > 0;
+	}
+
+	/** Call from {@link GameScene} after Enigma/Metamorphosis, so the log names the item still in the bag. */
+	public static void announceGift(){
+		if (Dungeon.hero == null || Dungeon.hero.belongings == null) return;
+		Item gift = null;
+		for (Item item : Dungeon.hero.belongings){
+			if (item.rebirthGift){
+				gift = item;
+				break;
+			}
+		}
+		if (gift == null) return;
+		gift.rebirthGift = false;
+		GLog.p(Messages.get(Rebirth.class, "gift", gift.name()));
 	}
 
 	private static void giveGift( Item gift ){
@@ -209,6 +236,7 @@ public class Rebirth {
 			Dungeon.energy += gift.quantity();
 			return;
 		}
+		gift.rebirthGift = true;
 		if (!gift.collect(Dungeon.hero.belongings.backpack)){
 			// Starting kit always has room; force-add if somehow full
 			Dungeon.hero.belongings.backpack.items.add(gift);

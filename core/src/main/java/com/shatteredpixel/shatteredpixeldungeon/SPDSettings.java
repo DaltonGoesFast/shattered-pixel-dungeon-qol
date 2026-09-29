@@ -181,6 +181,7 @@ public class SPDSettings extends GameSettings {
 	public static final String KEY_SCALE		= "scale";
 	public static final String KEY_QUICK_SWAP	= "quickslot_swapper";
 	public static final String KEY_SHOW_QUICKSLOT_SWAP_BUTTON = "show_quickslot_swap_button";
+	public static final String KEY_QUICKSLOTS_SHOWN = "quickslots_shown";
 	public static final String KEY_FLIPTOOLBAR	= "flipped_ui";
 	public static final String KEY_FLIPTAGS 	= "flip_tags";
 	public static final String KEY_FLIPSTATUSPANE = "flip_status_pane";
@@ -231,6 +232,15 @@ public class SPDSettings extends GameSettings {
 	/** On-screen swap chip while quickslot swapper is on; desktop defaults off (use hotkey). */
 	public static boolean showQuickslotSwapButton() {
 		return getBoolean( KEY_SHOW_QUICKSLOT_SWAP_BUTTON, !DeviceCompat.isDesktop() );
+	}
+
+	public static void quickslotsShown( int value ) {
+		put( KEY_QUICKSLOTS_SHOWN, value );
+	}
+
+	/** 0 = auto (width-based), 1-6 = fixed number of toolbar quickslot buttons. */
+	public static int quickslotsShown() {
+		return getInt( KEY_QUICKSLOTS_SHOWN, 0, 0, 6 );
 	}
 	
 	public static void flipToolbar( boolean value) {
@@ -684,5 +694,16 @@ public class SPDSettings extends GameSettings {
 
 	public static boolean trainingExportEnabled() {
 		return getBoolean( KEY_TRAINING_EXPORT_ENABLED, false );
+	}
+
+	public static final String KEY_PLAYER_DEBUG = "player_debug";
+
+	//read into ShatteredPixelDungeon.debugSession once per process
+	public static void playerDebug( boolean value ) {
+		put( KEY_PLAYER_DEBUG, value );
+	}
+
+	public static boolean playerDebug() {
+		return getBoolean( KEY_PLAYER_DEBUG, false );
 	}
 }

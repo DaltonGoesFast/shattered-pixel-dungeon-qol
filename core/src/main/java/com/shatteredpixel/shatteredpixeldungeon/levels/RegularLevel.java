@@ -697,14 +697,10 @@ public abstract class RegularLevel extends Level {
 			}
 		Random.popGenerator();
 
-		//extra spyglass loot
+		//extra spyglass loot stays hidden on the floor, even under the sacrifice pact
 		Random.pushGenerator(Random.Long());
 			int items = (int)(Random.Float() + CrackedSpyglass.extraLootChance());
 			for (int i = 0; i < items; i++){
-				if (sacrifice){
-					hoard.add(Generator.randomUsingDefaults());
-					continue;
-				}
 				int cell = randomDropCell();
 				if (map[cell] == Terrain.HIGH_GRASS || map[cell] == Terrain.FURROWED_GRASS) {
 					map[cell] = Terrain.GRASS;

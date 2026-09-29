@@ -76,6 +76,7 @@ Import bundle: `Lastest UI/streamerbot/shatter-the-streamer-export-0.2.0` (no `.
 | [setpiece-commands-brainstorm.md](setpiece-commands-brainstorm.md) | Draft high-cost setpiece spends (`!mimic`, `!pedestal`, `!trial`, `!ambush`, `!greed`) |
 | [run-artifacts.md](run-artifacts.md) | RoR2-style run modifiers (Honor, Command, Sacrifice, …) — brainstorm only |
 | [pact-ideas.md](pact-ideas.md) | Next pact pitches. Grudge is shaped on the gnoll brute death-rage |
+| [player-debug-guideline.md](player-debug-guideline.md) | Opt-in player debug mode. Guideline only; plan before implementing |
 
 ---
 

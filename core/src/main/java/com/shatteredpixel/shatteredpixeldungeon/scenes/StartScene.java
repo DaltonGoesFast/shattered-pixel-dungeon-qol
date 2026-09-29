@@ -274,7 +274,10 @@ public class StartScene extends PixelScene {
 					level.resetColor();
 				}
 
-				if (info.daily){
+				steps.resetColor();
+				if (info.debugRun){
+					steps.hardlight(2f, 0.6f, 0.6f);
+				} else if (info.daily){
 					if (info.dailyReplay){
 						steps.hardlight(1f, 0.5f, 2f);
 					} else {

@@ -95,7 +95,7 @@ public class MenuPane extends Component {
 		version.hardlight( 0xCACFC2 );
 		add(version);
 
-		depthIcon = Icons.get(Dungeon.level.feeling);
+		depthIcon = Dungeon.debugRun ? Icons.getDebugRun(Dungeon.level.feeling) : Icons.get(Dungeon.level.feeling);
 		add(depthIcon);
 
 		depthText = new BitmapText( Integer.toString( Dungeon.depth ), PixelScene.pixelFont);

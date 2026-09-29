@@ -22,6 +22,7 @@
 package com.shatteredpixel.shatteredpixeldungeon.actors.mobs;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SwarmGen;
 import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
@@ -118,6 +119,7 @@ public class ArmoredStatue extends Statue {
 		if (buff(Corrupting.CorruptingTracker.class) == null
 				&& !SwarmGen.isClone(this)) {
 			armor.identify(false);
+			Modifiers.markCommandLoot(armor);
 			Dungeon.level.drop(armor, pos).sprite.drop();
 		}
 		super.die( cause );

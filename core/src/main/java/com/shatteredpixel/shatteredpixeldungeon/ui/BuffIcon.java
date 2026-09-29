@@ -49,6 +49,7 @@ public class BuffIcon extends Image {
 	}
 
 	public void refresh(Buff buff){
+		if (buff.customIcon(this, large)) return;
 		refresh(buff.icon());
 		buff.tintIcon(this);
 	}
