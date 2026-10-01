@@ -73,10 +73,11 @@ public class RunicBlade extends MeleeWeapon {
 		}
 
 		//we apply here because of projecting
-		RunicSlashTracker tracker = Buff.affect(hero, RunicSlashTracker.class);
+		Char striker = GraveDuel.striker(hero);
+		RunicSlashTracker tracker = Buff.affect(striker, RunicSlashTracker.class);
 		tracker.boost = 3f + 0.50f*buffedLvl();
 		hero.belongings.abilityWeapon = this;
-		if (!hero.canAttack(enemy)){
+		if (!GraveDuel.canAttack(hero, enemy)){
 			GLog.w(Messages.get(this, "ability_target_range"));
 			tracker.detach();
 			hero.belongings.abilityWeapon = null;
@@ -84,12 +85,12 @@ public class RunicBlade extends MeleeWeapon {
 		}
 		hero.belongings.abilityWeapon = null;
 
-		hero.sprite.attack(enemy.pos, new Callback() {
+		striker.sprite.attack(enemy.pos, new Callback() {
 			@Override
 			public void call() {
 				beforeAbilityUsed(hero, enemy);
 				AttackIndicator.target(enemy);
-				if (hero.attack(enemy, 1f, 0, Char.INFINITE_ACCURACY)){
+				if (GraveDuel.attack(hero, enemy, 1f, 0, Char.INFINITE_ACCURACY)){
 					Sample.INSTANCE.play(Assets.Sounds.HIT_STRONG);
 					if (!enemy.isAlive()){
 						onAbilityKill(hero, enemy);

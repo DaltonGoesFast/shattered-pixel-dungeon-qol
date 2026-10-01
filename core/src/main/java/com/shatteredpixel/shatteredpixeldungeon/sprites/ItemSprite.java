@@ -26,6 +26,7 @@ import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.effects.CellEmitter;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Speck;
 import com.shatteredpixel.shatteredpixeldungeon.items.Gold;
+import com.shatteredpixel.shatteredpixeldungeon.items.GraveChalice;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.bombs.SpiteBomb;
@@ -214,6 +215,12 @@ public class ItemSprite extends MovieClip {
 			texture(Assets.Sprites.SPITE);
 			frame(0, 0, 10, 13);
 			perspectiveRaise = 5 / 16f;
+			glow(item.glowing());
+		} else if (item instanceof GraveChalice) {
+			if (this.emitter != null) this.emitter.killAndErase();
+			emitter = null;
+			texture(Assets.Sprites.GRAVE_CHALICE);
+			frame(0, 0, 12, 15);
 			glow(item.glowing());
 		} else {
 			view(item.image(), item.glowing());

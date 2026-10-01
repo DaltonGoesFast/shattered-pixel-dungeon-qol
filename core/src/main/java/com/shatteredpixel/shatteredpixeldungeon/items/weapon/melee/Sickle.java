@@ -93,21 +93,22 @@ public class Sickle extends MeleeWeapon {
 		}
 
 		hero.belongings.abilityWeapon = wep;
-		if (!hero.canAttack(enemy)){
+		if (!GraveDuel.canAttack(hero, enemy)){
 			GLog.w(Messages.get(wep, "ability_target_range"));
 			hero.belongings.abilityWeapon = null;
 			return;
 		}
 		hero.belongings.abilityWeapon = null;
 
-		hero.sprite.attack(enemy.pos, new Callback() {
+		Char striker = GraveDuel.striker(hero);
+		striker.sprite.attack(enemy.pos, new Callback() {
 			@Override
 			public void call() {
 				wep.beforeAbilityUsed(hero, enemy);
 				AttackIndicator.target(enemy);
 
-				Buff.affect(hero, HarvestBleedTracker.class, 0);
-				if (hero.attack(enemy, bleedMulti, bleedBoost, Char.INFINITE_ACCURACY)){
+				Buff.affect(striker, HarvestBleedTracker.class, 0);
+				if (GraveDuel.attack(hero, enemy, bleedMulti, bleedBoost, Char.INFINITE_ACCURACY)){
 					Sample.INSTANCE.play(Assets.Sounds.HIT_STRONG);
 				}
 

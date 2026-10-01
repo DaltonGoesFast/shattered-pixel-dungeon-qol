@@ -22,6 +22,7 @@
 package com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Guild;
 import com.shatteredpixel.shatteredpixeldungeon.Legacy;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Belongings;
@@ -224,6 +225,20 @@ public class ShopRoom extends SpecialRoom {
 
 		ArrayList<Item> itemsToSpawn = new ArrayList<>();
 
+		if (Guild.active()){
+			itemsToSpawn.addAll( Guild.stock() );
+
+			Bag bag = ChooseBag(Dungeon.hero.belongings);
+			if (bag != null) {
+				itemsToSpawn.add(bag);
+			}
+
+			if (Legacy.shopStocksAnkh()) itemsToSpawn.add( new Ankh() );
+			addSandbags( itemsToSpawn );
+
+			return shuffled( itemsToSpawn );
+		}
+
 		MeleeWeapon w;
 		MissileWeapon m;
 		switch (Dungeon.depth) {
@@ -308,27 +323,7 @@ public class ShopRoom extends SpecialRoom {
 		if (Legacy.shopStocksAnkh()) itemsToSpawn.add( new Ankh() );
 		itemsToSpawn.add( new StoneOfAugmentation() );
 
-		TimekeepersHourglass hourglass = Dungeon.hero.belongings.getItem(TimekeepersHourglass.class);
-		if (hourglass != null && hourglass.isIdentified() && !hourglass.cursed){
-			int bags = 0;
-			//creates the given float percent of the remaining bags to be dropped.
-			//this way players who get the hourglass late can still max it, usually.
-			switch (Dungeon.depth) {
-				case 6:
-					bags = (int)Math.ceil(( 5-hourglass.sandBags) * 0.20f ); break;
-				case 11:
-					bags = (int)Math.ceil(( 5-hourglass.sandBags) * 0.25f ); break;
-				case 16:
-					bags = (int)Math.ceil(( 5-hourglass.sandBags) * 0.50f ); break;
-				case 20: case 21:
-					bags = (int)Math.ceil(( 5-hourglass.sandBags) * 0.80f ); break;
-			}
-
-			for(int i = 1; i <= bags; i++){
-				itemsToSpawn.add( new TimekeepersHourglass.sandBag());
-				hourglass.sandBags ++;
-			}
-		}
+		addSandbags( itemsToSpawn );
 
 		Item rare;
 		switch (Random.Int(10)){
@@ -350,6 +345,34 @@ public class ShopRoom extends SpecialRoom {
 		rare.cursedKnown = true;
 		itemsToSpawn.add( rare );
 
+		return shuffled( itemsToSpawn );
+	}
+
+	private static void addSandbags( ArrayList<Item> itemsToSpawn ){
+		TimekeepersHourglass hourglass = Dungeon.hero.belongings.getItem(TimekeepersHourglass.class);
+		if (hourglass != null && hourglass.isIdentified() && !hourglass.cursed){
+			int bags = 0;
+			//creates the given float percent of the remaining bags to be dropped.
+			//this way players who get the hourglass late can still max it, usually.
+			switch (Dungeon.depth) {
+				case 6:
+					bags = (int)Math.ceil(( 5-hourglass.sandBags) * 0.20f ); break;
+				case 11:
+					bags = (int)Math.ceil(( 5-hourglass.sandBags) * 0.25f ); break;
+				case 16:
+					bags = (int)Math.ceil(( 5-hourglass.sandBags) * 0.50f ); break;
+				case 20: case 21:
+					bags = (int)Math.ceil(( 5-hourglass.sandBags) * 0.80f ); break;
+			}
+
+			for(int i = 1; i <= bags; i++){
+				itemsToSpawn.add( new TimekeepersHourglass.sandBag());
+				hourglass.sandBags ++;
+			}
+		}
+	}
+
+	private static ArrayList<Item> shuffled( ArrayList<Item> itemsToSpawn ){
 		//use a new generator here to prevent items in shop stock affecting levelgen RNG (e.g. sandbags)
 		//we can use a random long for the seed as it will be the same long every time
 		Random.pushGenerator(Random.Long());

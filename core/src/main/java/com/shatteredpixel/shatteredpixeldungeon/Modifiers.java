@@ -27,10 +27,14 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ChatSpawned;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.EvolutionTracker;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.GraveShade;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.MirrorImage;
+import com.shatteredpixel.shatteredpixeldungeon.effects.FloatingText;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.elixirs.ElixirOfMight;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfMight;
+import com.shatteredpixel.shatteredpixeldungeon.sprites.CharSprite;
+import com.watabou.utils.Random;
 
 /**
  * Run-wide pacts (UI) / modifiers (code). Parallel to {@link Challenges}; does not
@@ -56,6 +60,10 @@ public class Modifiers {
 	public static final int REBIRTH         = 16384;
 	public static final int ENIGMA          = 32768;
 	public static final int LEGACY          = 65536;
+	public static final int CRIMSON         = 131072;
+	public static final int GRAVE           = 262144;
+	public static final int GUILD           = 524288;
+	public static final int CHIMERA         = 1048576;
 
 	/** Settings clamp; bits 0–30 are storable. */
 	public static final int MAX_VALUE       = Integer.MAX_VALUE;
@@ -64,7 +72,7 @@ public class Modifiers {
 	public static final int[] IMPLEMENTED_MASKS = {
 			HONOR, GLASS, FRAILTY, DEATH, DEVOTION, SPITE, SOUL,
 			KIN, DISSONANCE, METAMORPHOSIS, COMMAND, ENIGMA, REBIRTH, SWARMS, SACRIFICE, EVOLUTION,
-			LEGACY
+			LEGACY, CRIMSON, GRAVE, GUILD, CHIMERA
 	};
 
 	/** Bits forbidden on daily / custom-seed runs (seed comparability). */
@@ -113,7 +121,9 @@ public class Modifiers {
 
 	/** Ids parallel to {@link #MASKS}. The pact window groups these into tabs. */
 	public static final String[] NAME_IDS = {
+			"chimera",
 			"command",
+			"crimson",
 			"death",
 			"devotion",
 			"dissonance",
@@ -121,6 +131,8 @@ public class Modifiers {
 			"evolution",
 			"frailty",
 			"glass",
+			"grave",
+			"guild",
 			"honor",
 			"kin",
 			"legacy",
@@ -133,7 +145,9 @@ public class Modifiers {
 	};
 
 	public static final int[] MASKS = {
+			CHIMERA,
 			COMMAND,
+			CRIMSON,
 			DEATH,
 			DEVOTION,
 			DISSONANCE,
@@ -141,6 +155,8 @@ public class Modifiers {
 			EVOLUTION,
 			FRAILTY,
 			GLASS,
+			GRAVE,
+			GUILD,
 			HONOR,
 			KIN,
 			LEGACY,
@@ -153,7 +169,7 @@ public class Modifiers {
 	};
 
 	/** Pact window: rules on you and your side. */
-	public static final int[] HERO_PACTS = { DEATH, FRAILTY, GLASS, DEVOTION };
+	public static final int[] HERO_PACTS = { DEATH, FRAILTY, GLASS, DEVOTION, CRIMSON, GRAVE, CHIMERA };
 
 	/** Pact window: who is in the dungeon and what they do. */
 	public static final int[] FOES_PACTS = {
@@ -162,7 +178,7 @@ public class Modifiers {
 
 	/** Pact window: items and what carries between runs. */
 	public static final int[] SPOILS_PACTS = {
-			COMMAND, ENIGMA, METAMORPHOSIS, SACRIFICE, REBIRTH, LEGACY
+			COMMAND, ENIGMA, METAMORPHOSIS, SACRIFICE, REBIRTH, LEGACY, GUILD
 	};
 
 	public static String idForMask( int mask ){
@@ -215,11 +231,12 @@ public class Modifiers {
 		return true;
 	}
 
-	/** Devotion covers every ally except Mirror Images. */
+	/** Devotion covers every ally except Mirror Images and Grave shades. */
 	public static boolean isDevotionAlly( Char ch ){
 		if (ch == null || ch == Dungeon.hero) return false;
 		if (ch.alignment != Char.Alignment.ALLY) return false;
 		if (ch instanceof MirrorImage) return false;
+		if (ch instanceof GraveShade) return false;
 		return true;
 	}
 
@@ -251,6 +268,45 @@ public class Modifiers {
 				ch.HT = cap;
 				ch.HP = Math.min(ch.HP, ch.HT);
 			}
+		}
+	}
+
+	/** Crimson blocks hit-point restoration on the hero only. */
+	public static boolean crimsonBlocksHeal( Char ch ){
+		return ch != null && ch == Dungeon.hero && Dungeon.isModified(CRIMSON);
+	}
+
+	/** Heal from a hero attack. Under Glass, any hit that removed hit points heals 1. */
+	public static void crimsonStrikeHeal( Char attacker, int preGlassDmg, int hpRemoved ){
+		if (!Dungeon.isModified(CRIMSON) || hpRemoved <= 0) return;
+		boolean shade = attacker instanceof GraveShade;
+		if (attacker != Dungeon.hero && !shade) return;
+		float heal;
+		if (Dungeon.isModified(GLASS)){
+			heal = 1;
+		} else {
+			int basis = Math.min(preGlassDmg, hpRemoved);
+			if (basis <= 0) return;
+			heal = Math.max(1, basis / 4);
+		}
+		//Grave shades restore at half the hero's rate; fractions round randomly
+		if (shade){
+			heal *= CRIMSON_SHADE_RATE;
+			heal = (int)heal + (Random.Float() < heal % 1 ? 1 : 0);
+		}
+		if (heal >= 1) crimsonHeal((int)heal);
+	}
+
+	public static final float CRIMSON_SHADE_RATE = 0.5f;
+
+	public static void crimsonHeal( int amount ){
+		Hero hero = Dungeon.hero;
+		if (hero == null || !hero.isAlive()) return;
+		amount = Math.min(amount, hero.HT - hero.HP);
+		if (amount <= 0) return;
+		hero.HP += amount;
+		if (hero.sprite != null){
+			hero.sprite.showStatusWithIcon(CharSprite.POSITIVE, Integer.toString(amount), FloatingText.HEALING);
 		}
 	}
 

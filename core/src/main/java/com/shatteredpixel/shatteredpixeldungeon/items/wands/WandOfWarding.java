@@ -24,6 +24,7 @@ package com.shatteredpixel.shatteredpixeldungeon.items.wands;
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.AllyBuff;
@@ -34,6 +35,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Terror;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Vertigo;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.spells.Stasis;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.GraveShade;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.NPC;
 import com.shatteredpixel.shatteredpixeldungeon.effects.FloatingText;
 import com.shatteredpixel.shatteredpixeldungeon.effects.MagicMissile;
@@ -53,6 +55,8 @@ import com.watabou.utils.Bundle;
 import com.watabou.utils.Callback;
 import com.watabou.utils.PointF;
 import com.watabou.utils.Random;
+
+import java.util.ArrayList;
 
 public class WandOfWarding extends Wand {
 
@@ -103,7 +107,11 @@ public class WandOfWarding extends Wand {
 		wardAvailable = (currentWardEnergy < maxWardEnergy);
 		
 		Char ch = Actor.findChar(target);
-		if (ch instanceof Ward){
+		int collision = new Ballistica(owner.pos, target, collisionProperties(target)).collisionPos;
+		if (!cursed && (shadeTarget(target, collision) != null
+				|| (Dungeon.isModified(Modifiers.GRAVE) && enemyTarget(target, collision) != null))){
+			//shade zaps, and Grave zaps at enemies, never place a ward, so ward energy does not refuse them
+		} else if (ch instanceof Ward){
 			if (!wardAvailable && ((Ward) ch).tier <= 3){
 				GLog.w( Messages.get(this, "no_more_wards"));
 				return false;
@@ -118,6 +126,27 @@ public class WandOfWarding extends Wand {
 		return super.tryToZap(owner, target);
 	}
 	
+	@Override
+	public void onShadeZap( GraveShade shade ) {
+		ArrayList<Ward> wards = new ArrayList<>();
+		for (Char ch : Actor.chars()){
+			if (ch instanceof Ward) wards.add((Ward) ch);
+		}
+		if (Stasis.getStasisAlly() instanceof Ward && !wards.contains(Stasis.getStasisAlly())){
+			wards.add((Ward) Stasis.getStasisAlly());
+		}
+
+		for (Ward ward : wards){
+			if (!ward.isFull()){
+				ward.wandHeal( buffedLvl() );
+			}
+			if (ward.isFull()){
+				ward.upgrade( buffedLvl() );
+			}
+			if (ward.sprite != null) ward.sprite.emitter().burst(MagicMissile.WardParticle.UP, ward.tier);
+		}
+	}
+
 	@Override
 	public void onZap(Ballistica bolt) {
 
@@ -308,6 +337,12 @@ public class WandOfWarding extends Wand {
 
 		public void wandHeal( int wandLevel ){
 			wandHeal( wandLevel, 1f );
+		}
+
+		public boolean isFull(){
+			if (tier <= 1 || tier >= 6) return true;
+			if (tier <= 3) return totalZaps == 0;
+			return HP >= HT;
 		}
 
 		public void wandHeal( int wandLevel, float healFactor ){

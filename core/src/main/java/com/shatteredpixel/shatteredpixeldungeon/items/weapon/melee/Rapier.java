@@ -103,20 +103,23 @@ public class Rapier extends MeleeWeapon {
 			}
 		}
 
-		if (hero.rooted || Dungeon.level.distance(hero.pos, target) < 2
-				|| Dungeon.level.distance(hero.pos, target)-1 > wep.reachFactor(hero)){
+		Char striker = GraveDuel.striker(hero);
+		int reach = wep.reachFactor(striker);
+
+		if (striker.rooted || Dungeon.level.distance(striker.pos, target) < 2
+				|| Dungeon.level.distance(striker.pos, target)-1 > reach){
 			GLog.w(Messages.get(wep, "ability_target_range"));
-			if (hero.rooted) PixelScene.shake( 1, 1f );
+			if (striker.rooted) PixelScene.shake( 1, 1f );
 			return;
 		}
 
 		int lungeCell = -1;
 		for (int i : PathFinder.NEIGHBOURS8){
-			if (Dungeon.level.distance(hero.pos+i, target) <= wep.reachFactor(hero)
-					&& Actor.findChar(hero.pos+i) == null
-					&& (Dungeon.level.passable[hero.pos+i] || (Dungeon.level.avoid[hero.pos+i] && hero.flying))){
-				if (lungeCell == -1 || Dungeon.level.trueDistance(hero.pos + i, target) < Dungeon.level.trueDistance(lungeCell, target)){
-					lungeCell = hero.pos + i;
+			if (Dungeon.level.distance(striker.pos+i, target) <= reach
+					&& Actor.findChar(striker.pos+i) == null
+					&& (Dungeon.level.passable[striker.pos+i] || (Dungeon.level.avoid[striker.pos+i] && striker.flying))){
+				if (lungeCell == -1 || Dungeon.level.trueDistance(striker.pos + i, target) < Dungeon.level.trueDistance(lungeCell, target)){
+					lungeCell = striker.pos + i;
 				}
 			}
 		}
@@ -130,25 +133,25 @@ public class Rapier extends MeleeWeapon {
 
 		hero.busy();
 		Sample.INSTANCE.play(Assets.Sounds.MISS);
-		hero.sprite.jump(hero.pos, dest, 0, 0.1f, new Callback() {
+		striker.sprite.jump(striker.pos, dest, 0, 0.1f, new Callback() {
 			@Override
 			public void call() {
-				if (Dungeon.level.map[hero.pos] == Terrain.OPEN_DOOR) {
-					Door.leave( hero.pos );
+				if (Dungeon.level.map[striker.pos] == Terrain.OPEN_DOOR) {
+					Door.leave( striker.pos );
 				}
-				hero.pos = dest;
-				Dungeon.level.occupyCell(hero);
-				Dungeon.observe();
+				striker.pos = dest;
+				Dungeon.level.occupyCell(striker);
+				if (striker == hero) Dungeon.observe();
 
 				hero.belongings.abilityWeapon = wep; //set this early to we can check canAttack
-				if (enemy != null && hero.canAttack(enemy)) {
-					hero.sprite.attack(enemy.pos, new Callback() {
+				if (enemy != null && GraveDuel.canAttack(hero, enemy)) {
+					striker.sprite.attack(enemy.pos, new Callback() {
 						@Override
 						public void call() {
 
 							wep.beforeAbilityUsed(hero, enemy);
 							AttackIndicator.target(enemy);
-							if (hero.attack(enemy, dmgMulti, dmgBoost, Char.INFINITE_ACCURACY)) {
+							if (GraveDuel.attack(hero, enemy, dmgMulti, dmgBoost, Char.INFINITE_ACCURACY)) {
 								Sample.INSTANCE.play(Assets.Sounds.HIT_STRONG);
 								if (!enemy.isAlive()) {
 									wep.onAbilityKill(hero, enemy);

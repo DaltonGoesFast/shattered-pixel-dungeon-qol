@@ -28,12 +28,14 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.AllyBuff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Amok;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Barkskin;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.abilities.cleric.PowerOfMany;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.spells.Stasis;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mimic;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.GraveShade;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.NPC;
 import com.shatteredpixel.shatteredpixeldungeon.effects.FloatingText;
 import com.shatteredpixel.shatteredpixeldungeon.effects.MagicMissile;
@@ -69,6 +71,33 @@ public class WandOfLivingEarth extends DamageWand {
 		return 6 + 2*lvl;
 	}
 	
+	@Override
+	public void onShadeZap( GraveShade shade ) {
+		EarthGuardian guardian = null;
+		for (Mob m : Dungeon.level.mobs){
+			if (m instanceof EarthGuardian){
+				guardian = (EarthGuardian) m;
+				break;
+			}
+		}
+		if (Stasis.getStasisAlly() instanceof EarthGuardian){
+			guardian = (EarthGuardian)Stasis.getStasisAlly();
+		}
+
+		if (guardian != null){
+			if (guardian.sprite != null) {
+				guardian.sprite.centerEmitter().burst(MagicMissile.EarthParticle.ATTRACT, 8 + buffedLvl() / 2);
+			}
+			guardian.setInfo(curUser, buffedLvl(), damageRoll());
+		}
+
+		Barkskin.conditionallyAppend(shade, 2, 5);
+		if (shade.sprite != null) {
+			shade.sprite.centerEmitter().burst(MagicMissile.EarthParticle.BURST, 5 + buffedLvl()/2);
+		}
+		Sample.INSTANCE.play( Assets.Sounds.HIT_MAGIC, 1, 0.9f * Random.Float(0.87f, 1.15f) );
+	}
+
 	@Override
 	public void onZap(Ballistica bolt) {
 		Char ch = Actor.findChar(bolt.collisionPos);

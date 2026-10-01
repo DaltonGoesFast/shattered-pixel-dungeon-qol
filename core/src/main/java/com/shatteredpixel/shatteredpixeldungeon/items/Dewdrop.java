@@ -23,6 +23,7 @@ package com.shatteredpixel.shatteredpixeldungeon.items;
 
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Barrier;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
@@ -102,6 +103,10 @@ public class Dewdrop extends Item {
 			shield = Math.min(shield, maxShield-curShield);
 		}
 
+		if (Modifiers.crimsonBlocksHeal(hero)){
+			heal = 0;
+		}
+
 		if (heal > 0 || shield > 0) {
 
 			if (heal > 0 && quantity > 1 && VialOfBlood.delayBurstHealing()){
@@ -120,7 +125,11 @@ public class Dewdrop extends Item {
 			}
 
 		} else if (!force) {
-			GLog.i( Messages.get(Dewdrop.class, "already_full") );
+			if (Modifiers.crimsonBlocksHeal(hero) && hero.HP < hero.HT){
+				GLog.i( Messages.get(Dewdrop.class, "crimson") );
+			} else {
+				GLog.i( Messages.get(Dewdrop.class, "already_full") );
+			}
 			return false;
 		}
 

@@ -57,9 +57,10 @@ public class HealingDart extends TippedDart {
 		
 		//heals 30 hp at base, scaling with enemy HT
 		PotionOfHealing.cure( defender );
-		if (Dungeon.isModified(Modifiers.GLASS)){
+		boolean crimson = Modifiers.crimsonBlocksHeal(defender);
+		if (!crimson && Dungeon.isModified(Modifiers.GLASS)){
 			Buff.affect( defender, Healing.class ).setHeal((int)(0.5f*defender.HT), 0.25f, 0);
-		} else {
+		} else if (!crimson) {
 			Buff.affect( defender, Healing.class ).setHeal((int)(0.5f*defender.HT + 30), 0.25f, 0);
 		}
 

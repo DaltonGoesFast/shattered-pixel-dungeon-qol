@@ -719,6 +719,7 @@ public class Command {
 			Weapon o = (Weapon) original;
 			Weapon n = (Weapon) result;
 			n.enchantment = o.enchantment;
+			n.shelfEnchant = o.shelfEnchant;
 			n.curseInfusionBonus = o.curseInfusionBonus;
 			n.masteryPotionBonus = o.masteryPotionBonus;
 			n.augment = o.augment;
@@ -734,6 +735,7 @@ public class Command {
 			Armor o = (Armor) original;
 			Armor n = (Armor) result;
 			n.inscribe(o.glyph);
+			n.shelfGlyph = o.shelfGlyph;
 			n.glyphHardened = o.glyphHardened;
 			n.augment = o.augment;
 			n.curseInfusionBonus = o.curseInfusionBonus;

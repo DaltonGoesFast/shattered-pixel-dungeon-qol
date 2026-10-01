@@ -218,6 +218,11 @@ public class Hero extends Char {
 	public HeroClass heroClass = HeroClass.ROGUE;
 	public HeroSubClass subClass = HeroSubClass.NONE;
 	public ArmorAbility armorAbility = null;
+	/** Chimera pact: the two subclasses and two armor abilities rolled at creation; null outside Chimera. */
+	public HeroSubClass[] chimeraSubs = null;
+	public ArmorAbility[] chimeraAbilities = null;
+	/** Chimera pact: one bit per HeroClass ordinal whose signature item was already granted. */
+	public int chimeraGifts = 0;
 	/** Optional display name; empty/null means use class/subclass title. */
 	public String customName = null;
 	public ArrayList<LinkedHashMap<Talent, Integer>> talents = new ArrayList<>();
@@ -325,6 +330,11 @@ public class Hero extends Char {
 	private static final String CLASS       = "class";
 	private static final String SUBCLASS    = "subClass";
 	private static final String ABILITY     = "armorAbility";
+	private static final String CHIMERA_SUB_A   = "chimera_sub_a";
+	private static final String CHIMERA_SUB_B   = "chimera_sub_b";
+	private static final String CHIMERA_ABIL_A  = "chimera_abil_a";
+	private static final String CHIMERA_ABIL_B  = "chimera_abil_b";
+	private static final String CHIMERA_GIFTS   = "chimera_gifts";
 
 	private static final String TALENT_AUTO_ORDER_1 = "talent_auto_order_1";
 	private static final String TALENT_AUTO_ORDER_2 = "talent_auto_order_2";
@@ -352,6 +362,13 @@ public class Hero extends Char {
 		bundle.put( CLASS, heroClass );
 		bundle.put( SUBCLASS, subClass );
 		bundle.put( ABILITY, armorAbility );
+		if (chimeraSubs != null && chimeraAbilities != null) {
+			bundle.put( CHIMERA_SUB_A, chimeraSubs[0] );
+			bundle.put( CHIMERA_SUB_B, chimeraSubs[1] );
+			bundle.put( CHIMERA_ABIL_A, chimeraAbilities[0] );
+			bundle.put( CHIMERA_ABIL_B, chimeraAbilities[1] );
+			bundle.put( CHIMERA_GIFTS, chimeraGifts );
+		}
 		if (customName != null && !customName.isEmpty()) {
 			bundle.put( CUSTOM_NAME, customName );
 		}
@@ -391,6 +408,19 @@ public class Hero extends Char {
 		heroClass = bundle.getEnum( CLASS, HeroClass.class );
 		subClass = bundle.getEnum( SUBCLASS, HeroSubClass.class );
 		armorAbility = (ArmorAbility)bundle.get( ABILITY );
+		if (bundle.contains( CHIMERA_SUB_A )) {
+			chimeraSubs = new HeroSubClass[]{
+					bundle.getEnum( CHIMERA_SUB_A, HeroSubClass.class ),
+					bundle.getEnum( CHIMERA_SUB_B, HeroSubClass.class ) };
+			chimeraAbilities = new ArmorAbility[]{
+					(ArmorAbility)bundle.get( CHIMERA_ABIL_A ),
+					(ArmorAbility)bundle.get( CHIMERA_ABIL_B ) };
+			chimeraGifts = bundle.getInt( CHIMERA_GIFTS );
+		} else {
+			chimeraSubs = null;
+			chimeraAbilities = null;
+			chimeraGifts = 0;
+		}
 		if (bundle.contains( CUSTOM_NAME )) {
 			customName = bundle.getString( CUSTOM_NAME );
 			if (customName != null && customName.isEmpty()) customName = null;
@@ -681,6 +711,7 @@ public class Hero extends Char {
 		}
 		Buff.affect( this, Regeneration.class );
 		Buff.affect( this, Hunger.class );
+		if (Dungeon.isModified(Modifiers.GRAVE)) Buff.affect( this, GraveRoster.class );
 	}
 	
 	public int tier() {
@@ -706,6 +737,8 @@ public class Hero extends Char {
 		boolean hit = attack( enemy );
 		Invisibility.dispel();
 		belongings.thrownWeapon = null;
+
+		if (wasEnemy) GraveRoster.noteOffense();
 
 		if (hit && subClass == HeroSubClass.GLADIATOR && wasEnemy){
 			Buff.affect( this, Combo.class ).hit( enemy );
@@ -1082,6 +1115,8 @@ public class Hero extends Char {
 		checkVisibleMobs();
 		BuffIndicator.refreshHero();
 		BuffIndicator.refreshBoss();
+
+		if (Dungeon.isModified(Modifiers.GRAVE)) GraveRoster.get();
 		
 		if (paralysed > 0) {
 			
@@ -1699,7 +1734,19 @@ public class Hero extends Char {
 			return false;
 		}
 
-		if (attackTarget.isAlive() && canAttack(attackTarget) && attackTarget.invisible == 0) {
+		if (Dungeon.isModified(Modifiers.GRAVE)
+				&& attackTarget.isAlive() && attackTarget.invisible == 0
+				&& Dungeon.level.adjacent(pos, attackTarget.pos)) {
+			Char target = attackTarget;
+			attackTarget = null;
+			curAction = null;
+			GraveRoster.heroClick(this, target);
+			spendAndNext(attackDelay());
+			return false;
+		}
+
+		if (!Dungeon.isModified(Modifiers.GRAVE)
+				&& attackTarget.isAlive() && canAttack(attackTarget) && attackTarget.invisible == 0) {
 
 			if (heroClass != HeroClass.DUELIST
 					&& hasTalent(Talent.AGGRESSIVE_BARRIER)
@@ -2560,7 +2607,7 @@ public class Hero extends Char {
 			@Override
 			public void call() {
 				GameScene.gameOver();
-				Sample.INSTANCE.play( Assets.Sounds.DEATH );
+				Sample.INSTANCE.play( SPDSettings.moddedBanners() ? Assets.Sounds.DEATH_MOD : Assets.Sounds.DEATH );
 			}
 		});
 

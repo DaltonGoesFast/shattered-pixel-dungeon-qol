@@ -23,6 +23,7 @@ package com.shatteredpixel.shatteredpixeldungeon.windows;
 
 import com.shatteredpixel.shatteredpixeldungeon.Command;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Guild;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
@@ -88,7 +89,7 @@ public class WndTradeItem extends WndInfoItem {
 				pos = warn.bottom();
 			}
 
-			RedButton btnSell = new RedButton( Messages.get(this, "sell", item.value()) ) {
+			RedButton btnSell = new RedButton( Messages.get(this, "sell", Guild.paysFor(item)) ) {
 				@Override
 				protected void onClick() {
 					TrainingExport.logShop("shop_sell", item.getClass().getSimpleName());
@@ -104,8 +105,8 @@ public class WndTradeItem extends WndInfoItem {
 
 		} else {
 
-			int priceAll= item.value();
-			RedButton btnSell1 = new RedButton( Messages.get(this, "sell_1", priceAll / item.quantity()) ) {
+			int priceAll= Guild.paysFor(item);
+			RedButton btnSell1 = new RedButton( Messages.get(this, "sell_1", Guild.paysFor(item, item.value() / item.quantity())) ) {
 				@Override
 				protected void onClick() {
 					TrainingExport.logShop("shop_sell", item.getClass().getSimpleName());
@@ -256,7 +257,7 @@ public class WndTradeItem extends WndInfoItem {
 		//selling items in the sell interface doesn't spend time
 		hero.spend(-hero.cooldown());
 
-		new Gold( item.value() ).doPickUp( hero );
+		new Gold( Guild.paysFor(item) ).doPickUp( hero );
 
 		if (shop != null){
 			shop.buybackItems.add(item);
@@ -283,7 +284,7 @@ public class WndTradeItem extends WndInfoItem {
 			//selling items in the sell interface doesn't spend time
 			hero.spend(-hero.cooldown());
 
-			new Gold( item.value() ).doPickUp( hero );
+			new Gold( Guild.paysFor(item) ).doPickUp( hero );
 
 			if (shop != null){
 				shop.buybackItems.add(item);

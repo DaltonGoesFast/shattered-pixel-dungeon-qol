@@ -23,6 +23,7 @@ package com.shatteredpixel.shatteredpixeldungeon.items.scrolls.exotic;
 
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroClass;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Speck;
@@ -79,6 +80,35 @@ public class ScrollOfMetamorphosis extends ExoticScroll {
 		if (Dungeon.hero.hasTalent(newTalent)) {
 			Talent.onTalentUpgraded(Dungeon.hero, newTalent);
 		}
+	}
+
+	/** One same-tier talent from each other class, skipping talents already at that tier. Tier is 1-based. */
+	public static LinkedHashMap<Talent, Integer> offersFor( Hero hero, Talent replacing, int tier ){
+		LinkedHashMap<Talent, Integer> options = new LinkedHashMap<>();
+		Set<Talent> curTalentsAtTier = hero.talents.get(tier-1).keySet();
+
+		for (HeroClass cls : HeroClass.values()){
+
+			ArrayList<LinkedHashMap<Talent, Integer>> clsTalents = new ArrayList<>();
+			Talent.initClassTalents(cls, clsTalents);
+
+			Set<Talent> clsTalentsAtTier = clsTalents.get(tier-1).keySet();
+			boolean replacingIsInSet = false;
+			for (Talent talent : clsTalentsAtTier.toArray(new Talent[0])){
+				if (talent == replacing){
+					replacingIsInSet = true;
+					break;
+				} else {
+					if (curTalentsAtTier.contains(talent)){
+						clsTalentsAtTier.remove(talent);
+					}
+				}
+			}
+			if (!replacingIsInSet && !clsTalentsAtTier.isEmpty()) {
+				options.put(Random.element(clsTalentsAtTier), hero.pointsInTalent(replacing));
+			}
+		}
+		return options;
 	}
 
 	private void confirmCancelation( Window chooseWindow, boolean byID ) {
@@ -207,33 +237,8 @@ public class ScrollOfMetamorphosis extends ExoticScroll {
 			this.replacing = replacing;
 			this.tier = tier;
 
-			LinkedHashMap<Talent, Integer> options = new LinkedHashMap<>();
-			Set<Talent> curTalentsAtTier = Dungeon.hero.talents.get(tier-1).keySet();
-
-			for (HeroClass cls : HeroClass.values()){
-
-				ArrayList<LinkedHashMap<Talent, Integer>> clsTalents = new ArrayList<>();
-				Talent.initClassTalents(cls, clsTalents);
-
-				Set<Talent> clsTalentsAtTier = clsTalents.get(tier-1).keySet();
-				boolean replacingIsInSet = false;
-				for (Talent talent : clsTalentsAtTier.toArray(new Talent[0])){
-					if (talent == replacing){
-						replacingIsInSet = true;
-						break;
-					} else {
-						if (curTalentsAtTier.contains(talent)){
-							clsTalentsAtTier.remove(talent);
-						}
-					}
-				}
-				if (!replacingIsInSet && !clsTalentsAtTier.isEmpty()) {
-					options.put(Random.element(clsTalentsAtTier), Dungeon.hero.pointsInTalent(replacing));
-				}
-			}
-
-			replaceOptions = options;
-			setup(replacing, tier, options);
+			replaceOptions = offersFor(Dungeon.hero, replacing, tier);
+			setup(replacing, tier, replaceOptions);
 		}
 
 		private void setup(Talent replacing, int tier, LinkedHashMap<Talent, Integer> replaceOptions){

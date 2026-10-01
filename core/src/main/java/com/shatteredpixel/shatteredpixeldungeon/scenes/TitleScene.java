@@ -172,8 +172,8 @@ public class TitleScene extends PixelScene {
 		btnPlay.icon(Icons.get(Icons.ENTER));
 		add(btnPlay);
 
-		btnSupport = new SupportButton(GREY_TR, Messages.get(this, "support"));
-		//add(btnSupport); // disabled for custom build
+		btnSupport = new SupportButton(GREY_TR, "DaltonGoesFast");
+		add(btnSupport);
 
 		btnRankings = new StyledButton(GREY_TR,Messages.get(this, "rankings")){
 			@Override
@@ -194,9 +194,15 @@ public class TitleScene extends PixelScene {
 		btnJournal.icon(Icons.get(Icons.JOURNAL));
 		add(btnJournal);
 
-		btnNews = new NewsButton(GREY_TR, Messages.get(this, "news"));
-		btnNews.icon(Icons.get(Icons.NEWS));
-		//add(btnNews); // disabled for custom build
+		btnNews = new StyledButton(GREY_TR, "Mod Changes"){
+			@Override
+			protected void onClick() {
+				ShatteredPixelDungeon.platform.openURI(
+						"https://github.com/DaltonGoesFast/shattered-pixel-dungeon-qol/blob/master/docs/mod-changes.md");
+			}
+		};
+		btnNews.icon(Icons.getSettings(Icons.SETTINGS_QOL));
+		add(btnNews);
 
 		btnChanges = new ChangesButton(GREY_TR, Messages.get(this, "changes"));
 		btnChanges.icon(Icons.get(Icons.CHANGES));
@@ -475,13 +481,15 @@ public class TitleScene extends PixelScene {
 
 		public SupportButton( Chrome.Type type, String label ){
 			super(type, label);
-			icon(Icons.get(Icons.GOLD));
+			Image youtube = new Image(Assets.Interfaces.SOCIAL_ICONS);
+			youtube.frame(youtube.texture.uvRectBySize(0, 0, 16, 16));
+			icon(youtube);
 			textColor(Window.TITLE_COLOR);
 		}
 
 		@Override
 		protected void onClick() {
-			ShatteredPixelDungeon.switchNoFade(SupporterScene.class);
+			ShatteredPixelDungeon.platform.openURI("https://www.youtube.com/@DaltonGoesFast");
 		}
 	}
 }

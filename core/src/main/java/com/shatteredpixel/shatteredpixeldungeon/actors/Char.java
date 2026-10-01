@@ -425,6 +425,8 @@ public abstract class Char extends Actor {
 
 			dmg = dmg*dmgMulti;
 
+			int crimsonBasis = Math.round(dmg);
+
 			// Glass pact: 5x melee damage for hero and allies
 			if (Dungeon.isModified(Modifiers.GLASS)
 					&& (this == Dungeon.hero || alignment == Alignment.ALLY)){
@@ -548,7 +550,9 @@ public abstract class Char extends Actor {
 				return true;
 			}
 
+			enemy.lastHpRemoved = 0;
 			enemy.damage( effectiveDamage, this );
+			Modifiers.crimsonStrikeHeal(this, crimsonBasis, enemy.lastHpRemoved);
 
 			if (buff(FireImbue.class) != null)  buff(FireImbue.class).proc(enemy);
 			if (buff(FrostImbue.class) != null) buff(FrostImbue.class).proc(enemy);
@@ -871,7 +875,11 @@ public abstract class Char extends Actor {
 		return cachedIncomingDOT;
 	}
 	
+	/** Primary hit points removed by the latest damage() call; excludes shielding, overkill, and Grim. */
+	public int lastHpRemoved = 0;
+
 	public void damage( int dmg, Object src ) {
+		lastHpRemoved = 0;
 		
 		if (!isAlive() || dmg < 0) {
 			return;
@@ -1038,6 +1046,7 @@ public abstract class Char extends Actor {
 		int shielded = dmg;
 		dmg = ShieldBuff.processDamage(this, dmg, src);
 		shielded -= dmg;
+		lastHpRemoved = Math.max(0, Math.min(HP, dmg));
 		HP -= dmg;
 
 		if (HP > 0 && src instanceof Char && ((Char) src).buff(Grim.GrimTracker.class) != null){

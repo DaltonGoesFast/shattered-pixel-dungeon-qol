@@ -23,6 +23,7 @@ package com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee;
 
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ArtifactRecharge;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Barrier;
@@ -31,6 +32,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.GreaterHaste;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.MonkEnergy;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Recharging;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Regeneration;
+import com.shatteredpixel.shatteredpixeldungeon.actors.hero.GraveRoster;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroClass;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroSubClass;
@@ -123,17 +125,21 @@ public class MeleeWeapon extends Weapon {
 				GLog.w(Messages.get(this, "ability_low_str"));
 			} else if ((Buff.affect(hero, Charger.class).charges + Buff.affect(hero, Charger.class).partialCharge) < abilityChargeUse(hero, null)) {
 				GLog.w(Messages.get(this, "ability_no_charge"));
+			} else if (Dungeon.isModified(Modifiers.GRAVE) && GraveRoster.livingShades().isEmpty()){
+				GraveRoster.failCall();
 			} else {
 
 				if (targetingPrompt() == null){
-					duelistAbility(hero, hero.pos);
-					updateQuickslot();
+					if (GraveDuel.begin(hero.pos)) {
+						duelistAbility(hero, hero.pos);
+						updateQuickslot();
+					}
 				} else {
 					usesTargeting = useTargeting();
 					GameScene.selectCell(new CellSelector.Listener() {
 						@Override
 						public void onSelect(Integer cell) {
-							if (cell != null) {
+							if (cell != null && GraveDuel.begin(cell)) {
 								duelistAbility(hero, cell);
 								updateQuickslot();
 							}

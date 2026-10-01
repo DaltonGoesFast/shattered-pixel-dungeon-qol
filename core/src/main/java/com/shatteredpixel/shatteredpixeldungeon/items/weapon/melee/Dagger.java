@@ -112,10 +112,11 @@ public class Dagger extends MeleeWeapon {
 			return;
 		}
 
-		PathFinder.buildDistanceMap(Dungeon.hero.pos, BArray.or(Dungeon.level.passable, Dungeon.level.avoid, null), maxDist);
-		if (PathFinder.distance[target] == Integer.MAX_VALUE || !Dungeon.level.heroFOV[target] || hero.rooted) {
+		Char striker = GraveDuel.striker(hero);
+		PathFinder.buildDistanceMap(striker.pos, BArray.or(Dungeon.level.passable, Dungeon.level.avoid, null), maxDist);
+		if (PathFinder.distance[target] == Integer.MAX_VALUE || !Dungeon.level.heroFOV[target] || striker.rooted) {
 			GLog.w(Messages.get(wep, "ability_target_range"));
-			if (Dungeon.hero.rooted) PixelScene.shake( 1, 1f );
+			if (striker.rooted) PixelScene.shake( 1, 1f );
 			return;
 		}
 
@@ -125,7 +126,19 @@ public class Dagger extends MeleeWeapon {
 		}
 
 		wep.beforeAbilityUsed(hero, null);
-		Buff.prolong(hero, Invisibility.class, invisTurns-1); //1 fewer turns as ability is instant
+		Buff.prolong(striker, Invisibility.class, invisTurns-1); //1 fewer turns as ability is instant
+
+		if (striker != hero){
+			striker.sprite.turnTo( striker.pos, target);
+			striker.pos = target;
+			Dungeon.level.occupyCell(striker);
+			striker.sprite.place( striker.pos );
+			CellEmitter.get( striker.pos ).burst( Speck.factory( Speck.WOOL ), 6 );
+			Sample.INSTANCE.play( Assets.Sounds.PUFF );
+			hero.next();
+			wep.afterAbilityUsed(hero);
+			return;
+		}
 
 		Dungeon.hero.sprite.turnTo( Dungeon.hero.pos, target);
 		Dungeon.hero.pos = target;

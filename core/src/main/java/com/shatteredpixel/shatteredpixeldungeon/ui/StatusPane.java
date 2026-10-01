@@ -49,7 +49,7 @@ import com.watabou.utils.GameMath;
 
 public class StatusPane extends Component {
 
-	private NinePatch bg;
+	private MirrorNinePatch bg;
 	/** Near-black #0c0c0c box behind HP bar and buffs for OBS chroma-key masking */
 	private ColorBlock obsMaskHpBuffs;
 	private Image avatar;
@@ -102,8 +102,8 @@ public class StatusPane extends Component {
 		obsMaskHpBuffs = new ColorBlock(1, 1, SPDSettings.OBS_CHROMA_MASK_COLOR);
 		add(obsMaskHpBuffs);
 
-		if (large)  bg = new NinePatch( asset, 0, 64, 41, 39, 33, 0, 4, 0 );
-		else        bg = new NinePatch( asset, 0,  0, 82, 38, 32, 0, 5, 0 );
+		if (large)  bg = new MirrorNinePatch( asset, 0, 64, 41, 39, 33, 0, 4, 0 );
+		else        bg = new MirrorNinePatch( asset, 0,  0, 82, 38, 32, 0, 5, 0 );
 		add( bg );
 
 		heroPaneCutout = new NinePatch(asset, 0, 0, 5, 36, 4, 0, 0, 0);
@@ -198,27 +198,40 @@ public class StatusPane extends Component {
 		height = large ? 39 : 38;
 
 		float heroPaneWidth = 30 + heroPaneExtraWidth;
+		// Large desktop UI only. Mirrors the frame so the portrait column is on the right.
+		boolean flip = large && SPDSettings.flipStatusPane();
 
 		bg.x = x + heroPaneExtraWidth;
 		bg.y = y;
 		if (large)  bg.size( 160, bg.height ); //HP bars must be 128px wide atm
 		else        bg.size(hpBarMaxWidth+32, bg.height ); //default max right is 50px health bar + 32
+		bg.setMirrored(flip);
 
-		avatar.x = bg.x - avatar.width / 2f + 15;
+		if (flip) {
+			avatar.x = bg.x + bg.width() - 15f - avatar.width() / 2f;
+		} else {
+			avatar.x = bg.x - avatar.width / 2f + 15;
+		}
 		avatar.y = bg.y - avatar.height / 2f + 16;
 		PixelScene.align(avatar);
 
-		heroInfo.setRect( x, y, heroPaneWidth, large ? 40 : 36 );
+		if (flip) {
+			heroInfo.setRect( bg.x + bg.width() - 30f, y, 30f, 40f );
+		} else {
+			heroInfo.setRect( x, y, heroPaneWidth, large ? 40 : 36 );
+		}
 
 		compass.x = avatar.x + avatar.width / 2f - compass.origin.x;
 		compass.y = avatar.y + avatar.height / 2f - compass.origin.y;
 		PixelScene.align(compass);
 
 		if (large) {
-			exp.x = x + 30;
+			// Unflipped bars start 30px in; flipped bars keep a 2px left inset (160 - 30 - 128).
+			float barX = flip ? bg.x + bg.width() - 30f - 128f : x + 30;
+			exp.x = barX;
 			exp.y = y + 30;
 
-			hp.x = shieldHP.x = Dot.x = x + 30;
+			hp.x = shieldHP.x = Dot.x = barX;
 			hp.y = shieldHP.y = Dot.y = y + 19;
 
 			hpText.x = hp.x + (128 - hpText.width())/2f;
@@ -229,10 +242,16 @@ public class StatusPane extends Component {
 			expText.y = exp.y;
 			PixelScene.align(expText);
 
-			heroInfoOnBar.setRect(heroInfo.right(), y + 19, 130, 20);
-
-			//little extra for 14th buff
-			buffs.setRect(x + 31, y, 142, 16);
+			if (flip) {
+				heroInfoOnBar.setRect(barX, y + 19, 128, 20);
+				float buffX = barX + 1;
+				float buffW = (bg.x + bg.width() - 30f) - buffX;
+				buffs.setRect(buffX, y, buffW, 16);
+			} else {
+				heroInfoOnBar.setRect(heroInfo.right(), y + 19, 130, 20);
+				//little extra for 14th buff
+				buffs.setRect(x + 31, y, 142, 16);
+			}
 
 			busy.x = x + bg.width + 1;
 			busy.y = y + bg.height - 9;
@@ -291,10 +310,12 @@ public class StatusPane extends Component {
 			busy.y = y + 37;
 		}
 
+		placeLevelText();
+
 		// OBS mask: #0c0c0c behind HP bar, buffs, and turn wheel for chroma-key
 		if (large) {
-			// Extend right past turn wheel (~half the arc radius)
-			float maskRight = busy.x + busy.width() + 9;
+			// Flipped portrait sits between the bars and the wheel, so stop the mask at the portrait.
+			float maskRight = flip ? (hp.x + 128) : (busy.x + busy.width() + 9);
 			obsMaskHpBuffs.x = hp.x;
 			obsMaskHpBuffs.y = y;
 			obsMaskHpBuffs.size(maskRight - hp.x, height);
@@ -393,16 +414,11 @@ public class StatusPane extends Component {
 
 			if (large){
 				level.text( "lv. " + lastLvl );
-				level.measure();
-				level.x = x + (30f - level.width()) / 2f;
-				level.y = y + 33f - level.baseLine() / 2f;
 			} else {
 				level.text( Integer.toString( lastLvl ) );
-				level.measure();
-				level.x = x + heroPaneExtraWidth + 25.5f - level.width() / 2f;
-				level.y = y + 31.0f - level.baseLine() / 2f;
 			}
-			PixelScene.align(level);
+			level.measure();
+			placeLevelText();
 		}
 
 		int tier = Dungeon.hero.tier();
@@ -412,6 +428,23 @@ public class StatusPane extends Component {
 		}
 
 		counter.setSweep((1f - Actor.now()%1f)%1f);
+	}
+
+	private void placeLevelText() {
+		if (large) {
+			boolean flip = SPDSettings.flipStatusPane();
+			float col = 30f;
+			if (flip) {
+				level.x = bg.x + bg.width() - col + (col - level.width()) / 2f;
+			} else {
+				level.x = x + (col - level.width()) / 2f;
+			}
+			level.y = y + 33f - level.baseLine() / 2f;
+		} else {
+			level.x = x + heroPaneExtraWidth + 25.5f - level.width() / 2f;
+			level.y = y + 31.0f - level.baseLine() / 2f;
+		}
+		PixelScene.align(level);
 	}
 
 	public void updateAvatar(){
@@ -441,6 +474,30 @@ public class StatusPane extends Component {
 		emitter.revive();
 		emitter.pos( avatar.center() );
 		emitter.burst( Speck.factory( Speck.STAR ), 12 );
+	}
+
+	/**
+	 * NinePatch flip swaps texture sides but keeps the original margin widths, which squashes
+	 * this pane's 33px portrait frame into the 4px cap. Swap the margin widths as well.
+	 */
+	private static class MirrorNinePatch extends NinePatch {
+
+		private final int baseLeft;
+		private final int baseRight;
+
+		public MirrorNinePatch( Object tx, int x, int y, int w, int h,
+				int left, int top, int right, int bottom ) {
+			super( tx, x, y, w, h, left, top, right, bottom );
+			baseLeft = left;
+			baseRight = right;
+		}
+
+		public void setMirrored( boolean mirror ) {
+			marginLeft = mirror ? baseRight : baseLeft;
+			marginRight = mirror ? baseLeft : baseRight;
+			flipHorizontal = mirror;
+			updateVertices();
+		}
 	}
 
 }

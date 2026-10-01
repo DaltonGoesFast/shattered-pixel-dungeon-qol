@@ -77,11 +77,14 @@ public class Assets {
 		public static final String ARCS_FG  = "interfaces/arcs2.png";
 
 		public static final String BANNERS  = "interfaces/banners.png";
+		public static final String BANNERS_MOD = "interfaces/banners_mod.png";
 		public static final String BADGES   = "interfaces/badges.png";
 		public static final String LOCKED   = "interfaces/locked_badge.png";
 
 		public static final String CHROME   = "interfaces/chrome.png";
 		public static final String ICONS    = "interfaces/icons.png";
+		public static final String SETTINGS_ICONS = "interfaces/settingsicons.png";
+		public static final String SOCIAL_ICONS = "interfaces/socialicons.png";
 		public static final String DEBUG_RUN = "interfaces/debugrun.png";
 		public static final String STATUS   = "interfaces/status_pane.png";
 		public static final String MENU     = "interfaces/menu_pane.png";
@@ -198,6 +201,7 @@ public class Assets {
 		public static final String LIGHTNING= "sounds/lightning.mp3";
 		public static final String LEVELUP  = "sounds/levelup.mp3";
 		public static final String DEATH    = "sounds/death.mp3";
+		public static final String DEATH_MOD = "sounds/death_mod.mp3";
 		public static final String CHALLENGE= "sounds/challenge.mp3";
 		public static final String CURSED   = "sounds/cursed.mp3";
 		public static final String TRAP     = "sounds/trap.mp3";
@@ -239,7 +243,7 @@ public class Assets {
 				HIT, MISS, HIT_SLASH, HIT_STAB, HIT_CRUSH, HIT_MAGIC, HIT_STRONG, HIT_PARRY,
 				HIT_ARROW, ATK_SPIRITBOW, ATK_CROSSBOW, HEALTH_WARN, HEALTH_CRITICAL,
 
-				DESCEND, EAT, READ, LULLABY, DRINK, SHATTER, ZAP, LIGHTNING, LEVELUP, DEATH,
+				DESCEND, EAT, READ, LULLABY, DRINK, SHATTER, ZAP, LIGHTNING, LEVELUP, DEATH, DEATH_MOD,
 				CHALLENGE, CURSED, TRAP, EVOKE, TOMB, ALERT, MELD, BOSS, BLAST, PLANT, RAY, BEACON,
 				TELEPORT, CHARMS, MASTERY, PUFF, ROCKS, BURNING, FALLING, GHOST, SECRET, BONES,
 				BEE, DEGRADE, MIMIC, DEBUFF, CHARGEUP, GAS, CHAINS, SCAN, SHEEP, MINE
@@ -271,6 +275,7 @@ public class Assets {
 	public static class Sprites {
 		public static final String ITEMS        = "sprites/items.png";
 		public static final String SPITE       = "sprites/spite.png";
+		public static final String GRAVE_CHALICE = "sprites/gravechalice.png";
 		public static final String ITEM_ICONS   = "sprites/item_icons.png";
 
 		public static final String WARRIOR  = "sprites/warrior.png";
@@ -317,6 +322,8 @@ public class Assets {
 		public static final String GHOST    = "sprites/ghost.png";
 		public static final String MAKER    = "sprites/wandmaker.png";
 		public static final String TROLL    = "sprites/blacksmith.png";
+		public static final String GUILD_SMITH = "sprites/guildblacksmith.png";
+		public static final String GUILD_MAKER = "sprites/guildwandmaker.png";
 		public static final String IMP      = "sprites/imp.png";
 		public static final String RATKING  = "sprites/ratking.png";
 		public static final String BEE      = "sprites/bee.png";

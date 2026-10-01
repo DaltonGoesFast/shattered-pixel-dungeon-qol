@@ -36,6 +36,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.abilities.rogue.Shad
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.spells.BodyForm;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.spells.HolyWeapon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.spells.Smite;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.GraveShade;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.MirrorImage;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.KindOfWeapon;
@@ -133,6 +134,8 @@ abstract public class Weapon extends KindOfWeapon {
 	public boolean curseInfusionBonus = false;
 	public boolean masteryPotionBonus = false;
 	private Enchantment savedEnchantmentForRestore = null;
+	/** Guild shelf: a good enchant held off the item until it is collected. */
+	public Enchantment shelfEnchant = null;
 	
 	@Override
 	public int proc( Char attacker, Char defender, int damage ) {
@@ -224,6 +227,7 @@ abstract public class Weapon extends KindOfWeapon {
 	private static final String MASTERY_POTION_BONUS = "mastery_potion_bonus";
 	private static final String AUGMENT	        = "augment";
 	private static final String SAVED_ENCHANT   = "saved_enchant";
+	private static final String SHELF_ENCHANT   = "shelf_enchant";
 
 	@Override
 	public void storeInBundle( Bundle bundle ) {
@@ -236,6 +240,7 @@ abstract public class Weapon extends KindOfWeapon {
 		bundle.put( MASTERY_POTION_BONUS, masteryPotionBonus );
 		bundle.put( AUGMENT, augment );
 		bundle.put( SAVED_ENCHANT, savedEnchantmentForRestore );
+		bundle.put( SHELF_ENCHANT, shelfEnchant );
 	}
 	
 	@Override
@@ -248,6 +253,7 @@ abstract public class Weapon extends KindOfWeapon {
 		curseInfusionBonus = bundle.getBoolean( CURSE_INFUSION_BONUS );
 		masteryPotionBonus = bundle.getBoolean( MASTERY_POTION_BONUS );
 		savedEnchantmentForRestore = (Enchantment)bundle.get( SAVED_ENCHANT );
+		shelfEnchant = (Enchantment)bundle.get( SHELF_ENCHANT );
 
 		augment = bundle.getEnum(AUGMENT, Augment.class);
 	}
@@ -262,6 +268,10 @@ abstract public class Weapon extends KindOfWeapon {
 	@Override
 	public boolean collect(Bag container) {
 		if(super.collect(container)){
+			if (shelfEnchant != null){
+				enchant( shelfEnchant );
+				shelfEnchant = null;
+			}
 			if (Dungeon.hero != null && Dungeon.hero.isAlive() && isIdentified() && enchantment != null){
 				Catalog.setSeen(enchantment.getClass());
 				Statistics.itemTypesDiscovered.add(enchantment.getClass());
@@ -563,7 +573,9 @@ abstract public class Weapon extends KindOfWeapon {
 		public abstract int proc( Weapon weapon, Char attacker, Char defender, int damage );
 
 		protected float procChanceMultiplier( Char attacker ){
-			return genericProcChanceMultiplier( attacker );
+			float multi = genericProcChanceMultiplier( attacker );
+			if (attacker instanceof GraveShade) multi *= 0.5f;
+			return multi;
 		}
 
 		public static float genericProcChanceMultiplier( Char attacker ){

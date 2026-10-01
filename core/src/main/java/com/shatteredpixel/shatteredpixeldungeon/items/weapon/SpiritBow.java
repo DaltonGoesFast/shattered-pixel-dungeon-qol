@@ -23,13 +23,17 @@ package com.shatteredpixel.shatteredpixeldungeon.items.weapon;
 
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.GraveSeed;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.RevealedArea;
+import com.shatteredpixel.shatteredpixeldungeon.actors.hero.GraveRoster;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.abilities.huntress.NaturesPower;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.GraveShade;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Splash;
 import com.shatteredpixel.shatteredpixeldungeon.effects.particles.LeafParticle;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
@@ -44,6 +48,7 @@ import com.shatteredpixel.shatteredpixeldungeon.plants.Sorrowmoss;
 import com.shatteredpixel.shatteredpixeldungeon.plants.Stormvine;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.CellSelector;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
+import com.shatteredpixel.shatteredpixeldungeon.sprites.CharSprite;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSpriteSheet;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.MissileSprite;
 import com.shatteredpixel.shatteredpixeldungeon.ui.QuickSlotButton;
@@ -368,6 +373,28 @@ public class SpiritBow extends Weapon {
 			if (enemy == null || enemy == curUser) {
 				parent = null;
 				Splash.at( cell, 0xCC99FFFF, 1 );
+			} else if (enemy instanceof GraveShade) {
+				parent = null;
+				if (GraveSeed.rollHit(curUser, (GraveShade) enemy, this)){
+					GraveSeed.plant((GraveShade) enemy);
+				} else {
+					enemy.sprite.showStatus(CharSprite.NEUTRAL, enemy.defenseVerb());
+					Splash.at( cell, 0xCC99FFFF, 1 );
+				}
+				if (sniperSpecial && SpiritBow.this.augment != Augment.SPEED) sniperSpecial = false;
+			} else if (Dungeon.isModified(Modifiers.GRAVE) && enemy.alignment == Char.Alignment.ENEMY) {
+				//Grave pact: the arrow never wounds the enemy; it seeds the shade fighting it
+				parent = null;
+				GraveRoster.noteOffense();
+				GraveShade shade = GraveRoster.shadeFor(enemy);
+				if (shade != null){
+					GraveSeed.plant(shade);
+					GraveRoster.rallyTo(enemy);
+				} else {
+					GraveRoster.failCall();
+				}
+				Splash.at( cell, 0xCC99FFFF, 1 );
+				if (sniperSpecial && SpiritBow.this.augment != Augment.SPEED) sniperSpecial = false;
 			} else {
 				if (!curUser.shoot( enemy, this )) {
 					Splash.at(cell, 0xCC99FFFF, 1);

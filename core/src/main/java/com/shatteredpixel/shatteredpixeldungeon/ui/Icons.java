@@ -484,6 +484,17 @@ public enum Icons {
 		}
 	}
 
+	//settingsicons.png: 16x16 tiles. 0 = QoL, 1 = debug, 2 = advanced
+	public static final int SETTINGS_QOL = 0;
+	public static final int SETTINGS_DEBUG = 1;
+	public static final int SETTINGS_ADVANCED = 2;
+
+	public static Image getSettings(int index){
+		Image icon = new Image( Assets.Interfaces.SETTINGS_ICONS );
+		icon.frame( icon.texture.uvRectBySize( index * 16, 0, 16, 16 ) );
+		return icon;
+	}
+
 	//debugrun.png follows the depth icon layout: a 6px glyph, then 7px glyphs on an 8px step, in Level.Feeling order
 	public static Image getDebugRun(Level.Feeling feeling){
 		int i = feeling == null ? 0 : feeling.ordinal();

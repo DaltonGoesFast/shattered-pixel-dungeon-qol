@@ -118,6 +118,8 @@ public class Armor extends EquipableItem {
 	public boolean curseInfusionBonus = false;
 	public boolean masteryPotionBonus = false;
 	private Glyph savedGlyphForRestore = null;
+	/** Guild shelf: a good glyph held off the armor until it is collected. */
+	public Glyph shelfGlyph = null;
 	
 	protected BrokenSeal seal;
 	
@@ -140,6 +142,7 @@ public class Armor extends EquipableItem {
 	private static final String SEAL            = "seal";
 	private static final String AUGMENT			= "augment";
 	private static final String SAVED_GLYPH     = "saved_glyph";
+	private static final String SHELF_GLYPH     = "shelf_glyph";
 
 	@Override
 	public void storeInBundle( Bundle bundle ) {
@@ -152,6 +155,7 @@ public class Armor extends EquipableItem {
 		bundle.put( MASTERY_POTION_BONUS, masteryPotionBonus );
 		bundle.put( SEAL, seal);
 		bundle.put( AUGMENT, augment);
+		bundle.put( SHELF_GLYPH, shelfGlyph );
 	}
 
 	@Override
@@ -165,6 +169,7 @@ public class Armor extends EquipableItem {
 		masteryPotionBonus = bundle.getBoolean( MASTERY_POTION_BONUS );
 		seal = (BrokenSeal)bundle.get(SEAL);
 		savedGlyphForRestore = (Glyph)bundle.get( SAVED_GLYPH );
+		shelfGlyph = (Glyph)bundle.get( SHELF_GLYPH );
 		
 		augment = bundle.getEnum(AUGMENT, Augment.class);
 	}
@@ -204,6 +209,10 @@ public class Armor extends EquipableItem {
 	@Override
 	public boolean collect(Bag container) {
 		if(super.collect(container)){
+			if (shelfGlyph != null){
+				inscribe( shelfGlyph );
+				shelfGlyph = null;
+			}
 			if (Dungeon.hero != null && Dungeon.hero.isAlive() && isIdentified() && glyph != null){
 				Catalog.setSeen(glyph.getClass());
 				Statistics.itemTypesDiscovered.add(glyph.getClass());

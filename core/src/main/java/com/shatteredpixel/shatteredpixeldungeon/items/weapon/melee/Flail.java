@@ -95,7 +95,7 @@ public class Flail extends MeleeWeapon {
 
 	@Override
 	protected int baseChargeUse(Hero hero, Char target){
-		if (Dungeon.hero.buff(SpinAbilityTracker.class) != null){
+		if (GraveDuel.findBuff(Dungeon.hero, SpinAbilityTracker.class) != null){
 			return 0;
 		} else {
 			return 1;
@@ -105,21 +105,22 @@ public class Flail extends MeleeWeapon {
 	@Override
 	protected void duelistAbility(Hero hero, Integer target) {
 
-		SpinAbilityTracker spin = hero.buff(SpinAbilityTracker.class);
+		SpinAbilityTracker spin = GraveDuel.findBuff(hero, SpinAbilityTracker.class);
 		if (spin != null && spin.spins >= 3){
 			GLog.w(Messages.get(this, "spin_warn"));
 			return;
 		}
 
+		Char spinner = spin != null ? spin.target : GraveDuel.striker(hero);
 		beforeAbilityUsed(hero, null);
 		if (spin == null){
-			spin = Buff.affect(hero, SpinAbilityTracker.class, 3f);
+			spin = Buff.affect(spinner, SpinAbilityTracker.class, 3f);
 		}
 
 		spin.spins++;
-		Buff.prolong(hero, SpinAbilityTracker.class, 3f);
+		Buff.prolong(spinner, SpinAbilityTracker.class, 3f);
 		Sample.INSTANCE.play(Assets.Sounds.CHAINS, 1, 1, 0.9f + 0.1f*spin.spins);
-		hero.sprite.operate(hero.pos);
+		spinner.sprite.operate(spinner.pos);
 		hero.spendAndNext(Actor.TICK);
 		BuffIndicator.refreshHero();
 

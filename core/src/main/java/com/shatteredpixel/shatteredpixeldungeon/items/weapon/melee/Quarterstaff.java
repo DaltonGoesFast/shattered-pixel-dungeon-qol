@@ -55,8 +55,9 @@ public class Quarterstaff extends MeleeWeapon {
 	protected void duelistAbility(Hero hero, Integer target) {
 		beforeAbilityUsed(hero, null);
 		//1 turn less as using the ability is instant
-		Buff.prolong(hero, DefensiveStance.class, 3 + buffedLvl());
-		hero.sprite.operate(hero.pos);
+		Char striker = GraveDuel.striker(hero);
+		Buff.prolong(striker, DefensiveStance.class, 3 + buffedLvl());
+		striker.sprite.operate(striker.pos);
 		hero.next();
 		afterAbilityUsed(hero);
 	}

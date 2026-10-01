@@ -21,6 +21,9 @@
 
 package com.shatteredpixel.shatteredpixeldungeon.actors.hero.spells;
 
+import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
+import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
+import com.shatteredpixel.shatteredpixeldungeon.actors.hero.GraveRoster;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.HolyTome;
 import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
@@ -35,7 +38,13 @@ public abstract class TargetedClericSpell extends ClericSpell {
 		GameScene.selectCell(new CellSelector.Listener() {
 			@Override
 			public void onSelect(Integer cell) {
+				Char aimed = null;
+				if (cell != null){
+					int hit = targetingFlags() == -1 ? cell : new Ballistica(hero.pos, cell, targetingFlags()).collisionPos;
+					aimed = Actor.findChar(hit);
+				}
 				onTargetSelected(tome, hero, cell);
+				GraveRoster.rallyTo(aimed);
 			}
 
 			@Override

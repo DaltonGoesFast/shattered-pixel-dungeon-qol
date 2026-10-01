@@ -24,9 +24,13 @@ package com.shatteredpixel.shatteredpixeldungeon.items.wands;
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Barrier;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.GraveImbue;
+import com.shatteredpixel.shatteredpixeldungeon.actors.hero.GraveRoster;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.GraveShade;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Blindness;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Degrade;
@@ -136,6 +140,28 @@ public abstract class Wand extends Item {
 	}
 
 	public abstract void onZap(Ballistica attack);
+
+	public void onShadeZap( GraveShade shade ){
+		GraveImbue.imbue( shade, this, chargesPerCast() );
+	}
+
+	//Grave pact: a zap whose clicked cell or collision cell holds a shade empowers that shade
+	public static GraveShade shadeTarget( int target, int collision ){
+		if (!Dungeon.isModified(Modifiers.GRAVE)) return null;
+		Char clicked = Actor.findChar(target);
+		if (clicked instanceof GraveShade) return (GraveShade) clicked;
+		Char hit = Actor.findChar(collision);
+		if (hit instanceof GraveShade) return (GraveShade) hit;
+		return null;
+	}
+
+	public static Char enemyTarget( int target, int collision ){
+		Char clicked = Actor.findChar(target);
+		if (clicked != null && clicked.alignment == Char.Alignment.ENEMY) return clicked;
+		Char hit = Actor.findChar(collision);
+		if (hit != null && hit.alignment == Char.Alignment.ENEMY) return hit;
+		return null;
+	}
 
 	public abstract void onHit( MagesStaff staff, Char attacker, Char defender, int damage);
 
@@ -720,6 +746,16 @@ public abstract class Wand extends Item {
 					
 					curUser.busy();
 
+					GraveShade aimedShade = curWand.cursed ? null : shadeTarget(target, cell);
+					Char aimedEnemy = aimedShade == null ? enemyTarget(target, cell) : null;
+					if (aimedEnemy != null){
+						GraveRoster.noteOffense();
+					}
+					//Grave pact: a zap at an enemy empowers a shade instead of touching the enemy
+					final boolean graveRedirect = aimedEnemy != null && !curWand.cursed
+							&& Dungeon.isModified(Modifiers.GRAVE);
+					final GraveShade shade = graveRedirect ? GraveRoster.shadeFor(aimedEnemy) : aimedShade;
+
 					//backup barrier logic
 					//This triggers before the wand zap, mostly so the barrier helps vs skeletons
 					if (curUser.hasTalent(Talent.BACKUP_BARRIER)
@@ -766,7 +802,14 @@ public abstract class Wand extends Item {
 					} else {
 						curWand.fx(shot, new Callback() {
 							public void call() {
-								curWand.onZap(shot);
+								if (shade != null){
+									curWand.onShadeZap(shade);
+								} else if (graveRedirect){
+									GraveRoster.failCall();
+								} else {
+									curWand.onZap(shot);
+								}
+								GraveRoster.rallyTo(aimedEnemy);
 								if (Random.Float() < WondrousResin.extraCurseEffectChance()){
 									WondrousResin.forcePositive = true;
 									CursedWand.cursedZap(curWand,

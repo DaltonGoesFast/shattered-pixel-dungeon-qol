@@ -94,28 +94,29 @@ public class Spear extends MeleeWeapon {
 		}
 
 		hero.belongings.abilityWeapon = wep;
-		if (!hero.canAttack(enemy) || Dungeon.level.adjacent(hero.pos, enemy.pos)){
+		Char striker = GraveDuel.striker(hero);
+		if (!GraveDuel.canAttack(hero, enemy) || Dungeon.level.adjacent(striker.pos, enemy.pos)){
 			GLog.w(Messages.get(wep, "ability_target_range"));
 			hero.belongings.abilityWeapon = null;
 			return;
 		}
 		hero.belongings.abilityWeapon = null;
 
-		hero.sprite.attack(enemy.pos, new Callback() {
+		striker.sprite.attack(enemy.pos, new Callback() {
 			@Override
 			public void call() {
 				wep.beforeAbilityUsed(hero, enemy);
 				AttackIndicator.target(enemy);
 				int oldPos = enemy.pos;
 				//do not push if enemy has moved, or another push is active (e.g. elastic)
-				if (hero.attack(enemy, dmgMulti, dmgBoost, Char.INFINITE_ACCURACY)) {
+				if (GraveDuel.attack(hero, enemy, dmgMulti, dmgBoost, Char.INFINITE_ACCURACY)) {
 					if (enemy.isAlive() && enemy.pos == oldPos && !Pushing.pushingExistsForChar(enemy)){
 						//trace a ballistica to our target (which will also extend past them
-						Ballistica trajectory = new Ballistica(hero.pos, enemy.pos, Ballistica.STOP_TARGET);
+						Ballistica trajectory = new Ballistica(striker.pos, enemy.pos, Ballistica.STOP_TARGET);
 						//trim it to just be the part that goes past them
 						trajectory = new Ballistica(trajectory.collisionPos, trajectory.path.get(trajectory.path.size() - 1), Ballistica.PROJECTILE);
 						//knock them back along that ballistica
-						WandOfBlastWave.throwChar(enemy, trajectory, 1, true, false, hero);
+						WandOfBlastWave.throwChar(enemy, trajectory, 1, true, false, striker);
 					} else if (!enemy.isAlive()) {
 						wep.onAbilityKill(hero, enemy);
 					}

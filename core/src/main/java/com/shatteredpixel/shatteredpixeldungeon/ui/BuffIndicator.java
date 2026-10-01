@@ -24,6 +24,7 @@ package com.shatteredpixel.shatteredpixeldungeon.ui;
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
@@ -295,6 +296,8 @@ public class BuffIndicator extends Component {
 
 			Collections.reverse(buttons);
 			for (BuffButton icon : buttons) {
+				// Overlapping icons clip a corner digit, so drop the count on a squished row.
+				icon.suppressSmallCount();
 				icon.setPos(icon.left() - cumulativeAdjust, icon.top());
 				icon.visible = icon.right() <= right()+1;
 				if (!icon.visible) buffsHidden = true;
@@ -322,7 +325,12 @@ public class BuffIndicator extends Component {
 		private int topOffset = 0;
 
 		public Image grey; //only for small
-		public BitmapText text; //only for large
+		public BitmapText text;
+		public BitmapText textShadow; //1px drop shadow for the small-icon count
+
+		// Small icons show a 1-2 character count at half scale. Hidden once the row overlaps.
+		private boolean smallCount;
+		private boolean smallCountSuppressed;
 
 		public BuffButton( Buff buff, boolean large ){
 			super( new BuffIcon(buff, large));
@@ -330,6 +338,7 @@ public class BuffIndicator extends Component {
 			this.large = large;
 
 			bringToFront(grey);
+			bringToFront(textShadow);
 			bringToFront(text);
 		}
 
@@ -339,16 +348,42 @@ public class BuffIndicator extends Component {
 			grey = new Image( TextureCache.createSolid(0xCC666666));
 			add( grey );
 
+			textShadow = new BitmapText(PixelScene.pixelFont);
+			textShadow.visible = false;
+			add( textShadow );
+
 			text = new BitmapText(PixelScene.pixelFont);
 			add( text );
 		}
 
+		public void suppressSmallCount() {
+			smallCountSuppressed = true;
+		}
+
 		public void updateIcon(){
 			((BuffIcon)icon).refresh(buff);
-			//round up to the nearest pixel if <50% faded, otherwise round down
-			if (!large || buff.iconTextDisplay().isEmpty()) {
-				text.visible = false;
+			smallCountSuppressed = false;
+
+			String label = buff.iconTextDisplay();
+			if (label == null) label = "";
+			smallCount = !large && SPDSettings.buffIconCounts() && label.length() >= 1 && label.length() <= 2;
+
+			// Large icons replace the fade with a full-size colored count.
+			// Small icons keep the fade and add a half-size white count on top.
+			if (large && !label.isEmpty()) {
+				text.visible = true;
+				textShadow.visible = false;
+				grey.visible = false;
+				if (buff.type == Buff.buffType.POSITIVE)        text.hardlight(CharSprite.POSITIVE);
+				else if (buff.type == Buff.buffType.NEGATIVE)   text.hardlight(CharSprite.NEGATIVE);
+				text.alpha(0.7f);
+
+				text.text(label);
+				text.measure();
+			} else {
+				textShadow.visible = false;
 				grey.visible = true;
+				//round up to the nearest pixel if <50% faded, otherwise round down
 				float fadeHeight = GameMath.gate(0, buff.iconFadePercent(), 1) * icon.height();
 				float zoom = (camera() != null) ? camera().zoom : 1;
 				if (fadeHeight < icon.height() / 2f) {
@@ -356,15 +391,20 @@ public class BuffIndicator extends Component {
 				} else {
 					grey.scale.set(icon.width(), (float) Math.floor(zoom * fadeHeight) / zoom);
 				}
-			} else if (!buff.iconTextDisplay().isEmpty()) {
-				text.visible = true;
-				grey.visible = false;
-				if (buff.type == Buff.buffType.POSITIVE)        text.hardlight(CharSprite.POSITIVE);
-				else if (buff.type == Buff.buffType.NEGATIVE)   text.hardlight(CharSprite.NEGATIVE);
-				text.alpha(0.7f);
 
-				text.text(buff.iconTextDisplay());
-				text.measure();
+				if (smallCount) {
+					text.visible = true;
+					text.resetColor();
+					text.alpha(1f);
+					text.text(label);
+					text.measure();
+					textShadow.text(label);
+					textShadow.measure();
+					textShadow.hardlight(0x000000);
+					textShadow.alpha(1f);
+				} else {
+					text.visible = false;
+				}
 			}
 		}
 
@@ -374,13 +414,33 @@ public class BuffIndicator extends Component {
 			grey.x = icon.x = this.x + (large ? 0 : 1);
 			grey.y = icon.y = this.y + (large ? 0 : 2) + topOffset;
 
-			if (text.width > width()){
-				text.scale.set(PixelScene.align(0.5f));
+			if (large) {
+				textShadow.visible = false;
+				if (text.width > width()){
+					text.scale.set(PixelScene.align(0.5f));
+				} else {
+					text.scale.set(1f);
+				}
+				text.x = this.x + width() - text.width() - 1;
+				text.y = this.y + width() - text.baseLine() - 2;
+			} else if (smallCount && !smallCountSuppressed) {
+				float s = PixelScene.align(0.5f);
+				text.visible = true;
+				text.scale.set(s);
+				text.x = icon.x + icon.width() - text.width();
+				text.y = icon.y + icon.height() - text.baseLine();
+				PixelScene.align(text);
+
+				textShadow.visible = true;
+				textShadow.scale.set(s);
+				float nudge = PixelScene.defaultZoom > 0 ? 1f / PixelScene.defaultZoom : s;
+				textShadow.x = text.x + nudge;
+				textShadow.y = text.y + nudge;
+				PixelScene.align(textShadow);
 			} else {
-				text.scale.set(1f);
+				text.visible = false;
+				textShadow.visible = false;
 			}
-			text.x = this.x + width() - text.width() - 1;
-			text.y = this.y + width() - text.baseLine() - 2;
 		}
 
 		@Override

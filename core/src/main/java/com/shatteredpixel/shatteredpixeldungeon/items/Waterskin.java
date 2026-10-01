@@ -22,6 +22,7 @@
 package com.shatteredpixel.shatteredpixeldungeon.items;
 
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
+import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Barrier;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
@@ -108,6 +109,12 @@ public class Waterskin extends Item {
 					if (missingShieldPercent > 0){
 						dropsNeeded += missingShieldPercent / 0.05f;
 					}
+				}
+
+				if (Modifiers.crimsonBlocksHeal(hero)
+						&& (!hero.hasTalent(Talent.SHIELDING_DEW) || curShield >= maxShield)){
+					GLog.i( Messages.get(Dewdrop.class, "crimson") );
+					return;
 				}
 
 				//trimming off 0.01 drops helps with floating point errors

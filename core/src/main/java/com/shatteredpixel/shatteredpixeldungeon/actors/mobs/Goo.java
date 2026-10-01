@@ -28,6 +28,7 @@ import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
+import com.shatteredpixel.shatteredpixeldungeon.actors.hero.GraveRoster;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Invisibility;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.LockedFloor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Ooze;
@@ -284,6 +285,7 @@ public class Goo extends Mob {
 	public void die( Object cause ) {
 		StreamingEvents.bossSlainDepthPending = Dungeon.depth;
 		super.die( cause );
+		GraveRoster.unlock( 2 );
 		
 		Dungeon.level.unseal();
 		

@@ -1,4 +1,5 @@
 @echo off
+color 1F
 REM ====== EDIT THIS PATH to your Lastest UI folder (used when plugin runs from temp folder) ======
 set "OVERLAY_DIR=C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI"
 cd /d "%OVERLAY_DIR%"

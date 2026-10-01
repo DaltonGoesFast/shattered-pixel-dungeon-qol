@@ -30,9 +30,12 @@ import com.shatteredpixel.shatteredpixeldungeon.messages.Languages;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
+import com.shatteredpixel.shatteredpixeldungeon.scenes.TitleScene;
+import com.shatteredpixel.shatteredpixeldungeon.scenes.WelcomeScene;
 import com.shatteredpixel.shatteredpixeldungeon.services.news.News;
 import com.shatteredpixel.shatteredpixeldungeon.services.updates.Updates;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.CharSprite;
+import com.shatteredpixel.shatteredpixeldungeon.ui.BuffIndicator;
 import com.shatteredpixel.shatteredpixeldungeon.ui.CheckBox;
 import com.shatteredpixel.shatteredpixeldungeon.ui.GameLog;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Icons;
@@ -81,9 +84,6 @@ public class WndSettings extends WndTabbed {
 
 	public static int last_index = 0;
 
-	/** Quickslot-swap chip on the QoL tab; the toolbar popup enables it with the swapper. */
-	private static CheckBox quickslotSwapBox;
-
 	public WndSettings() {
 		super();
 
@@ -124,7 +124,7 @@ public class WndSettings extends WndTabbed {
 		height = Math.max(height, qol.height());
 		add( qol );
 
-		add( new IconTab(Icons.get(Icons.TALENT)){
+		add( new IconTab(Icons.getSettings(Icons.SETTINGS_QOL)){
 			@Override
 			protected void select(boolean value) {
 				super.select(value);
@@ -175,7 +175,7 @@ public class WndSettings extends WndTabbed {
 		height = Math.max(height, advanced.height());
 		add( advanced );
 
-		add( new IconTab(Icons.get(Icons.INFO)){
+		add( new IconTab(Icons.getSettings(Icons.SETTINGS_ADVANCED)){
 			@Override
 			protected void select(boolean value) {
 				super.select(value);
@@ -234,7 +234,7 @@ public class WndSettings extends WndTabbed {
 		height = Math.max(height, debug.height());
 		add( debug );
 
-		add( new IconTab(Icons.getDebugRun(null)){
+		add( new IconTab(Icons.getSettings(Icons.SETTINGS_DEBUG)){
 			@Override
 			protected void select(boolean value) {
 				super.select(value);
@@ -261,7 +261,6 @@ public class WndSettings extends WndTabbed {
 
 	@Override
 	public void hide() {
-		quickslotSwapBox = null;
 		super.hide();
 		//resets generators because there's no need to retain chars for languages not selected
 		ShatteredPixelDungeon.seamlessResetScene(new Game.SceneChangeCallback() {
@@ -545,9 +544,6 @@ public class WndSettings extends WndTabbed {
 									protected void onClick() {
 										super.onClick();
 										SPDSettings.quickSwapper(checked());
-										if (quickslotSwapBox != null) {
-											quickslotSwapBox.enable(checked());
-										}
 										Toolbar.updateLayout();
 									}
 								};
@@ -955,6 +951,7 @@ public class WndSettings extends WndTabbed {
 		CheckBox chkShowQuickslotSwapButton;
 		CheckBox chkCenterOnCycleNoEnemies;
 		CheckBox chkBossBarAllEnemies;
+		CheckBox chkBuffIconCounts;
 		CheckBox chkAugmentIcons;
 		CheckBox chkAutoTalentPlan;
 
@@ -1042,8 +1039,6 @@ public class WndSettings extends WndTabbed {
 				}
 			};
 			chkShowQuickslotSwapButton.checked(SPDSettings.showQuickslotSwapButton());
-			chkShowQuickslotSwapButton.enable(SPDSettings.quickSwapper());
-			quickslotSwapBox = chkShowQuickslotSwapButton;
 			add(chkShowQuickslotSwapButton);
 
 			chkCenterOnCycleNoEnemies = new CheckBox(Messages.get(UITab.class, "center_on_cycle_no_enemies")) {
@@ -1065,6 +1060,18 @@ public class WndSettings extends WndTabbed {
 			};
 			chkBossBarAllEnemies.checked(SPDSettings.bossBarAllEnemies());
 			add(chkBossBarAllEnemies);
+
+			chkBuffIconCounts = new CheckBox(Messages.get(UITab.class, "buff_icon_counts")) {
+				@Override
+				protected void onClick() {
+					super.onClick();
+					SPDSettings.buffIconCounts(checked());
+					BuffIndicator.refreshHero();
+					BuffIndicator.refreshBoss();
+				}
+			};
+			chkBuffIconCounts.checked(SPDSettings.buffIconCounts());
+			add(chkBuffIconCounts);
 
 			chkAugmentIcons = new CheckBox(Messages.get(UITab.class, "augment_icons")) {
 				@Override
@@ -1141,6 +1148,9 @@ public class WndSettings extends WndTabbed {
 			chkBossBarAllEnemies.setRect(0, pos + GAP, width, BTN_HEIGHT);
 			pos = chkBossBarAllEnemies.bottom();
 
+			chkBuffIconCounts.setRect(0, pos + GAP, width, BTN_HEIGHT);
+			pos = chkBuffIconCounts.bottom();
+
 			chkAugmentIcons.setRect(0, pos + GAP, width, BTN_HEIGHT);
 			pos = chkAugmentIcons.bottom();
 
@@ -1155,6 +1165,7 @@ public class WndSettings extends WndTabbed {
 		ColorBlock sep1;
 		OptionSlider optAltTilesetChance;
 		RenderedTextBlock altDeprecated;
+		CheckBox chkModdedBanners;
 		ColorBlock sepStreaming;
 		CheckBox chkStreaming;
 		OptionSlider optStreamingPort;
@@ -1191,6 +1202,20 @@ public class WndSettings extends WndTabbed {
 			altDeprecated = PixelScene.renderTextBlock(Messages.get(this, "alt_tileset_deprecated"), 6);
 			altDeprecated.hardlight(0x888888);
 			add(altDeprecated);
+
+			chkModdedBanners = new CheckBox(Messages.get(this, "modded_banners")) {
+				@Override
+				protected void onClick() {
+					super.onClick();
+					SPDSettings.moddedBanners(checked());
+					if (ShatteredPixelDungeon.scene() instanceof TitleScene
+							|| ShatteredPixelDungeon.scene() instanceof WelcomeScene) {
+						ShatteredPixelDungeon.seamlessResetScene();
+					}
+				}
+			};
+			chkModdedBanners.checked(SPDSettings.moddedBanners());
+			add(chkModdedBanners);
 
 			if (DeviceCompat.isDesktop()) {
 				sepStreaming = new ColorBlock(1, 1, 0xFF000000);
@@ -1255,6 +1280,9 @@ public class WndSettings extends WndTabbed {
 			altDeprecated.maxWidth((int)width);
 			altDeprecated.setPos(0, pos + GAP);
 			pos = altDeprecated.bottom();
+
+			chkModdedBanners.setRect(0, pos + GAP, width, BTN_HEIGHT);
+			pos = chkModdedBanners.bottom();
 
 			if (chkStreaming != null) {
 				sepStreaming.size(width, 1);

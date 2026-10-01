@@ -209,6 +209,32 @@ Unused on purpose: Snake, Swarm, Guard, DM-200, Golem (region already full). Flo
 - **Key-locked special rooms** (iron door armory/crypt/etc.): weapon/armor/wand/ring/artifact prizes become gold. **Trinket catalyst is never removed.** **Crystal vault, crystal choice, and crystal chests keep their gear.** Secret rooms keep normal loot. Challenge rooms with open doors (pool/traps/sentry) and statue weapons are unchanged.
 - Equipment is “regularly generated” loot, not a separate 5–15% sprinkle on top of a full floor of gear.
 
+**Crimson — heal by striking, the flask is a weapon** ✅ design locked  
+
+- **Player:** Striking restores you. A thrown healing potion bursts for damage and poisons.
+- Hero only. A hero attack (melee, thrown, spirit bow) that removes hit points heals `max(1, basis/4)`, capped at missing HP. Basis = min(damage just before Glass’s 5×, HP actually removed). Shields and overkill don’t count. **With Glass on, every such hit heals a flat 1.**
+- DoT ticks, wand zaps, bombs, ally hits, and separate enchant procs don’t heal. Vampiric, soul mark, regen, Chalice, Salt Cube, level-up HP, ankhs, and food buffs stay.
+- No hero HP from: PoH drink (still cures), honeyed/aquatic elixirs, dew + waterskin (Shielding Dew barrier stays), sungrass, Water of Health (cure/uncurse/hunger stay), healing darts, Hearty Meal. Ally heals and barriers stay.
+- Thrown PoH on an **enemy**: `4 + depth` impact through armor (no Glass, no enchants), heal quarter of HP removed (min 1), plus Venomous-style poison: 3-turn delay if fresh, extend `3 + depth/5`. Anyone else / empty tile: splash. No beneficial-throw confirm.
+- Pharmacophobia: throw is splash only. Drink keeps the challenge’s cure + `pharmacophobiaProc`.
+
+**Guild — each shop keeps one trade** ✅ design locked  
+
+- **Player:** Each shop keeps one trade, and pays more for it. Two of a kind may hide which is finer.
+- Spoils pact. Floor loot is unchanged. Buy price stays `Shopkeeper.sellPrice` (value × 5 × (depth/5 + 1)). The keeper does not gouge.
+- **Crafts:** floor 6 Arms, floor 11 Mail, floor 16 Arcana, imp (depth 20/21) Stores.
+- **Staples on every counter** (known, never part of the gamble): the next `ChooseBag` bag, one Potion of Healing, one Small Ration, hourglass sandbags (same rules), ankhs only through `Legacy.shopStocksAnkh()`, and three Torches on the imp only.
+- **Shelves:**
+  - Arms: 4 T2 melee, 5 T3 (50% chance one T3 becomes T4 at 3/4 or T5 at 1/4), 5 T2 missiles, 2 `TippedDart.randomTipped(2)`, 1 Stylus, 2 Remove Curse, 1 Stone of Augmentation.
+  - Mail: 5 Mail, 1 Leather, 1 Scale, 3 Plate, 1 Remove Curse, 1 Stone of Augmentation.
+  - Arcana: 9 wands, 5 rings, 1 artifact from the artifact deck (never a duplicate), 2 Identify.
+  - Stores: 1 Magic Mapping, Alchemize ×2–3, 6 potions, 6 scrolls, two rolls of bomb / double bomb / honeypot (1/4, 1/2, 1/4 each).
+- Gear rolls use `Generator.randomUsingDefaults` so the deck does not eat duplicates. Two of the same piece can share a shelf.
+- **Hidden roll** (melee, missiles, armor, wands, rings, the artifact): the class’s own `random()` sets the curse at floor odds (30%). Level is then rerolled at shelf odds: +0 45%, +1 35%, +2 15%, +3 5% (wands refill to the new max charges). The artifact stays +0. Weapon and armor `random()` already applies Parchment Scrap’s curse and enchant multipliers; a good enchant or glyph is held off the item on the shelf (`shelfEnchant` / `shelfGlyph`) and applied when the item is collected into the pack, so it adds no name, glow, or price tell. Curse enchants and glyphs stay on the item (hidden until `cursedKnown`). Level and curse stay, `levelKnown` and `cursedKnown` are false, and `identify()` is never called. Title, glow, examine (+0 stats), and price match across copies. After purchase, vanilla identify rules apply. Fireblast and Regrowth show the 1-charge blurb while the level is unknown.
+- **Sell premium:** at each counter, its own trade sells for 130% of `value()` (Arms: weapons and thrown; Mail: armor except class armor; Arcana: wands, rings, artifacts; Stores: potions, scrolls, bombs, honeypots, Alchemize, torches). Buyback charges the same amount. Everything else sells at `value()`.
+- **Room size:** same as vanilla, sized to the stock so the shelf has no empty stretch. The imp shop stays 9×9.
+- Not seed-banned. Command, Sacrifice, Metamorphosis, Enigma, Hex, and Crimson are unchanged; Command’s shop swap keeps the hidden level and curse.
+
 ---
 
 
@@ -321,6 +347,8 @@ Treat these as **fun-run flags**, not Champion progress, unless you later add ha
 3. Kin, Dissonance (`SpawnScaled`) ✅ done; Evolution ✅ done
 4. Sacrifice ✅ done; Metamorphosis, Enigma ✅ done
 5. Swarms ✅ done; Command ✅ done; Rebirth
-6. Prestige / Vengeance / Chaos / Delusion only after a later design pass
+6. Crimson ✅ done
+7. Guild ✅ done
+8. Prestige / Vengeance / Chaos / Delusion only after a later design pass
 
 Honor is the smallest combat slice. Command is the largest (UI, shops, quotas). Rebirth is the only cross-run state.

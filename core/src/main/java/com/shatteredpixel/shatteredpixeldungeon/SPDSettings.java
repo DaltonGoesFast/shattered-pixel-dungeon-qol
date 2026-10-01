@@ -139,6 +139,17 @@ public class SPDSettings extends GameSettings {
 		return getInt( KEY_SCREEN_SHAKE, 2, 0, 4 );
 	}
 
+	/** Off uses vanilla title/death banners and the vanilla death sound. */
+	public static final String KEY_MODDED_BANNERS = "modded_banners";
+
+	public static void moddedBanners( boolean value ) {
+		put( KEY_MODDED_BANNERS, value );
+	}
+
+	public static boolean moddedBanners() {
+		return getBoolean( KEY_MODDED_BANNERS, false );
+	}
+
 	/** 0–100: chance each region uses {@code 01-}prefixed tiles at run start; 0 = never (default), 100 = always. Deprecated. */
 	public static final String KEY_ALT_TILESET_CHANCE = "alt_tileset_chance";
 
@@ -187,6 +198,7 @@ public class SPDSettings extends GameSettings {
 	public static final String KEY_FLIPSTATUSPANE = "flip_status_pane";
 	public static final String KEY_CENTER_ON_CYCLE_NO_ENEMIES = "center_on_cycle_no_enemies";
 	public static final String KEY_BOSS_BAR_ALL_ENEMIES = "boss_bar_all_enemies";
+	public static final String KEY_BUFF_ICON_COUNTS = "buff_icon_counts";
 	public static final String KEY_AUGMENT_ICONS = "augment_icons";
 	public static final String KEY_BARMODE		= "toolbar_mode";
 	public static final String KEY_SLOTWATERSKIN= "quickslot_waterskin";
@@ -319,6 +331,15 @@ public class SPDSettings extends GameSettings {
 
 	public static boolean bossBarAllEnemies() {
 		return getBoolean( KEY_BOSS_BAR_ALL_ENEMIES, true );
+	}
+
+	public static void buffIconCounts( boolean value ) {
+		put( KEY_BUFF_ICON_COUNTS, value );
+	}
+
+	/** Half-size turn counts on the 7px buff icons (mobile status bar and boss bar). */
+	public static boolean buffIconCounts() {
+		return getBoolean( KEY_BUFF_ICON_COUNTS, true );
 	}
 	
 	public static void toolbarMode( String value ) {

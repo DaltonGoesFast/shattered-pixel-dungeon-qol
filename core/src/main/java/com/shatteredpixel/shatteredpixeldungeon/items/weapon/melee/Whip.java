@@ -57,14 +57,15 @@ public class Whip extends MeleeWeapon {
 		ArrayList<Char> targets = new ArrayList<>();
 		Char closest = null;
 
+		Char striker = GraveDuel.striker(hero);
 		hero.belongings.abilityWeapon = this;
 		for (Char ch : Actor.chars()){
 			if (ch.alignment == Char.Alignment.ENEMY
 					&& !hero.isCharmedBy(ch)
 					&& Dungeon.level.heroFOV[ch.pos]
-					&& hero.canAttack(ch)){
+					&& GraveDuel.canAttack(hero, ch)){
 				targets.add(ch);
-				if (closest == null || Dungeon.level.trueDistance(hero.pos, closest.pos) > Dungeon.level.trueDistance(hero.pos, ch.pos)){
+				if (closest == null || Dungeon.level.trueDistance(striker.pos, closest.pos) > Dungeon.level.trueDistance(striker.pos, ch.pos)){
 					closest = ch;
 				}
 			}
@@ -78,13 +79,13 @@ public class Whip extends MeleeWeapon {
 
 		throwSound();
 		Char finalClosest = closest;
-		hero.sprite.attack(hero.pos, new Callback() {
+		striker.sprite.attack(striker.pos, new Callback() {
 			@Override
 			public void call() {
 				beforeAbilityUsed(hero, finalClosest);
 				for (Char ch : targets) {
 					//ability does no extra damage
-					hero.attack(ch, 1, 0, Char.INFINITE_ACCURACY);
+					GraveDuel.attack(hero, ch, 1, 0, Char.INFINITE_ACCURACY);
 					if (!ch.isAlive()){
 						onAbilityKill(hero, ch);
 					}
