@@ -35,6 +35,7 @@ Rules on you and your allies.
 - **Devotion.** Allies stay on the floor where you leave them. They do not follow you down. A corrupted ally no longer wastes away. Mirror images are not included.
 - **Crimson.** A strike that draws blood restores you, about a quarter of the damage that landed. Ordinary healing does not: potions, dew, sungrass, and the waterskin will not refill your health. A thrown potion of healing bursts on an enemy, deals a little damage, and poisons them.
 - **Grave.** Your hands do not strike. Shades swing the weapon you carry. Up to four can be out, and they return on their own clocks. A chalice can call the next one early, at a cost in health and hunger. Wands and the spirit bow feed a shade instead of wounding the enemy you aimed at.
+- **Chimera.** When the run starts, each of your class talent slots is replaced with a talent from another class. Tengu's mask and the King's crown each offer two choices drawn from the other classes, not your own. The first time you take a subclass or armor ability from a class, you gain that class's signature item: the Warrior's broken seal, the Mage's staff, the Rogue's cloak, the Huntress's spirit bow, or the Cleric's holy tome. The Duelist grants no extra item.
 
 ### Foes
 
