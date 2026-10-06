@@ -40,6 +40,14 @@ When a spawn or champion command reaches a live run through the streaming server
 
 Viewers can use **`!heal`**, **`!cleanse`**, **`!dew`**, **`!corruptally`** (corrupted ally from the **current biome**, boss floors allowed), **`!hex`**, **`!degrade`**, and **`!sabotage`** (removes a **random positive buff that has a visible icon**). Costs are set in the overlay; there are no helper/hurter roles or side discounts.
 
+### Debug runs
+
+Settings → **Debug** (`player_debug`, restart required) is this fork's debug mode. Runs started with it on are stamped debug runs: they never count for badges, dailies, rankings, or the journal.
+
+In a debug run the hero is given **Scroll of Debug** by [Zrp200](https://github.com/Zrp200/ScrollOfDebug) (GPL-3.0, v2.2.0). It is placed in the inventory (and the first empty quickslot) whenever a floor loads, if it isn't already there. The Debug tab's **Debug scroll** button gives it again after a drop, without changing floors. Read it and type commands such as `give`, `spawn`, `affect`, `use`, `goto`, and `help`.
+
+The scroll is not in item generation, the journal catalog, or the give-item list. A normal run never receives it, and loading a non-debug run removes it if one is present. The existing Debug tab actions (heal, identify, bags, reveal, stairs, give item, set level, go to floor) are unchanged.
+
 ### Other run-affecting chat actions (summary)
 
 Full syntax and tables live in **[COMMANDS.md](COMMANDS.md)**. At a glance, viewers can spend points to:

@@ -1,6 +1,7 @@
 # retain these to support class references for the bundling and translation systems
 -keepnames class com.shatteredpixel.** { *; }
 -keepnames class com.watabou.** { *; }
+-keep class com.zrp200.scrollofdebug.** { *; }
 
 # keep classes that are instantiated via reflection
 -keep class * extends com.watabou.noosa.Gizmo { *; }

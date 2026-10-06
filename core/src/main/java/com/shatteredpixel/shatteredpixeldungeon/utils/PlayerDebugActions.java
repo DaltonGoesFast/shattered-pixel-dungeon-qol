@@ -29,6 +29,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.bags.ScrollHolder;
 import com.shatteredpixel.shatteredpixeldungeon.items.bags.VelvetPouch;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.PotionOfHealing;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfIdentify;
+import com.zrp200.scrollofdebug.ScrollOfDebug;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfMagicMapping;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfRemoveCurse;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfTeleportation;
@@ -240,11 +241,34 @@ public final class PlayerDebugActions {
 		return giveItem(clazz, quantity, level);
 	}
 
+	/**
+	 * Put a Scroll of Debug in the hero's inventory if this is a debug run and they don't have one.
+	 * The same grant runs when a debug floor loads; this is the mid-floor replacement.
+	 */
+	public static String giveScrollOfDebug() {
+		String err = precheck();
+		if (err != null) return err;
+		if (!ScrollOfDebug.isDebugRun()) {
+			return "ERR:" + Messages.get(PlayerDebugActions.class, "scroll_denied");
+		}
+		boolean had = Dungeon.hero.belongings.getItem(ScrollOfDebug.class) != null;
+		ScrollOfDebug.handleDebug();
+		if (Dungeon.hero.belongings.getItem(ScrollOfDebug.class) == null) {
+			return "ERR:" + Messages.get(PlayerDebugActions.class, "scroll_failed");
+		}
+		String msg = Messages.get(PlayerDebugActions.class, had ? "scroll_already" : "scroll_given");
+		if (!had) GLog.p(msg);
+		return msg;
+	}
+
 	/** Give an item class: identified, uncursed, at the given upgrade level. Gold goes to the purse. */
 	public static String giveItem(Class<? extends Item> clazz, int quantity, int level) {
 		String err = precheck();
 		if (err != null) return err;
 		if (clazz == null) return "ERR:No item";
+		if (ScrollOfDebug.class.isAssignableFrom(clazz)) {
+			return "ERR:" + Messages.get(PlayerDebugActions.class, "scroll_denied");
+		}
 
 		Hero hero = Dungeon.hero;
 		quantity = Math.max(1, Math.min(quantity, MAX_QUANTITY));

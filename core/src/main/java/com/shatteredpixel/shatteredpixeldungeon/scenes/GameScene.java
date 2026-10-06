@@ -246,6 +246,9 @@ public class GameScene extends PixelScene {
 			return;
 		}
 
+		//debug runs gain a scroll of debug; any other run has it stripped before the HUD builds
+		com.zrp200.scrollofdebug.ScrollOfDebug.handleDebug();
+
 		Dungeon.level.playLevelMusic();
 
 		SPDSettings.lastClass(Dungeon.hero.heroClass.ordinal());
