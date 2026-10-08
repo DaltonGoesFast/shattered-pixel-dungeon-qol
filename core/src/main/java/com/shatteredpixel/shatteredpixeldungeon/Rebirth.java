@@ -47,8 +47,8 @@ import java.util.ArrayList;
 
 /**
  * Rebirth pact: cross-run gift queue in {@code rebirth.dat}.
- * Amulet sacrifice writes the item; death before sacrifice writes a consolation flag;
- * only a later Rebirth run consumes the queue.
+ * Amulet sacrifice writes the item. An empty slot is filled by chance when the next
+ * Rebirth run starts, so a gift does not require a previous death.
  */
 public class Rebirth {
 
@@ -146,25 +146,25 @@ public class Rebirth {
 		writeConsolation();
 	}
 
-	/** Consume queue into starting inventory when this run has Rebirth on. */
+	/** Consume queue into starting inventory when this run has Rebirth on.
+	 *  A saved sacrifice is delivered as-is. An empty slot is filled by chance. */
 	public static void deliverIfNeeded(){
 		if (!Dungeon.isModified(Modifiers.REBIRTH)) return;
 		if (Dungeon.hero == null) return;
 
 		Bundle bundle = readFile();
-		if (bundle == null || !bundle.contains(MODE)) return;
-
-		String mode = bundle.getString(MODE);
-		clearFile();
-
 		Item gift = null;
-		if (MODE_SACRIFICE.equals(mode) && bundle.contains(ITEM)){
-			gift = (Item) bundle.get(ITEM);
-		} else if (MODE_CONSOLATION.equals(mode)){
-			gift = consolationItem();
+		if (bundle != null && bundle.contains(MODE)){
+			String mode = bundle.getString(MODE);
+			clearFile();
+			if (MODE_SACRIFICE.equals(mode) && bundle.contains(ITEM)){
+				gift = (Item) bundle.get(ITEM);
+			}
 		}
 
-		if (gift == null) return;
+		if (gift == null){
+			gift = consolationItem();
+		}
 
 		if (gift instanceof Artifact){
 			Generator.removeArtifact(((Artifact) gift).getClass());

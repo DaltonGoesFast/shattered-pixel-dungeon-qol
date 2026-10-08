@@ -36,7 +36,9 @@ import java.util.HashMap;
 
 public class GamesInProgress {
 	
-	public static final int MAX_SLOTS = HeroClass.values().length;
+	public static final int SLOTS_PER_PAGE = 6;
+	public static final int PAGE_COUNT = 2;
+	public static final int MAX_SLOTS = SLOTS_PER_PAGE * PAGE_COUNT;
 	
 	//null means we have loaded info and it is empty, no entry means unknown.
 	private static HashMap<Integer, Info> slotStates = new HashMap<>();
@@ -74,15 +76,35 @@ public class GamesInProgress {
 	}
 	
 	public static int firstEmpty(){
-		for (int i = 1; i <= MAX_SLOTS; i++){
+		for (int page = 0; page < PAGE_COUNT; page++){
+			int slot = firstEmpty(page);
+			if (slot != -1) return slot;
+		}
+		return -1;
+	}
+
+	public static int firstEmpty( int page ){
+		int start = page * SLOTS_PER_PAGE + 1;
+		int end = Math.min(MAX_SLOTS, start + SLOTS_PER_PAGE - 1);
+		for (int i = start; i <= end; i++){
 			if (check(i) == null) return i;
 		}
 		return -1;
 	}
 	
 	public static ArrayList<Info> checkAll(){
+		return checkRange(1, MAX_SLOTS);
+	}
+
+	public static ArrayList<Info> checkPage( int page ){
+		int start = page * SLOTS_PER_PAGE + 1;
+		int end = Math.min(MAX_SLOTS, start + SLOTS_PER_PAGE - 1);
+		return checkRange(start, end);
+	}
+
+	private static ArrayList<Info> checkRange( int start, int end ){
 		ArrayList<Info> result = new ArrayList<>();
-		for (int i = 1; i <= MAX_SLOTS; i++){
+		for (int i = start; i <= end; i++){
 			Info curr = check(i);
 			if (curr != null) result.add(curr);
 		}

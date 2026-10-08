@@ -25,6 +25,7 @@ import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
 import com.shatteredpixel.shatteredpixeldungeon.QuickSlot;
 import com.shatteredpixel.shatteredpixeldungeon.Rankings;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
@@ -51,6 +52,7 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.Icons;
 import com.shatteredpixel.shatteredpixeldungeon.ui.ItemSlot;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RedButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RenderedTextBlock;
+import com.shatteredpixel.shatteredpixeldungeon.ui.ScrollPane;
 import com.shatteredpixel.shatteredpixeldungeon.ui.TalentButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.TalentsPane;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
@@ -111,18 +113,33 @@ public class WndRanking extends WndTabbed {
 	private void createControls() {
 
 		if (Dungeon.hero != null) {
-			Icons[] icons =
-					{Icons.RANKINGS, Icons.TALENT, Icons.BACKPACK_LRG, Icons.BADGES, Icons.CHALLENGE_COLOR};
-			Group[] pages =
-					{new StatsTab(), new TalentsTab(), new ItemsTab(), new BadgesTab(), null};
+			boolean hasChallenges = Dungeon.challenges != 0;
+			boolean hasPacts = Dungeon.modifiers != 0;
+			int pageCount = 4 + (hasChallenges ? 1 : 0) + (hasPacts ? 1 : 0);
 
-			if (Dungeon.challenges != 0) pages[4] = new ChallengesTab();
+			Icons[] icons = new Icons[pageCount];
+			Group[] pages = new Group[pageCount];
+			icons[0] = Icons.RANKINGS;
+			icons[1] = Icons.TALENT;
+			icons[2] = Icons.BACKPACK_LRG;
+			icons[3] = Icons.BADGES;
+			pages[0] = new StatsTab();
+			pages[1] = new TalentsTab();
+			pages[2] = new ItemsTab();
+			pages[3] = new BadgesTab();
+
+			int extra = 4;
+			if (hasChallenges) {
+				icons[extra] = Icons.CHALLENGE_COLOR;
+				pages[extra] = new ChallengesTab();
+				extra++;
+			}
+			if (hasPacts) {
+				icons[extra] = Icons.PACTS;
+				pages[extra] = new PactsTab();
+			}
 
 			for (int i = 0; i < pages.length; i++) {
-
-				if (pages[i] == null) {
-					break;
-				}
 
 				add(pages[i]);
 
@@ -376,7 +393,8 @@ public class WndRanking extends WndTabbed {
 			pos = 0;
 
 			int slotsActive = 0;
-			for (int i = 0; i < QuickSlot.SIZE; i++){
+			// First hotbar only. Laying out both sets on one row crushes the icons.
+			for (int i = 0; i < QuickSlot.SLOTS_PER_SET; i++){
 				if (Dungeon.quickslot.isNonePlaceholder(i)){
 					slotsActive++;
 				}
@@ -389,7 +407,7 @@ public class WndRanking extends WndTabbed {
 
 			float slotWidth = Math.min(28, ((WIDTH - slotsActive + 1) / (float)slotsActive));
 
-			for (int i = -1; i < QuickSlot.SIZE; i++){
+			for (int i = -1; i < QuickSlot.SLOTS_PER_SET; i++){
 				Item item = null;
 				if (i == -1){
 					item = trinket;
@@ -500,6 +518,67 @@ public class WndRanking extends WndTabbed {
 
 				pos = cb.bottom();
 			}
+		}
+
+	}
+
+	private class PactsTab extends Group {
+
+		public PactsTab(){
+			super();
+
+			camera = WndRanking.this.camera;
+
+			Component content = new Component();
+			float pos = 0;
+			int[][] groups = { Modifiers.HERO_PACTS, Modifiers.FOES_PACTS, Modifiers.SPOILS_PACTS };
+
+			for (int[] group : groups) {
+				for (int mask : group) {
+					if ((Dungeon.modifiers & mask) == 0) continue;
+
+					final String pact = Modifiers.idForMask( mask );
+					if (pact == null) continue;
+
+					CheckBox cb = new CheckBox( Messages.titleCase(Messages.get(Modifiers.class, pact)) );
+					cb.checked( true );
+					cb.active = false;
+
+					if (pos > 0) pos += 1;
+					cb.setRect( 0, pos, WIDTH-16, 15 );
+					content.add( cb );
+
+					IconButton info = new IconButton(Icons.get(Icons.INFO)){
+						@Override
+						protected void onClick() {
+							super.onClick();
+							ShatteredPixelDungeon.scene().add(
+									new WndMessage(Messages.get(Modifiers.class, pact+"_desc"))
+							);
+						}
+					};
+					info.setRect(cb.right(), pos, 16, 15);
+					content.add(info);
+
+					pos = cb.bottom();
+				}
+			}
+
+			content.setSize( WIDTH, pos );
+
+			if (pos <= HEIGHT) {
+				add( content );
+				return;
+			}
+
+			ScrollPane pane = new ScrollPane( content ){
+				@Override
+				public void onClick( float x, float y ) {
+					// clicks belong to the checkboxes and info buttons
+				}
+			};
+			add( pane );
+			pane.setRect( 0, 0, WIDTH, HEIGHT );
 		}
 
 	}

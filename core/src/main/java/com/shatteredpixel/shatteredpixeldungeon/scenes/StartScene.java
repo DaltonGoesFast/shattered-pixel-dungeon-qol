@@ -51,6 +51,9 @@ public class StartScene extends PixelScene {
 	
 	private static final int SLOT_WIDTH = 120;
 	private static final int SLOT_HEIGHT = 22;
+	private static final int PACT_RUN_COLOR = 0x03FFFF;
+
+	private static int savePage = 0;
 	
 	@Override
 	public void create() {
@@ -84,42 +87,12 @@ public class StartScene extends PixelScene {
 		align(title);
 		add(title);
 		
-		ArrayList<GamesInProgress.Info> games = GamesInProgress.checkAll();
-		
-		int slotCount = Math.min(GamesInProgress.MAX_SLOTS, games.size()+1);
-		int slotGap = 10 - slotCount;
-		int slotsHeight = slotCount*SLOT_HEIGHT + (slotCount-1)* slotGap;
-		slotsHeight += 14;
+		if (savePage < 0) savePage = 0;
+		if (savePage >= GamesInProgress.PAGE_COUNT) savePage = GamesInProgress.PAGE_COUNT - 1;
 
-		while (slotGap >= 2 && slotsHeight > (h-title.bottom()-2)){
-			slotGap--;
-			slotsHeight -= slotCount-1;
-		}
-		
-		float yPos = insets.top + (h - slotsHeight + title.bottom() + 2)/2f - 4;
-		yPos = Math.max(yPos, title.bottom()+2);
-		float slotLeft = insets.left + (w - SLOT_WIDTH) / 2f;
-		
-		for (GamesInProgress.Info game : games) {
-			SaveSlotButton existingGame = new SaveSlotButton();
-			existingGame.set(game.slot);
-			existingGame.setRect(slotLeft, yPos, SLOT_WIDTH, SLOT_HEIGHT);
-			yPos += SLOT_HEIGHT + slotGap;
-			align(existingGame);
-			add(existingGame);
-			
-		}
-		
-		if (games.size() < GamesInProgress.MAX_SLOTS){
-			SaveSlotButton newGame = new SaveSlotButton();
-			newGame.set(GamesInProgress.firstEmpty());
-			newGame.setRect(slotLeft, yPos, SLOT_WIDTH, SLOT_HEIGHT);
-			yPos += SLOT_HEIGHT + slotGap;
-			align(newGame);
-			add(newGame);
-		}
-		
-		GamesInProgress.curSlot = 0;
+		ArrayList<GamesInProgress.Info> games = GamesInProgress.checkPage(savePage);
+		int emptySlot = GamesInProgress.firstEmpty(savePage);
+		int slotCount = games.size() + (emptySlot == -1 ? 0 : 1);
 
 		String sortText = "";
 		switch (SPDSettings.gamesInProgressSort()){
@@ -147,12 +120,102 @@ public class StartScene extends PixelScene {
 		};
 		btnSort.textColor(0xCCCCCC);
 
-		if (yPos + 10 > Camera.main.height) {
-			btnSort.setRect(slotLeft - btnSort.reqWidth() - 6, Camera.main.height - 14, btnSort.reqWidth() + 4, 12);
-		} else {
-			btnSort.setRect(slotLeft, yPos, btnSort.reqWidth() + 4, 12);
+		float slotLeft = insets.left + (w - SLOT_WIDTH) / 2f;
+		boolean showSort = games.size() >= 2;
+		boolean sortBeside = showSort && (insets.left + w) - (slotLeft + SLOT_WIDTH) >= btnSort.reqWidth() + 8;
+		int controlRows = 1 + (showSort && !sortBeside ? 1 : 0);
+
+		int slotGap = 10 - slotCount;
+		int slotsHeight = slotCount*SLOT_HEIGHT + Math.max(0, slotCount-1)* slotGap;
+		slotsHeight += 14 * controlRows;
+
+		while (slotGap >= 2 && slotsHeight > (h-title.bottom()-2)){
+			slotGap--;
+			slotsHeight -= Math.max(0, slotCount-1);
 		}
-		if (games.size() >= 2) add(btnSort);
+		
+		float yPos = insets.top + (h - slotsHeight + title.bottom() + 2)/2f - 4;
+		yPos = Math.max(yPos, title.bottom()+2);
+		
+		for (GamesInProgress.Info game : games) {
+			SaveSlotButton existingGame = new SaveSlotButton();
+			existingGame.set(game.slot);
+			existingGame.setRect(slotLeft, yPos, SLOT_WIDTH, SLOT_HEIGHT);
+			yPos += SLOT_HEIGHT + slotGap;
+			align(existingGame);
+			add(existingGame);
+			
+		}
+		
+		if (emptySlot != -1){
+			SaveSlotButton newGame = new SaveSlotButton();
+			newGame.set(emptySlot);
+			newGame.setRect(slotLeft, yPos, SLOT_WIDTH, SLOT_HEIGHT);
+			yPos += SLOT_HEIGHT + slotGap;
+			align(newGame);
+			add(newGame);
+		}
+		
+		GamesInProgress.curSlot = 0;
+
+		float controlsY = yPos;
+		if (controlsY + 12 > Camera.main.height - 2) {
+			controlsY = Camera.main.height - 14;
+		}
+
+		StyledButton btnPrev = new StyledButton(Chrome.Type.TOAST_TR, "", 6){
+			@Override
+			protected void onClick() {
+				super.onClick();
+				if (savePage > 0){
+					savePage--;
+					ShatteredPixelDungeon.seamlessResetScene();
+				}
+			}
+		};
+		btnPrev.icon(Icons.get(Icons.LEFTARROW));
+		btnPrev.enable(savePage > 0);
+		btnPrev.setRect(slotLeft, controlsY, 16, 12);
+		add(btnPrev);
+
+		StyledButton btnNext = new StyledButton(Chrome.Type.TOAST_TR, "", 6){
+			@Override
+			protected void onClick() {
+				super.onClick();
+				if (savePage < GamesInProgress.PAGE_COUNT - 1){
+					savePage++;
+					ShatteredPixelDungeon.seamlessResetScene();
+				}
+			}
+		};
+		btnNext.icon(Icons.get(Icons.RIGHTARROW));
+		btnNext.enable(savePage < GamesInProgress.PAGE_COUNT - 1);
+		btnNext.setRect(slotLeft + SLOT_WIDTH - 16, controlsY, 16, 12);
+		add(btnNext);
+
+		RenderedTextBlock pageLabel = PixelScene.renderTextBlock(
+				Messages.get(this, "page", savePage + 1, GamesInProgress.PAGE_COUNT), 6);
+		pageLabel.hardlight(0xCCCCCC);
+		pageLabel.setPos(
+				slotLeft + (SLOT_WIDTH - pageLabel.width()) / 2f,
+				controlsY + (12 - pageLabel.height()) / 2f
+		);
+		align(pageLabel);
+		add(pageLabel);
+
+		if (showSort) {
+			if (sortBeside) {
+				btnSort.setRect(slotLeft + SLOT_WIDTH + 4, controlsY, btnSort.reqWidth() + 4, 12);
+			} else {
+				float sortY = controlsY + 14;
+				if (sortY + 12 > Camera.main.height - 2) {
+					btnSort.setRect(slotLeft - btnSort.reqWidth() - 6, controlsY, btnSort.reqWidth() + 4, 12);
+				} else {
+					btnSort.setRect(slotLeft, sortY, btnSort.reqWidth() + 4, 12);
+				}
+			}
+			add(btnSort);
+		}
 
 		fadeIn();
 		
@@ -262,7 +325,12 @@ public class StartScene extends PixelScene {
 				level.text(Integer.toString(info.level));
 				level.measure();
 				
-				if (info.challenges > 0){
+				if (info.modifiers > 0){
+					name.hardlight(PACT_RUN_COLOR);
+					lastPlayed.hardlight(PACT_RUN_COLOR);
+					depth.hardlight(PACT_RUN_COLOR);
+					level.hardlight(PACT_RUN_COLOR);
+				} else if (info.challenges > 0){
 					name.hardlight(Window.TITLE_COLOR);
 					lastPlayed.hardlight(Window.TITLE_COLOR);
 					depth.hardlight(Window.TITLE_COLOR);

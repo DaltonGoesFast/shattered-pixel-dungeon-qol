@@ -75,6 +75,7 @@ public enum Icons {
 	REPEAT,
 	ARROW,
 	CHALLENGE_COLOR,
+	PACTS,
 	SCROLL_COLOR,
 	COPY,
 	PASTE,
@@ -143,6 +144,9 @@ public enum Icons {
 	}
 	
 	public static Image get( Icons type ) {
+		if (type == PACTS) {
+			return new Image( Assets.Interfaces.PACTS_ICON );
+		}
 		Image icon = new Image( Assets.Interfaces.ICONS );
 		switch (type) {
 

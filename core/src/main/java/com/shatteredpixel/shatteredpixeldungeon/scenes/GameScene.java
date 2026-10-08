@@ -246,6 +246,9 @@ public class GameScene extends PixelScene {
 			return;
 		}
 
+		//debug runs gain a scroll of debug; any other run has it stripped before the HUD builds
+		com.zrp200.scrollofdebug.ScrollOfDebug.handleDebug();
+
 		Dungeon.level.playLevelMusic();
 
 		SPDSettings.lastClass(Dungeon.hero.heroClass.ordinal());
@@ -828,7 +831,7 @@ public class GameScene extends PixelScene {
 		}
 
 		if (!SPDSettings.intro() &&
-				Rankings.INSTANCE.totalNumber > 0 &&
+				Rankings.INSTANCE.gamesPlayed() > 0 &&
 				!Document.ADVENTURERS_GUIDE.isPageRead(Document.GUIDE_DIEING)){
 			GameScene.flashForDocument(Document.ADVENTURERS_GUIDE, Document.GUIDE_DIEING);
 		}
@@ -1810,7 +1813,11 @@ public class GameScene extends PixelScene {
 			protected void onClick() {
 				GamesInProgress.selectedClass = Dungeon.hero.heroClass;
 				GamesInProgress.curSlot = GamesInProgress.firstEmpty();
-				ShatteredPixelDungeon.switchScene(HeroSelectScene.class);
+				if (GamesInProgress.curSlot == -1){
+					ShatteredPixelDungeon.switchScene(StartScene.class);
+				} else {
+					ShatteredPixelDungeon.switchScene(HeroSelectScene.class);
+				}
 			}
 
 			@Override

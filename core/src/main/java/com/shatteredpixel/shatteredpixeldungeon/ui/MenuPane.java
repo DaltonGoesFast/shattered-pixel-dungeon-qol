@@ -152,8 +152,8 @@ public class MenuPane extends Component {
 		}
 
 		if (Modifiers.activeModifiers() > 0){
-			pactIcon = Icons.get(Icons.CHAL_COUNT);
-			pactIcon.hardlight(0.5f, 1f, 2f);
+			pactIcon = Icons.get(Icons.PACTS);
+			pactIcon.scale.set(7f / pactIcon.width());
 			add(pactIcon);
 
 			pactText = new BitmapText( Integer.toString( Modifiers.activeModifiers() ), PixelScene.pixelFont);

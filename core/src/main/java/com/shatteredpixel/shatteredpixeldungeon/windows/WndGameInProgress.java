@@ -97,7 +97,7 @@ public class WndGameInProgress extends Window {
 					Game.scene().add( new WndPacts( info.modifiers, false ) );
 				}
 			};
-			btnPacts.icon(Icons.get(Icons.CHALLENGE_COLOR));
+			btnPacts.icon(Icons.get(Icons.PACTS));
 			float btnW = btnPacts.reqWidth() + 2;
 			btnPacts.setRect( (WIDTH - btnW)/2, pos, btnW , 18 );
 			add( btnPacts );

@@ -254,7 +254,17 @@ public class AboutScene extends PixelScene {
 		freesound.setRect(transifex.left()-10, transifex.bottom() + 8, colWidth+20, 0);
 		content.add(freesound);
 
-		content.setSize( fullWidth, freesound.bottom()+10 + insets.bottom );
+		CreditsBlock debugScroll = new CreditsBlock(true,
+				Window.TITLE_COLOR,
+				null,
+				null,
+				"Debug runs can use _Scroll of Debug_ by _Zrp200_ (GPL-3.0). It is not part of a normal run.",
+				"github.com/Zrp200/ScrollOfDebug",
+				"https://github.com/Zrp200/ScrollOfDebug");
+		debugScroll.setRect(freesound.left(), freesound.bottom() + 8, colWidth+20, 0);
+		content.add(debugScroll);
+
+		content.setSize( fullWidth, debugScroll.bottom()+10 + insets.bottom );
 
 		list.setRect( 0, 0, w, h );
 		list.scrollTo(0, 0);

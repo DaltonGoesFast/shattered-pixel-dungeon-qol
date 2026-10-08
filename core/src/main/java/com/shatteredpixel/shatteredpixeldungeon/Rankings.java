@@ -71,6 +71,15 @@ public enum Rankings {
 	public int totalNumber;
 	public int wonNumber;
 
+	/** Runs with at least one pact. Separate from {@link #records}. */
+	public ArrayList<Record> pactRecords;
+	public int lastPactRecord = -1;
+	public int pactTotal;
+	public int pactWon;
+
+	/** Which board {@link com.shatteredpixel.shatteredpixeldungeon.scenes.RankingsScene} is showing. */
+	public static boolean viewingPacts;
+
 	//The number of runs which are only present locally, not in the cloud
 	public int localTotal;
 	public int localWon;
@@ -146,28 +155,24 @@ public enum Rankings {
 			return;
 		}
 
-		records.add( rec );
-		
-		Collections.sort( records, scoreComparator );
-		
-		lastRecord = records.indexOf( rec );
-		int size = records.size();
-		while (size > TABLE_SIZE) {
-
-			if (lastRecord == size - 1) {
-				records.remove( size - 2 );
-				lastRecord--;
-			} else {
-				records.remove( size - 1 );
-			}
-
-			size = records.size();
+		boolean pactRun = Dungeon.modifiers != 0;
+		viewingPacts = pactRun;
+		if (pactRecords == null) {
+			pactRecords = new ArrayList<>();
 		}
+		addToBoard( pactRun ? pactRecords : records, rec, pactRun );
 
-		if (rec.customSeed.isEmpty()) {
-			totalNumber++;
-			if (win) {
-				wonNumber++;
+		if (rec.customSeed == null || rec.customSeed.isEmpty()) {
+			if (pactRun) {
+				pactTotal++;
+				if (win) {
+					pactWon++;
+				}
+			} else {
+				totalNumber++;
+				if (win) {
+					wonNumber++;
+				}
 			}
 		}
 
@@ -178,6 +183,80 @@ public enum Rankings {
 		if (crystal != null){
 			tempStore.restoreHeroBelongings(Dungeon.hero, null);
 		}
+	}
+
+	/** Non-custom-seed games on both boards. Used by badges and the "already played" checks. */
+	public int gamesPlayed() {
+		return totalNumber + pactTotal;
+	}
+
+	public int gamesWon() {
+		return wonNumber + pactWon;
+	}
+
+	private void addToBoard( ArrayList<Record> board, Record rec, boolean pactBoard ) {
+		board.add( rec );
+		Collections.sort( board, scoreComparator );
+
+		int latest = board.indexOf( rec );
+		int size = board.size();
+		while (size > TABLE_SIZE) {
+			if (latest == size - 1) {
+				board.remove( size - 2 );
+				latest--;
+			} else {
+				board.remove( size - 1 );
+			}
+			size = board.size();
+		}
+
+		if (pactBoard) {
+			lastPactRecord = latest;
+		} else {
+			lastRecord = latest;
+		}
+	}
+
+	private static boolean countsTowardTotals( Record rec ) {
+		return rec.customSeed == null || rec.customSeed.isEmpty();
+	}
+
+	private static boolean recordHasPacts( Record rec ) {
+		return rec.gameData != null
+				&& rec.gameData.contains( MODIFIERS )
+				&& rec.gameData.getInt( MODIFIERS ) != 0;
+	}
+
+	/** Move pact runs off the normal board. Only runs still in the saved top 11 can be split. */
+	private void splitPactRecords() {
+		ArrayList<Record> keep = new ArrayList<>();
+		Record latest = (lastRecord >= 0 && lastRecord < records.size()) ? records.get( lastRecord ) : null;
+
+		for (Record rec : records) {
+			if (recordHasPacts( rec )) {
+				pactRecords.add( rec );
+				if (countsTowardTotals( rec )) {
+					pactTotal++;
+					if (rec.win) {
+						pactWon++;
+					}
+					if (totalNumber > 0) {
+						totalNumber--;
+					}
+					if (rec.win && wonNumber > 0) {
+						wonNumber--;
+					}
+				}
+			} else {
+				keep.add( rec );
+			}
+		}
+
+		records = keep;
+		Collections.sort( records, scoreComparator );
+		Collections.sort( pactRecords, scoreComparator );
+		lastRecord = latest == null ? -1 : records.indexOf( latest );
+		lastPactRecord = latest == null ? -1 : pactRecords.indexOf( latest );
 	}
 
 	private int score( boolean win ) {
@@ -395,6 +474,10 @@ public enum Rankings {
 	private static final String LATEST	= "latest";
 	private static final String TOTAL	= "total";
 	private static final String WON     = "won";
+	private static final String PACT_RECORDS = "pact_records";
+	private static final String PACT_LATEST  = "pact_latest";
+	private static final String PACT_TOTAL   = "pact_total";
+	private static final String PACT_WON     = "pact_won";
 
 	public static final String LATEST_DAILY	        = "latest_daily";
 	public static final String DAILY_HISTORY_DATES  = "daily_history_dates";
@@ -406,6 +489,10 @@ public enum Rankings {
 		bundle.put( LATEST, lastRecord );
 		bundle.put( TOTAL, totalNumber );
 		bundle.put( WON, wonNumber );
+		bundle.put( PACT_RECORDS, pactRecords );
+		bundle.put( PACT_LATEST, lastPactRecord );
+		bundle.put( PACT_TOTAL, pactTotal );
+		bundle.put( PACT_WON, pactWon );
 
 		bundle.put(LATEST_DAILY, latestDaily);
 
@@ -435,6 +522,8 @@ public enum Rankings {
 		}
 		
 		records = new ArrayList<>();
+		pactRecords = new ArrayList<>();
+		lastPactRecord = -1;
 		
 		try {
 			Bundle bundle = FileUtils.bundleFromFile( RANKINGS_FILE );
@@ -473,6 +562,18 @@ public enum Rankings {
 				if (latestDate > SPDSettings.lastDaily()){
 					SPDSettings.lastDaily(latestDate);
 				}
+			}
+
+			if (!bundle.contains( PACT_TOTAL )) {
+				splitPactRecords();
+				save();
+			} else {
+				for (Bundlable record : bundle.getCollection( PACT_RECORDS )) {
+					pactRecords.add( (Record)record );
+				}
+				lastPactRecord = bundle.getInt( PACT_LATEST );
+				pactTotal = bundle.getInt( PACT_TOTAL );
+				pactWon = bundle.getInt( PACT_WON );
 			}
 
 		} catch (IOException e) {

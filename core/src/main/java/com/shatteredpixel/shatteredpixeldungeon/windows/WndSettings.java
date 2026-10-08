@@ -1367,6 +1367,7 @@ public class WndSettings extends WndTabbed {
 			addAction("give_item", new Callback() { public void call() {
 				ShatteredPixelDungeon.scene().addToFront(new WndPlayerDebugGiveItem());
 			} });
+			addAction("debug_scroll", new Callback() { public void call() { report(PlayerDebugActions.giveScrollOfDebug()); } });
 			addAction("set_level", new Callback() { public void call() {
 				ShatteredPixelDungeon.scene().addToFront(WndPlayerDebugValue.heroLevel());
 			} });

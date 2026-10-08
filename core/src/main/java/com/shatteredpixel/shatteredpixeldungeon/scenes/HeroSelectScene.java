@@ -99,6 +99,14 @@ public class HeroSelectScene extends PixelScene {
 	private static boolean chalWasRandomized = false;
 	private static boolean pactWasRandomized = false;
 
+	private Image pactIcon(){
+		Image icon = Icons.get(Icons.PACTS);
+		if (SPDSettings.modifiers() <= 0){
+			icon.brightness(0.45f);
+		}
+		return icon;
+	}
+
 	@Override
 	public void create() {
 		super.create();
@@ -491,7 +499,7 @@ public class HeroSelectScene extends PixelScene {
 	@Override
 	public void update() {
 		super.update();
-		if (SPDSettings.intro() && Rankings.INSTANCE.totalNumber > 0){
+		if (SPDSettings.intro() && Rankings.INSTANCE.gamesPlayed() > 0){
 			SPDSettings.intro(false);
 		}
 		btnExit.visible = btnExit.active = !SPDSettings.intro();
@@ -879,7 +887,7 @@ public class HeroSelectScene extends PixelScene {
 				protected void onClick() {
 					if (!Badges.firstWinFeaturesUnlocked()){
 						ShatteredPixelDungeon.scene().addToFront( new WndTitledMessage(
-								Icons.get(Icons.CHALLENGE_GREY),
+								Icons.get(Icons.PACTS),
 								Messages.get(WndPacts.class, "title"),
 								Messages.get(HeroSelectScene.class, "pacts_nowin")
 						));
@@ -889,14 +897,14 @@ public class HeroSelectScene extends PixelScene {
 					ShatteredPixelDungeon.scene().addToFront(new WndPacts(SPDSettings.modifiers(), true) {
 						public void onBackPressed() {
 							super.onBackPressed();
-							icon(Icons.get(SPDSettings.modifiers() > 0 ? Icons.CHALLENGE_COLOR : Icons.CHALLENGE_GREY));
+							icon(pactIcon());
 							updateOptionsColor();
 						}
 					} );
 				}
 			};
 			pactButton.leftJustify = true;
-			pactButton.icon(Icons.get(SPDSettings.modifiers() > 0 ? Icons.CHALLENGE_COLOR : Icons.CHALLENGE_GREY));
+			pactButton.icon(pactIcon());
 			add(pactButton);
 			buttons.add(pactButton);
 
@@ -1052,7 +1060,7 @@ public class HeroSelectScene extends PixelScene {
 								mask |= pactMasks.remove(0);
 							}
 							SPDSettings.modifiers(Modifiers.sanitize(mask));
-							pactButton.icon(Icons.get(SPDSettings.modifiers() > 0 ? Icons.CHALLENGE_COLOR : Icons.CHALLENGE_GREY));
+							pactButton.icon(pactIcon());
 							ShatteredPixelDungeon.scene().addToFront(new WndPacts(mask, false));
 						}
 

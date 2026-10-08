@@ -30,6 +30,7 @@ import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.HeroSelectScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.InterlevelScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.RankingsScene;
+import com.shatteredpixel.shatteredpixeldungeon.scenes.StartScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.TitleScene;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Icons;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RedButton;
@@ -83,7 +84,7 @@ public class WndGame extends Window {
 					GameScene.show( new WndPacts( Dungeon.modifiers, false ) );
 				}
 			} );
-			curBtn.icon(Icons.get(Icons.CHALLENGE_COLOR));
+			curBtn.icon(Icons.get(Icons.PACTS));
 		}
 
 		// Restart
@@ -94,7 +95,11 @@ public class WndGame extends Window {
 				protected void onClick() {
 					GamesInProgress.selectedClass = Dungeon.hero.heroClass;
 					GamesInProgress.curSlot = GamesInProgress.firstEmpty();
-					ShatteredPixelDungeon.switchScene(HeroSelectScene.class);
+					if (GamesInProgress.curSlot == -1){
+						ShatteredPixelDungeon.switchScene(StartScene.class);
+					} else {
+						ShatteredPixelDungeon.switchScene(HeroSelectScene.class);
+					}
 				}
 			} );
 			curBtn.icon(Icons.get(Icons.ENTER));

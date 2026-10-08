@@ -275,12 +275,12 @@ Unused on purpose: Snake, Swarm, Guard, DM-200, Golem (region already full). Flo
 - **Stack as a unit:** 5 Healing → 5 of one other potion, not five independent rolls.
 - Name stays Enigma. Old unique-reroll / on-use-scramble pitch is retired.
 
-**Rebirth — forced carry on amulet, consolation on death** ✅ design locked  
+**Rebirth — chosen carry on amulet, chance if the slot is empty** ✅ design locked  
 
 - **Dailies / custom seeds: cannot enable.**
 - On **Amulet pickup** you **must** sacrifice one **non-unique** (full upgrades/enchants OK). That item starts in the **next** run’s inventory. Only **one** carry — a new sacrifice replaces any previous queue, no snowball.
 - Amulet itself and uniques cannot be the sacrifice.
-- If you **die before sacrificing** (including dying while holding last run’s carry): the next Rebirth run starts with **one random loot item** instead (`Generator.random` — potion, dirk, anything floor loot can be). Not the lost carry.
+- If the slot is **empty** when a Rebirth run starts, chance fills it (`Generator.random` — potion, dirk, anything floor loot can be). A previous death is not required. Dying before sacrificing still writes that same consolation, and does not keep a lost carry.
 
 **Vengeance — hostile allies / doppelganger** 🚧 skipped for now  
 

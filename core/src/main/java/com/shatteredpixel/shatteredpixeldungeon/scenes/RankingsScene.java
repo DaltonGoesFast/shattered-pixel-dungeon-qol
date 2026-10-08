@@ -51,6 +51,8 @@ import com.watabou.utils.DeviceCompat;
 import com.watabou.utils.GameMath;
 import com.watabou.utils.RectF;
 
+import java.util.ArrayList;
+
 public class RankingsScene extends PixelScene {
 	
 	private static final float ROW_HEIGHT_MAX	= 20;
@@ -84,7 +86,11 @@ public class RankingsScene extends PixelScene {
 
 		Rankings.INSTANCE.load();
 
-		IconTitle title = new IconTitle( Icons.RANKINGS.get(), Messages.get(this, "title"));
+		final boolean pacts = Rankings.viewingPacts;
+		final ArrayList<Rankings.Record> shown = pacts ? Rankings.INSTANCE.pactRecords : Rankings.INSTANCE.records;
+		final int latest = pacts ? Rankings.INSTANCE.lastPactRecord : Rankings.INSTANCE.lastRecord;
+
+		IconTitle title = new IconTitle( Icons.RANKINGS.get(), Messages.get(this, pacts ? "pact_title" : "title"));
 		title.setSize(200, 0);
 		title.setPos(
 				insets.left + (w - title.reqWidth()) / 2f,
@@ -93,18 +99,18 @@ public class RankingsScene extends PixelScene {
 		align(title);
 		add(title);
 		
-		if (Rankings.INSTANCE.records.size() > 0) {
+		if (shown.size() > 0) {
 
 			//attempts to give each record as much space as possible, ideally as much space as portrait mode
-			float rowHeight = GameMath.gate(ROW_HEIGHT_MIN, (h - 26)/Rankings.INSTANCE.records.size(), ROW_HEIGHT_MAX);
+			float rowHeight = GameMath.gate(ROW_HEIGHT_MIN, (h - 26)/shown.size(), ROW_HEIGHT_MAX);
 
 			float left = (w - Math.min( MAX_ROW_WIDTH, w )) / 2 + GAP;
-			float top = (h - rowHeight  * Rankings.INSTANCE.records.size()) / 2;
+			float top = (h - rowHeight  * shown.size()) / 2;
 			
 			int pos = 0;
 			
-			for (Rankings.Record rec : Rankings.INSTANCE.records) {
-				Record row = new Record( pos, pos == Rankings.INSTANCE.lastRecord, rec );
+			for (Rankings.Record rec : shown) {
+				Record row = new Record( pos, pos == latest, rec );
 				float offset = 0;
 				if (rowHeight <= 14){
 					offset = (pos % 2 == 1) ? 5 : -5;
@@ -115,12 +121,15 @@ public class RankingsScene extends PixelScene {
 				pos++;
 			}
 			
-			if (Rankings.INSTANCE.totalNumber >= Rankings.TABLE_SIZE) {
+			int played = pacts ? Rankings.INSTANCE.pactTotal : Rankings.INSTANCE.totalNumber;
+			int won = pacts ? Rankings.INSTANCE.pactWon : Rankings.INSTANCE.wonNumber;
+			// Pact board always shows wins/played. The normal board keeps the old "list is full" threshold.
+			if (pacts ? played > 0 : played >= Rankings.TABLE_SIZE) {
 				
 				RenderedTextBlock label = PixelScene.renderTextBlock( 8 );
 				label.hardlight( 0xCCCCCC );
 				label.setHightlighting(true, Window.SHPX_COLOR);
-				label.text( Messages.get(this, "total") + " _" + Rankings.INSTANCE.wonNumber + "_/" + Rankings.INSTANCE.totalNumber );
+				label.text( Messages.get(this, pacts ? "pact_total" : "total") + " _" + won + "_/" + played );
 				add( label );
 				
 				label.setPos(
@@ -133,7 +142,7 @@ public class RankingsScene extends PixelScene {
 			
 		} else {
 
-			RenderedTextBlock noRec = PixelScene.renderTextBlock(Messages.get(this, "no_games"), 8);
+			RenderedTextBlock noRec = PixelScene.renderTextBlock(Messages.get(this, pacts ? "pact_no_games" : "no_games"), 8);
 			noRec.hardlight( 0xCCCCCC );
 			noRec.setPos(
 					insets.left + (w - noRec.width()) / 2,
@@ -167,6 +176,19 @@ public class RankingsScene extends PixelScene {
 			left += 16;
 			add(btnDailies);
 		}
+
+		IconButton btnPacts = new IconButton(Icons.get(Icons.PACTS)) {
+			@Override
+			protected void onClick() {
+				Rankings.viewingPacts = !Rankings.viewingPacts;
+				ShatteredPixelDungeon.switchNoFade(RankingsScene.class);
+			}
+		};
+		if (!pacts) {
+			btnPacts.icon().brightness(0.6f);
+		}
+		btnPacts.setRect( left, insets.top, 16, 20 );
+		add(btnPacts);
 
 		if (Dungeon.daily){
 			addToFront(new WndDailies());

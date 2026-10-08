@@ -1,0 +1,17 @@
+Scroll of Debug v2.2.0
+https://github.com/Zrp200/ScrollOfDebug
+commit 7d01866e5e73b0ce3f5ca8975ac110a9054c154e (2025-12-28)
+License: GNU General Public License v3.0 (GitHub repository license; same license as this fork)
+
+The upstream files did not carry per-file copyright headers. The GPL notice at the top of each
+Java file was added when vendoring, and names Zrp200 as the copyright holder.
+
+Local changes from that commit, all in ScrollOfDebug.java:
+- handleDebug() follows this fork's debug-run stamp
+  (ShatteredPixelDungeon.debugSession && Dungeon.debugRun) instead of DeviceCompat.isDebug().
+- doRead() and interpret() refuse to run unless that stamp is set.
+- The class index is built on first use, not when the class is loaded.
+- Item name, description chrome, and the command prompt come from messages properties.
+  Command syntax text inside the tool stays in this file.
+- reset() keeps the scroll-holder sprite and does not join the scroll rune table.
+- value() and energyVal() are 0. The item is unique and its curse state is known.
