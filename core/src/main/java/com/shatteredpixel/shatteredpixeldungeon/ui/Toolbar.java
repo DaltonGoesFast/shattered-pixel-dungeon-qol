@@ -48,6 +48,7 @@ import com.watabou.input.ControllerHandler;
 import com.watabou.input.GameAction;
 import com.watabou.input.KeyBindings;
 import com.watabou.noosa.Camera;
+import com.watabou.noosa.ColorBlock;
 import com.watabou.noosa.Game;
 import com.watabou.noosa.Gizmo;
 import com.watabou.noosa.Image;
@@ -73,6 +74,11 @@ public class Toolbar extends Component {
 
 	/** 0 unset, otherwise the last quickswapper page size; changing it resets {@link QuickSlotButton#quickSlotPage}. */
 	private int swapperPageSize;
+
+	/** Mobile quickslot strip. Inactive unless the slots no longer fit beside the fixed buttons. */
+	private QuickslotScrollStrip slotStrip;
+	private boolean quickslotScrollActive;
+	private int quickslotScrollKey = Integer.MIN_VALUE;
 
 	private static Toolbar instance;
 
@@ -105,6 +111,10 @@ public class Toolbar extends Component {
 		for (int i = 0; i < btnQuick.length; i++){
 			add( btnQuick[i] = new QuickslotTool(64, 0, 22, 24, i) );
 		}
+
+		// Controller is registered here, then the slot buttons are moved above it.
+		// Wait, search, and inventory are created afterward, so they stay above the slots.
+		createQuickslotStrip();
 
 		// Hidden button: swap quickslot set / page (e.g. ` key)
 		add(new Button(){
@@ -565,6 +575,7 @@ public class Toolbar extends Component {
 		}
 
 		if (SPDSettings.interfaceSize() > 0){
+			releaseQuickslotScroll();
 			btnInventory.setPos(right - btnInventory.width(), y);
 			btnWait.setPos(btnInventory.left() - btnWait.width(), y);
 			btnSearch.setPos(btnWait.left() - btnSearch.width(), y);
@@ -696,6 +707,7 @@ public class Toolbar extends Component {
 
 		}
 
+		layoutMobileQuickslotScroll();
 	}
 
 	public static void updateLayout(){
@@ -714,6 +726,11 @@ public class Toolbar extends Component {
 					((Tool)tool).enable( lastEnabled );
 				}
 			}
+			// Quickslots live inside the scroll strip while it is active, so they are not direct children.
+			for (QuickslotTool tool : btnQuick) {
+				tool.enable( lastEnabled );
+			}
+			btnSwap.enable( lastEnabled && btnSwap.visible );
 		}
 		
 		if (!Dungeon.hero.isAlive()) {
@@ -729,6 +746,7 @@ public class Toolbar extends Component {
 			tool.alpha(value);
 		}
 		btnSwap.alpha( value );
+		if (slotStrip != null) slotStrip.fade( value );
 	}
 
 	public void pickup( Item item, int cell ) {
@@ -762,7 +780,7 @@ public class Toolbar extends Component {
 		public Tool( int x, int y, int width, int height ) {
 			super();
 
-			hotArea.blockLevel = PointerArea.ALWAYS_BLOCK;
+			setHotAreaBlockLevel( PointerArea.ALWAYS_BLOCK );
 			frame(x, y, width, height);
 		}
 
@@ -1059,6 +1077,257 @@ public class Toolbar extends Component {
 				x = startX*p + endX*(1-p);
 				y = startY*p + endY*(1-p);
 			}
+		}
+	}
+
+	private void createQuickslotStrip() {
+		slotStrip = new QuickslotScrollStrip();
+		slotStrip.active = false;
+		slotStrip.visible = false;
+		addToBack( slotStrip );
+		// Swap first, then slots, so a slot wins the 2px overlap with the swap chip.
+		// Fixed buttons are created after this and stay in front of both.
+		btnSwap.givePointerPriority();
+		for (QuickslotTool tool : btnQuick) {
+			tool.slot.prioritizeForScroll();
+		}
+	}
+
+	/**
+	 * Mobile layout only. If the quickslots and swap chip no longer fit between the fixed
+	 * buttons, park them in {@link #slotStrip} at full size and scroll. Desktop returns
+	 * before this runs.
+	 */
+	private void layoutMobileQuickslotScroll() {
+		if (!quickslotsOverflow()) {
+			releaseQuickslotScroll();
+			return;
+		}
+
+		float gapLeft;
+		float gapRight;
+		if (!SPDSettings.flipToolbar()) {
+			gapRight = btnInventory.left();
+			gapLeft = x;
+			if (btnSearch.right() <= gapRight) gapLeft = Math.max( gapLeft, btnSearch.right() );
+			if (btnWait.right() <= gapRight) gapLeft = Math.max( gapLeft, btnWait.right() );
+		} else {
+			gapLeft = btnInventory.right();
+			gapRight = x + width;
+			if (btnSearch.left() >= gapLeft) gapRight = Math.min( gapRight, btnSearch.left() );
+			if (btnWait.left() >= gapLeft) gapRight = Math.min( gapRight, btnWait.left() );
+		}
+		float gap = gapRight - gapLeft;
+		if (gap < 8) {
+			releaseQuickslotScroll();
+			return;
+		}
+
+		ArrayList<Component> row = new ArrayList<>();
+		for (QuickslotTool tool : btnQuick) {
+			if (tool.visible) row.add( tool );
+		}
+		if (btnSwap.visible) row.add( btnSwap );
+		row.sort( (a, b) -> Float.compare( a.left(), b.left() ) );
+
+		float contentWidth = 0;
+		Component prev = null;
+		for (int i = 0; i < row.size(); i++) {
+			Component c = row.get( i );
+			if (prev != null && (prev == btnSwap || c == btnSwap)) {
+				contentWidth -= 2;
+			}
+			contentWidth += c.width();
+			prev = c;
+		}
+		if (contentWidth <= gap + 0.5f) {
+			releaseQuickslotScroll();
+			return;
+		}
+
+		if (!quickslotScrollActive) {
+			for (QuickslotTool tool : btnQuick) {
+				tool.slot.setScrollPassthrough( true );
+			}
+			btnSwap.setScrollPassthrough( true );
+			quickslotScrollActive = true;
+		}
+
+		for (QuickslotTool tool : btnQuick) {
+			ensureInStrip( tool );
+			if (!tool.visible) tool.setPos( 0, -100 );
+		}
+		ensureInStrip( btnSwap );
+		if (!btnSwap.visible) btnSwap.setPos( 0, -100 );
+
+		float cursor = 0;
+		prev = null;
+		for (int i = 0; i < row.size(); i++) {
+			Component c = row.get( i );
+			if (prev != null && (prev == btnSwap || c == btnSwap)) {
+				cursor -= 2;
+			}
+			c.setPos( cursor, c == btnSwap ? 3 : 2 );
+			cursor += c.width();
+			prev = c;
+		}
+
+		int key = QuickSlotButton.quickSlotPage
+				+ QuickSlotButton.lastVisible * 32
+				+ (btnSwap.visible ? 1 << 10 : 0)
+				+ (SPDSettings.flipToolbar() ? 1 << 11 : 0);
+		float keepX;
+		if (key != quickslotScrollKey) {
+			// Slot 0 sits against inventory: the right end when the bar is not flipped.
+			keepX = SPDSettings.flipToolbar() ? 0 : Float.MAX_VALUE;
+			quickslotScrollKey = key;
+		} else {
+			keepX = slotStrip.content().camera.scroll.x;
+		}
+
+		slotStrip.active = true;
+		slotStrip.visible = true;
+		slotStrip.content().setSize( Math.max( 1, contentWidth ), height );
+		slotStrip.setRect( gapLeft, y, gap, height );
+		slotStrip.clampScroll( keepX );
+	}
+
+	private boolean quickslotsOverflow() {
+		float minX = Float.POSITIVE_INFINITY;
+		float maxX = Float.NEGATIVE_INFINITY;
+		boolean any = false;
+		for (QuickslotTool tool : btnQuick) {
+			if (!tool.visible) continue;
+			any = true;
+			minX = Math.min( minX, tool.left() );
+			maxX = Math.max( maxX, tool.right() );
+		}
+		if (btnSwap.visible) {
+			any = true;
+			minX = Math.min( minX, btnSwap.left() );
+			maxX = Math.max( maxX, btnSwap.right() );
+		}
+		if (!any) return false;
+		if (minX < x - 0.5f || maxX > x + width + 0.5f) return true;
+		return overlapsX( minX, maxX, btnWait )
+				|| overlapsX( minX, maxX, btnSearch )
+				|| overlapsX( minX, maxX, btnInventory );
+	}
+
+	private static boolean overlapsX( float minX, float maxX, Component other ) {
+		return minX < other.right() - 0.5f && maxX > other.left() + 0.5f;
+	}
+
+	private void ensureInStrip( Component c ) {
+		if (c.parent != slotStrip.content()) {
+			slotStrip.content().add( c );
+			c.clearCameraTree();
+		}
+	}
+
+	private void releaseQuickslotScroll() {
+		if (!quickslotScrollActive) return;
+		for (QuickslotTool tool : btnQuick) {
+			tool.slot.setScrollPassthrough( false );
+			if (tool.parent != this) {
+				add( tool );
+				tool.clearCameraTree();
+			}
+		}
+		btnSwap.setScrollPassthrough( false );
+		if (btnSwap.parent != this) {
+			add( btnSwap );
+			btnSwap.clearCameraTree();
+		}
+		quickslotScrollActive = false;
+		quickslotScrollKey = Integer.MIN_VALUE;
+		if (slotStrip != null) {
+			slotStrip.active = false;
+			slotStrip.visible = false;
+		}
+	}
+
+	/** Horizontal scroller for the mobile quickslot row. Fixed toolbar buttons are not children. */
+	private class QuickslotScrollStrip extends ScrollPane {
+
+		private ColorBlock edgeLeft;
+		private ColorBlock edgeRight;
+		private float edgeAlpha = 0.45f;
+
+		QuickslotScrollStrip() {
+			super( new Component() );
+		}
+
+		@Override
+		protected void createChildren() {
+			super.createChildren();
+			edgeLeft = new ColorBlock( 3, 1, 0xFF000000 );
+			edgeRight = new ColorBlock( 3, 1, 0xFF000000 );
+			edgeLeft.alpha( edgeAlpha );
+			edgeRight.alpha( edgeAlpha );
+			edgeLeft.visible = false;
+			edgeRight.visible = false;
+			add( edgeLeft );
+			add( edgeRight );
+		}
+
+		@Override
+		protected boolean captureZoomKeys() {
+			return false;
+		}
+
+		@Override
+		protected boolean scrollOnWheelX() {
+			return true;
+		}
+
+		void fade( float toolbarAlpha ) {
+			edgeAlpha = 0.45f * toolbarAlpha;
+			if (edgeLeft != null) {
+				edgeLeft.alpha( edgeAlpha );
+				edgeRight.alpha( edgeAlpha );
+			}
+		}
+
+		void clampScroll( float x ) {
+			scrollTo( x, 0 );
+			positionEdges();
+		}
+
+		@Override
+		protected void layout() {
+			super.layout();
+			thumb.visible = false;
+			positionEdges();
+		}
+
+		@Override
+		public synchronized void update() {
+			super.update();
+			if (content != null && content.camera != null) {
+				content.camera.scroll.y = 0;
+			}
+			positionEdges();
+		}
+
+		private void positionEdges() {
+			if (edgeLeft == null || content == null || content.camera == null) return;
+			float max = content.width() - width;
+			if (max < 0) max = 0;
+			float sx = content.camera.scroll.x;
+			boolean moreLeft = sx > 0.5f;
+			boolean moreRight = max - sx > 0.5f;
+			edgeLeft.visible = moreLeft;
+			edgeRight.visible = moreRight;
+			if (!moreLeft && !moreRight) return;
+			edgeLeft.size( 3, Math.max( 1, height ) );
+			edgeRight.size( 3, Math.max( 1, height ) );
+			edgeLeft.x = x;
+			edgeLeft.y = y;
+			edgeRight.x = x + width - 3;
+			edgeRight.y = y;
+			edgeLeft.alpha( edgeAlpha );
+			edgeRight.alpha( edgeAlpha );
 		}
 	}
 }

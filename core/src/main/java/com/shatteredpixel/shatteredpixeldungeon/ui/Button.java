@@ -50,14 +50,23 @@ public class Button extends Component {
 	protected float pressTime;
 	protected boolean clickReady;
 
-	/** Drags pass through to a parent {@link ScrollPane} instead of counting as a click. */
+	/**
+	 * A drag past {@link ScrollPane}'s threshold scrolls an ancestor pane and does not click.
+	 * A still press can still long-click. While this is on, a disabled button does not swallow
+	 * the gesture, so the pane behind it can scroll.
+	 */
 	private boolean scrollPassthrough;
+	private boolean scrollDragging;
+	private final PointF scrollLast = new PointF();
+	/** Restored when scroll passthrough is turned off. Tools raise this to {@link PointerArea#ALWAYS_BLOCK}. */
+	private int idleBlockLevel = PointerArea.BLOCK_WHEN_ACTIVE;
 
 	@Override
 	protected void createChildren() {
 		hotArea = new PointerArea( 0, 0, 0, 0 ) {
 			@Override
 			protected void onPointerDown( PointerEvent event ) {
+				scrollDragging = false;
 				pressedButton = Button.this;
 				pressTime = 0;
 				clickReady = true;
@@ -65,6 +74,7 @@ public class Button extends Component {
 			}
 			@Override
 			protected void onPointerUp( PointerEvent event ) {
+				scrollDragging = false;
 				if (pressedButton == Button.this){
 					pressedButton = null;
 				} else {
@@ -136,15 +146,28 @@ public class Button extends Component {
 
 			@Override
 			protected void onDrag( PointerEvent event ) {
-				// Same threshold as ScrollPane: a drag should scroll, not activate the button.
-				if (scrollPassthrough && clickReady
-						&& PointF.distance( event.current, event.start ) > PixelScene.defaultZoom * 8) {
-					clickReady = false;
-					if (pressedButton == Button.this) {
-						pressedButton = null;
-					}
-					Button.this.onPointerUp();
+				if (!scrollPassthrough || event == null || event.current == null) {
+					return;
 				}
+				// Same threshold as ScrollPane: a drag should scroll, not activate the button.
+				if (!scrollDragging) {
+					if (clickReady
+							&& PointF.distance( event.current, event.start ) > PixelScene.defaultZoom * 8) {
+						clickReady = false;
+						if (pressedButton == Button.this) {
+							pressedButton = null;
+						}
+						Button.this.onPointerUp();
+						scrollDragging = true;
+						scrollLast.set( event.current );
+					}
+					return;
+				}
+				ScrollPane pane = ancestorScrollPane();
+				if (pane != null) {
+					pane.scrollBy( event.current.x - scrollLast.x, event.current.y - scrollLast.y );
+				}
+				scrollLast.set( event.current );
 			}
 		};
 		add( hotArea );
@@ -344,8 +367,33 @@ public class Button extends Component {
 	}
 
 	public void enableScrollPassthrough(){
-		scrollPassthrough = true;
-		hotArea.blockLevel = PointerArea.NEVER_BLOCK;
+		setScrollPassthrough( true );
+	}
+
+	public void setScrollPassthrough( boolean on ){
+		scrollPassthrough = on;
+		if (on) {
+			hotArea.blockLevel = PointerArea.BLOCK_WHEN_ACTIVE;
+		} else {
+			scrollDragging = false;
+			hotArea.blockLevel = idleBlockLevel;
+		}
+	}
+
+	protected void setHotAreaBlockLevel( int level ){
+		idleBlockLevel = level;
+		if (!scrollPassthrough) {
+			hotArea.blockLevel = level;
+		}
+	}
+
+	private ScrollPane ancestorScrollPane() {
+		for (Gizmo g = parent; g != null; g = g.parent) {
+			if (g instanceof ScrollPane) {
+				return (ScrollPane) g;
+			}
+		}
+		return null;
 	}
 	
 }

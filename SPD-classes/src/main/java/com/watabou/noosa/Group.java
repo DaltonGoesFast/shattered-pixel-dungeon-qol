@@ -95,6 +95,24 @@ public class Group extends Gizmo {
 	public synchronized int indexOf( Gizmo g ) {
 		return members.indexOf( g );
 	}
+
+	/**
+	 * Forget cached cameras on this group and its children.
+	 * {@link Gizmo#camera()} stores the first camera it finds, so a reparented
+	 * button would keep drawing and hit-testing against the old one.
+	 */
+	public void clearCameraTree() {
+		camera = null;
+		if (members == null) return;
+		for (int i = 0; i < length; i++) {
+			Gizmo g = members.get(i);
+			if (g instanceof Group) {
+				((Group) g).clearCameraTree();
+			} else if (g != null) {
+				g.camera = null;
+			}
+		}
+	}
 	
 	public synchronized Gizmo add( Gizmo g ) {
 		

@@ -475,4 +475,14 @@ public class QuickSlotButton extends Button {
 			}
 		}
 	}
+
+	/** The item button inside this slot. A drag scrolls the mobile strip instead of using the item. */
+	public void setScrollPassthrough( boolean on ) {
+		slot.setScrollPassthrough( on );
+	}
+
+	/** Place the item button above the quickslot strip's scroll listener. */
+	public void prioritizeForScroll() {
+		slot.givePointerPriority();
+	}
 }
