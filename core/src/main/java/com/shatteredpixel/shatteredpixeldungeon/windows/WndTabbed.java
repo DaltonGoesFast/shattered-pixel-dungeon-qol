@@ -214,6 +214,13 @@ public class WndTabbed extends Window {
 			
 			btLabel.text( label );
 		}
+
+		public void text( String label ) {
+			btLabel.text( label );
+			// text() rebuilds glyphs and drops the selected/unselected alpha
+			btLabel.alpha( selected ? 1.0f : 0.6f );
+			layout();
+		}
 		
 		@Override
 		protected void createChildren() {

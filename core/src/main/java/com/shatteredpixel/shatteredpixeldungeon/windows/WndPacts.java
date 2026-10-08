@@ -46,9 +46,17 @@ public class WndPacts extends WndTabbed {
 
 	private static int lastIdx = 0;
 
+	private static final String[] PAGE_KEYS = { "hero", "foes", "spoils" };
+	private static final int[][] PAGE_MASKS = {
+			Modifiers.HERO_PACTS, Modifiers.FOES_PACTS, Modifiers.SPOILS_PACTS
+	};
+
 	private boolean editable;
 	private ArrayList<CheckBox> boxes;
 	private ArrayList<Integer> boxMasks;
+	private ArrayList<ArrayList<CheckBox>> pageBoxes;
+	private LabeledTab[] pageTabs;
+	private RenderedTextBlock title;
 
 	private ScrollPane pane;
 	private Component[] pages;
@@ -62,8 +70,9 @@ public class WndPacts extends WndTabbed {
 		this.editable = editable;
 		boxes = new ArrayList<>();
 		boxMasks = new ArrayList<>();
+		pageBoxes = new ArrayList<>();
 
-		RenderedTextBlock title = PixelScene.renderTextBlock( Messages.get(this, "title"), 12 );
+		title = PixelScene.renderTextBlock( Messages.get(this, "title"), 12 );
 		title.hardlight( TITLE_COLOR );
 		title.setPos(
 				(WIDTH - title.width()) / 2,
@@ -91,11 +100,12 @@ public class WndPacts extends WndTabbed {
 		};
 		add(pane);
 
-		pages = new Component[]{
-				buildPage(Modifiers.HERO_PACTS, checked),
-				buildPage(Modifiers.FOES_PACTS, checked),
-				buildPage(Modifiers.SPOILS_PACTS, checked)
-		};
+		pages = new Component[PAGE_MASKS.length];
+		for (int i = 0; i < PAGE_MASKS.length; i++) {
+			ArrayList<CheckBox> page = new ArrayList<>();
+			pageBoxes.add(page);
+			pages[i] = buildPage(PAGE_MASKS[i], checked, page);
+		}
 
 		float tallest = 0;
 		for (Component page : pages) {
@@ -111,32 +121,43 @@ public class WndPacts extends WndTabbed {
 		listH = height - listTop;
 		pane.setRect(0, listTop, WIDTH, listH);
 
-		add( new LabeledTab( Messages.get(this, "hero") ){
-			@Override
-			protected void select( boolean value ) {
-				super.select( value );
-				if (selected) showPage( 0 );
-			}
-		} );
-		add( new LabeledTab( Messages.get(this, "foes") ){
-			@Override
-			protected void select( boolean value ) {
-				super.select( value );
-				if (selected) showPage( 1 );
-			}
-		} );
-		add( new LabeledTab( Messages.get(this, "spoils") ){
-			@Override
-			protected void select( boolean value ) {
-				super.select( value );
-				if (selected) showPage( 2 );
-			}
-		} );
+		pageTabs = new LabeledTab[PAGE_KEYS.length];
+		for (int i = 0; i < PAGE_KEYS.length; i++) {
+			final int idx = i;
+			pageTabs[i] = new LabeledTab( Messages.get(this, PAGE_KEYS[i]) ){
+				@Override
+				protected void select( boolean value ) {
+					super.select( value );
+					if (selected) showPage( idx );
+				}
+			};
+			add( pageTabs[i] );
+		}
 
 		layoutTabs();
 
 		if (lastIdx < 0 || lastIdx >= tabs.size()) lastIdx = 0;
 		select( lastIdx );
+		refreshCounts();
+	}
+
+	private void refreshCounts() {
+		int total = 0;
+		for (int i = 0; i < pageBoxes.size(); i++) {
+			int count = 0;
+			for (CheckBox box : pageBoxes.get(i)) {
+				if (box.checked()) count++;
+			}
+			total += count;
+			pageTabs[i].text( Messages.get(this, "count",
+					Messages.get(this, PAGE_KEYS[i]), count) );
+		}
+		title.text( Messages.get(this, "title_count", Messages.get(this, "title"), total) );
+		title.setPos(
+				(WIDTH - title.width()) / 2,
+				(TTL_HEIGHT - title.height()) / 2
+		);
+		PixelScene.align(title);
 	}
 
 	private void showPage( int index ) {
@@ -149,7 +170,7 @@ public class WndPacts extends WndTabbed {
 		pane.scrollTo( 0, 0 );
 	}
 
-	private Component buildPage( int[] masks, int checked ) {
+	private Component buildPage( int[] masks, int checked, ArrayList<CheckBox> tabBoxes ) {
 		Component page = new Component();
 		float pos = 0;
 
@@ -179,6 +200,7 @@ public class WndPacts extends WndTabbed {
 					if (!active) return;
 					Sample.INSTANCE.play( Assets.Sounds.CLICK );
 					super.onClick();
+					refreshCounts();
 				}
 			};
 			cb.enableScrollPassthrough();
@@ -199,6 +221,7 @@ public class WndPacts extends WndTabbed {
 			page.add( cb );
 			boxes.add( cb );
 			boxMasks.add( mask );
+			tabBoxes.add( cb );
 
 			IconButton info = new IconButton(Icons.get(Icons.INFO)){
 				@Override

@@ -724,6 +724,7 @@ public class HeroSelectScene extends PixelScene {
 									if (info.customSeed.isEmpty() && info.seed == seed){
 										SPDSettings.customSeed("");
 										icon.resetColor();
+										refreshPactButton();
 										ShatteredPixelDungeon.scene().addToFront(new WndMessage(Messages.get(HeroSelectScene.class, "custom_seed_duplicate")));
 										return;
 									}
@@ -735,6 +736,7 @@ public class HeroSelectScene extends PixelScene {
 								SPDSettings.customSeed("");
 								icon.resetColor();
 							}
+							refreshPactButton();
 							updateOptionsColor();
 						}
 					});
@@ -882,7 +884,7 @@ public class HeroSelectScene extends PixelScene {
 			add(challengeButton);
 			buttons.add(challengeButton);
 
-			pactButton = new StyledButton(Chrome.Type.BLANK, Messages.get(WndPacts.class, "title"), 6){
+			pactButton = new StyledButton(Chrome.Type.BLANK, pactButtonLabel(), 6){
 				@Override
 				protected void onClick() {
 					if (!Badges.firstWinFeaturesUnlocked()){
@@ -897,7 +899,7 @@ public class HeroSelectScene extends PixelScene {
 					ShatteredPixelDungeon.scene().addToFront(new WndPacts(SPDSettings.modifiers(), true) {
 						public void onBackPressed() {
 							super.onBackPressed();
-							icon(pactIcon());
+							refreshPactButton();
 							updateOptionsColor();
 						}
 					} );
@@ -1060,7 +1062,7 @@ public class HeroSelectScene extends PixelScene {
 								mask |= pactMasks.remove(0);
 							}
 							SPDSettings.modifiers(Modifiers.sanitize(mask));
-							pactButton.icon(pactIcon());
+							refreshPactButton();
 							ShatteredPixelDungeon.scene().addToFront(new WndPacts(mask, false));
 						}
 
@@ -1116,6 +1118,17 @@ public class HeroSelectScene extends PixelScene {
 			this.height = top+bg.marginBottom()-y-1;
 			bg.size(this.width, this.height);
 
+		}
+
+		private String pactButtonLabel(){
+			int count = Modifiers.activeModifiers(Modifiers.sanitize(SPDSettings.modifiers()));
+			return Messages.get(WndPacts.class, "count", Messages.get(WndPacts.class, "title"), count);
+		}
+
+		private void refreshPactButton(){
+			pactButton.text( pactButtonLabel() );
+			pactButton.icon( pactIcon() );
+			layout();
 		}
 
 		private void alpha( float value ){
