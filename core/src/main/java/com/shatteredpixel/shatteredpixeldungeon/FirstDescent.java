@@ -391,14 +391,8 @@ public class FirstDescent {
 				((KindOfWeapon) result).equipSecondary(hero);
 			} else if (item instanceof EquipableItem && result instanceof EquipableItem){
 				((EquipableItem) item).doUnequip(hero, false);
-				// Floor 1 cloth always remakes into a heavier tier. Leave it in the bag.
-				if (item instanceof Armor && Dungeon.depth == 1){
-					if (!result.collect()){
-						Dungeon.level.drop(result, hero.pos).sprite.drop();
-					}
-				} else {
-					((EquipableItem) result).doEquip(hero);
-				}
+				// Floor 1 cloth still remakes into a heavier tier; wear it like later floors.
+				((EquipableItem) result).doEquip(hero);
 			} else {
 				((EquipableItem) item).doUnequip(hero, false);
 				if (!result.collect()){
