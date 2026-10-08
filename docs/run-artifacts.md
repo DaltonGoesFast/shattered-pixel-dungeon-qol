@@ -200,14 +200,16 @@ Unused on purpose: Snake, Swarm, Guard, DM-200, Golem (region already full). Flo
 - Keep upgrade level, curse, and identify status. **Armor glyph and augment are rerolled**; armor becomes any other regular tier (cloth↔plate). **Weapon enchant and augment are also rerolled** (cursed weapons stay in the curse-enchant family).
 - Name stays Metamorphosis.
 
-**Sacrifice — chests gone, kills pay the equipment budget** ✅ design locked  
+**Sacrifice — loose treasure is carried by the monsters** ✅ design locked  
 
-- Remove regular chests and **gold (locked) chests**. **Keep a gold chest if it holds the trinket catalyst.** Crystal chests stay. Shops stay. Sacrificial Fire rooms left alone.
-- **No mimics except crystal mimics.** Regular and golden mimics do not spawn.
-- Hostile kills use vanilla `lootChance` again (**`LimitedDrops` caps stay** — flies stop printing healing after a few). Vanilla `maxLvl+2` overlevel gate is **off** so overleveled kills still pay. ~**1/3** of successful native drops become a normal `Gold.random()` pile instead (floor gold budget moved onto kills).
-- **Floor equipment and floor gold piles are gone.** Consumable piles (potion/scroll/seed/stone/food) can still exist. Equipment budget is paid through kills: **vanilla upgrade odds** (+0 75% / +1 20% / +2 5%), chance **50% / 25% / 10% / then 0** per floor, **hard cap of 2 drops**. Only real enemies pay (no clones, wraiths, zero-exp spawns, or overleveled kills). Native loot still ignores those gates.
-- **Key-locked special rooms** (iron door armory/crypt/etc.): weapon/armor/wand/ring/artifact prizes become gold. **Trinket catalyst is never removed.** **Crystal vault, crystal choice, and crystal chests keep their gear.** Secret rooms keep normal loot. Challenge rooms with open doors (pool/traps/sentry) and statue weapons are unchanged.
-- Equipment is “regularly generated” loot, not a separate 5–15% sprinkle on top of a full floor of gear.
+- **Player:** The dungeon's loose treasure is carried by its monsters. Kill them to claim it. Locked, secret, and puzzle rewards stay where they lie.
+- Main dungeon only (`Dungeon.branch == 0`, regular floors). Boss floors, the vault, and the mines are untouched.
+- Ungated loot is rolled normally, then taken off the ground and dealt to enemies on that floor: one item per carrier, round robin, wrapping when the hoard outnumbers the roster. Carriers are sorted by cell, then shuffled, so a seeded floor deals the same way each time. Gold is carried and is not Command loot; every other cargo item is. Killing the carrier drops that cargo beside its own loot. A chasm death sends the cargo down the pit. If nobody can carry, the hoard is put back as ordinary heaps.
+- A carrier is a hostile enemy in a standard or connection room. Mimics, bosses, and minibosses do not carry. Rooms under `.rooms.quest.` are not open, even when they extend `StandardRoom`.
+- Collected from those open rooms: heaps, regular chests, and skeletons, plus the items inside a suspicious-chest mimic. An emptied heap is removed. An emptied mimic is removed. The floor's usual 3/4/5 generated drops (plus 2 on a large floor) never land; they go straight into the hoard. Carriable prizes still waiting in `itemsToSpawn` do too.
+- Left where they are: keys, torches, ceremonial candles, the guidebook, journal pages, dried rose petals, and the trinket catalyst. Locked chests, crystal chests, tombs, remains, and shop stock are never collected. Special rooms, secret rooms, quest rooms, and shops keep what they hold. Hidden spyglass piles, bones, darkness torches, and cached rations are placed after the sweep and stay on the floor.
+- The trinket catalyst stays where it spawned. A room that already claimed it keeps that placement. If it is still unplaced, it drops as a locked chest with its golden key, the same as a run without this pact.
+- Native kill loot is not rewritten. `Mob.rollToDropLoot` still uses vanilla `lootChance`, `LimitedDrops`, and the `maxLvl+2` gate, and clones still drop nothing there. A few exotic bonus drops skip their own clone and overlevel early-return while Sacrifice is on (gnoll exile's extra items, hermit crab's armor, caustic slime's blob, the DM-201 shard, the spectral necromancer's scroll, and the monk's Imp token check). The shared roll they call underneath is still gated.
 
 **Crimson — heal by striking, the flask is a weapon** ✅ design locked  
 
