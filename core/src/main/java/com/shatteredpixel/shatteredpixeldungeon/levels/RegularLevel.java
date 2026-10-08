@@ -253,6 +253,10 @@ public abstract class RegularLevel extends Level {
 		PathFinder.buildDistanceMap(entrance(), entranceWalkable, 8);
 
 		Mob mob = null;
+		// Consecutive rooms that rejected this mob. The entrance sits inside the 8-tile
+		// exclusion, so dropping the slot on the first miss deletes a floor-1 rat and
+		// leaves the hero at 9/10. Drop only after every candidate room has failed.
+		int roomMisses = 0;
 		while (mobsToSpawn > 0) {
 			if (mob == null) mob = createMob();
 			Room roomToSpawn;
@@ -279,6 +283,7 @@ public abstract class RegularLevel extends Level {
 				mobsToSpawn--;
 				mobs.add(mob);
 				mob = null;
+				roomMisses = 0;
 
 				//chance to add a second mob to this room, except on floor 1
 				if (Dungeon.depth > 1 && mobsToSpawn > 0 && Random.Int(4) == 0){
@@ -301,16 +306,18 @@ public abstract class RegularLevel extends Level {
 						mobsToSpawn--;
 						mobs.add(mob);
 						mob = null;
-					} else {
-						// large / awkward mob could not fit — drop this spawn slot
-						mobsToSpawn--;
-						mob = null;
+						roomMisses = 0;
 					}
+					// else keep this mob and try another room next iteration
 				}
 			} else {
-				// large / awkward mob could not fit — drop this spawn slot
-				mobsToSpawn--;
-				mob = null;
+				roomMisses++;
+				if (stdRooms.isEmpty() || roomMisses >= stdRooms.size()) {
+					// large / awkward mob could not fit in any room — drop this spawn slot
+					mobsToSpawn--;
+					mob = null;
+					roomMisses = 0;
+				}
 			}
 		}
 
