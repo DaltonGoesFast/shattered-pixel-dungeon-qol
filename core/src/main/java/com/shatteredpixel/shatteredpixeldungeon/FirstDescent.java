@@ -319,7 +319,9 @@ public class FirstDescent {
 		if (item instanceof Potion){
 			return !(item instanceof Elixir || item instanceof Brew);
 		}
-		return item instanceof Scroll
+		// Unique scrolls are not loot. Upgrade currency is already excluded above;
+		// this also leaves the debug-run Scroll of Debug, which is unique.
+		return (item instanceof Scroll && !item.unique)
 				|| item instanceof Plant.Seed
 				|| item instanceof Runestone
 				|| item instanceof TippedDart
