@@ -21,6 +21,7 @@
 
 package com.shatteredpixel.shatteredpixeldungeon.items.potions;
 
+import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
@@ -46,6 +47,7 @@ import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSpriteSheet;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
+import com.watabou.noosa.audio.Sample;
 
 public class PotionOfHealing extends Potion {
 
@@ -90,11 +92,23 @@ public class PotionOfHealing extends Potion {
 
 	@Override
 	public void shatter( int cell ) {
-		super.shatter( cell );
-		if (!Dungeon.isModified(Modifiers.CRIMSON) || Dungeon.isChallenged(Challenges.NO_HEALING)) return;
-
 		Char ch = Actor.findChar( cell );
-		if (ch == null || ch.alignment != Char.Alignment.ENEMY || !ch.isAlive()) return;
+		//Only a living enemy is harmed. Anything else still splashes harmlessly.
+		boolean harmful = Dungeon.isModified(Modifiers.CRIMSON)
+				&& !Dungeon.isChallenged(Challenges.NO_HEALING)
+				&& ch != null
+				&& ch.alignment == Char.Alignment.ENEMY
+				&& ch.isAlive();
+		if (!harmful) {
+			super.shatter( cell );
+			return;
+		}
+
+		splash( cell );
+		if (Dungeon.level.heroFOV[cell]) {
+			GLog.i( Messages.get(this, "shatter") );
+			Sample.INSTANCE.play( Assets.Sounds.SHATTER );
+		}
 
 		int dr = Math.round(ch.drRoll() * AscensionChallenge.statModifier(ch));
 		if (ch.buff(SpawnScaled.class) != null) {
