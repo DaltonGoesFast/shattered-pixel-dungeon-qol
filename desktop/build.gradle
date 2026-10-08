@@ -59,24 +59,6 @@ tasks.register('runShowcaseExport', JavaExec) {
     }
 }
 
-// Generate floor 1 for a seed and print each mob's EXP.
-//   gradlew :desktop:runFloorOneExpProbe -PprobeSeed=JNC-ZKQ-VTN
-tasks.register('runFloorOneExpProbe', JavaExec) {
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'com.shatteredpixel.shatteredpixeldungeon.desktop.FloorOneExpProbe'
-    systemProperty 'Specification-Title', appName
-    systemProperty 'Implementation-Title', appPackageName
-    systemProperty 'Specification-Version', appVersionName + "-INDEV"
-    systemProperty 'Implementation-Version', appVersionCode
-    def raw = project.findProperty('probeSeed')
-    if (raw != null && raw.toString().trim()) {
-        args raw.toString()
-    }
-    if (osName.contains('mac')) {
-        jvmArgs '-XstartOnFirstThread'
-    }
-}
-
 tasks.register('release', Jar) {
     //FIXME this is now needed as of gradle 7.0, due to our weird sourceSets setup. Should see if there's a better way to do this
     setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE)
