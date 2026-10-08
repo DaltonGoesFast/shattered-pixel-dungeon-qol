@@ -383,14 +383,15 @@ public class SpiritBow extends Weapon {
 				}
 				if (sniperSpecial && SpiritBow.this.augment != Augment.SPEED) sniperSpecial = false;
 			} else if (Dungeon.isModified(Modifiers.GRAVE) && enemy.alignment == Char.Alignment.ENEMY) {
-				//Grave pact: the arrow never wounds the enemy; it seeds the shade fighting it
+				//Grave pact: the arrow never wounds the enemy. It calls a ready wraith, or seeds the shade fighting it.
 				parent = null;
-				GraveRoster.noteOffense();
+				boolean called = GraveRoster.callIfReady(curUser);
+				if (!called) GraveRoster.noteOffense();
 				GraveShade shade = GraveRoster.shadeFor(enemy);
 				if (shade != null){
 					GraveSeed.plant(shade);
 					GraveRoster.rallyTo(enemy);
-				} else {
+				} else if (!called) {
 					GraveRoster.failCall();
 				}
 				Splash.at( cell, 0xCC99FFFF, 1 );
