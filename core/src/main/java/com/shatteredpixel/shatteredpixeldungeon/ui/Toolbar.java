@@ -111,9 +111,14 @@ public class Toolbar extends Component {
 			@Override
 			protected void onClick() {
 				if (SPDSettings.quickSwapper()) {
+					if (QuickSlotButton.pageCount() <= 1) {
+						return;
+					}
 					QuickSlotButton.advanceQuickSwapperPage();
-				} else {
+				} else if (SPDSettings.secondQuickslotBar()) {
 					QuickSlotButton.activeSet = 1 - QuickSlotButton.activeSet;
+				} else {
+					return;
 				}
 				Toolbar.updateLayout();
 				QuickSlotButton.refresh();
@@ -524,6 +529,11 @@ public class Toolbar extends Component {
 		int fixedQuickslots = SPDSettings.quickslotsShown();
 		if (fixedQuickslots > 0) quickslotsToShow = fixedQuickslots;
 
+		// Hidden second bank uses the same buttons as the first row. Don't keep a stale set selected.
+		if (!SPDSettings.secondQuickslotBar()) {
+			QuickSlotButton.activeSet = 0;
+		}
+
 		int startingSlot;
 		if (SPDSettings.quickSwapper()) {
 			int pageSize;
@@ -541,12 +551,16 @@ public class Toolbar extends Component {
 			QuickSlotButton.pageSize = pageSize;
 			QuickSlotButton.quickSlotPage %= QuickSlotButton.pageCount();
 
-			quickslotsToShow = Math.min(pageSize, QuickSlot.SIZE - QuickSlotButton.quickSlotPage * pageSize);
+			quickslotsToShow = Math.min(pageSize, QuickSlotButton.visibleSlotCount() - QuickSlotButton.quickSlotPage * pageSize);
 			QuickSlotButton.lastVisible = quickslotsToShow;
 			startingSlot = 0;
-			boolean showSwapChip = SPDSettings.showQuickslotSwapButton();
+			// No second page (second bank hidden and the first row already fits) means no swap chip and no gap.
+			boolean showSwapChip = SPDSettings.showQuickslotSwapButton() && QuickSlotButton.pageCount() > 1;
 			btnSwap.visible = showSwapChip;
 			btnSwap.active = lastEnabled && showSwapChip;
+			if (!showSwapChip) {
+				btnSwap.setPos(0, PixelScene.uiCamera.height);
+			}
 		} else {
 			swapperPageSize = 0;
 			startingSlot = 0;
@@ -911,7 +925,7 @@ public class Toolbar extends Component {
 		@Override
 		protected void onClick() {
 			super.onClick();
-			if (!SPDSettings.quickSwapper()) {
+			if (!SPDSettings.quickSwapper() || QuickSlotButton.pageCount() <= 1) {
 				return;
 			}
 			QuickSlotButton.advanceQuickSwapperPage();
@@ -928,7 +942,7 @@ public class Toolbar extends Component {
 
 			int nextPage = (QuickSlotButton.quickSlotPage + 1) % QuickSlotButton.pageCount();
 			int base = nextPage * QuickSlotButton.pageSize;
-			int pageEnd = Math.min(base + QuickSlotButton.pageSize, QuickSlot.SIZE);
+			int pageEnd = Math.min(base + QuickSlotButton.pageSize, QuickSlotButton.visibleSlotCount());
 
 			for (int i = 1; i < 4; i++){
 				int slot = base + (i - 1);
