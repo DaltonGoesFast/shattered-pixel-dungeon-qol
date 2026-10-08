@@ -33,6 +33,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.journal.DocumentPage;
 import com.shatteredpixel.shatteredpixeldungeon.items.journal.Guidebook;
 import com.shatteredpixel.shatteredpixeldungeon.items.keys.Key;
 import com.shatteredpixel.shatteredpixeldungeon.items.quest.CeremonialCandle;
+import com.shatteredpixel.shatteredpixeldungeon.items.trinkets.TrinketCatalyst;
 import com.shatteredpixel.shatteredpixeldungeon.levels.RegularLevel;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.Room;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.connection.ConnectionRoom;
@@ -47,6 +48,7 @@ import java.util.Iterator;
  * Sacrifice pact: ungated floor loot is generated normally, then taken off the ground and
  * carried by enemies on that floor. Killing a carrier drops its cargo alongside native loot.
  * Special, secret, and quest rooms, tombs, crystal chests, and shops keep their loot.
+ * The trinket catalyst stays where it spawned.
  */
 public class Sacrifice {
 
@@ -55,7 +57,7 @@ public class Sacrifice {
 		return Dungeon.isModified(Modifiers.SACRIFICE) && Dungeon.branch == 0;
 	}
 
-	/** Keys, torches, quest items, and journal pages stay on the floor. */
+	/** Keys, torches, quest items, journal pages, and the trinket catalyst stay on the floor. */
 	public static boolean isCarriable(Item item){
 		return item != null
 				&& !(item instanceof Key)
@@ -63,7 +65,8 @@ public class Sacrifice {
 				&& !(item instanceof CeremonialCandle)
 				&& !(item instanceof Guidebook)
 				&& !(item instanceof DocumentPage)
-				&& !(item instanceof DriedRose.Petal);
+				&& !(item instanceof DriedRose.Petal)
+				&& !(item instanceof TrinketCatalyst);
 	}
 
 	/** Standard or connection rooms, excluding quest rooms that extend StandardRoom. */
