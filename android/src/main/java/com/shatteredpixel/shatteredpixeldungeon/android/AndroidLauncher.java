@@ -50,6 +50,13 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.Button;
 import com.watabou.input.KeyEvent;
 import com.watabou.noosa.Game;
 import com.watabou.utils.FileUtils;
+import com.zrp200.scrollofdebug.PackageTrie;
+
+import dalvik.system.DexFile;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Enumeration;
 
 public class AndroidLauncher extends AndroidApplication {
 	
@@ -132,6 +139,8 @@ public class AndroidLauncher extends AndroidApplication {
 			instance = this;
 		}
 
+		installScrollClassIndex();
+
 		//Shattered still overrides the back gesture behaviour, but we need to do it in a new way
 		// (API added in Android 13, functionality enforced in Android 16)
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -169,6 +178,32 @@ public class AndroidLauncher extends AndroidApplication {
 		
 		initialize(new ShatteredPixelDungeon(support), config);
 		
+	}
+
+	/**
+	 * An APK has no jar entries for the game packages, so the scroll's jar scan
+	 * is empty. List dex class names the same way zrp200's apk_support build does.
+	 */
+	@SuppressWarnings("deprecation")
+	private void installScrollClassIndex() {
+		final String pkg = "com.shatteredpixel.shatteredpixeldungeon";
+		PackageTrie.classNameSource = new PackageTrie.ClassNameSource() {
+			@Override
+			public Iterable<String> classNames() throws IOException {
+				DexFile dex = new DexFile(getContext().getPackageCodePath());
+				try {
+					ArrayList<String> names = new ArrayList<>();
+					Enumeration<String> entries = dex.entries();
+					while (entries.hasMoreElements()) {
+						String name = entries.nextElement();
+						if (name != null && name.startsWith(pkg)) names.add(name);
+					}
+					return names;
+				} finally {
+					dex.close();
+				}
+			}
+		};
 	}
 
 	@Override

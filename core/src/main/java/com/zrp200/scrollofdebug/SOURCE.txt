@@ -6,12 +6,15 @@ License: GNU General Public License v3.0 (GitHub repository license; same licens
 The upstream files did not carry per-file copyright headers. The GPL notice at the top of each
 Java file was added when vendoring, and names Zrp200 as the copyright holder.
 
-Local changes from that commit, all in ScrollOfDebug.java:
-- handleDebug() follows this fork's debug-run stamp
+Local changes from that commit:
+- ScrollOfDebug.java: handleDebug() follows this fork's debug-run stamp
   (ShatteredPixelDungeon.debugSession && Dungeon.debugRun) instead of DeviceCompat.isDebug().
 - doRead() and interpret() refuse to run unless that stamp is set.
 - The class index is built on first use, not when the class is loaded.
+  On Android, ensureTrie() reads PackageTrie.classNameSource instead of the empty jar scan.
 - Item name, description chrome, and the command prompt come from messages properties.
   Command syntax text inside the tool stays in this file.
 - reset() keeps the scroll-holder sprite and does not join the scroll rune table.
 - value() and energyVal() are 0. The item is unique and its curse state is known.
+- PackageTrie.classNameSource is the small stand-in for upstream shpd/1.3/apk_support
+  (PlatformSupport.findClasses). AndroidLauncher fills it from DexFile.entries().
