@@ -47,6 +47,7 @@ import com.watabou.utils.PathFinder;
 /**
  * Grave pact roster: four shade slots on point clocks. Only the lowest dead slot's clock
  * moves; each completed offense against an enemy shaves {@link #SHAVE}.
+ * When a wraith is ready, that offense calls it instead: a melee click, a wand zap, or a shot.
  */
 public class GraveRoster extends Buff {
 
@@ -173,7 +174,21 @@ public class GraveRoster extends Buff {
 		BuffIndicator.refreshHero();
 	}
 
-	/** One completed offense against an enemy. */
+	/**
+	 * A completed offense calls a ready wraith and does not also shave the clock.
+	 * @return true when a ready wraith was called, including when no cell is free for it
+	 */
+	public static boolean callIfReady( Hero hero ){
+		GraveRoster roster = get();
+		if (roster == null || hero == null) return false;
+		roster.validate();
+		int ready = roster.lowestReady();
+		if (ready < 0) return false;
+		roster.summon(hero, ready);
+		return true;
+	}
+
+	/** One completed offense against an enemy, when no wraith was ready to call. */
 	public static void noteOffense(){
 		GraveRoster roster = get();
 		if (roster == null) return;
@@ -301,14 +316,8 @@ public class GraveRoster extends Buff {
 
 	/** Hero attack-click on an enemy under Grave. Caller spends the hero's time. */
 	public static void heroClick( Hero hero, Char target ){
-		GraveRoster roster = get();
-		if (roster == null) return;
-		roster.validate();
-
-		int ready = roster.lowestReady();
-		if (ready >= 0){
-			if (roster.summon(hero, ready)) return;
-		}
+		if (get() == null) return;
+		if (callIfReady(hero)) return;
 
 		GraveShade sender = null;
 		for (GraveShade s : livingShades()){

@@ -748,10 +748,13 @@ public abstract class Wand extends Item {
 
 					GraveShade aimedShade = curWand.cursed ? null : shadeTarget(target, cell);
 					Char aimedEnemy = aimedShade == null ? enemyTarget(target, cell) : null;
-					if (aimedEnemy != null){
+					//One offense per zap, on the enemy aimed at. A chain or a cone does not add more.
+					final boolean called = aimedEnemy != null && GraveRoster.callIfReady(curUser);
+					if (aimedEnemy != null && !called){
 						GraveRoster.noteOffense();
 					}
-					//Grave pact: a zap at an enemy empowers a shade instead of touching the enemy
+					//Grave pact: a zap at an enemy empowers a shade instead of touching the enemy.
+					//The call happens first, so a wraith that just arrived can take the charge.
 					final boolean graveRedirect = aimedEnemy != null && !curWand.cursed
 							&& Dungeon.isModified(Modifiers.GRAVE);
 					final GraveShade shade = graveRedirect ? GraveRoster.shadeFor(aimedEnemy) : aimedShade;
@@ -805,7 +808,7 @@ public abstract class Wand extends Item {
 								if (shade != null){
 									curWand.onShadeZap(shade);
 								} else if (graveRedirect){
-									GraveRoster.failCall();
+									if (!called) GraveRoster.failCall();
 								} else {
 									curWand.onZap(shot);
 								}

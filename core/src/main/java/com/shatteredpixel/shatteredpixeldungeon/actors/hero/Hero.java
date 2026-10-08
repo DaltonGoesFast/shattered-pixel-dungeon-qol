@@ -738,7 +738,8 @@ public class Hero extends Char {
 		Invisibility.dispel();
 		belongings.thrownWeapon = null;
 
-		if (wasEnemy) GraveRoster.noteOffense();
+		//One offense per shot, including a miss. A ready wraith is called instead of shaving the clock.
+		if (wasEnemy && !GraveRoster.callIfReady(this)) GraveRoster.noteOffense();
 
 		if (hit && subClass == HeroSubClass.GLADIATOR && wasEnemy){
 			Buff.affect( this, Combo.class ).hit( enemy );
