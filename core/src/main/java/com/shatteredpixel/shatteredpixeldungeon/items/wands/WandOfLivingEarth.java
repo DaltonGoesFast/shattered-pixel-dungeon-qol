@@ -24,11 +24,11 @@ package com.shatteredpixel.shatteredpixeldungeon.items.wands;
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.AllyBuff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Amok;
-import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Barkskin;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.abilities.cleric.PowerOfMany;
@@ -72,30 +72,18 @@ public class WandOfLivingEarth extends DamageWand {
 	}
 	
 	@Override
-	public void onShadeZap( GraveShade shade ) {
-		EarthGuardian guardian = null;
-		for (Mob m : Dungeon.level.mobs){
-			if (m instanceof EarthGuardian){
-				guardian = (EarthGuardian) m;
-				break;
-			}
-		}
-		if (Stasis.getStasisAlly() instanceof EarthGuardian){
-			guardian = (EarthGuardian)Stasis.getStasisAlly();
-		}
+	public boolean graveFeedsShade() {
+		return false;
+	}
 
-		if (guardian != null){
-			if (guardian.sprite != null) {
-				guardian.sprite.centerEmitter().burst(MagicMissile.EarthParticle.ATTRACT, 8 + buffedLvl() / 2);
-			}
-			guardian.setInfo(curUser, buffedLvl(), damageRoll());
+	/** Grave pact: the shot still builds armor, and it does not wound an enemy, a mimic, or a shade. */
+	private void strike( Char ch, int damage ) {
+		if (Dungeon.isModified(Modifiers.GRAVE)
+				&& (ch.alignment == Char.Alignment.ENEMY || ch instanceof Mimic || ch instanceof GraveShade)) {
+			return;
 		}
-
-		Barkskin.conditionallyAppend(shade, 2, 5);
-		if (shade.sprite != null) {
-			shade.sprite.centerEmitter().burst(MagicMissile.EarthParticle.BURST, 5 + buffedLvl()/2);
-		}
-		Sample.INSTANCE.play( Assets.Sounds.HIT_MAGIC, 1, 0.9f * Random.Float(0.87f, 1.15f) );
+		wandProc(ch, chargesPerCast());
+		ch.damage(damage, this);
 	}
 
 	@Override
@@ -155,8 +143,7 @@ public class WandOfLivingEarth extends DamageWand {
 
 				ch.sprite.centerEmitter().burst(MagicMissile.EarthParticle.BURST, 5 + buffedLvl()/2);
 
-				wandProc(ch, chargesPerCast());
-				ch.damage(damage, this);
+				strike(ch, damage);
 
 				int closest = -1;
 				boolean[] passable = Dungeon.level.passable;
@@ -201,8 +188,7 @@ public class WandOfLivingEarth extends DamageWand {
 
 				ch.sprite.centerEmitter().burst(MagicMissile.EarthParticle.BURST, 5 + buffedLvl() / 2);
 
-				wandProc(ch, chargesPerCast());
-				ch.damage(damage, this);
+				strike(ch, damage);
 				Sample.INSTANCE.play( Assets.Sounds.HIT_MAGIC, 1, 0.8f * Random.Float(0.87f, 1.15f) );
 				
 				if (guardian == null) {

@@ -145,6 +145,11 @@ public abstract class Wand extends Item {
 		GraveImbue.imbue( shade, this, chargesPerCast() );
 	}
 
+	/** Grave pact: a zap at an enemy or a shade feeds that shade. Warding and living earth keep their own zap. */
+	public boolean graveFeedsShade(){
+		return true;
+	}
+
 	//Grave pact: a zap whose clicked cell or collision cell holds a shade empowers that shade
 	public static GraveShade shadeTarget( int target, int collision ){
 		if (!Dungeon.isModified(Modifiers.GRAVE)) return null;
@@ -746,7 +751,7 @@ public abstract class Wand extends Item {
 					
 					curUser.busy();
 
-					GraveShade aimedShade = curWand.cursed ? null : shadeTarget(target, cell);
+					GraveShade aimedShade = curWand.cursed || !curWand.graveFeedsShade() ? null : shadeTarget(target, cell);
 					Char aimedEnemy = aimedShade == null ? enemyTarget(target, cell) : null;
 					//One offense per zap, on the enemy aimed at. A chain or a cone does not add more.
 					final boolean called = aimedEnemy != null && GraveRoster.callIfReady(curUser);
@@ -756,6 +761,7 @@ public abstract class Wand extends Item {
 					//Grave pact: a zap at an enemy empowers a shade instead of touching the enemy.
 					//The call happens first, so a wraith that just arrived can take the charge.
 					final boolean graveRedirect = aimedEnemy != null && !curWand.cursed
+							&& curWand.graveFeedsShade()
 							&& Dungeon.isModified(Modifiers.GRAVE);
 					final GraveShade shade = graveRedirect ? GraveRoster.shadeFor(aimedEnemy) : aimedShade;
 

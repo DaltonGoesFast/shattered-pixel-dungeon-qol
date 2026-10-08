@@ -81,6 +81,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mimic;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Monk;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Snake;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.GraveShade;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Imp;
 import com.shatteredpixel.shatteredpixeldungeon.effects.CellEmitter;
 import com.shatteredpixel.shatteredpixeldungeon.effects.FloatingText;
@@ -1737,7 +1738,7 @@ public class Hero extends Char {
 
 		if (Dungeon.isModified(Modifiers.GRAVE)
 				&& attackTarget.isAlive() && attackTarget.invisible == 0
-				&& Dungeon.level.adjacent(pos, attackTarget.pos)) {
+				&& GraveShade.heroInWeaponRange(this, attackTarget)) {
 			Char target = attackTarget;
 			attackTarget = null;
 			curAction = null;

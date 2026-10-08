@@ -33,7 +33,6 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.GraveRoster;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfAccuracy;
-import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfFuror;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Flail;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.MeleeWeapon;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Quarterstaff;
@@ -180,18 +179,31 @@ public class GraveShade extends DirectableAlly {
 		return reach;
 	}
 
+	/** True when a melee click from the hero would have reached this enemy. */
+	public static boolean heroInWeaponRange( Hero hero, Char enemy ){
+		if (hero == null || enemy == null) return false;
+		if (Dungeon.level.adjacent(hero.pos, enemy.pos)) return true;
+		MeleeWeapon wep = heroWeapon();
+		return wep != null && wep.canReach(hero, enemy.pos);
+	}
+
 	@Override
 	protected boolean canAttack(Char enemy) {
 		return canStrike(enemy);
 	}
 
 	public boolean canStrike( Char enemy ){
-		if (enemy == null || enemy == this || heroWeapon() == null || !Actor.chars().contains(enemy)){
+		if (enemy == null || enemy == this || !Actor.chars().contains(enemy)){
 			return false;
 		}
+		MeleeWeapon wep = heroWeapon();
+		if (wep == null) return false;
 		if (Dungeon.level.adjacent(pos, enemy.pos)) return true;
+		if (wep.canReach(this, enemy.pos)) return true;
 
+		//disintegration imbue can reach one tile past the weapon itself
 		int reach = reach();
+		if (reach <= wep.reachFactor(this)) return false;
 		if (Dungeon.level.distance(pos, enemy.pos) > reach) return false;
 
 		boolean[] passable = BArray.not(Dungeon.level.solid, null);
@@ -218,24 +230,26 @@ public class GraveShade extends DirectableAlly {
 		}
 		MeleeWeapon wep = heroWeapon();
 		if (wep != null){
-			//flail spin is tracked on the shade; encumbrance is read from the hero
-			Char accOwner = buff(Flail.SpinAbilityTracker.class) != null ? this : hero;
-			skill *= wep.accuracyFactor(accOwner, target);
+			skill *= wep.accuracyFactor(this, target);
 		}
-		return Math.round(skill);
+		return Math.max(1, Math.round(skill));
+	}
+
+	@Override
+	public boolean canSurpriseAttack() {
+		MeleeWeapon wep = heroWeapon();
+		Hero hero = Dungeon.hero;
+		if (wep == null || hero == null) return true;
+		if (hero.STR() < wep.STRReq()) return false;
+		if (wep instanceof Flail) return false;
+		return true;
 	}
 
 	@Override
 	public float attackDelay() {
 		MeleeWeapon wep = heroWeapon();
-		if (wep == null) return 1f;
-		Hero hero = Dungeon.hero;
-		float delay = wep.delayFactor(hero);
-		if (buff(Scimitar.SwordDance.class) != null && hero.buff(Scimitar.SwordDance.class) == null){
-			float furor = RingOfFuror.attackSpeedMultiplier(hero);
-			delay *= furor / (furor + 0.6f);
-		}
-		return delay;
+		if (wep == null) return super.attackDelay();
+		return super.attackDelay() * wep.delayFactor(this);
 	}
 
 	@Override

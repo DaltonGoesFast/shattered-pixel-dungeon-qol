@@ -77,14 +77,15 @@ public class Guild {
 		}
 	}
 
-	/** Craft shelf plus the healing potion, ration, and imp torches. Bag, ankh, and sandbags come from ShopRoom. */
+	/** Craft shelf, the vanilla potion and scroll mix, healing, ration, and imp torches. Bag, ankh, and sandbags come from ShopRoom. */
 	public static ArrayList<Item> stock(){
 		ArrayList<Item> items = new ArrayList<>();
 
 		switch (craft()){
 			case ARMS:
-				for (int i = 0; i < 4; i++) items.add( hide( Generator.randomUsingDefaults( Generator.wepTiers[1] ) ) );
+				for (int i = 0; i < 2; i++) items.add( hide( Generator.randomUsingDefaults( Generator.wepTiers[1] ) ) );
 				for (int i = 0; i < 4; i++) items.add( hide( Generator.randomUsingDefaults( Generator.wepTiers[2] ) ) );
+				for (int i = 0; i < 2; i++) items.add( hide( Generator.randomUsingDefaults( Generator.wepTiers[3] ) ) );
 				int lastTier = 2;
 				if (Random.Int(2) == 0) lastTier = Random.Int(4) == 0 ? 4 : 3;
 				items.add( hide( Generator.randomUsingDefaults( Generator.wepTiers[lastTier] ) ) );
@@ -124,6 +125,21 @@ public class Guild {
 					}
 				}
 				break;
+		}
+
+		//Same unidentified mix as a normal shop, so healing and remove curse are not the only colors.
+		//The imp already stocks six random potions and six random scrolls.
+		if (craft() != STORES){
+			items.add( Generator.randomUsingDefaults( Generator.Category.POTION ) );
+			items.add( Generator.randomUsingDefaults( Generator.Category.POTION ) );
+			if (craft() != ARCANA) items.add( new ScrollOfIdentify() );
+			if (craft() == ARCANA) items.add( new ScrollOfRemoveCurse() );
+			items.add( new ScrollOfMagicMapping() );
+			for (int i = 0; i < 2; i++){
+				items.add( Random.Int(2) == 0 ?
+						Generator.randomUsingDefaults( Generator.Category.POTION ) :
+						Generator.randomUsingDefaults( Generator.Category.SCROLL ) );
+			}
 		}
 
 		items.add( new PotionOfHealing() );

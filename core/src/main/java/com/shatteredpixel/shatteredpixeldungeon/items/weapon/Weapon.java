@@ -189,7 +189,11 @@ abstract public class Weapon extends KindOfWeapon {
 			return damage;
 		}
 		
-		if (!levelKnown && attacker == Dungeon.hero) {
+		//a grave shade swings the hero's weapon, so those hits identify it too
+		boolean graveSwing = attacker instanceof GraveShade
+				&& Dungeon.hero != null
+				&& GraveShade.heroWeapon() == this;
+		if (!levelKnown && (attacker == Dungeon.hero || graveSwing)) {
 			float uses = Math.min( availableUsesToID, Talent.itemIDSpeedFactor(Dungeon.hero, this) );
 			availableUsesToID -= uses;
 			usesLeftToID -= uses;
@@ -299,13 +303,21 @@ abstract public class Weapon extends KindOfWeapon {
 		return !isIdentified() && usesLeftToID <= 0;
 	}
 	
+	/** The hero whose strength this swing is judged against. A grave shade uses yours. */
+	private Hero encumbranceHero(Char owner){
+		if (owner instanceof Hero) return (Hero) owner;
+		if (owner instanceof GraveShade) return Dungeon.hero;
+		return null;
+	}
+
 	@Override
 	public float accuracyFactor(Char owner, Char target) {
 		
 		int encumbrance = 0;
-		
-		if( owner instanceof Hero ){
-			encumbrance = STRReq() - ((Hero)owner).STR();
+
+		Hero hero = encumbranceHero(owner);
+		if (hero != null){
+			encumbrance = STRReq() - hero.STR();
 		}
 
 		float ACC = this.ACC;
@@ -324,8 +336,9 @@ abstract public class Weapon extends KindOfWeapon {
 
 	protected float baseDelay( Char owner ){
 		float delay = augment.delayFactor(this.DLY);
-		if (owner instanceof Hero) {
-			int encumbrance = STRReq() - ((Hero)owner).STR();
+		Hero hero = encumbranceHero(owner);
+		if (hero != null) {
+			int encumbrance = STRReq() - hero.STR();
 			if (encumbrance > 0){
 				delay *= Math.pow( 1.2, encumbrance );
 			}
@@ -335,9 +348,14 @@ abstract public class Weapon extends KindOfWeapon {
 	}
 
 	protected float speedMultiplier(Char owner ){
-		float multi = RingOfFuror.attackSpeedMultiplier(owner);
+		Char speedOwner = owner;
+		if (owner instanceof GraveShade && Dungeon.hero != null){
+			speedOwner = Dungeon.hero;
+		}
+		float multi = RingOfFuror.attackSpeedMultiplier(speedOwner);
 
-		if (owner.buff(Scimitar.SwordDance.class) != null){
+		if (owner.buff(Scimitar.SwordDance.class) != null
+				|| (speedOwner != owner && speedOwner.buff(Scimitar.SwordDance.class) != null)){
 			multi += 0.6f;
 		}
 
@@ -353,7 +371,8 @@ abstract public class Weapon extends KindOfWeapon {
 				return reach;
 			}
 		}
-		if (owner instanceof Hero && owner.buff(AscendedForm.AscendBuff.class) != null){
+		Hero form = encumbranceHero(owner);
+		if (form != null && form.buff(AscendedForm.AscendBuff.class) != null){
 			reach += 2;
 		}
 		if (hasEnchant(Projecting.class, owner)){
