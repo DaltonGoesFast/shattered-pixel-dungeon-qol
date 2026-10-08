@@ -65,6 +65,7 @@ public class ScrollPane extends Component {
 		KeyEvent.addKeyListener(keyListener = new Signal.Listener<KeyEvent>() {
 			@Override
 			public boolean onSignal(KeyEvent keyEvent) {
+				if (!captureZoomKeys()) return false;
 				GameAction action = KeyBindings.getActionForKey(keyEvent);
 				if (action == SPDAction.ZOOM_IN){
 					if (keyEvent.pressed){
@@ -96,21 +97,40 @@ public class ScrollPane extends Component {
 	}
 
 	public void scrollTo( float x, float y ) {
+		content.camera.scroll.set( x, y );
+		clampCameraScroll();
+	}
+
+	/** Finger movement in screen pixels. Positive dx moves the content with the pointer. */
+	public void scrollBy( float screenDx, float screenDy ) {
 		Camera c = content.camera;
-		c.scroll.set( x, y );
-		if (c.scroll.x + width > content.width()) {
-			c.scroll.x = content.width() - width;
+		if (c == null || c.zoom == 0) return;
+		c.scroll.x -= screenDx / c.zoom;
+		c.scroll.y -= screenDy / c.zoom;
+		clampCameraScroll();
+	}
+
+	/** Zoom keys scroll a pane that has them. HUD strips override this and return false. */
+	protected boolean captureZoomKeys() {
+		return true;
+	}
+
+	/** Mouse-wheel scrolls vertically unless a strip overrides this. */
+	protected boolean scrollOnWheelX() {
+		return false;
+	}
+
+	private void clampCameraScroll() {
+		Camera c = content.camera;
+		float maxX = content.width() - width;
+		float maxY = content.height() - height;
+		if (maxX < 0) maxX = 0;
+		if (maxY < 0) maxY = 0;
+		c.scroll.x = GameMath.gate(0, c.scroll.x, maxX);
+		c.scroll.y = GameMath.gate(0, c.scroll.y, maxY);
+		if (thumb != null && content.height() > 0) {
+			thumb.y = y + height * c.scroll.y / content.height();
 		}
-		if (c.scroll.x < 0) {
-			c.scroll.x = 0;
-		}
-		if (c.scroll.y + height > content.height()) {
-			c.scroll.y = content.height() - height;
-		}
-		if (c.scroll.y < 0) {
-			c.scroll.y = 0;
-		}
-		thumb.y = this.y + height * c.scroll.y / content.height();
 	}
 
 	@Override
@@ -173,7 +193,12 @@ public class ScrollPane extends Component {
 		@Override
 		protected void onScroll(ScrollEvent event) {
 			PointF newPt = new PointF(lastPos);
-			newPt.y -= event.amount * content.camera.zoom * 10;
+			float delta = event.amount * content.camera.zoom * 10;
+			if (scrollOnWheelX()) {
+				newPt.x -= delta;
+			} else {
+				newPt.y -= delta;
+			}
 			scroll(newPt);
 			dragging = false;
 		}
@@ -216,20 +241,7 @@ public class ScrollPane extends Component {
 			Camera c = content.camera;
 			
 			c.shift( PointF.diff( lastPos, current ).invScale( c.zoom ) );
-			if (c.scroll.x + width > content.width()) {
-				c.scroll.x = content.width() - width;
-			}
-			if (c.scroll.x < 0) {
-				c.scroll.x = 0;
-			}
-			if (c.scroll.y + height > content.height()) {
-				c.scroll.y = content.height() - height;
-			}
-			if (c.scroll.y < 0) {
-				c.scroll.y = 0;
-			}
-			
-			thumb.y = y + height * c.scroll.y / content.height();
+			clampCameraScroll();
 			
 			lastPos.set( current );
 			
