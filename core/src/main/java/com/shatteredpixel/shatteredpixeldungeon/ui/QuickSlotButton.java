@@ -43,7 +43,7 @@ import com.watabou.utils.PathFinder;
 
 public class QuickSlotButton extends Button {
 
-	/** Which set of 6 slots is visible (0 or 1) when quickslot swapper is off. Toggle with QUICKSLOT_SWAP_SET hotkey. */
+	/** Which set of 6 slots is visible (0 or 1) when quickslot swapper is off. Ignored while the second quickslot bar is hidden. */
 	public static int activeSet = 0;
 
 	/**
@@ -54,8 +54,13 @@ public class QuickSlotButton extends Button {
 	public static int pageSize = QuickSlot.SLOTS_PER_SET;
 	public static int quickSlotPage = 0;
 
+	/** Slots the toolbar may show. The second bank stays stored in {@link QuickSlot} either way. */
+	public static int visibleSlotCount() {
+		return SPDSettings.secondQuickslotBar() ? QuickSlot.SIZE : QuickSlot.SLOTS_PER_SET;
+	}
+
 	public static int pageCount() {
-		return (QuickSlot.SIZE + pageSize - 1) / pageSize;
+		return (visibleSlotCount() + pageSize - 1) / pageSize;
 	}
 
 	public static void advanceQuickSwapperPage() {
@@ -79,9 +84,10 @@ public class QuickSlotButton extends Button {
 		if (SPDSettings.quickSwapper()) {
 			int page = quickSlotPage % pageCount();
 			// hidden buttons past the end of a short last page must still map to a real slot
-			return Math.min((displaySlot % pageSize) + page * pageSize, QuickSlot.SIZE - 1);
+			return Math.min((displaySlot % pageSize) + page * pageSize, visibleSlotCount() - 1);
 		}
-		return displaySlot + activeSet * QuickSlot.SLOTS_PER_SET;
+		int set = SPDSettings.secondQuickslotBar() ? activeSet : 0;
+		return displaySlot + set * QuickSlot.SLOTS_PER_SET;
 	}
 
 	public QuickSlotButton( int slotNum ) {

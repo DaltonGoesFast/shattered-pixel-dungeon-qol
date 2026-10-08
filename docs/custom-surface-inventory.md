@@ -171,6 +171,7 @@ Common fields: `request_id`, optional `username` (echoed on results as `username
 | `tile_indicator` | `true` | Hover tile highlight |
 | `alt_tileset_chance` | `50` (0–100) | Per-chapter alt roll; migrates legacy `force_alt_tilesets` |
 | `quickslot_swapper` | `true` | Dual quickslot sets |
+| `second_quickslot_bar` | `true` | Extra quickslot bank (slots 7–12). Off hides it; assignments kept |
 | `show_quickslot_swap_button` | desktop `false` / mobile `true` | On-screen swap button |
 | `center_on_cycle_no_enemies` | `false` | Danger indicator behavior |
 | `boss_bar_all_enemies` | `true` | Boss-style HP bar for targets |

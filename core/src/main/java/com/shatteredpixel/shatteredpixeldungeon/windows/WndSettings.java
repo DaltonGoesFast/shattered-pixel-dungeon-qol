@@ -948,6 +948,8 @@ public class WndSettings extends WndTabbed {
 		RedButton btnResetHudLayout;
 		OptionSlider optQuickslotsShown;
 		RenderedTextBlock txtQuickslotsShown;
+		CheckBox chkSecondQuickslotBar;
+		RenderedTextBlock txtSecondQuickslotBar;
 		CheckBox chkShowQuickslotSwapButton;
 		CheckBox chkCenterOnCycleNoEnemies;
 		CheckBox chkBossBarAllEnemies;
@@ -1029,6 +1031,22 @@ public class WndSettings extends WndTabbed {
 			txtQuickslotsShown.hardlight(0x888888);
 			add(txtQuickslotsShown);
 			updateQuickslotsShownText();
+
+			chkSecondQuickslotBar = new CheckBox(Messages.get(this, "second_quickslot_bar")) {
+				@Override
+				protected void onClick() {
+					super.onClick();
+					SPDSettings.secondQuickslotBar(checked());
+					Toolbar.updateLayout();
+					QuickSlotButton.refresh();
+				}
+			};
+			chkSecondQuickslotBar.checked(SPDSettings.secondQuickslotBar());
+			add(chkSecondQuickslotBar);
+
+			txtSecondQuickslotBar = PixelScene.renderTextBlock(Messages.get(this, "second_quickslot_bar_desc"), 6);
+			txtSecondQuickslotBar.hardlight(0x888888);
+			add(txtSecondQuickslotBar);
 
 			chkShowQuickslotSwapButton = new CheckBox(Messages.get(UITab.class, "quickslot_swap_button")) {
 				@Override
@@ -1138,6 +1156,13 @@ public class WndSettings extends WndTabbed {
 			txtQuickslotsShown.maxWidth((int)width);
 			txtQuickslotsShown.setPos((width - txtQuickslotsShown.width())/2f, pos + 1);
 			pos = txtQuickslotsShown.bottom();
+
+			chkSecondQuickslotBar.setRect(0, pos + GAP, width, BTN_HEIGHT);
+			pos = chkSecondQuickslotBar.bottom();
+
+			txtSecondQuickslotBar.maxWidth((int)width);
+			txtSecondQuickslotBar.setPos(0, pos + 1);
+			pos = txtSecondQuickslotBar.bottom();
 
 			chkShowQuickslotSwapButton.setRect(0, pos + GAP, width, BTN_HEIGHT);
 			pos = chkShowQuickslotSwapButton.bottom();

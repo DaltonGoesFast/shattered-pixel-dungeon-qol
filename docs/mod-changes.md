@@ -12,6 +12,7 @@ These live in **Settings → Quality of Life**.
 
 - **Tile indicator on hover.** The tile under the cursor is marked.
 - **Quickslots shown.** Auto, or a fixed row of 1 to 6 slots.
+- **Show second quickslot bar.** The extra quickslot bank (slots 7–12). Off hides that row; items assigned there stay put.
 - **Show quickslot swap button.** A button to switch quickslot sets.
 - **Center hero on Switch Target.** If you press the enemy-cycle button and nothing is left to target, the camera returns to you.
 - **Boss health bar for targeted enemies.** The large health bar also tracks the enemy you have targeted, not only bosses.
