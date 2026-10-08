@@ -15,8 +15,9 @@ allprojects {
         appPackageName = 'com.shatteredpixel.shatteredpixeldungeon.qol'
 
         //Full releases gets +2 on version code, needed for an F-Droid quirk
-        appVersionCode = 921
-        appVersionName = '4.0.0-QoL-7'
+        //Stay above official v4.0.2 (922) and the local QoL-8 working copy (923)
+        appVersionCode = 924
+        appVersionName = '4.0.2-QoL-8'
 
         appJavaCompatibility = JavaVersion.VERSION_11
 

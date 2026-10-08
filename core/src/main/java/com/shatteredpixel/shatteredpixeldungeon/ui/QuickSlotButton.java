@@ -300,7 +300,7 @@ public class QuickSlotButton extends Button {
 
 	public static void set(int displaySlot, Item item){
 		Dungeon.quickslot.setSlot( getActualSlot(displaySlot) , item );
-		refresh();
+		Item.updateQuickslot();
 
 		//Remember if the player adds the waterskin as one of their first actions.
 		if (Statistics.duration + Actor.now() <= 10){
