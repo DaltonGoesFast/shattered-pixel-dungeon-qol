@@ -482,13 +482,23 @@ public class QuickSlotButton extends Button {
 		}
 	}
 
-	/** The item button inside this slot. A drag scrolls the mobile strip instead of using the item. */
+	/**
+	 * A drag on this slot scrolls the mobile strip. A still tap or long-press still
+	 * uses or assigns, including an empty slot, whose click is this button rather
+	 * than the item button inside it.
+	 */
 	public void setScrollPassthrough( boolean on ) {
+		super.setScrollPassthrough( on );
 		slot.setScrollPassthrough( on );
 	}
 
-	/** Place the item button above the quickslot strip's scroll listener. */
+	/**
+	 * Sit this button, then its item button, above the quickslot strip's scroll listener.
+	 * The item button stays in front so a filled slot uses or long-presses the item.
+	 * An empty slot's item button is disabled, so the assign click lands here.
+	 */
 	public void prioritizeForScroll() {
+		givePointerPriority();
 		slot.givePointerPriority();
 	}
 }
