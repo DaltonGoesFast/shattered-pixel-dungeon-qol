@@ -1191,11 +1191,23 @@ public class ScrollOfDebug extends Scroll {
     /** Classpath scan is deferred so a normal run never walks the game classes. */
     static void ensureTrie() {
         if (trie != null) return;
-        try {
-            trie = PackageTrie.getClassesForPackage(ROOT);
-        } catch (ClassNotFoundException e) {
-            Game.reportException(e);
-            trie = new PackageTrie();
+        // Desktop leaves classNameSource null and scans the jar. Android sets
+        // the source because an APK has dex and no com/shatteredpixel jar entries.
+        if (PackageTrie.classNameSource == null) {
+            try {
+                trie = PackageTrie.getClassesForPackage(ROOT);
+            } catch (ClassNotFoundException e) {
+                Game.reportException(e);
+                trie = new PackageTrie();
+            }
+        }
+        if (PackageTrie.classNameSource != null && (trie == null || trie.isEmpty())) {
+            try {
+                trie = PackageTrie.fromClassNames(ROOT, PackageTrie.classNameSource.classNames());
+            } catch (Exception e) {
+                Game.reportException(e);
+                trie = new PackageTrie();
+            }
         }
     }
 

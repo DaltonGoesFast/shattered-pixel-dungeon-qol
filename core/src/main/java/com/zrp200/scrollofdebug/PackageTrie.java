@@ -37,6 +37,18 @@ import java.util.jar.JarFile;
 
 public class PackageTrie {
 
+    /**
+     * Lists binary class names when the game is not stored as jar entries.
+     * Android sets this from {@code dalvik.system.DexFile}; desktop leaves it null.
+     * Same idea as zrp200's {@code PlatformSupport.findClasses} on {@code shpd/1.3/apk_support}.
+     */
+    public interface ClassNameSource {
+        Iterable<String> classNames() throws Exception;
+    }
+
+    /** Installed by the Android launcher before the first scroll command. */
+    public static volatile ClassNameSource classNameSource;
+
     /** package of core game files (for example com.shatteredpixel.shatteredpixeldungeon) **/
     private final String ROOT;
     public PackageTrie(String ROOT) {this.ROOT = ROOT;}
@@ -225,6 +237,26 @@ public class PackageTrie {
         }
         return root;
     }
+
+    /**
+     * Builds a trie from binary names (for example dex entries). One class that
+     * fails to load is skipped so it cannot abort the rest of the scan.
+     */
+    static PackageTrie fromClassNames(String pckgname, Iterable<String> names) {
+        PackageTrie tree = new PackageTrie(pckgname);
+        ClassLoader loader = PackageTrie.class.getClassLoader();
+        if (names == null || loader == null) return tree;
+        for (String name : names) {
+            if (name == null || !name.startsWith(pckgname)) continue;
+            try {
+                tree.addClass(Class.forName(name, false, loader), pckgname);
+            } catch (Throwable ignored) {
+                // a missing or broken class must not abort the index
+            }
+        }
+        return tree;
+    }
+
     private static PackageTrie checkDirectory(File directory, String pckgname, PackageTrie trie) throws ClassNotFoundException {
         File tmpDirectory;
 

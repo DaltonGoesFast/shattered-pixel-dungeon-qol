@@ -2,6 +2,12 @@
 -keepnames class com.shatteredpixel.** { *; }
 -keepnames class com.watabou.** { *; }
 -keep class com.zrp200.scrollofdebug.** { *; }
+# The package keep retains this field. Pin it so R8 cannot drop the launcher's write.
+# Short names still match because -keepnames retains com.shatteredpixel class names,
+# and -keep * implements Bundlable retains items, actors, traps, and levels for construction.
+-keepclassmembers class com.zrp200.scrollofdebug.PackageTrie {
+    public static com.zrp200.scrollofdebug.PackageTrie$ClassNameSource classNameSource;
+}
 
 # keep classes that are instantiated via reflection
 -keep class * extends com.watabou.noosa.Gizmo { *; }
