@@ -1,0 +1,64 @@
+# Shattered Pixel Dungeon & Streaming Vocabulary Dictionary
+# Lines starting with # are comments. Whisper will be primed with these terms.
+
+# --- Heroes & Subclasses ---
+Shattered Pixel Dungeon
+Warrior, Gladiator, Berserker
+Mage, Battlemage, Warlock
+Rogue, Assassin, Freerunner
+Huntress, Sniper, Warden
+Duelist, Champion, Monk
+
+# --- Core Mechanics & Stats ---
+depth, floor, talent points, upgrade scroll, strength requirement
+identified, uncursed, cursed, enchanted, inscribed
+Ankh, blessed Ankh, waterskin, dewdrop, alchemy pot, seed
+
+# --- Mystery Potion Colors ---
+azure potion, crimson potion, jade potion, ivory potion, amber potion
+golden potion, bistre potion, silver potion, turquoise potion, charcoal potion
+magenta potion, indigo potion
+
+# --- Identified Potions & Elixirs ---
+potion of healing, potion of liquid flame, potion of frost, potion of toxic gas
+potion of paralytic gas, potion of invisibility, potion of mind vision
+potion of purity, potion of experience, potion of earthen armor, potion of stamina
+potion of haste, potion of levitation, elixir of dragon's breath
+elixir of feather fall, elixir of aquatic healing, elixir of arcane armor
+
+# --- Mystery Scroll Names & Runic Names ---
+scroll of upgrade, scroll of transmutation, scroll of psionic blast
+scroll of remove curse, scroll of identify, scroll of magic mapping
+scroll of recharge, scroll of mirror image, scroll of teleportation
+scroll of lullaby, scroll of retribution, scroll of terror, scroll of passage
+KAUNAN, SOWILO, LAGUZ, TIWAZ, PERTHRO, GYFU, RAIDO, MANNAZ, JERA
+
+# --- Rings & Artifacts ---
+Ring of Wealth, Ring of Haste, Ring of Furor, Ring of Evasion, Ring of Accuracy
+Ring of Tenacity, Ring of Elements, Ring of Force, Ring of Sharpshooting
+Ring of Might, Ring of Arcana, Ring of Energy
+Chalice of Blood, Horn of Plenty, Cloak of Shadows, Master Thieves' Armband
+Talisman of Foresight, Dried Rose, Unstable Spellbook, Timekeeper's Hourglass
+Alchemist's Toolkit, Ethereal Chains, Holy Tome
+
+# --- Wands & Weapons ---
+wand of fireblast, wand of magic missile, wand of lightning, wand of disintegration
+wand of corrosion, wand of frost, wand of regrowth, wand of warding
+wand of transfusion, wand of corruption, wand of living earth, wand of blast wave
+dagger, mage's staff, shortsword, hand axe, spear, sword, mace, battle axe
+flail, longsword, runic blade, war hammer, glaive, greataxe, whip, crossbow
+
+# --- Enemies & Bosses ---
+marsupial rat, albino rat, gnoll scout, sewer crab, swarm of flies, caustic slime
+blessed snake, skeleton, thief, bandit, crazy thief, prison guard, necromancer
+vampire bat, gnoll brute, gnoll shaman, DM-100, DM-200, DM-201, DM-300
+cave spinner, fire elemental, frost elemental, shock elemental, ghoul, dwarf monk
+dwarf warlock, golem, demon spawner, ripper demon, succubus, evil eye, scorpio
+Goo, Tengu, King of Dwarves, Yog-Dzewa, Rotting Fist, Burning Fist, Bright Fist
+
+# --- Traps & Hazards ---
+fire trap, poison dart trap, chilling trap, paralytic trap, disintegration trap
+pitfall trap, summon trap, alarm trap, teleportation trap, sheep trap
+
+# --- Channel & Streaming Terms ---
+daltongoesfast, streamer, Streamer.bot, backtrack, short, Twitch, chat spawn

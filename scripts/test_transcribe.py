@@ -11,6 +11,25 @@ import subprocess
 import time
 import numpy as np
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+VOCABULARY_FILE = os.path.join(SCRIPT_DIR, "game_vocabulary.txt")
+
+def load_game_vocabulary():
+    if not os.path.exists(VOCABULARY_FILE):
+        return None
+    terms = []
+    try:
+        with open(VOCABULARY_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    terms.append(line)
+        if terms:
+            return "Shattered Pixel Dungeon commentary. Terminology: " + ", ".join(terms)
+    except Exception:
+        pass
+    return None
+
 def find_latest_video():
     videos_dir = os.path.expanduser("~/Videos")
     candidates = []
@@ -28,8 +47,7 @@ def find_matching_telemetry(video_path):
     date_part = base.replace(" ", "_")
     target_name = f"telemetry_{date_part}.jsonl"
 
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    telemetry_dir = os.path.normpath(os.path.join(script_dir, "..", "Lastest UI", "telemetry_logs"))
+    telemetry_dir = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "Lastest UI", "telemetry_logs"))
     target_path = os.path.join(telemetry_dir, target_name)
     if os.path.exists(target_path):
         return target_path
@@ -46,9 +64,9 @@ def extract_track2(video_path, output_wav):
     cmd = [
         "ffmpeg", "-y",
         "-i", video_path,
-        "-map", "0:a:1",        # Audio stream 1 = Track 2
-        "-ar", "16000",         # 16kHz sample rate optimal for Whisper
-        "-ac", "1",             # Mono
+        "-map", "0:a:1",
+        "-ar", "16000",
+        "-ac", "1",
         "-c:a", "pcm_s16le",
         output_wav
     ]
@@ -68,9 +86,9 @@ def transcribe(wav_path):
     from faster_whisper import WhisperModel
 
     audio_data = load_audio_wav(wav_path)
-    print("\n[2/3] Transcribing audio with word timestamps...")
+    prompt = load_game_vocabulary()
+    print("\n[2/3] Transcribing audio with word timestamps (with SPD vocabulary priming)...")
 
-    # Attempt CUDA first; fall back to fast CPU (int8) if CUDA runtime DLLs are missing
     use_gpu = True
     try:
         model = WhisperModel("small.en", device="cuda", compute_type="float16")
@@ -83,7 +101,7 @@ def transcribe(wav_path):
     if use_gpu:
         try:
             print("      Running on: NVIDIA CUDA (GPU)")
-            segments, info = model.transcribe(audio_data, word_timestamps=True, vad_filter=True)
+            segments, info = model.transcribe(audio_data, initial_prompt=prompt, word_timestamps=True, vad_filter=True)
             for s in segments:
                 words = [{"word": w.word.strip(), "start": round(w.start, 2), "end": round(w.end, 2)} for w in (s.words or [])]
                 results.append({
@@ -102,7 +120,7 @@ def transcribe(wav_path):
         print("      Running on: CPU (int8 optimized)")
         model = WhisperModel("small.en", device="cpu", compute_type="int8")
         t0 = time.time()
-        segments, info = model.transcribe(audio_data, word_timestamps=True, vad_filter=True)
+        segments, info = model.transcribe(audio_data, initial_prompt=prompt, word_timestamps=True, vad_filter=True)
         for s in segments:
             words = [{"word": w.word.strip(), "start": round(w.start, 2), "end": round(w.end, 2)} for w in (s.words or [])]
             results.append({

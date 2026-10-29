@@ -6,7 +6,7 @@ Triggered via your Stream Deck button after ending a stream:
   2. Finds the corresponding telemetry_*.jsonl log.
   3. Finds all Backtrack/Vertical highlight clips created during the run.
   4. Extracts Audio Track 2 (clean mic) with FFmpeg.
-  5. Transcribes speech with Faster-Whisper (GPU with CPU fallback).
+  5. Transcribes speech with Faster-Whisper using game_vocabulary.txt priming.
   6. Builds unified story timeline dossier (session_story.json).
   7. Organizes everything into a clean, dedicated Session folder:
      ~/Videos/Stream_Sessions/YYYY-MM-DD_Stream_HH-MM-SS/
@@ -31,6 +31,25 @@ VIDEOS_DIR = os.path.expanduser("~/Videos")
 SESSIONS_ROOT = os.path.join(VIDEOS_DIR, "Stream_Sessions")
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TELEMETRY_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "Lastest UI", "telemetry_logs"))
+VOCABULARY_FILE = os.path.join(SCRIPT_DIR, "game_vocabulary.txt")
+
+
+def load_game_vocabulary():
+    """Loads game vocabulary to prime Whisper's initial_prompt."""
+    if not os.path.exists(VOCABULARY_FILE):
+        return None
+    terms = []
+    try:
+        with open(VOCABULARY_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    terms.append(line)
+        if terms:
+            return "Shattered Pixel Dungeon commentary. Terminology: " + ", ".join(terms)
+    except Exception:
+        pass
+    return None
 
 
 def find_latest_session_video():
@@ -117,7 +136,8 @@ def transcribe_audio(wav_path):
     from faster_whisper import WhisperModel
 
     audio_data = load_audio_wav(wav_path)
-    print("[2/5] Running Faster-Whisper Speech-to-Text...")
+    prompt = load_game_vocabulary()
+    print("[2/5] Running Faster-Whisper Speech-to-Text (with SPD vocabulary priming)...")
 
     use_gpu = True
     try:
@@ -131,7 +151,7 @@ def transcribe_audio(wav_path):
     if use_gpu:
         try:
             print("      Engine: NVIDIA CUDA (GPU)")
-            segments, info = model.transcribe(audio_data, word_timestamps=True, vad_filter=True)
+            segments, info = model.transcribe(audio_data, initial_prompt=prompt, word_timestamps=True, vad_filter=True)
             for s in segments:
                 words = [{"word": w.word.strip(), "start": round(w.start, 2), "end": round(w.end, 2)} for w in (s.words or [])]
                 results.append({
@@ -150,7 +170,7 @@ def transcribe_audio(wav_path):
         print("      Engine: CPU (int8)")
         model = WhisperModel("small.en", device="cpu", compute_type="int8")
         t0 = time.time()
-        segments, info = model.transcribe(audio_data, word_timestamps=True, vad_filter=True)
+        segments, info = model.transcribe(audio_data, initial_prompt=prompt, word_timestamps=True, vad_filter=True)
         for s in segments:
             words = [{"word": w.word.strip(), "start": round(w.start, 2), "end": round(w.end, 2)} for w in (s.words or [])]
             results.append({
