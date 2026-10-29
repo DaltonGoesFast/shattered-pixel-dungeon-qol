@@ -12,6 +12,7 @@ Shattered Pixel Dungeon QoL + **Shatter the Streamer** streaming integration.
 |------|------------|
 | Viewer / panel copy | [COMMANDS.md](../COMMANDS.md), [user-facing-summary.md](user-facing-summary.md) |
 | Streamer (go live) | [streaming-setup-guide.md](streaming-setup-guide.md) § **6. Pre-stream checklist** |
+| Post-stream / Video editing | [stream-telemetry-pipeline.md](stream-telemetry-pipeline.md) |
 | Collaborator (code) | [CONTRIBUTING.md](../CONTRIBUTING.md), [project-structure.md](project-structure.md) |
 | Upstream / SPD 4.0 merge | [custom-surface-inventory.md](custom-surface-inventory.md) |
 | Economy tuning | [Chat Command Economy v1.md](Chat%20Command%20Economy%20v1.md), [economy-v11-apply.md](economy-v11-apply.md) |
@@ -55,6 +56,7 @@ Import bundle: `Lastest UI/streamerbot/shatter-the-streamer-export-0.2.0` (no `.
 | [bestiary-summon-system.md](bestiary-summon-system.md) | Zone unlocks, sprint, heat 2×, Hall of Fame |
 | [economy-v11-apply.md](economy-v11-apply.md) | Cap, bank, R10 session end |
 | [obs-scene-rebuild-plan.md](obs-scene-rebuild-plan.md) | OBS source naming / rebuild |
+| [stream-telemetry-pipeline.md](stream-telemetry-pipeline.md) | Telemetry capture, DaVinci Resolve 4-track XML & Shorts polish |
 
 ---
 
