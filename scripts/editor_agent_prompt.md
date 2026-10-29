@@ -42,6 +42,10 @@ Your objective is to output a structured **Edit Decision List (EDL)** JSON speci
    * Cut silent, prolonged inventory sorting (> 15 seconds of silence with no gameplay events).
    * Cut black transition screens (`interlevel`).
 
+5. **Combat & Reaction Closure (Never Leave Viewers Hanging):**
+   * If the streamer reacts to a threat or shouts about a dangerous mob (e.g. *"projecting skeleton, oh no!"*), NEVER cut the clip until the enemy defeat message appears in `telemetry_events` AND the streamer finishes their reaction.
+   * A reaction without the battle resolution ruins pacing. Always include the setup, the fight, and the conclusion.
+
 ---
 
 ### Output JSON Format
