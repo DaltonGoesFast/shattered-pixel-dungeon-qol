@@ -1,27 +1,34 @@
 """
-process_stream.py - Post-Stream Processing Pipeline.
+process_stream.py - Post-Stream Processing & File Organization Pipeline.
 
-Runs when you hit your Stream Deck button after ending a stream:
-  1. Finds the latest stream video in ~/Videos.
+Triggered via your Stream Deck button after ending a stream:
+  1. Finds the latest stream recording in ~/Videos.
   2. Finds the corresponding telemetry_*.jsonl log.
   3. Finds all Backtrack/Vertical highlight clips created during the run.
   4. Extracts Audio Track 2 (clean mic) with FFmpeg.
   5. Transcribes speech with Faster-Whisper (GPU with CPU fallback).
-  6. Weaves everything into a single master story file:
-     ~/Videos/processed_sessions/session_story_YYYY-MM-DD_HH-MM-SS.json
+  6. Builds unified story timeline dossier (session_story.json).
+  7. Organizes everything into a clean, dedicated Session folder:
+     ~/Videos/Stream_Sessions/YYYY-MM-DD_Stream_HH-MM-SS/
+       ├── raw_recording.mp4
+       ├── session_story.json
+       ├── telemetry.jsonl
+       └── shorts/
+           └── Backtrack_*.mp4
 """
 
 import os
 import sys
 import json
 import wave
+import shutil
 import subprocess
 import time
 from datetime import datetime
 import numpy as np
 
 VIDEOS_DIR = os.path.expanduser("~/Videos")
-PROCESSED_DIR = os.path.join(VIDEOS_DIR, "processed_sessions")
+SESSIONS_ROOT = os.path.join(VIDEOS_DIR, "Stream_Sessions")
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TELEMETRY_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "Lastest UI", "telemetry_logs"))
 
@@ -68,8 +75,7 @@ def find_backtrack_clips_in_window(start_mtime, end_mtime):
             full = os.path.join(VIDEOS_DIR, f)
             try:
                 mtime = os.path.getmtime(full)
-                # Allow a small buffer before and after recording window
-                if (start_mtime - 10) <= mtime <= (end_mtime + 60):
+                if (start_mtime - 15) <= mtime <= (end_mtime + 60):
                     clips.append({
                         "file": f,
                         "path": full,
@@ -83,7 +89,7 @@ def find_backtrack_clips_in_window(start_mtime, end_mtime):
 
 
 def extract_track2(video_path, output_wav):
-    print(f"[1/4] Extracting Track 2 (Clean Mic) from: {os.path.basename(video_path)}...")
+    print(f"[1/5] Extracting Track 2 (Clean Mic) from: {os.path.basename(video_path)}...")
     cmd = [
         "ffmpeg", "-y",
         "-i", video_path,
@@ -111,7 +117,7 @@ def transcribe_audio(wav_path):
     from faster_whisper import WhisperModel
 
     audio_data = load_audio_wav(wav_path)
-    print("[2/4] Running Faster-Whisper Speech-to-Text...")
+    print("[2/5] Running Faster-Whisper Speech-to-Text...")
 
     use_gpu = True
     try:
@@ -172,13 +178,12 @@ def main():
     if telem_file:
         print(f"Telemetry:    {os.path.basename(telem_file)}")
     else:
-        print("Telemetry:    None found (using audio only)")
+        print("Telemetry:    None found")
 
-    # Recording time bounds
     video_mtime = os.path.getmtime(video_path)
     video_size_mb = os.path.getsize(video_path) / (1024 * 1024)
 
-    # 1. Extract audio
+    # 1. Extract and transcribe audio
     temp_wav = os.path.join(SCRIPT_DIR, "temp_stream_mic.wav")
     try:
         extract_track2(video_path, temp_wav)
@@ -191,7 +196,7 @@ def main():
                 pass
 
     # 2. Parse telemetry
-    print("[3/4] Parsing gameplay telemetry events...")
+    print("[3/5] Parsing gameplay telemetry events...")
     telemetry_events = []
     session_start_ms = None
     session_end_ms = None
@@ -218,7 +223,7 @@ def main():
     print(f"      Found {len(backtrack_clips)} Vertical Backtrack highlight clips.")
 
     # 4. Synthesize chronological timeline
-    print("[4/4] Building unified story timeline for AI editing...")
+    print("[4/5] Building unified story timeline for AI editing...")
     combined_timeline = []
 
     for ev in telemetry_events:
@@ -253,15 +258,59 @@ def main():
 
     combined_timeline.sort(key=lambda x: x["time_sec"])
 
-    # 5. Save master dossier
-    os.makedirs(PROCESSED_DIR, exist_ok=True)
-    base_name = os.path.splitext(os.path.basename(video_path))[0].replace(" ", "_")
-    output_json_path = os.path.join(PROCESSED_DIR, f"session_story_{base_name}.json")
+    # 5. Organize into dedicated Session Folder
+    print("[5/5] Organizing files into dedicated Stream Session folder...")
+    video_basename = os.path.basename(video_path)
+    base_stem = os.path.splitext(video_basename)[0]
+    session_slug = base_stem.replace(" ", "_Stream_")
+    session_dir = os.path.join(SESSIONS_ROOT, session_slug)
+    shorts_dir = os.path.join(session_dir, "shorts")
 
+    os.makedirs(session_dir, exist_ok=True)
+    if backtrack_clips:
+        os.makedirs(shorts_dir, exist_ok=True)
+
+    # Move master video
+    new_video_path = os.path.join(session_dir, video_basename)
+    try:
+        shutil.move(video_path, new_video_path)
+        print(f"      Moved video -> {os.path.basename(session_dir)}/{video_basename}")
+    except Exception as e:
+        new_video_path = video_path
+        print(f"      Note: Could not move video (in use?): {e}")
+
+    # Move telemetry file
+    new_telem_path = None
+    if telem_file and os.path.exists(telem_file):
+        new_telem_path = os.path.join(session_dir, "telemetry.jsonl")
+        try:
+            shutil.move(telem_file, new_telem_path)
+            print(f"      Moved telemetry -> telemetry.jsonl")
+        except Exception:
+            try:
+                shutil.copy2(telem_file, new_telem_path)
+            except Exception:
+                new_telem_path = telem_file
+
+    # Move backtrack clips into shorts/
+    for clip in backtrack_clips:
+        orig_clip_path = clip["path"]
+        if os.path.exists(orig_clip_path):
+            target_clip_path = os.path.join(shorts_dir, clip["file"])
+            try:
+                shutil.move(orig_clip_path, target_clip_path)
+                clip["path"] = target_clip_path
+            except Exception:
+                pass
+
+    # Save session_story.json in the session folder
+    output_json_path = os.path.join(session_dir, "session_story.json")
     master_dossier = {
         "metadata": {
-            "video_file": os.path.basename(video_path),
-            "video_path": video_path,
+            "session_name": session_slug,
+            "session_dir": session_dir,
+            "video_file": os.path.basename(new_video_path),
+            "video_path": new_video_path,
             "video_size_mb": round(video_size_mb, 1),
             "processed_at_iso": datetime.now().isoformat(),
             "speech_segment_count": len(transcript),
@@ -278,15 +327,16 @@ def main():
         json.dump(master_dossier, f, indent=2)
 
     print("\n" + "=" * 65)
-    print("   PROCESSING COMPLETE! MASTER STORY DOSSIER CREATED")
+    print("   PROCESSING COMPLETE! SESSION PACKAGED & READY")
     print("=" * 65)
-    print(f"   Dossier:  {output_json_path}")
-    print(f"   Size:     {os.path.getsize(output_json_path) / 1024:.1f} KB")
-    print(f"   Speech:   {len(transcript)} spoken segments")
-    print(f"   Game:     {len(telemetry_events)} telemetry events")
-    print(f"   Shorts:   {len(backtrack_clips)} manual backtrack clips")
+    print(f"   Session Folder: {session_dir}")
+    print(f"   Dossier:        session_story.json ({os.path.getsize(output_json_path)/1024:.1f} KB)")
+    print(f"   Master Video:   {os.path.basename(new_video_path)} ({video_size_mb:.1f} MB)")
+    print(f"   Speech Lines:   {len(transcript)}")
+    print(f"   Game Events:    {len(telemetry_events)}")
+    print(f"   Shorts Saved:   {len(backtrack_clips)} in /shorts/")
     print("=" * 65)
-    print("   Ready for AI Video Editing Agent!")
+    print("   Root ~/Videos is clean. Archive is ready for AI Editing Agent!")
     print("=" * 65 + "\n")
 
 
