@@ -33,7 +33,9 @@ def sec_to_frames(seconds: float, fps: int = DEFAULT_FPS) -> int:
 
 def create_fcp_xml(video_path: str, cuts: list, markers: list, fps: int = DEFAULT_FPS) -> str:
     """Builds FCP7 XML string for DaVinci Resolve import."""
-    file_uri = "file://localhost/" + urllib.parse.quote(os.path.abspath(video_path).replace("\\", "/"))
+    norm_path = os.path.abspath(video_path).replace("\\", "/")
+    # Keep ':' and '/' unescaped so Windows drive letters (C:) work in DaVinci Resolve
+    file_uri = "file://localhost/" + urllib.parse.quote(norm_path, safe=":/")
     file_name = os.path.basename(video_path)
 
     # Calculate total sequence duration in frames
