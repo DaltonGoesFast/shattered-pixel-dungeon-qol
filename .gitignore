@@ -45,6 +45,9 @@ temp_*.png
 *.reapeaks
 
 # Lastest UI generated/runtime
+Lastest UI/telemetry_logs/
+__pycache__/
+*.pyc
 Lastest UI/**/My-Nice-Script_*.cmd
 Lastest UI/game_summary.txt
 Lastest UI/game_summary.json

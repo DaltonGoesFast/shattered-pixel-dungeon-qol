@@ -34,6 +34,31 @@ TELEMETRY_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "Lastest UI", "t
 VOCABULARY_FILE = os.path.join(SCRIPT_DIR, "game_vocabulary.txt")
 
 
+def setup_cuda_dlls():
+    import site
+    import ctypes
+    paths = site.getsitepackages() + [site.getusersitepackages()]
+    for base in paths:
+        cublas_bin = os.path.join(base, "nvidia", "cublas", "bin")
+        cudnn_bin = os.path.join(base, "nvidia", "cudnn", "bin")
+        for b in [cublas_bin, cudnn_bin]:
+            if os.path.exists(b):
+                try:
+                    os.add_dll_directory(b)
+                except Exception:
+                    pass
+                os.environ["PATH"] = b + os.pathsep + os.environ.get("PATH", "")
+                for dll in ["cublasLt64_12.dll", "cublas64_12.dll", "cudnn64_9.dll"]:
+                    p = os.path.join(b, dll)
+                    if os.path.exists(p):
+                        try:
+                            ctypes.CDLL(p)
+                        except Exception:
+                            pass
+
+setup_cuda_dlls()
+
+
 def load_game_vocabulary():
     """Loads game vocabulary to prime Whisper's initial_prompt."""
     if not os.path.exists(VOCABULARY_FILE):
@@ -345,6 +370,36 @@ def main():
 
     with open(output_json_path, "w", encoding="utf-8") as f:
         json.dump(master_dossier, f, indent=2)
+
+    # 6. Auto-generate DaVinci Resolve Timeline XML
+    print("[6/6] Generating DaVinci Resolve Timeline XML...")
+    try:
+        from generate_resolve_xml import generate_cuts_from_story, create_fcp_xml
+        rough_cuts, markers = generate_cuts_from_story(master_dossier)
+        xml_content = create_fcp_xml(
+            video_path=new_video_path,
+            cuts=rough_cuts,
+            markers=markers,
+            fps=60
+        )
+        xml_path = os.path.join(session_dir, "timeline_resolve.xml")
+        with open(xml_path, "w", encoding="utf-8") as xf:
+            xf.write(xml_content)
+        print(f"      Created DaVinci Resolve XML -> {os.path.basename(xml_path)}")
+    except Exception as e:
+        print(f"      Warning: Could not auto-generate DaVinci XML: {e}")
+
+    # 7. Polish vertical backtrack clips (if any)
+    if backtrack_clips:
+        print("\n[Bonus] Auto-polishing Vertical Shorts with animated captions...")
+        try:
+            from polish_shorts import process_short_video
+            for clip in backtrack_clips:
+                cpath = clip.get("path")
+                if cpath and os.path.exists(cpath):
+                    process_short_video(cpath, burn=True)
+        except Exception as e:
+            print(f"      Warning: Could not polish shorts: {e}")
 
     print("\n" + "=" * 65)
     print("   PROCESSING COMPLETE! SESSION PACKAGED & READY")
