@@ -32,10 +32,12 @@ Your objective is to output a structured **Edit Decision List (EDL)** JSON speci
      * Note on Chat Spawns: Stream viewers frequently use `!summon` every 60s during free-command periods. Do NOT treat routine mob spawns as automatic highlights; only include a chat spawn if it directly triggered a chaotic near-death moment, wipe, or big streamer reaction.
    * **Act 3 (Climax, 3–5 mins):** The final boss battle, tragic defeat, or glorious victory/ascension.
 
-3. **Audio & Sentence Integrity (Crucial):**
-   * NEVER cut in the middle of a spoken sentence or word.
-   * Look at the `words` timestamps in the transcript. Always place cut points during the silence (gaps > 0.4s) between phrases.
-   * If the streamer is explaining a strategy or joke, keep both the setup and the punchline.
+3. **Audio & Sentence Integrity (Crucial Breathing Room):**
+   * NEVER cut right against a spoken word or consonant.
+   * **Pre-Roll Pad (0.5s – 0.8s):** Always start the cut 0.5s to 0.8s *before* the first spoken word so the new scene and ambient game audio establish before speech begins.
+   * **Post-Roll Pad (0.8s – 1.2s):** Always let the last sentence ring out with 0.8s to 1.2s of room tone/gameplay after the final word.
+   * Never let adjacent clips sound like sentences are colliding into each other. If a clip ends on speech, let the room tone settle before cutting.
+   * Look at the `words` timestamps in the transcript. Always place cut points comfortably in the silence between phrases.
 
 4. **Trimming Dead Air:**
    * Cut repetitive corridor walking through previously cleared rooms.
