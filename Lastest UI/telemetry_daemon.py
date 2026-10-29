@@ -2,7 +2,7 @@
 telemetry_daemon.py - Background Telemetry Recorder for Live Stream Video Editing.
 
 Monitors:
-  1. OBS Studio WebSocket (listens for RecordStateChanged, ReplayBufferSaved)
+  1. OBS Studio WebSocket (listens for RecordStateChanged, ReplayBufferSaved, Aitum Vertical vendor events)
   2. Shattered Pixel Dungeon WebSocket (:5001) (listens for game_log, hero_died, boss_slain, snapshot diffs)
   3. Video directory (detects Vertical Backtrack clip creations)
 
@@ -36,7 +36,7 @@ class TelemetrySession:
     """Manages an active recording session and writes to .jsonl."""
 
     def __init__(self, video_path: str, start_epoch_ms: int):
-        self.video_path = video_path
+        self.video_path = video_path or ""
         self.start_epoch_ms = start_epoch_ms
         self.active = True
         self.lock = threading.Lock()
@@ -48,7 +48,7 @@ class TelemetrySession:
 
         self.file = open(self.log_path, "a", encoding="utf-8")
         self.log_event("session_start", {
-            "video_path": video_path,
+            "video_path": self.video_path,
             "start_time_iso": datetime.fromtimestamp(start_epoch_ms / 1000.0).isoformat(),
         })
         print(f"[Telemetry] Session recording started -> {self.log_path}")
@@ -168,12 +168,12 @@ class TelemetryDaemon:
                     time.sleep(5)
                     continue
 
-                # op 1 Identify with Output & General events (1 << 6 = Outputs, 1 << 0 = General)
+                # op 1 Identify - subscribe to all standard events + vendor events (2047 | 512)
                 ws.send(json.dumps({
                     "op": 1,
                     "d": {
                         "rpcVersion": 1,
-                        "eventSubscriptions": (1 << 6) | (1 << 0)
+                        "eventSubscriptions": 2047
                     }
                 }))
 
@@ -184,6 +184,8 @@ class TelemetryDaemon:
                     time.sleep(5)
                     continue
 
+                # Set socket to blocking (no timeout) so we never disconnect on silence
+                ws.settimeout(None)
                 print(f"[Telemetry] Connected to OBS WebSocket at {url}")
 
                 while self.running:
@@ -197,11 +199,13 @@ class TelemetryDaemon:
                         event_data = d.get("eventData", {})
 
                         if event_type == "RecordStateChanged":
+                            state = event_data.get("outputState")
                             active = event_data.get("outputActive", False)
                             path = event_data.get("outputPath", "")
-                            if active:
+                            
+                            if state == "OBS_WEBSOCKET_OUTPUT_STARTED" or (active and path):
                                 self.start_session(path)
-                            else:
+                            elif state == "OBS_WEBSOCKET_OUTPUT_STOPPED" or (not active and state != "OBS_WEBSOCKET_OUTPUT_STARTING"):
                                 self.stop_session()
 
                         elif event_type == "ReplayBufferSaved":
@@ -209,9 +213,15 @@ class TelemetryDaemon:
                             self.log("vertical_clip_saved", {"clip_path": replay_path})
                             print(f"[Telemetry] Highlight clip recorded -> {replay_path}")
 
-            except Exception:
+                        elif event_type == "VendorEvent":
+                            vendor = event_data.get("vendorName")
+                            if vendor == "aitum-vertical-canvas":
+                                sub_event = event_data.get("eventType")
+                                self.log("aitum_vertical_event", {"event": sub_event})
+
+            except Exception as e:
                 url_idx += 1
-                time.sleep(10)
+                time.sleep(5)
 
     # -------------------------------------------------------------
     # Game WebSocket Listener (:5001)
@@ -223,6 +233,7 @@ class TelemetryDaemon:
         while self.running:
             try:
                 ws = websocket.create_connection(DEFAULT_GAME_WS, timeout=3)
+                ws.settimeout(None)
                 print(f"[Telemetry] Connected to Game WebSocket at {DEFAULT_GAME_WS}")
                 while self.running:
                     raw = ws.recv()
@@ -254,7 +265,7 @@ class TelemetryDaemon:
                         self._process_snapshot(data)
 
             except Exception:
-                time.sleep(10)
+                time.sleep(5)
 
     def _process_snapshot(self, snap: dict):
         hero = snap.get("hero", {})
