@@ -65,35 +65,54 @@ def load_audio_wav(wav_path):
         return np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
 
 def transcribe(wav_path):
-    print("\n[2/3] Loading faster-whisper model (small.en)...")
     from faster_whisper import WhisperModel
 
+    audio_data = load_audio_wav(wav_path)
+    print("\n[2/3] Transcribing audio with word timestamps...")
+
+    # Attempt CUDA first; fall back to fast CPU (int8) if CUDA runtime DLLs are missing
+    use_gpu = True
     try:
         model = WhisperModel("small.en", device="cuda", compute_type="float16")
-        print("      Running on: NVIDIA CUDA (GPU)")
-    except Exception as e:
-        print(f"      CUDA note: {e}")
-        print("      Falling back to: CPU (int8)")
-        model = WhisperModel("small.en", device="cpu", compute_type="int8")
+    except Exception:
+        use_gpu = False
 
-    print("      Loading audio samples...")
-    audio_data = load_audio_wav(wav_path)
-
-    print("      Transcribing audio with word timestamps...")
     t0 = time.time()
-    segments, info = model.transcribe(audio_data, word_timestamps=True, vad_filter=True)
-    
     results = []
-    for s in segments:
-        words = [{"word": w.word.strip(), "start": round(w.start, 2), "end": round(w.end, 2)} for w in (s.words or [])]
-        results.append({
-            "start": round(s.start, 2),
-            "end": round(s.end, 2),
-            "text": s.text.strip(),
-            "words": words
-        })
-    print(f"      Transcription finished in {time.time() - t0:.2f}s!")
-    return results
+
+    if use_gpu:
+        try:
+            print("      Running on: NVIDIA CUDA (GPU)")
+            segments, info = model.transcribe(audio_data, word_timestamps=True, vad_filter=True)
+            for s in segments:
+                words = [{"word": w.word.strip(), "start": round(w.start, 2), "end": round(w.end, 2)} for w in (s.words or [])]
+                results.append({
+                    "start": round(s.start, 2),
+                    "end": round(s.end, 2),
+                    "text": s.text.strip(),
+                    "words": words
+                })
+            print(f"      GPU transcription finished in {time.time() - t0:.2f}s!")
+            return results
+        except Exception as e:
+            print(f"      [Notice] GPU runtime DLL missing ({e}). Switching to CPU mode...")
+            use_gpu = False
+
+    if not use_gpu:
+        print("      Running on: CPU (int8 optimized)")
+        model = WhisperModel("small.en", device="cpu", compute_type="int8")
+        t0 = time.time()
+        segments, info = model.transcribe(audio_data, word_timestamps=True, vad_filter=True)
+        for s in segments:
+            words = [{"word": w.word.strip(), "start": round(w.start, 2), "end": round(w.end, 2)} for w in (s.words or [])]
+            results.append({
+                "start": round(s.start, 2),
+                "end": round(s.end, 2),
+                "text": s.text.strip(),
+                "words": words
+            })
+        print(f"      CPU transcription finished in {time.time() - t0:.2f}s!")
+        return results
 
 def main():
     video_path = find_latest_video()
