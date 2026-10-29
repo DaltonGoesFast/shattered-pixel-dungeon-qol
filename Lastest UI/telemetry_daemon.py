@@ -230,11 +230,13 @@ class TelemetryDaemon:
         if not websocket:
             return
 
+        waiting_logged = False
         while self.running:
             try:
                 ws = websocket.create_connection(DEFAULT_GAME_WS, timeout=3)
                 ws.settimeout(None)
-                print(f"[Telemetry] Connected to Game WebSocket at {DEFAULT_GAME_WS}")
+                print(f"[Telemetry] >>> Connected to Game WebSocket at {DEFAULT_GAME_WS} <<<")
+                waiting_logged = False
                 while self.running:
                     raw = ws.recv()
                     if not raw:
@@ -265,7 +267,10 @@ class TelemetryDaemon:
                         self._process_snapshot(data)
 
             except Exception:
-                time.sleep(5)
+                if not waiting_logged:
+                    print(f"[Telemetry] Waiting for Game WebSocket at {DEFAULT_GAME_WS}...")
+                    waiting_logged = True
+                time.sleep(3)
 
     def _process_snapshot(self, snap: dict):
         hero = snap.get("hero", {})
