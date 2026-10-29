@@ -23,8 +23,13 @@ package com.shatteredpixel.shatteredpixeldungeon.utils;
 
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.ConcurrentLinkedQueue;
+
 /**
- * Static flags for streaming events (hero death, boss slain).
+ * Static flags for streaming events (hero death, boss slain, game log messages).
  * The desktop ticker reads these and broadcasts via WebSocket.
  */
 public class StreamingEvents {
@@ -33,14 +38,35 @@ public class StreamingEvents {
 	public static volatile int heroDiedChallengeCount = -1;
 	public static volatile int bossSlainDepthPending = -1;
 
+	private static final ConcurrentLinkedQueue<String> pendingLogs = new ConcurrentLinkedQueue<>();
+
 	public static void notifyHeroDied() {
 		heroDiedPending = true;
 		heroDiedChallengeCount = Challenges.activeChallenges();
+	}
+
+	public static void notifyGameLog(String msg) {
+		if (msg != null && !msg.trim().isEmpty() && !msg.equals(GLog.NEW_LINE)) {
+			pendingLogs.offer(msg);
+		}
+	}
+
+	public static List<String> drainLogs() {
+		if (pendingLogs.isEmpty()) {
+			return Collections.emptyList();
+		}
+		List<String> list = new ArrayList<>();
+		String s;
+		while ((s = pendingLogs.poll()) != null) {
+			list.add(s);
+		}
+		return list;
 	}
 
 	public static void clear() {
 		heroDiedPending = false;
 		heroDiedChallengeCount = -1;
 		bossSlainDepthPending = -1;
+		pendingLogs.clear();
 	}
 }

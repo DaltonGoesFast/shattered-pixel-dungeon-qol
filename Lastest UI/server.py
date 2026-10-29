@@ -4894,6 +4894,13 @@ if __name__ == '__main__':
     threading.Thread(target=double_points_countdown_thread, daemon=True).start()
     threading.Thread(target=free_until_freeze_thread, daemon=True).start()
     threading.Thread(target=stream_end_debounce_thread, daemon=True).start()
+
+    # Telemetry recorder for automated video editing
+    try:
+        import telemetry_daemon
+        telemetry_daemon.start_in_background()
+    except Exception as e:
+        print(f"[Telemetry] Warning: could not start telemetry daemon: {e}")
     
     # Load initial data
     game_info = parser.get_current_game_info()

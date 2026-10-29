@@ -50,6 +50,7 @@ public class GLog {
 		
 		DeviceCompat.log( TAG, text );
 		update.dispatch( text );
+		StreamingEvents.notifyGameLog( text );
 	}
 	
 	public static void p( String text, Object... args ) {

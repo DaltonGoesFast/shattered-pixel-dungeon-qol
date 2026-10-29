@@ -95,6 +95,10 @@ public final class StreamingBootstrapper {
 							StreamingEvents.bossSlainDepthPending = -1;
 							s.broadcastEvent("boss_slain", Map.of("depth", depth));
 						}
+						List<String> logs = StreamingEvents.drainLogs();
+						for (String logMsg : logs) {
+							s.broadcastEvent("game_log", Map.of("message", logMsg));
+						}
 						Map<String, Object> snapshot = GameStateSnapshot.build();
 						String json = GSON.toJson(snapshot);
 						s.setLastPayload(json);
