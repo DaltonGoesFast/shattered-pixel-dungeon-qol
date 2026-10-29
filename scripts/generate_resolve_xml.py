@@ -13,9 +13,8 @@ Features:
       Track 4: Game Audio
   - Color-coded DaVinci Timeline Markers placed for:
       - Boss Fights (Green)
-      - Near-Death / Drama (Red)
-      - Chat Spawns (Yellow)
-      - Vertical Highlights (Cyan)
+      - Near-Death / Hero Death (Red)
+      - Vertical Backtrack Highlights (Cyan)
 """
 
 import os
@@ -187,9 +186,6 @@ def generate_cuts_from_story(story: dict) -> tuple:
         elif etype == "danger_low_hp":
             anchor_times.append((max(0.0, t - 15.0), t + 15.0, "Near Death"))
             markers.append({"name": "Near Death (HP Drop)", "source_time_sec": t})
-        elif "spawned" in msg or "dropped a dewdrop" in msg:
-            anchor_times.append((max(0.0, t - 5.0), t + 25.0, "Chat Event"))
-            markers.append({"name": f"Chat: {msg}", "source_time_sec": t})
 
     # Always keep intro (0 to 30s)
     anchor_times.append((0.0, min(45.0, meta.get("video_size_mb", 60.0)), "Intro"))

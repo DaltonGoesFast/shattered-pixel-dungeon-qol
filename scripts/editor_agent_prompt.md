@@ -28,7 +28,8 @@ Your objective is to output a structured **Edit Decision List (EDL)** JSON speci
 
 2. **The 3-Act Narrative Arc:**
    * **Act 1 (Intro, 1–2 mins):** Establish the hero class, pacts/modifiers, and build goal. Hook the viewer immediately.
-   * **Act 2 (Progression & Chaos, 10–14 mins):** Feature major milestones (floor changes, build upgrades, clutch low-HP survivals, and viewer chat spawns).
+   * **Act 2 (Progression & Chaos, 10–14 mins):** Feature major milestones (floor changes, build upgrades, clutch low-HP survivals, and notable drama).
+     * Note on Chat Spawns: Stream viewers frequently use `!summon` every 60s during free-command periods. Do NOT treat routine mob spawns as automatic highlights; only include a chat spawn if it directly triggered a chaotic near-death moment, wipe, or big streamer reaction.
    * **Act 3 (Climax, 3–5 mins):** The final boss battle, tragic defeat, or glorious victory/ascension.
 
 3. **Audio & Sentence Integrity (Crucial):**
