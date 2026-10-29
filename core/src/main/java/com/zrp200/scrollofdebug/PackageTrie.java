@@ -41,6 +41,27 @@ public class PackageTrie {
     private final String ROOT;
     public PackageTrie(String ROOT) {this.ROOT = ROOT;}
 
+    /** Android supplies this. Desktop leaves it null and scans class files instead. */
+    public interface Indexer {
+        PackageTrie index(String packageName);
+    }
+    private static Indexer indexer;
+    public static void setIndexer(Indexer indexer) { PackageTrie.indexer = indexer; }
+
+    /** Builds a trie from an already-open class index, or falls back to a classpath scan. */
+    public static PackageTrie indexOrScan(String packageName) throws ClassNotFoundException {
+        if (indexer != null) {
+            PackageTrie indexed = indexer.index(packageName);
+            if (indexed != null && !indexed.isEmpty()) return indexed;
+        }
+        return getClassesForPackage(packageName);
+    }
+
+    public void indexClass(Class<?> cls, String packageName) {
+        if (cls == null || cls.getPackage() == null) return;
+        addClass(cls, packageName);
+    }
+
     public PackageTrie() { this("com.shatteredpixel.shatteredpixeldungeon"); }  // backwards compatibility
 
     private final HashMap<String, PackageTrie> subTries = new HashMap<>();

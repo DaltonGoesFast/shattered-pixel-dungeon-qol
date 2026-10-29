@@ -1103,6 +1103,11 @@ def _dispatch_chat_command_inner(body: dict) -> ChatResult:
     try:
         if cmd in ("points",):
             result = handle_points_query(username)
+        elif cmd == "bob":
+            result = handle_points_query("bob")
+            extra = dict(result.extra or {})
+            extra["command"] = "bob"
+            result.extra = extra
         elif cmd == "bank":
             result = handle_bank(username, args)
         elif cmd in ("toppoints", "leaderboard"):

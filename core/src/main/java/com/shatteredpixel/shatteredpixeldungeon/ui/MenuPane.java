@@ -152,8 +152,7 @@ public class MenuPane extends Component {
 		}
 
 		if (Modifiers.activeModifiers() > 0){
-			pactIcon = Icons.get(Icons.PACTS);
-			pactIcon.scale.set(7f / pactIcon.width());
+			pactIcon = new Image(Assets.Interfaces.PACTS_ICON_SMALL);
 			add(pactIcon);
 
 			pactText = new BitmapText( Integer.toString( Modifiers.activeModifiers() ), PixelScene.pixelFont);
@@ -240,7 +239,7 @@ public class MenuPane extends Component {
 
 		if (pactIcon != null){
 			float leftOf = (challengeIcon != null) ? challengeIcon.x : (btnJournal.left() - 7);
-			pactIcon.x = leftOf - 7 + (7 - pactIcon.width())/2f - 0.1f;
+			pactIcon.x = leftOf - pactIcon.width() - 0.1f;
 			pactIcon.y = depthIcon.y;
 			PixelScene.align(pactIcon);
 

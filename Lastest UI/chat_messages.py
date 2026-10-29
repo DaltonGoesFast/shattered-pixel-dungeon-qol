@@ -152,6 +152,7 @@ def not_enough_points(user: str, cost: int, total: int, detail: str = "") -> str
 USAGE = {
     "help": "Usage: !help or !help <command> - bare !help links to the full command list on GitHub.",
     "points": "Usage: !points - show your chat points, donor points, and Bestiary sprint/heat XP.",
+    "bob": "Usage: !bob - show bob's chat points, donor points, and Bestiary sprint/heat XP.",
     "economy": "Usage: !economy / !reminder - live chat-cap / earn / bank rules from current config.",
     "bank": "Usage: !bank / !bank all, or !bank <amount> - convert chat pts to donor pts at 10%.",
     "toppoints": "Usage: !toppoints / !leaderboard - top 3 by donor points.",

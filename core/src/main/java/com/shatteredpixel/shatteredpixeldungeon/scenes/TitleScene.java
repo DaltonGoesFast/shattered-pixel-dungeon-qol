@@ -116,12 +116,18 @@ public class TitleScene extends PixelScene {
 
 		align(title);
 
-		// Flames flank the logo on each side, mid-height to avoid overlap with text
-		float flameY = title.y + 42;
-		float leftFlameX = title.x - 15;
-		float rightFlameX = title.x + title.width + 15;
-		leftFB = placeTorch(leftFlameX, flameY);
-		rightFB = placeTorch(rightFlameX, flameY);
+		if (SPDSettings.moddedBanners()) {
+			// Flames flank the logo on each side, mid-height to avoid overlap with text
+			float flameY = title.y + 42;
+			leftFB = placeTorch(title.x - 15, flameY);
+			rightFB = placeTorch(title.x + title.width + 15, flameY);
+		} else if (landscape()) {
+			leftFB = placeTorch(title.x + 30, title.y + 35);
+			rightFB = placeTorch(title.x + title.width - 30, title.y + 35);
+		} else {
+			leftFB = placeTorch(title.x + 16, title.y + 70);
+			rightFB = placeTorch(title.x + title.width - 16, title.y + 70);
+		}
 
 		signs = new Image(BannerSprites.get( landscape() ? BannerSprites.Type.TITLE_GLOW_LAND : BannerSprites.Type.TITLE_GLOW_PORT)){
 			private float time = 0;

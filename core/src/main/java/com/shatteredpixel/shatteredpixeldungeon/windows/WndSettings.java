@@ -947,9 +947,7 @@ public class WndSettings extends WndTabbed {
 		CheckBox chkFlipStatusPane;
 		RedButton btnResetHudLayout;
 		OptionSlider optQuickslotsShown;
-		RenderedTextBlock txtQuickslotsShown;
 		CheckBox chkSecondQuickslotBar;
-		RenderedTextBlock txtSecondQuickslotBar;
 		CheckBox chkShowQuickslotSwapButton;
 		CheckBox chkCenterOnCycleNoEnemies;
 		CheckBox chkBossBarAllEnemies;
@@ -1020,17 +1018,11 @@ public class WndSettings extends WndTabbed {
 				@Override
 				protected void onChange() {
 					SPDSettings.quickslotsShown(getSelectedValue());
-					updateQuickslotsShownText();
 					Toolbar.updateLayout();
 				}
 			};
 			optQuickslotsShown.setSelectedValue(SPDSettings.quickslotsShown());
 			add(optQuickslotsShown);
-
-			txtQuickslotsShown = PixelScene.renderTextBlock(6);
-			txtQuickslotsShown.hardlight(0x888888);
-			add(txtQuickslotsShown);
-			updateQuickslotsShownText();
 
 			chkSecondQuickslotBar = new CheckBox(Messages.get(this, "second_quickslot_bar")) {
 				@Override
@@ -1043,10 +1035,6 @@ public class WndSettings extends WndTabbed {
 			};
 			chkSecondQuickslotBar.checked(SPDSettings.secondQuickslotBar());
 			add(chkSecondQuickslotBar);
-
-			txtSecondQuickslotBar = PixelScene.renderTextBlock(Messages.get(this, "second_quickslot_bar_desc"), 6);
-			txtSecondQuickslotBar.hardlight(0x888888);
-			add(txtSecondQuickslotBar);
 
 			chkShowQuickslotSwapButton = new CheckBox(Messages.get(UITab.class, "quickslot_swap_button")) {
 				@Override
@@ -1119,12 +1107,6 @@ public class WndSettings extends WndTabbed {
 			add(chkAutoTalentPlan);
 		}
 
-		private void updateQuickslotsShownText() {
-			int n = SPDSettings.quickslotsShown();
-			txtQuickslotsShown.text(Messages.get(this, "quickslots_showing",
-					n == 0 ? Messages.get(this, "quickslots_auto") : Integer.toString(n)));
-		}
-
 		@Override
 		protected void layout() {
 			title.setPos((width - title.width())/2, y + GAP);
@@ -1153,16 +1135,8 @@ public class WndSettings extends WndTabbed {
 			optQuickslotsShown.setRect(0, pos + GAP, width, SLIDER_HEIGHT);
 			pos = optQuickslotsShown.bottom();
 
-			txtQuickslotsShown.maxWidth((int)width);
-			txtQuickslotsShown.setPos((width - txtQuickslotsShown.width())/2f, pos + 1);
-			pos = txtQuickslotsShown.bottom();
-
 			chkSecondQuickslotBar.setRect(0, pos + GAP, width, BTN_HEIGHT);
 			pos = chkSecondQuickslotBar.bottom();
-
-			txtSecondQuickslotBar.maxWidth((int)width);
-			txtSecondQuickslotBar.setPos(0, pos + 1);
-			pos = txtSecondQuickslotBar.bottom();
 
 			chkShowQuickslotSwapButton.setRect(0, pos + GAP, width, BTN_HEIGHT);
 			pos = chkShowQuickslotSwapButton.bottom();

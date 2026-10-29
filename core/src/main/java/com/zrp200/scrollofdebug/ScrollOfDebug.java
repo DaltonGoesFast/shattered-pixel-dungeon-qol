@@ -1192,7 +1192,7 @@ public class ScrollOfDebug extends Scroll {
     static void ensureTrie() {
         if (trie != null) return;
         try {
-            trie = PackageTrie.getClassesForPackage(ROOT);
+            trie = PackageTrie.indexOrScan(ROOT);
         } catch (ClassNotFoundException e) {
             Game.reportException(e);
             trie = new PackageTrie();
