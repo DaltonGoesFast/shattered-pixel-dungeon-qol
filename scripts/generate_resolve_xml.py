@@ -21,6 +21,7 @@ import os
 import sys
 import json
 import urllib.parse
+import subprocess
 from xml.etree import ElementTree as ET
 from xml.dom import minidom
 
@@ -31,17 +32,28 @@ def sec_to_frames(seconds: float, fps: int = DEFAULT_FPS) -> int:
     return int(round(seconds * fps))
 
 
+def get_video_duration_frames(video_path: str, fps: int = DEFAULT_FPS) -> int:
+    try:
+        cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", video_path]
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+        dur_sec = float(res.stdout.strip())
+        return int(round(dur_sec * fps))
+    except Exception:
+        return 3600 * fps * 4
+
+
 def create_fcp_xml(video_path: str, cuts: list, markers: list, fps: int = DEFAULT_FPS) -> str:
     """Builds FCP7 XML string for DaVinci Resolve import."""
     norm_path = os.path.abspath(video_path).replace("\\", "/")
     # Keep ':' and '/' unescaped so Windows drive letters (C:) work in DaVinci Resolve
     file_uri = "file://localhost/" + urllib.parse.quote(norm_path, safe=":/")
     file_name = os.path.basename(video_path)
+    total_media_frames = get_video_duration_frames(video_path, fps)
 
     # Calculate total sequence duration in frames
     total_timeline_frames = sum(sec_to_frames(c["duration_sec"], fps) for c in cuts)
 
-    xmeml = ET.Element("xmeml", version="4")
+    xmeml = ET.Element("xmeml", version="5")
     sequence = ET.SubElement(xmeml, "sequence")
     
     ET.SubElement(sequence, "name").text = f"Agent Cut - {os.path.splitext(file_name)[0]}"
@@ -90,9 +102,10 @@ def create_fcp_xml(video_path: str, cuts: list, markers: list, fps: int = DEFAUL
         ET.SubElement(file_el, "pathurl").text = file_uri
         f_rate = ET.SubElement(file_el, "rate")
         ET.SubElement(f_rate, "timebase").text = str(fps)
+        ET.SubElement(file_el, "duration").text = str(total_media_frames)
         f_media = ET.SubElement(file_el, "media")
         f_video = ET.SubElement(f_media, "video")
-        ET.SubElement(f_video, "duration").text = str(total_timeline_frames * 2)
+        ET.SubElement(f_video, "duration").text = str(total_media_frames)
 
         curr_timeline_frame += dur_frames
 
@@ -121,7 +134,11 @@ def create_fcp_xml(video_path: str, cuts: list, markers: list, fps: int = DEFAUL
             ET.SubElement(aclip, "end").text = str(curr_a_frame + dur_frames)
 
             afile = ET.SubElement(aclip, "file", id="file_master")
+            ET.SubElement(afile, "name").text = file_name
             ET.SubElement(afile, "pathurl").text = file_uri
+            f_rate = ET.SubElement(afile, "rate")
+            ET.SubElement(f_rate, "timebase").text = str(fps)
+            ET.SubElement(afile, "duration").text = str(total_media_frames)
 
             sourcetrack = ET.SubElement(aclip, "sourcetrack")
             ET.SubElement(sourcetrack, "mediatype").text = "audio"
