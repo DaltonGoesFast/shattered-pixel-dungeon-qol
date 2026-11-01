@@ -1099,7 +1099,9 @@ public class Toolbar extends Component {
 		slotStrip.active = false;
 		slotStrip.visible = false;
 		addToBack( slotStrip );
-		// Swap first, then slots, so a slot wins the 2px overlap with the swap chip.
+		// Swap first, then each slot (outer button, then its item button).
+		// The controller covers the strip and would otherwise eat an empty slot's
+		// assign click. A slot stays in front of the swap chip's 2px overlap.
 		// Fixed buttons are created after this and stay in front of both.
 		btnSwap.givePointerPriority();
 		for (QuickslotTool tool : btnQuick) {
