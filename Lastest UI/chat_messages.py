@@ -629,14 +629,24 @@ def bestiary_level_up(winner: str, from_zone: str, to_zone: str, donor: int) -> 
     return f"Bestiary level-up! {from_zone} -> {to_zone}."
 
 
-def bestiary_halls_loop(winner: str, winner_xp: int = 0) -> str:
+def bestiary_halls_loop(winner: str, winner_xp: int = 0, donor: int = 0) -> str:
     w = display_name(winner) or winner or "Nobody"
+    donor_n = int(donor or 0)
     if is_youtube_platform():
-        if winner:
+        if winner and donor_n > 0:
+            msg = f"Halls sprint! {w} takes the badge (+{donor_n} donor pts)."
+        elif winner:
             msg = f"Halls sprint! {w} takes the badge."
         else:
             msg = "Halls sprint loop! No eligible winner."
         return clamp_youtube_chat(msg)
+    if winner and donor_n > 0:
+        xp_bit = f" ({int(winner_xp)} XP)" if int(winner_xp or 0) > 0 else ""
+        return (
+            f"Halls sprint loop! {w} takes the Halls badge{xp_bit} "
+            f"and earns {donor_n} donor points! "
+            f"(Can't win another sprint crown this stream.)"
+        )
     if winner:
         xp_bit = f" ({int(winner_xp)} XP)" if int(winner_xp or 0) > 0 else ""
         return (
@@ -667,6 +677,7 @@ def bestiary_progress_line(bestiary: dict) -> str:
         return bestiary_halls_loop(
             lu.get("winner") or "",
             int(lu.get("winner_xp") or 0),
+            int(lu.get("donor_reward") or 0),
         )
     return ""
 

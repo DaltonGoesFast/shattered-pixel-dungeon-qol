@@ -624,15 +624,20 @@ func _on_level_up(payload: Dictionary) -> void:
 		if typeof(last) == TYPE_DICTIONARY:
 			winner = str(last.get("user", ""))
 	var reason := str(payload.get("last_crown_reason", "")).strip_edges().to_lower()
+	var donor := int(payload.get("last_crown_donor", 0))
 	var msg := ""
 	if reason == "halls_loop":
 		msg = "Halls sprint!"
 		if winner != "":
 			msg += "  %s" % _short_name(winner, CompanionConfig.bestiary_chip_name_max_chars)
+		if donor > 0:
+			msg += "  +%d" % donor
 	else:
 		msg = "%s unlocked!" % zone
 		if winner != "":
 			msg += "  Sprint: %s" % _short_name(winner, CompanionConfig.bestiary_chip_name_max_chars)
+		if donor > 0:
+			msg += "  +%d" % donor
 	_show_banner(msg)
 
 

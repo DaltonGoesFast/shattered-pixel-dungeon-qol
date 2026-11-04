@@ -1130,6 +1130,18 @@ def _grant_sprint_donor(username: str, amount: int) -> bool:
         return False
 
 
+def _settle_sprint_donors(grants: list[tuple[str, int]]) -> None:
+    """Pay each crowned sprint once. One viewer is paid at most once per settlement."""
+    seen: set[str] = set()
+    for username, amount in grants:
+        key = (username or "").strip().lower()
+        amt = int(amount or 0)
+        if not key or amt <= 0 or key in seen:
+            continue
+        seen.add(key)
+        _grant_sprint_donor(username, amt)
+
+
 def spend_xp_from_cost(cost: int) -> int:
     """Bestiary bar XP from a paid command cost. Promo/zero cost → 0 (no summon floor)."""
     c = int(cost or 0)
@@ -1162,17 +1174,20 @@ def _add_bar_xp_and_level_up(
     bar_xp_add: int,
     cfg: dict,
     now: int,
-) -> tuple[bool, Optional[dict], list[dict[str, Any]]]:
+) -> tuple[bool, Optional[dict], list[dict[str, Any]], bool, list[tuple[str, int]]]:
     """Add co-op bar XP, Shatter Event pips, level-ups, and Halls loops.
 
     Mutates state. Caller holds _lock.
-    Returns (leveled_up, level_up_info, shatter_events, halls_looped).
+    Returns (leveled_up, level_up_info, shatter_events, halls_looped, donor_grants).
+    donor_grants is one (username, amount) per crown this call. Halls loops use the
+    same per-level purse as a zone clear. Callers pay the list once, outside _lock.
     """
     max_lvl = _max_level(cfg)
     leveled_up = False
     halls_looped = False
     level_up_info: Optional[dict] = None
     shatter_events: list[dict[str, Any]] = []
+    donor_grants: list[tuple[str, int]] = []
     state["bar_xp"] = int(state.get("bar_xp", 0)) + max(0, int(bar_xp_add))
 
     # Safety: avoid infinite Halls loops if overflow is huge
@@ -1196,7 +1211,8 @@ def _add_bar_xp_and_level_up(
         overflow = int(state.get("bar_xp", 0)) - thresh
 
         if cur >= max_lvl:
-            # Halls repeatable sprint loop — crown, lock, freeze badge, no donor
+            # Halls repeatable sprint. Crown, lock, and pay the same purse as a zone clear.
+            # Sprint XP is wiped below, so a later loop in this same fill cannot crown again.
             sprint_before = dict(state.get("sprint_xp") or {})
             ineligible = _sprint_ineligible_keys(state)
             winner_display, winner_xp, _gap = _pick_eligible_sprint_leader(
@@ -1209,6 +1225,9 @@ def _add_bar_xp_and_level_up(
                     state, cur, zone, winner_display, winner_xp, now
                 )
                 _lock_sprint_winner(state, winner_key)
+            donor_reward = _sprint_donor_for_level(cur, cfg) if winner_key else 0
+            if donor_reward > 0:
+                donor_grants.append((winner_display, donor_reward))
             ev = _grant_shatter_event(state, cfg, cur, reason="halls_loop")
             if ev:
                 shatter_events.append(ev)
@@ -1227,11 +1246,16 @@ def _add_bar_xp_and_level_up(
                 "winner": winner_display,
                 "winner_xp": winner_xp,
                 "newly_unlocked": [],
-                "donor_reward": 0,
+                "donor_reward": donor_reward,
             }
             if not leveled_up:
-                state["last_crown_reason"] = "halls_loop"
-                level_up_info = loop_info
+                # A bar that overflows through several loops only has a sprint on the
+                # first one. Keep that crown so a later empty loop does not hide the payout.
+                announced = level_up_info or {}
+                if not announced.get("winner"):
+                    state["last_crown_reason"] = "halls_loop"
+                    state["last_crown_donor"] = donor_reward
+                    level_up_info = loop_info
             continue
 
         # Zone level-up — crown highest eligible sprint XP
@@ -1275,7 +1299,10 @@ def _add_bar_xp_and_level_up(
         state["last_level_up_ts"] = now
         leveled_up = True
         state["last_crown_reason"] = "level_up"
-        donor_reward = _sprint_donor_for_level(old_level, cfg) if winner_display else 0
+        donor_reward = _sprint_donor_for_level(old_level, cfg) if winner_key else 0
+        if donor_reward > 0:
+            donor_grants.append((winner_display, donor_reward))
+        state["last_crown_donor"] = donor_reward
         level_up_info = {
             "reason": "level_up",
             "from_level": old_level,
@@ -1288,7 +1315,7 @@ def _add_bar_xp_and_level_up(
             "donor_reward": donor_reward,
         }
 
-    return leveled_up, level_up_info, shatter_events, halls_looped
+    return leveled_up, level_up_info, shatter_events, halls_looped, donor_grants
 
 
 def apply_bar_xp(username: str, xp: int) -> dict[str, Any]:
@@ -1335,8 +1362,8 @@ def apply_bar_xp(username: str, xp: int) -> dict[str, Any]:
             xp_mult = 1.0
 
         bar_xp_add = _cap_bar_contrib(state, key, bar_xp_add, cfg)
-        leveled_up, level_up_info, shatter_events, halls_looped = _add_bar_xp_and_level_up(
-            state, bar_xp_add, cfg, now
+        leveled_up, level_up_info, shatter_events, halls_looped, donor_grants = (
+            _add_bar_xp_and_level_up(state, bar_xp_add, cfg, now)
         )
 
         # Refresh heat leader file / totals (bar-only; counts unchanged)
@@ -1369,10 +1396,7 @@ def apply_bar_xp(username: str, xp: int) -> dict[str, Any]:
             "heat_xp": heat_xp,
         }
 
-    if leveled_up and level_up_info and level_up_info.get("winner"):
-        _grant_sprint_donor(
-            level_up_info["winner"], int(level_up_info.get("donor_reward") or 0)
-        )
+    _settle_sprint_donors(donor_grants)
 
     return result
 
@@ -1451,8 +1475,8 @@ def apply_summon(username: str, monster: str) -> dict[str, Any]:
         last_mobs[key] = monster
         state["last_monster_by_user"] = last_mobs
 
-        leveled_up, level_up_info, shatter_events, halls_looped = _add_bar_xp_and_level_up(
-            state, bar_xp_add, cfg, now
+        leveled_up, level_up_info, shatter_events, halls_looped, donor_grants = (
+            _add_bar_xp_and_level_up(state, bar_xp_add, cfg, now)
         )
 
         heat_user, heat_xp = _leader_from_scores(
@@ -1484,11 +1508,9 @@ def apply_summon(username: str, monster: str) -> dict[str, Any]:
             "heat_xp": heat_xp,
         }
 
-    # Donor grant outside main mutation lock (uses points lock)
-    if leveled_up and level_up_info and level_up_info.get("winner"):
-        _grant_sprint_donor(
-            level_up_info["winner"], int(level_up_info.get("donor_reward") or 0)
-        )
+    # Donor grant outside main mutation lock (uses points lock).
+    # One entry per crown; Halls loops are included and the same viewer is paid once.
+    _settle_sprint_donors(donor_grants)
 
     return result
 
@@ -1568,6 +1590,7 @@ def get_state_payload() -> dict[str, Any]:
             "sprint_winners": sprint_winners,
             "last_level_up_ts": int(state.get("last_level_up_ts", 0) or 0),
             "last_crown_reason": str(state.get("last_crown_reason") or ""),
+            "last_crown_donor": int(state.get("last_crown_donor", 0) or 0),
             "session_summon_counts": dict(state.get("session_summon_counts") or {}),
             "heat_window_sec": window,
             "sprint_donor_reward": int(cfg.get("sprint_donor_reward", 100)),
