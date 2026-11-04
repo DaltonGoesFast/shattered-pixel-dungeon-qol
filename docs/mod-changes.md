@@ -43,7 +43,7 @@ Rules on you and your allies.
 Who is in the dungeon, and what they do.
 
 - **Honor.** Every enemy is a champion.
-- **Evolution.** Enemies grow as you reach new depths. Each new deepest floor adds 2% to them, up to 50%.
+- **Evolution.** Enemies grow as you reach new depths. Each new deepest floor adds 2% to them, up to 50%. After a Legacy loop, floor 1 starts at that 50% (or higher, if an earlier loop grew past it) and each new deepest floor adds 1%.
 - **Dissonance.** Any foe may show up on a floor. One that belongs deeper is weaker when it arrives early. One that belongs shallower is worth more experience when it arrives late.
 - **Kin.** Each floor is a single species.
 - **Swarms.** A solid hit can split a foe in two. Each half keeps half the health.

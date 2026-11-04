@@ -86,6 +86,8 @@ public class Legacy {
 		String customName;
 		int loop;
 		int steps;
+		/** Evolution percent at floor 1 of the loop being started. */
+		int evolutionBase;
 		ArrayList<Item> kit = new ArrayList<>();
 		ArrayList<Boolean> ringKnown = new ArrayList<>();
 		ArrayList<Item> ankhs = new ArrayList<>();
@@ -269,6 +271,9 @@ public class Legacy {
 		c.customName = hero.customName;
 		c.loop = loop + 1;
 		c.steps = steps;
+		// Bank while this loop's deepest floor is still live. Floor 1 of the next
+		// loop starts at 50, or higher if this loop already grew past that.
+		c.evolutionBase = Modifiers.evolutionBaseForNextLoop();
 
 		boolean kitHasClassArmor = false;
 		for (Item item : hero.belongings){
@@ -332,8 +337,10 @@ public class Legacy {
 			loop = carry.loop;
 			steps = carry.steps;
 			phase = PHASE_NONE;
+			Modifiers.evolutionBase = carry.evolutionBase;
 		} else {
 			reset();
+			Modifiers.evolutionBase = 0;
 		}
 	}
 
