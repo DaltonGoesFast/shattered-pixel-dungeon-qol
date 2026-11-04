@@ -34,6 +34,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.elixirs.ElixirOfMight;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfMight;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.CharSprite;
+import com.watabou.utils.Bundle;
 import com.watabou.utils.Random;
 
 /**
@@ -318,13 +319,82 @@ public class Modifiers {
 	}
 
 	/**
-	 * Global Evolution multiplier from deepest main-path floor.
-	 * Floor 1 = 1.00, +2% per new deepest floor, capped at 1.50.
+	 * Percent banked at floor 1 of the current loop. 0 on loop 1.
+	 * Loop 2+ is at least {@link #EVOLUTION_LOOP_FLOOR}; a later loop keeps the
+	 * previous loop's ending percent when that is higher.
+	 */
+	public static int evolutionBase = 0;
+
+	/** First-loop cap, and the least a later loop may start from. */
+	public static final int EVOLUTION_LOOP_FLOOR = 50;
+
+	private static final String EVOLUTION_BASE = "evolution_base";
+
+	/**
+	 * Global Evolution multiplier.
+	 * Loop 1 ({@link Legacy#loop} is 1-based): +2% per new deepest floor, cap +50%.
+	 * Floor 1 = 1.00, floor 26 = 1.50. Unchanged for saves that have not looped.
+	 * Loop 2+: floor 1 starts at {@link #evolutionBase} (at least +50%) and each new
+	 * deepest floor adds +1%. The base is the previous loop's ending percent, so
+	 * growth past 50% is kept and a loop never opens below 50%.
 	 */
 	public static float evolutionMultiplier(){
 		if (!Dungeon.isModified(EVOLUTION)) return 1f;
-		int deepest = Math.max(1, Statistics.deepestFloor);
-		return 1f + Math.min(0.50f, 0.02f * (deepest - 1));
+		int gained = floorsGainedThisLoop();
+		if (Legacy.loop <= 1){
+			return 1f + Math.min(0.50f, 0.02f * gained);
+		}
+		return 1f + (loopedEvolutionBase() + gained) / 100f;
+	}
+
+	/** Tracker stacks. Same number as the percent bonus. */
+	public static int evolutionPercent(){
+		if (!Dungeon.isModified(EVOLUTION)) return 0;
+		if (Legacy.loop <= 1){
+			return Math.round(100f * (evolutionMultiplier() - 1f));
+		}
+		return loopedEvolutionBase() + floorsGainedThisLoop();
+	}
+
+	/** New main-path floors since floor 1 of this loop. Ascent does not subtract. */
+	private static int floorsGainedThisLoop(){
+		return Math.max(0, Statistics.deepestFloor - 1);
+	}
+
+	private static int loopedEvolutionBase(){
+		return Math.max(EVOLUTION_LOOP_FLOOR, evolutionBase);
+	}
+
+	/**
+	 * Percent to bank before {@link Statistics} resets for the next loop.
+	 * Floor 1 of that loop starts here: at least 50, or higher once a loop has grown past it.
+	 */
+	public static int evolutionBaseForNextLoop(){
+		if (!Dungeon.isModified(EVOLUTION)) return 0;
+		return Math.max(EVOLUTION_LOOP_FLOOR, evolutionPercent());
+	}
+
+	public static void storeEvolution( Bundle bundle ){
+		bundle.put( EVOLUTION_BASE, evolutionBase );
+	}
+
+	public static void restoreEvolution( Bundle bundle ){
+		evolutionBase = bundle.contains( EVOLUTION_BASE ) ? bundle.getInt( EVOLUTION_BASE ) : 0;
+	}
+
+	/**
+	 * Looped saves written before the base was stored still have Evolution derived from
+	 * the reset deepest floor, so the tracker reads near 0. On load, a run with
+	 * Evolution on and {@link Legacy#loop} above 1 whose base is below 50 is raised to 50.
+	 * Stacks then read as 50 plus floors gained this loop. A base already at or above 50
+	 * (a later loop that kept its surplus) is left alone. Loop 1 is not touched.
+	 */
+	public static void migrateEvolutionOnLoad(){
+		if (!Dungeon.isModified(EVOLUTION)) return;
+		if (Legacy.loop <= 1) return;
+		if (evolutionBase < EVOLUTION_LOOP_FLOOR){
+			evolutionBase = EVOLUTION_LOOP_FLOOR;
+		}
 	}
 
 	/** Hostiles only when Evolution or Legacy growth is on. */

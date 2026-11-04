@@ -66,6 +66,6 @@ public class EvolutionTracker extends Buff {
 	}
 
 	private int boostPercent() {
-		return Math.round(100 * (Modifiers.evolutionMultiplier() - 1f));
+		return Modifiers.evolutionPercent();
 	}
 }
