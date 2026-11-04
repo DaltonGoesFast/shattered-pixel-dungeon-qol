@@ -89,6 +89,7 @@ def test_youtube_query_replies() -> None:
         )
         _assert_len("level-up", m.bestiary_level_up(USER, "Sewers", "Prison", 100))
         _assert_len("halls-loop", m.bestiary_halls_loop(USER, 400))
+        _assert_len("halls-loop donor", m.bestiary_halls_loop(USER, 400, 500))
         _assert_len("halls-loop empty", m.bestiary_halls_loop("", 0))
         _assert_len(
             "toppoints",
