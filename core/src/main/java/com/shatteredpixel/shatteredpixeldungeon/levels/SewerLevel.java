@@ -51,6 +51,7 @@ import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.SurfaceScene;
 import com.shatteredpixel.shatteredpixeldungeon.tiles.DungeonTilemap;
 import com.shatteredpixel.shatteredpixeldungeon.utils.AltAssetPaths;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndMessage;
 import com.watabou.noosa.Game;
 import com.watabou.noosa.Group;
@@ -171,6 +172,7 @@ public class SewerLevel extends RegularLevel {
 				return false;
 			} else {
 				Statistics.ascended = true;
+				StreamingEvents.notifyAscended();
 				Game.switchScene(SurfaceScene.class, new Game.SceneChangeCallback() {
 					@Override
 					public void beforeCreate() {

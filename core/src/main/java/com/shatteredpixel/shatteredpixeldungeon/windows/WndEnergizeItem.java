@@ -29,6 +29,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.EquipableItem;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.trinkets.Trinket;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.AlchemyScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSprite;
@@ -151,6 +152,8 @@ public class WndEnergizeItem extends WndInfoItem {
 
 	private static void energize(Item item){
 		Hero hero = Dungeon.hero;
+
+		StreamingEvents.notifyItemUsed( item, "energize", item.isIdentified() );
 
 		if (ShatteredPixelDungeon.scene() instanceof AlchemyScene){
 

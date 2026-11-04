@@ -41,6 +41,7 @@ class TelemetrySession:
         self.active = True
         self.lock = threading.Lock()
         self.event_count = 0
+        self._sync_logged = False
 
         os.makedirs(TELEMETRY_DIR, exist_ok=True)
         timestamp_str = datetime.fromtimestamp(start_epoch_ms / 1000.0).strftime("%Y-%m-%d_%H-%M-%S")
@@ -50,8 +51,39 @@ class TelemetrySession:
         self.log_event("session_start", {
             "video_path": self.video_path,
             "start_time_iso": datetime.fromtimestamp(start_epoch_ms / 1000.0).isoformat(),
+            "start_epoch_ms": start_epoch_ms,
         })
         print(f"[Telemetry] Session recording started -> {self.log_path}")
+        if self.video_path:
+            print(f"[Telemetry] OBS output path: {self.video_path}")
+
+    def try_log_session_sync(self):
+        """Once the OBS output file exists, estimate clock skew vs wall start."""
+        if self._sync_logged or not self.video_path:
+            return
+        if not os.path.exists(self.video_path):
+            return
+        try:
+            # Prefer birth time when available; fall back to mtime
+            st = os.stat(self.video_path)
+            file_mtime_ms = int(st.st_mtime * 1000)
+            file_ctime_ms = int(getattr(st, "st_ctime", st.st_mtime) * 1000)
+            # On Windows ctime is creation time; use the earlier of ctime/mtime near session start
+            candidates = [file_ctime_ms, file_mtime_ms]
+            file_ref_ms = min(candidates, key=lambda t: abs(t - self.start_epoch_ms))
+            clock_skew_ms = file_ref_ms - self.start_epoch_ms
+            self.log_event("session_sync", {
+                "video_path": self.video_path,
+                "file_mtime_ms": file_mtime_ms,
+                "file_ctime_ms": file_ctime_ms,
+                "file_ref_ms": file_ref_ms,
+                "wall_start_epoch_ms": self.start_epoch_ms,
+                "clock_skew_ms": clock_skew_ms,
+            })
+            self._sync_logged = True
+            print(f"[Telemetry] session_sync clock_skew_ms={clock_skew_ms}")
+        except Exception as e:
+            print(f"[Telemetry] session_sync failed: {e}")
 
     def video_time_sec(self, epoch_ms: int) -> float:
         return max(0.0, round((epoch_ms - self.start_epoch_ms) / 1000.0, 3))
@@ -130,16 +162,37 @@ class TelemetryDaemon:
                 self.current_session.close()
             now_ms = int(time.time() * 1000)
             self.current_session = TelemetrySession(video_path, now_ms)
+        # Kick a short poller so session_sync lands once the MP4 appears
+        threading.Thread(target=self._session_sync_poller, daemon=True, name="Telemetry-Sync").start()
+
+    def _session_sync_poller(self):
+        for _ in range(30):
+            with self.session_lock:
+                sess = self.current_session
+                if not sess or not sess.active:
+                    return
+                if sess._sync_logged:
+                    return
+                sess.try_log_session_sync()
+                if sess._sync_logged:
+                    return
+            time.sleep(1)
 
     def stop_session(self):
         with self.session_lock:
             if self.current_session and self.current_session.active:
+                # Last chance to capture sync before close
+                try:
+                    self.current_session.try_log_session_sync()
+                except Exception:
+                    pass
                 self.current_session.close()
                 self.current_session = None
 
     def log(self, event_type: str, data: dict = None):
         with self.session_lock:
             if self.current_session and self.current_session.active:
+                self.current_session.try_log_session_sync()
                 self.current_session.log_event(event_type, data)
 
     # -------------------------------------------------------------
@@ -248,8 +301,15 @@ class TelemetryDaemon:
 
                     msg_type = data.get("type")
 
+                    # Strip envelope fields; keep scalar payload for jsonl
+                    def _payload():
+                        return {k: v for k, v in data.items() if k not in ("type", "source")}
+
                     if msg_type == "game_log":
-                        # In-game combat, trap, item, or status log message
+                        # Skip routine pickup echoes — notable pickups already have item_picked_up.
+                        msg = (data.get("message") or "").strip()
+                        if msg.startswith("You picked up:"):
+                            continue
                         self.log("game_log", {"message": data.get("message")})
 
                     elif msg_type == "hero_died":
@@ -261,6 +321,57 @@ class TelemetryDaemon:
                     elif msg_type == "boss_slain":
                         self.log("boss_slain", {"depth": data.get("depth")})
                         print(f"[Telemetry] Logged: Boss Slain (depth {data.get('depth')})!")
+
+                    # ui_state / menu_scene: live OBS still gets these via server.py;
+                    # omit from telemetry jsonl (huge duplicate spam, unused by the editor).
+                    elif msg_type in ("menu_scene", "ui_state"):
+                        continue
+
+                    elif msg_type == "buff_changed":
+                        # Barrier shield ticks dominate long runs; drop even if an older jar emits them.
+                        if (data.get("buff") or "") == "Barrier":
+                            continue
+                        self.log(msg_type, _payload())
+
+                    elif msg_type in (
+                        "lock_opened",
+                        "trap_triggered",
+                        "alchemy_opened",
+                        "alchemy_crafted",
+                        "alchemy_closed",
+                        "item_identified",
+                        "item_used",
+                        "item_picked_up",
+                        "shop_buy",
+                        "shop_sell",
+                        "shop_sell_all",
+                        "well_drunk",
+                        "sacrificial_reward",
+                        "quest_complete",
+                        "amulet_obtained",
+                        "ascended",
+                        "surface_reached",
+                        "interlevel_start",
+                        "interlevel_end",
+                        "mob_slain",
+                    ):
+                        self.log(msg_type, _payload())
+                        if msg_type in (
+                            "lock_opened",
+                            "trap_triggered",
+                            "alchemy_crafted",
+                            "item_identified",
+                            "item_used",
+                            "item_picked_up",
+                            "shop_buy",
+                            "shop_sell",
+                            "shop_sell_all",
+                            "quest_complete",
+                            "amulet_obtained",
+                            "ascended",
+                            "mob_slain",
+                        ):
+                            print(f"[Telemetry] Logged: {msg_type} {_payload()}")
 
                     elif "hero" in data and "stats" in data:
                         # Full GameStateSnapshot: detect meaningful state changes

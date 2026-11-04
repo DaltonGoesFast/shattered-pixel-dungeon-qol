@@ -44,6 +44,10 @@ temp_banners.png
 temp_*.png
 *.reapeaks
 
+# Local API secrets (never commit)
+**/secrets.local.json
+Lastest UI/secrets.local.json
+
 # Lastest UI generated/runtime
 Lastest UI/telemetry_logs/
 __pycache__/

@@ -44,6 +44,7 @@ import com.shatteredpixel.shatteredpixeldungeon.journal.Notes.Landmark;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.CharSprite;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
 import com.watabou.noosa.audio.Sample;
 
 public class WaterOfHealth extends WellWater {
@@ -74,6 +75,7 @@ public class WaterOfHealth extends WellWater {
 		Dungeon.hero.interrupt();
 	
 		GLog.p( Messages.get(this, "procced") );
+		StreamingEvents.notifyWellDrunk( "health" );
 		
 		return true;
 	}

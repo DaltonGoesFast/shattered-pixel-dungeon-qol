@@ -105,6 +105,7 @@ import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.CharSprite;
 import com.shatteredpixel.shatteredpixeldungeon.tiles.DungeonTilemap;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
 import com.watabou.noosa.audio.Sample;
 import com.watabou.noosa.tweeners.AlphaTweener;
 import com.watabou.utils.Bundlable;
@@ -1174,6 +1175,7 @@ public abstract class Mob extends Char {
 		boolean soulMarked = buff(SoulMark.class) != null;
 
 		super.die( cause );
+		StreamingEvents.notifyMobSlain( this );
 
 		if (Dungeon.isModified(Modifiers.SOUL)
 				&& alignment == Alignment.ENEMY

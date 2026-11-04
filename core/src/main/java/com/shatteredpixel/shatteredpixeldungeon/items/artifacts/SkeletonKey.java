@@ -52,6 +52,7 @@ import com.shatteredpixel.shatteredpixeldungeon.scenes.CellSelector;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSpriteSheet;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
 import com.watabou.noosa.audio.Sample;
 import com.watabou.utils.Bundle;
 import com.watabou.utils.Callback;
@@ -160,6 +161,7 @@ public class SkeletonKey extends Artifact {
 								Buff.affect(curUser, KeyReplacementTracker.class).processIronLockOpened();
 								Level.set(target, Terrain.DOOR);
 								GameScene.updateMap(target);
+								StreamingEvents.notifyLockOpened("skeleton_artifact", "door", target, "skeleton_key");
 								charge -= 1;
 								gainExp(2 + 1);
 								Talent.onArtifactUsed(Dungeon.hero);
@@ -178,6 +180,7 @@ public class SkeletonKey extends Artifact {
 							public void call() {
 								Level.set(target, Terrain.DOOR);
 								GameScene.updateMap(target);
+								StreamingEvents.notifyLockOpened("none", "hero_locked_door", target, "skeleton_key");
 								//no charge cost, no artifact on-use
 								curUser.spendAndNext(Actor.TICK);
 								curUser.sprite.idle();
@@ -198,6 +201,7 @@ public class SkeletonKey extends Artifact {
 								Buff.affect(curUser, KeyReplacementTracker.class).processCrystalLockOpened();
 								Level.set(target, Terrain.EMPTY);
 								GameScene.updateMap(target);
+								StreamingEvents.notifyLockOpened("skeleton_artifact", "crystal_door", target, "skeleton_key");
 								charge -= 5;
 								gainExp(2 + 5);
 								Talent.onArtifactUsed(Dungeon.hero);
@@ -297,6 +301,7 @@ public class SkeletonKey extends Artifact {
 							public void call() {
 								Buff.affect(curUser, KeyReplacementTracker.class).processGoldLockOpened();
 								Dungeon.level.heaps.get(target).open(curUser);
+								StreamingEvents.notifyLockOpened("skeleton_artifact", "locked_chest", target, "skeleton_key");
 								charge -= 2;
 								gainExp(2 + 2);
 								Talent.onArtifactUsed(Dungeon.hero);
@@ -318,6 +323,7 @@ public class SkeletonKey extends Artifact {
 							public void call() {
 								Buff.affect(curUser, KeyReplacementTracker.class).processCrystalLockOpened();
 								Dungeon.level.heaps.get(target).open(curUser);
+								StreamingEvents.notifyLockOpened("skeleton_artifact", "crystal_chest", target, "skeleton_key");
 								charge -= 5;
 								gainExp(2 + 5);
 								Talent.onArtifactUsed(Dungeon.hero);

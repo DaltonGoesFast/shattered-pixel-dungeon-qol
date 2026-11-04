@@ -53,6 +53,7 @@ import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSprite;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.MissileSprite;
 import com.shatteredpixel.shatteredpixeldungeon.ui.QuickSlotButton;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
 import com.shatteredpixel.shatteredpixeldungeon.utils.TrainingExport;
 import com.watabou.noosa.audio.Sample;
 import com.watabou.noosa.particles.Emitter;
@@ -148,6 +149,7 @@ public class Item implements Bundlable {
 			GameScene.pickUp( this, pos );
 			Sample.INSTANCE.play( Assets.Sounds.ITEM );
 			hero.spendAndNext( pickupDelay() );
+			StreamingEvents.notifyItemPickedUp( this );
 			if (flagged) {
 				Command.offerAfterPickup( this, incomingQty );
 			}
@@ -493,6 +495,8 @@ public class Item implements Bundlable {
 
 	public Item identify( boolean byHero ) {
 
+		boolean wasIdentified = isIdentified();
+
 		if (byHero && Dungeon.hero != null && Dungeon.hero.isAlive()){
 			Catalog.setSeen(getClass());
 			Statistics.itemTypesDiscovered.add(getClass());
@@ -501,6 +505,10 @@ public class Item implements Bundlable {
 		levelKnown = true;
 		cursedKnown = true;
 		Item.updateQuickslot();
+
+		if (!wasIdentified) {
+			StreamingEvents.notifyItemIdentified( this, byHero );
+		}
 		
 		return this;
 	}

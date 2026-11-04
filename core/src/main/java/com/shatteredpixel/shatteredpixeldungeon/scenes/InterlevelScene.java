@@ -49,6 +49,7 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.Icons;
 import com.shatteredpixel.shatteredpixeldungeon.ui.TitleBackground;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RenderedTextBlock;
 import com.shatteredpixel.shatteredpixeldungeon.ui.StyledButton;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndError;
 import com.watabou.gltextures.TextureCache;
 import com.watabou.input.KeyEvent;
@@ -127,6 +128,7 @@ public class InterlevelScene extends PixelScene {
 		String loadingAsset;
 		int loadingDepth;
 		fadeTime = NORM_FADE;
+		int fromDepth = Dungeon.depth;
 
 		long seed = Dungeon.seed;
 		switch (mode){
@@ -165,6 +167,11 @@ public class InterlevelScene extends PixelScene {
 				loadingDepth = returnDepth;
 				break;
 		}
+
+		StreamingEvents.notifyInterlevelStart(
+				mode != null ? mode.name() : "NONE",
+				fromDepth,
+				loadingDepth );
 
 		//flush the texture cache whenever moving between regions, helps reduce memory load
 		int region = (int)Math.ceil(loadingDepth / 5f);
@@ -523,6 +530,9 @@ public class InterlevelScene extends PixelScene {
 			}
 			
 			if ((timeLeft -= Game.elapsed) <= 0) {
+				StreamingEvents.notifyInterlevelEnd(
+						mode != null ? mode.name() : "NONE",
+						Dungeon.depth );
 				Game.switchScene( GameScene.class );
 				KeyEvent.clearListeners(); //removes potential listener for continue
 				thread = null;

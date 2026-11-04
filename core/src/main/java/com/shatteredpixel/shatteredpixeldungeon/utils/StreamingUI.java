@@ -99,5 +99,12 @@ public final class StreamingUI {
 		lastUIStateWindows.clear();
 		lastUIStateWindows.addAll( open );
 		l.onUIState( scene, open );
+		// Also queue a typed telemetry event for post-stream editing (journal/rankings/etc.)
+		StringBuilder csv = new StringBuilder();
+		for (int i = 0; i < open.size(); i++) {
+			if (i > 0) csv.append(',');
+			csv.append(open.get(i));
+		}
+		StreamingEvents.notifyMenuScene(scene, csv.toString());
 	}
 }

@@ -1,18 +1,8 @@
 """
-polish_shorts.py - Turn raw Aitum Vertical Backtrack clips into polished Shorts / TikToks.
+polish_shorts.py - Subtitle sidecars for Aitum Vertical Backtrack clips.
 
-Features:
-  1. Extracts audio from vertical clip.
-  2. Runs Faster-Whisper with GPU acceleration and SPD vocabulary primer.
-  3. Uses word-level timestamps to generate:
-     - Standard SRT subtitles (.srt)
-     - Animated ASS subtitles (.ass) with viral "pop/highlight" word effect:
-       * Styled for 1080x1920 portrait
-       * Bold, high-contrast font with thick black outline
-       * Spoken word dynamically highlighted in vivid yellow while sentence stays visible
-       * Positioned safely above TikTok / Shorts UI overlays
-  4. Automatically burns subtitles onto the video using NVIDIA NVENC hardware acceleration
-     producing ready-to-upload `<clip_name>_captioned.mp4`.
+Default: Faster-Whisper → `.srt` only (import/toggle in Resolve; no burn-in).
+Optional `--burn`: also write animated `.ass` and encode `*_captioned.mp4` via NVENC.
 """
 
 import os
@@ -25,44 +15,14 @@ import argparse
 import numpy as np
 from typing import List, Dict, Any
 
-# Ensure CUDA DLLs are discoverable and preloaded into memory on Windows
-def setup_cuda_dlls():
-    import site
-    import ctypes
-    paths = site.getsitepackages() + [site.getusersitepackages()]
-    for base in paths:
-        cublas_bin = os.path.join(base, "nvidia", "cublas", "bin")
-        cudnn_bin = os.path.join(base, "nvidia", "cudnn", "bin")
-        for b in [cublas_bin, cudnn_bin]:
-            if os.path.exists(b):
-                try:
-                    os.add_dll_directory(b)
-                except Exception:
-                    pass
-                os.environ["PATH"] = b + os.pathsep + os.environ.get("PATH", "")
-                for dll in ["cublasLt64_12.dll", "cublas64_12.dll", "cudnn64_9.dll"]:
-                    p = os.path.join(b, dll)
-                    if os.path.exists(p):
-                        try:
-                            ctypes.CDLL(p)
-                        except Exception:
-                            pass
+from whisper_cuda import setup_cuda_dlls
+from game_vocab_utils import whisper_initial_prompt, correct_transcript_with_lexicon
 
 setup_cuda_dlls()
 
 from faster_whisper import WhisperModel
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-VOCAB_PATH = os.path.join(SCRIPT_DIR, "game_vocabulary.txt")
-
-
-def load_vocabulary() -> str:
-    """Loads custom SPD and streaming vocabulary for whisper prompt primer."""
-    if not os.path.exists(VOCAB_PATH):
-        return ""
-    with open(VOCAB_PATH, "r", encoding="utf-8") as f:
-        words = [line.strip() for line in f if line.strip() and not line.startswith("#")]
-    return ", ".join(words)
 
 
 def format_ass_time(sec: float) -> str:
@@ -110,9 +70,25 @@ def load_audio_wav(wav_path: str) -> np.ndarray:
 
 def transcribe_words(wav_path: str) -> List[Dict[str, Any]]:
     """Transcribes audio using Faster-Whisper with word-level timestamps."""
-    vocab_primer = load_vocabulary()
+    prompt = whisper_initial_prompt()
     audio_data = load_audio_wav(wav_path)
     all_words = []
+
+    def consume(segments):
+        out = []
+        for s in segments:
+            if not s.words:
+                continue
+            for w in s.words:
+                clean_word = w.word.strip()
+                if clean_word:
+                    out.append({
+                        "word": clean_word,
+                        "start": w.start,
+                        "end": max(w.start + 0.1, w.end),
+                        "prob": w.probability
+                    })
+        return out
 
     try:
         print("      Running on: NVIDIA CUDA (GPU)")
@@ -120,47 +96,28 @@ def transcribe_words(wav_path: str) -> List[Dict[str, Any]]:
         segments, _ = model.transcribe(
             audio_data,
             word_timestamps=True,
-            initial_prompt=vocab_primer,
+            initial_prompt=prompt,
             beam_size=5,
             vad_filter=True,
             vad_parameters=dict(min_silence_duration_ms=400)
         )
-        for s in segments:
-            if not s.words:
-                continue
-            for w in s.words:
-                clean_word = w.word.strip()
-                if clean_word:
-                    all_words.append({
-                        "word": clean_word,
-                        "start": w.start,
-                        "end": max(w.start + 0.1, w.end),
-                        "prob": w.probability
-                    })
+        all_words = consume(segments)
     except Exception as e:
         print(f"      [Whisper GPU fallback] {e} -> Running on CPU...")
         model = WhisperModel("small.en", device="cpu", compute_type="int8")
         segments, _ = model.transcribe(
             audio_data,
             word_timestamps=True,
-            initial_prompt=vocab_primer,
+            initial_prompt=prompt,
             beam_size=5,
             vad_filter=True,
             vad_parameters=dict(min_silence_duration_ms=400)
         )
-        for s in segments:
-            if not s.words:
-                continue
-            for w in s.words:
-                clean_word = w.word.strip()
-                if clean_word:
-                    all_words.append({
-                        "word": clean_word,
-                        "start": w.start,
-                        "end": max(w.start + 0.1, w.end),
-                        "prob": w.probability
-                    })
+        all_words = consume(segments)
 
+    # Lexicon cleanup via shared vocab helper (segment-shaped shim)
+    shim = [{"text": " ".join(w["word"] for w in all_words), "words": all_words}]
+    correct_transcript_with_lexicon(shim)
     return all_words
 
 
@@ -285,8 +242,8 @@ def burn_subtitles(video_path: str, ass_path: str, output_path: str):
         subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
 
 
-def process_short_video(video_path: str, burn: bool = True) -> Dict[str, str]:
-    """Processes a single vertical video file."""
+def process_short_video(video_path: str, burn: bool = False) -> Dict[str, str]:
+    """Processes a single vertical video file. Default: .srt sidecar only."""
     print(f"\n[Short Polish] Processing: {os.path.basename(video_path)}")
     base_dir = os.path.dirname(video_path)
     base_name = os.path.splitext(os.path.basename(video_path))[0]
@@ -311,31 +268,44 @@ def process_short_video(video_path: str, burn: bool = True) -> Dict[str, str]:
         chunks = chunk_words(words)
         print(f"   -> Grouped into {len(chunks)} punchy subtitle chunks.")
 
-        print("   -> Generating SRT and animated ASS subtitle tracks...")
+        print("   -> Generating SRT subtitle sidecar...")
         generate_srt(chunks, srt_path)
-        generate_ass(chunks, ass_path)
         print(f"      Created: {os.path.basename(srt_path)}")
-        print(f"      Created: {os.path.basename(ass_path)}")
 
+        wrote_ass = False
         if burn:
-            print("   -> Burning animated subtitles to video via GPU NVENC...")
+            print("   -> Generating ASS + burning into video via GPU NVENC...")
+            generate_ass(chunks, ass_path)
+            wrote_ass = True
+            print(f"      Created: {os.path.basename(ass_path)}")
             burn_subtitles(video_path, ass_path, captioned_video)
             print(f"      Exported: {os.path.basename(captioned_video)}")
 
     return {
         "srt": srt_path,
-        "ass": ass_path,
+        "ass": ass_path if wrote_ass else None,
         "captioned_video": captioned_video if burn else None
     }
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Polish vertical Backtrack clips with animated subtitles.")
+    parser = argparse.ArgumentParser(
+        description="Write Shorts subtitle sidecars (.srt). Burn-in is opt-in."
+    )
     parser.add_argument("target", nargs="?", default="", help="Path to video file or session folder.")
-    parser.add_argument("--no-burn", action="store_true", help="Generate .ass and .srt subtitle files only without re-encoding video.")
+    parser.add_argument(
+        "--burn",
+        action="store_true",
+        help="Also write .ass and burn into *_captioned.mp4 (off by default).",
+    )
+    parser.add_argument(
+        "--no-burn",
+        action="store_true",
+        help="Deprecated alias: burn-in is already off by default.",
+    )
     args = parser.parse_args()
 
-    burn = not args.no_burn
+    burn = bool(args.burn) and not args.no_burn
 
     # If no target specified, look for latest session folder
     target_path = args.target

@@ -66,6 +66,7 @@ import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSprite;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSpriteSheet;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndBag;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndOptions;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndUseItem;
@@ -307,6 +308,8 @@ public class Potion extends Item {
 		
 		hero.sprite.operate( hero.pos );
 
+		StreamingEvents.notifyItemUsed( this, "drink", isKnown() );
+
 		if (!anonymous) {
 			Catalog.countUse(getClass());
 			if (Random.Float() < talentChance) {
@@ -327,6 +330,7 @@ public class Potion extends Item {
 			if (!(this instanceof AquaBrew) && !(this instanceof PotionOfStormClouds)){
 				Dungeon.level.pressCell( cell );
 			}
+			StreamingEvents.notifyItemUsed( this, "throw", isKnown() );
 			shatter( cell );
 
 			if (!anonymous && (mustThrowPots.contains(getClass()) || canThrowPots.contains(getClass()) || this instanceof Brew)) {
@@ -345,6 +349,7 @@ public class Potion extends Item {
 	
 	public void shatter( int cell ) {
 		splash( cell );
+		StreamingEvents.notifyItemUsed( this, "shatter", isKnown() );
 		if (Dungeon.level.heroFOV[cell]) {
 			GLog.i( Messages.get(Potion.class, "shatter") );
 			Sample.INSTANCE.play( Assets.Sounds.SHATTER );

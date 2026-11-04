@@ -271,6 +271,7 @@ public class Dungeon {
 		Random.resetGenerators();
 		
 		Statistics.reset();
+		com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents.clearRunState();
 		Legacy.initForRun();
 		Notes.reset();
 

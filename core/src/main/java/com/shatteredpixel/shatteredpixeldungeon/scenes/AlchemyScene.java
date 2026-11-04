@@ -43,6 +43,7 @@ import com.shatteredpixel.shatteredpixeldungeon.journal.Catalog;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Document;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Journal;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSprite;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSpriteSheet;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Button;
@@ -122,6 +123,7 @@ public class AlchemyScene extends PixelScene {
 	@Override
 	public void create() {
 		super.create();
+		StreamingEvents.notifyAlchemyOpened(toolkit != null);
 
 		int w = Camera.main.width;
 		int h = Camera.main.height;
@@ -723,6 +725,11 @@ public class AlchemyScene extends PixelScene {
 
 			craftItem(ingredients, result);
 			TrainingExport.logAlchemy(recipe.getClass().getSimpleName());
+			StreamingEvents.notifyAlchemyCrafted(
+					recipe.getClass().getSimpleName(),
+					result.getClass().getSimpleName(),
+					result.quantity(),
+					Dungeon.energy);
 
 		}
 
@@ -839,6 +846,7 @@ public class AlchemyScene extends PixelScene {
 
 	@Override
 	public void destroy() {
+		StreamingEvents.notifyAlchemyClosed();
 		synchronized ( inputs ) {
 			clearSlots();
 			for (int i = 0; i < inputs.length; i++) {

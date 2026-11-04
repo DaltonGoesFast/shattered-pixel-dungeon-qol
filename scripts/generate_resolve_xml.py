@@ -174,40 +174,219 @@ def create_fcp_xml(video_path: str, cuts: list, markers: list, fps: int = DEFAUL
     return parsed.toprettyxml(indent="  ")
 
 
+def _collect_word_spans(transcript: list) -> list:
+    """Flatten transcript into sorted (start, end) word spans."""
+    spans = []
+    for seg in transcript or []:
+        words = seg.get("words") or []
+        if words:
+            for w in words:
+                try:
+                    spans.append((float(w["start"]), float(w["end"])))
+                except Exception:
+                    pass
+        else:
+            try:
+                spans.append((float(seg["start"]), float(seg["end"])))
+            except Exception:
+                pass
+    spans.sort(key=lambda x: x[0])
+    return spans
+
+
+def _sentence_end_after(spans: list, t: float, max_extend: float = 12.0) -> float:
+    """If t lands mid-phrase, extend to the end of the current spoken sentence."""
+    if not spans:
+        return t
+    # Find the word covering / just before t
+    idx = None
+    for i, (ws, we) in enumerate(spans):
+        if ws <= t <= we + 0.35:
+            idx = i
+            break
+        if ws > t:
+            idx = max(0, i - 1)
+            break
+    if idx is None:
+        return t
+    end = spans[idx][1]
+    j = idx
+    limit = t + max_extend
+    while j + 1 < len(spans) and spans[j + 1][0] <= limit:
+        gap = spans[j + 1][0] - spans[j][1]
+        # Sentence / phrase break: longer pause
+        if gap >= 0.55:
+            break
+        j += 1
+        end = spans[j][1]
+        if end >= limit:
+            break
+    return max(t, end)
+
+
+def snap_cuts_to_speech(
+    cuts: list,
+    transcript: list,
+    video_duration_sec: float = None,
+    pre_roll: float = 0.55,
+    post_roll: float = 0.75,
+    search_pad: float = 4.0,
+    max_duration_sec: float = 40.0,
+) -> list:
+    """
+    Snap cut edges into silence / speech breathing room (snappy bias).
+    - start: silence gap / pre-roll before first word in window
+    - end: prefer not cutting mid-sentence; finish the current phrase
+    - boss/fight/clutch titles: do NOT shorten the authored window (full takes)
+    - other clips: may shorten to last speech; clamp very long clips
+    """
+    spans = _collect_word_spans(transcript)
+    if not cuts:
+        return cuts
+
+    snapped = []
+    for cut in cuts:
+        s = float(cut.get("start_time_sec", 0.0))
+        e = float(cut.get("end_time_sec", s))
+        if e <= s:
+            e = s + 1.0
+
+        title = (cut.get("title") or "").lower()
+        pacing = (cut.get("pacing") or "").lower()
+        allow_long = pacing in ("boss", "long", "normal") or any(
+            k in title
+            for k in (
+                "boss",
+                "clutch",
+                "near death",
+                "hero death",
+                "fight",
+                "yog",
+                "ascension",
+                "alchemy",
+                "quest",
+                "sacrificial",
+                "build",
+                "artifact",
+                "amulet",
+                "shop",
+            )
+        )
+
+        window_words = [sp for sp in spans if sp[1] >= s and sp[0] <= e]
+
+        if window_words:
+            first_word_start = window_words[0][0]
+            last_word_end = window_words[-1][1]
+
+            if allow_long:
+                # Preserve authored window (boss/story packages); only fix mid-sentence edges
+                new_s = max(0.0, s)
+                # If we open mid-word, roll back to that word's start / prior gap
+                for ws, we in spans:
+                    if ws <= new_s <= we:
+                        prev_ends = [sp[1] for sp in spans if sp[1] <= ws]
+                        gap_start = prev_ends[-1] if prev_ends else max(0.0, ws - pre_roll)
+                        new_s = max(gap_start, ws - pre_roll)
+                        break
+                new_e = max(e, last_word_end + post_roll)
+                new_e = _sentence_end_after(spans, new_e, max_extend=14.0) + post_roll
+            else:
+                prev_ends = [sp[1] for sp in spans if sp[1] <= first_word_start]
+                gap_start = prev_ends[-1] if prev_ends else max(0.0, first_word_start - pre_roll)
+                new_s = max(gap_start, first_word_start - pre_roll)
+                new_s = max(0.0, max(s - search_pad, new_s))
+                # Snappy end on last speech inside window, but finish the sentence
+                new_e = last_word_end + post_roll
+                new_e = min(max(new_e, e), e + search_pad)
+                new_e = _sentence_end_after(spans, new_e, max_extend=10.0) + post_roll
+                new_e = max(new_e, first_word_start + 0.8)
+        else:
+            new_s = max(0.0, s)
+            new_e = e
+
+        if video_duration_sec is not None:
+            new_s = min(new_s, max(0.0, video_duration_sec - 0.1))
+            new_e = min(new_e, video_duration_sec)
+
+        if (not allow_long) and (new_e - new_s) > max_duration_sec and window_words:
+            # Keep the end (payoff/reaction), trim earlier walk-and-talk
+            new_s = max(new_s, new_e - max_duration_sec)
+
+        if new_e <= new_s:
+            new_e = new_s + 0.5
+
+        out = dict(cut)
+        out["start_time_sec"] = round(new_s, 2)
+        out["end_time_sec"] = round(new_e, 2)
+        out["duration_sec"] = round(new_e - new_s, 2)
+        snapped.append(out)
+
+    return snapped
+
+
 def generate_cuts_from_story(story: dict) -> tuple:
     """Fallback: Generates high-confidence rough cuts if no AI cuts.json provided."""
     meta = story.get("metadata", {})
-    timeline = story.get("unified_story_timeline", [])
     highlights = story.get("highlight_clips", [])
+    transcript = story.get("transcript", [])
 
     # Find anchor windows
     anchor_times = []
     markers = []
 
-    # 1. Backtrack clips
+    # 1. Backtrack clips (tighter windows — snappy bias)
     for h in highlights:
         t = h.get("offset_from_start_sec", 0.0)
-        anchor_times.append((max(0.0, t - 30.0), t + 5.0, "Vertical Highlight"))
+        anchor_times.append((max(0.0, t - 18.0), t + 4.0, "Vertical Highlight"))
         markers.append({"name": "Short Highlight", "source_time_sec": t, "comment": h.get("file", "")})
 
-    # 2. Telemetry drama (boss kills, hero death, chat spawns, low HP)
+    # 2. Telemetry drama (boss kills, hero death, low HP)
     for ev in story.get("telemetry_events", []):
         t = ev.get("video_time_sec", 0.0)
         etype = ev.get("type")
-        msg = ev.get("message", "")
 
         if etype == "boss_slain":
-            anchor_times.append((max(0.0, t - 40.0), t + 10.0, "Boss Slain"))
+            # Prefer long continuous boss takes; speech-snap will not shorten "Boss" titles
+            anchor_times.append((max(0.0, t - 90.0), t + 25.0, "Boss Fight"))
             markers.append({"name": f"Boss Slain (Depth {ev.get('depth')})", "source_time_sec": t})
         elif etype == "hero_died":
-            anchor_times.append((max(0.0, t - 25.0), t + 10.0, "Hero Death"))
+            anchor_times.append((max(0.0, t - 18.0), t + 6.0, "Hero Death"))
             markers.append({"name": "Hero Died", "source_time_sec": t})
         elif etype == "danger_low_hp":
-            anchor_times.append((max(0.0, t - 15.0), t + 15.0, "Near Death"))
+            anchor_times.append((max(0.0, t - 10.0), t + 8.0, "Near Death"))
             markers.append({"name": "Near Death (HP Drop)", "source_time_sec": t})
+        elif etype == "amulet_obtained":
+            anchor_times.append((max(0.0, t - 20.0), t + 8.0, "Amulet"))
+            markers.append({"name": "Amulet Obtained", "source_time_sec": t})
+        elif etype in ("ascended", "surface_reached"):
+            anchor_times.append((max(0.0, t - 15.0), t + 10.0, "Ascension"))
+            markers.append({"name": "Ascended / Surface", "source_time_sec": t})
+        elif etype == "quest_complete":
+            quest = ev.get("quest", "quest")
+            anchor_times.append((max(0.0, t - 22.0), t + 10.0, "Quest Complete"))
+            markers.append({"name": f"Quest Complete ({quest})", "source_time_sec": t})
+        elif etype == "sacrificial_reward":
+            prize = ev.get("prize_class") or ev.get("item_class") or "reward"
+            anchor_times.append((max(0.0, t - 35.0), t + 12.0, "Sacrificial Reward"))
+            markers.append({"name": f"Sacrificial Reward ({prize})", "source_time_sec": t})
+        elif etype == "item_picked_up" and (ev.get("category") == "artifact" or "Artifact" in str(ev.get("item_class") or "")):
+            name = ev.get("item_name") or ev.get("item_class") or "artifact"
+            anchor_times.append((max(0.0, t - 8.0), t + 14.0, "Artifact Find"))
+            markers.append({"name": f"Artifact ({name})", "source_time_sec": t})
+        elif etype == "item_used" and "Upgrade" in str(ev.get("item_class") or ""):
+            anchor_times.append((max(0.0, t - 8.0), t + 10.0, "Scroll of Upgrade"))
+            markers.append({"name": "Scroll of Upgrade", "source_time_sec": t})
+        elif etype == "shop_buy":
+            # Prefer post-boss shopping; short window so merge can attach to boss aftermath
+            anchor_times.append((max(0.0, t - 4.0), t + 8.0, "Shop"))
+        elif etype == "mob_slain":
+            mob = ev.get("mob_name") or ev.get("mob_class") or "Miniboss"
+            anchor_times.append((max(0.0, t - 22.0), t + 6.0, "Miniboss Slain"))
+            markers.append({"name": f"Mob Slain ({mob})", "source_time_sec": t})
 
-    # Always keep intro (0 to 30s)
-    anchor_times.append((0.0, min(45.0, meta.get("video_size_mb", 60.0)), "Intro"))
+    # Always keep a short intro hook
+    anchor_times.append((0.0, 25.0, "Intro"))
 
     # Merge overlapping windows
     anchor_times.sort(key=lambda x: x[0])
@@ -232,6 +411,18 @@ def generate_cuts_from_story(story: dict) -> tuple:
             "duration_sec": round(e - s, 2),
             "title": label
         })
+
+    video_dur = None
+    video_path = meta.get("video_path")
+    if video_path and os.path.exists(video_path):
+        try:
+            video_dur = get_video_duration_frames(video_path, DEFAULT_FPS) / float(DEFAULT_FPS)
+        except Exception:
+            video_dur = None
+
+    cuts = snap_cuts_to_speech(cuts, transcript, video_duration_sec=video_dur)
+    for idx, c in enumerate(cuts, start=1):
+        c["clip_index"] = idx
 
     return cuts, markers
 
@@ -290,6 +481,23 @@ def main():
             cut_data = json.load(f)
             cuts = cut_data.get("cuts", cut_data if isinstance(cut_data, list) else [])
             markers = cut_data.get("markers", [])
+            # Still derive telemetry markers if AI file omitted them
+            if not markers:
+                _, markers = generate_cuts_from_story(story)
+        transcript = story.get("transcript", [])
+        try:
+            video_dur = get_video_duration_frames(video_path, DEFAULT_FPS) / float(DEFAULT_FPS)
+        except Exception:
+            video_dur = None
+        # Authored / Gemini EDLs already chose windows — only nudge edges for speech,
+        # do not crush long story clips with the heuristic 40s cap.
+        cuts = snap_cuts_to_speech(
+            cuts, transcript, video_duration_sec=video_dur, max_duration_sec=900.0
+        )
+        for idx, c in enumerate(cuts, start=1):
+            c["clip_index"] = idx
+            if "duration_sec" not in c:
+                c["duration_sec"] = round(c["end_time_sec"] - c["start_time_sec"], 2)
     else:
         print("Synthesizing rough-cut timeline from telemetry highlights...")
         cuts, markers = generate_cuts_from_story(story)

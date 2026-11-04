@@ -35,6 +35,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.AmuletScene;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSpriteSheet;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
 import com.watabou.noosa.Game;
 import com.watabou.utils.Callback;
 
@@ -81,6 +82,7 @@ public class Amulet extends Item {
 		if (super.doPickUp( hero, pos )) {
 			
 			if (!Statistics.amuletObtained) {
+				StreamingEvents.notifyAmuletObtained();
 				final boolean legacy = Legacy.active();
 				if (!legacy) Statistics.amuletObtained = true;
 				hero.spend(-hero.cooldown());

@@ -6,11 +6,6 @@ const _FONT: FontFile = preload("res://assets/fonts/pixel_font.ttf")
 const _SpdUi := preload("res://scripts/spd_ui_art.gd")
 const _PLATFORMS := ["twitch", "youtube", "tiktok"]
 const _SHORT := {"twitch": "TW", "youtube": "YT", "tiktok": "TT"}
-const _BADGE_COLORS := {
-	"twitch": Color("9146ff"),
-	"youtube": Color("ff0033"),
-	"tiktok": Color("00d4d8"),
-}
 
 var _margin: MarginContainer
 
@@ -96,35 +91,57 @@ func _add_total(parent: BoxContainer) -> void:
 			total += count
 			known += 1
 	if CompanionConfig.viewer_counts_show_icons:
-		var badge := _make_badge("tiktok")
-		var badge_label := badge.get_node("Label") as Label
-		badge_label.text = "Σ"
-		badge.color = Color(0.18, 0.2, 0.24, 1.0)
-		parent.add_child(badge)
+		parent.add_child(_make_total_badge())
 	var text := str(total) if known > 0 else "--"
 	if any_stale:
 		text += "*"
 	parent.add_child(_make_label(text))
 
 
-func _make_badge(platform: String) -> ColorRect:
-	var badge := ColorRect.new()
+func _make_badge(platform: String) -> Control:
 	var size_px := maxi(12, CompanionConfig.viewer_counts_font_size_px)
+	var tex: AtlasTexture = _SpdUi.social_icon_for_platform(platform)
+	if tex != null:
+		var icon := TextureRect.new()
+		icon.texture = tex
+		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.custom_minimum_size = Vector2(size_px, size_px)
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		return icon
+	## Fallback if the sheet is missing: first letter of TW/YT/TT.
+	var badge := ColorRect.new()
 	badge.custom_minimum_size = Vector2(size_px, size_px)
-	badge.color = _BADGE_COLORS[platform]
+	badge.color = Color(0.18, 0.2, 0.24, 1.0)
 	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var label := Label.new()
-	label.name = "Label"
 	label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.add_theme_font_override("font", _FONT)
 	label.add_theme_font_size_override("font_size", maxi(8, size_px - 6))
 	label.add_theme_color_override("font_color", Color.WHITE)
-	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
-	label.add_theme_constant_override("shadow_offset_x", 1)
-	label.add_theme_constant_override("shadow_offset_y", 1)
-	label.text = str(_SHORT[platform]).left(1)
+	label.text = str(_SHORT.get(platform, "?")).left(1)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.add_child(label)
+	return badge
+
+
+func _make_total_badge() -> ColorRect:
+	var size_px := maxi(12, CompanionConfig.viewer_counts_font_size_px)
+	var badge := ColorRect.new()
+	badge.custom_minimum_size = Vector2(size_px, size_px)
+	badge.color = Color(0.18, 0.2, 0.24, 1.0)
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var label := Label.new()
+	label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_override("font", _FONT)
+	label.add_theme_font_size_override("font_size", maxi(8, size_px - 6))
+	label.add_theme_color_override("font_color", Color.WHITE)
+	label.text = "Σ"
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	badge.add_child(label)
 	return badge

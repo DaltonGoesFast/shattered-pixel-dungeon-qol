@@ -32,6 +32,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.weapon.Weapon;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSpriteSheet;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
 
 public class ScrollOfIdentify extends InventoryScroll {
 
@@ -58,18 +59,22 @@ public class ScrollOfIdentify extends InventoryScroll {
 		if (ShardOfOblivion.passiveIDDisabled()) {
 			if (item instanceof Weapon){
 				((Weapon) item).setIDReady();
+				StreamingEvents.notifyItemIdReady( item );
 				GLog.p(Messages.get(ShardOfOblivion.class, "identify_ready"), item.name());
 				return;
 			} else if (item instanceof Armor){
 				((Armor) item).setIDReady();
+				StreamingEvents.notifyItemIdReady( item );
 				GLog.p(Messages.get(ShardOfOblivion.class, "identify_ready"), item.name());
 				return;
 			} else if (item instanceof Ring){
 				((Ring) item).setIDReady();
+				StreamingEvents.notifyItemIdReady( item );
 				GLog.p(Messages.get(ShardOfOblivion.class, "identify_ready"), item.name());
 				return;
 			} else if (item instanceof Wand){
 				((Wand) item).setIDReady();
+				StreamingEvents.notifyItemIdReady( item );
 				GLog.p(Messages.get(ShardOfOblivion.class, "identify_ready"), item.name());
 				return;
 			}

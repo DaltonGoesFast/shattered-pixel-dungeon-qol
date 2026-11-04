@@ -25,6 +25,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.ui.BuffIndicator;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
 import com.watabou.noosa.Image;
 import com.watabou.utils.Bundle;
 import com.watabou.utils.Reflection;
@@ -74,6 +75,7 @@ public class Buff extends Actor {
 
 		if (target.add( this )){
 			if (target.sprite != null) fx( true );
+			StreamingEvents.notifyBuffChanged( this, true );
 			return true;
 		} else {
 			this.target = null;
@@ -82,7 +84,10 @@ public class Buff extends Actor {
 	}
 	
 	public void detach() {
-		if (target.remove( this ) && target.sprite != null) fx( false );
+		if (target.remove( this )) {
+			if (target.sprite != null) fx( false );
+			StreamingEvents.notifyBuffChanged( this, false );
+		}
 	}
 	
 	@Override

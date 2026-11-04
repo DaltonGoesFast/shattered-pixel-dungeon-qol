@@ -2748,6 +2748,23 @@ public class Hero extends Char {
 				}
 				
 				if (hasKey) {
+					String keyType;
+					String target;
+					if (door == Terrain.LOCKED_DOOR) {
+						keyType = "iron";
+						target = "door";
+					} else if (door == Terrain.HERO_LKD_DR) {
+						keyType = "none";
+						target = "hero_locked_door";
+					} else if (door == Terrain.CRYSTAL_DOOR) {
+						keyType = "crystal";
+						target = "crystal_door";
+					} else {
+						keyType = "worn";
+						target = "locked_exit";
+					}
+					// Note: terrain may already be changed above; use pre-change door var
+					StreamingEvents.notifyLockOpened(keyType, target, doorCell, "hero_operate");
 					GameScene.updateKeyDisplay();
 					GameScene.updateMap(doorCell);
 					spend(Key.TIME_TO_UNLOCK);
@@ -2785,6 +2802,22 @@ public class Hero extends Char {
 				}
 
 				if (hasKey) {
+					String keyType = "none";
+					String target = "chest";
+					if (heap.type == Type.LOCKED_CHEST) {
+						keyType = "golden";
+						target = "locked_chest";
+					} else if (heap.type == Type.CRYSTAL_CHEST) {
+						keyType = "crystal";
+						target = "crystal_chest";
+					} else if (heap.type == Type.SKELETON) {
+						target = "skeleton";
+					} else if (heap.type == Type.REMAINS) {
+						target = "remains";
+					} else if (heap.type == Type.TOMB) {
+						target = "tomb";
+					}
+					StreamingEvents.notifyLockOpened(keyType, target, heap.pos, "hero_operate");
 					GameScene.updateKeyDisplay();
 					heap.open(this);
 					spend(Key.TIME_TO_UNLOCK);

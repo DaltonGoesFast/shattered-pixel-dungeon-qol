@@ -44,6 +44,7 @@ import com.shatteredpixel.shatteredpixeldungeon.journal.Notes;
 import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.special.SacrificeRoom;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
 import com.watabou.noosa.audio.Sample;
 import com.watabou.utils.Bundle;
 import com.watabou.utils.PathFinder;
@@ -200,9 +201,12 @@ public class SacrificialFire extends Blob {
 					Sample.INSTANCE.play(Assets.Sounds.BURNING );
 					GLog.w( Messages.get(SacrificialFire.class, "reward"));
 					if (prize != null) {
+						StreamingEvents.notifySacrificialReward( prize.getClass().getSimpleName() );
 						Dungeon.level.drop(prize, firePos).sprite.drop();
 					} else {
-						Dungeon.level.drop(SacrificeRoom.prize(Dungeon.level), firePos).sprite.drop();
+						Item dropped = SacrificeRoom.prize(Dungeon.level);
+						StreamingEvents.notifySacrificialReward( dropped != null ? dropped.getClass().getSimpleName() : "Item" );
+						Dungeon.level.drop(dropped, firePos).sprite.drop();
 					}
 				}
 			} else {

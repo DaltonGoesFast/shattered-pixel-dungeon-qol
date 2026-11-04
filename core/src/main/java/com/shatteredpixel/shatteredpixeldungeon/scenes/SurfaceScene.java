@@ -37,6 +37,7 @@ import com.shatteredpixel.shatteredpixeldungeon.sprites.GhostSprite;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.RatSprite;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.WardSprite;
 import com.shatteredpixel.shatteredpixeldungeon.ui.TitleBackground;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RedButton;
 import com.watabou.gltextures.SmartTexture;
 import com.watabou.gltextures.TextureCache;
@@ -86,6 +87,7 @@ public class SurfaceScene extends PixelScene {
 	public void create() {
 		
 		super.create();
+		StreamingEvents.notifySurfaceReached();
 
 		Music.INSTANCE.playTracks(
 				new String[]{Assets.Music.THEME_2, Assets.Music.THEME_1},

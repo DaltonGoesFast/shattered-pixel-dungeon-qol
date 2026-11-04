@@ -46,6 +46,7 @@ import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.GhostSprite;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndQuest;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndSadGhost;
 import com.watabou.noosa.Game;
@@ -396,6 +397,7 @@ public class Ghost extends NPC {
 			armor = null;
 			
 			Notes.remove( Notes.Landmark.GHOST );
+			StreamingEvents.notifyQuestComplete( "ghost" );
 		}
 
 		public static boolean processed(){

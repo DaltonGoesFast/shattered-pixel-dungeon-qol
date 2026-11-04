@@ -99,6 +99,9 @@ public final class StreamingBootstrapper {
 						for (String logMsg : logs) {
 							s.broadcastEvent("game_log", Map.of("message", logMsg));
 						}
+						for (StreamingEvents.TypedEvent te : StreamingEvents.drainTyped()) {
+							s.broadcastEvent(te.type, te.fields);
+						}
 						Map<String, Object> snapshot = GameStateSnapshot.build();
 						String json = GSON.toJson(snapshot);
 						s.setLastPayload(json);

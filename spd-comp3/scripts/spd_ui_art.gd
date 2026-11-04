@@ -61,8 +61,11 @@ const CHROME_STYLE_LABELS := [
 const BANNER_BOSS_SLAIN := "res://assets/ui_spd/banners/boss_slain.png"
 ## 5x 16px icons: Sewers, Prison, Caves, City, Halls (from interfaces/levelicons.png).
 const LEVEL_ICONS := "res://assets/ui_spd/levelicons/levelicons.png"
+## 4x 16px icons: YouTube, Discord, TikTok, Twitch (from interfaces/socialicons.png).
+const SOCIAL_ICONS := "res://assets/ui_spd/socialicons/socialicons.png"
 const PIXEL_FONT := "res://assets/fonts/pixel_font.ttf"
 const LEVEL_ICON_SIZE := 16
+const SOCIAL_ICON_SIZE := 16
 
 ## Cached soft HUD font — do not mutate the shared pixel_font import used by marches.
 static var _hud_font_cache = null
@@ -296,3 +299,25 @@ static func level_icon_for_zone(zone: String, fallback_level: int = 1) -> AtlasT
 	if idx < 0:
 		return level_icon(fallback_level)
 	return level_icon_at(idx)
+
+
+static func social_icon_at(sheet_index: int = 0) -> AtlasTexture:
+	## Sheet column 0..3 → YouTube, Discord, TikTok, Twitch.
+	var idx := clampi(sheet_index, 0, 3)
+	return atlas_region(
+		SOCIAL_ICONS, Rect2i(idx * SOCIAL_ICON_SIZE, 0, SOCIAL_ICON_SIZE, SOCIAL_ICON_SIZE)
+	)
+
+
+static func social_icon_for_platform(platform: String) -> AtlasTexture:
+	match str(platform).to_lower():
+		"youtube", "yt":
+			return social_icon_at(0)
+		"discord":
+			return social_icon_at(1)
+		"tiktok", "tt":
+			return social_icon_at(2)
+		"twitch", "tw":
+			return social_icon_at(3)
+		_:
+			return null

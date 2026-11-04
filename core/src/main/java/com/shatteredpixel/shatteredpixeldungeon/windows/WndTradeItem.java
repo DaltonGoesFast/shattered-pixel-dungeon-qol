@@ -46,6 +46,7 @@ import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSpriteSheet;
 import com.shatteredpixel.shatteredpixeldungeon.ui.CurrencyIndicator;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RedButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RenderedTextBlock;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
 import com.shatteredpixel.shatteredpixeldungeon.utils.TrainingExport;
 
 public class WndTradeItem extends WndInfoItem {
@@ -93,6 +94,7 @@ public class WndTradeItem extends WndInfoItem {
 				@Override
 				protected void onClick() {
 					TrainingExport.logShop("shop_sell", item.getClass().getSimpleName());
+					StreamingEvents.notifyShop("shop_sell", item, Guild.paysFor(item), item.quantity());
 					sell( item, finalShop);
 					hide();
 				}
@@ -110,6 +112,7 @@ public class WndTradeItem extends WndInfoItem {
 				@Override
 				protected void onClick() {
 					TrainingExport.logShop("shop_sell", item.getClass().getSimpleName());
+					StreamingEvents.notifyShop("shop_sell", item, Guild.paysFor(item, item.value() / item.quantity()), 1);
 					sellOne( item, finalShop );
 					hide();
 				}
@@ -121,6 +124,7 @@ public class WndTradeItem extends WndInfoItem {
 				@Override
 				protected void onClick() {
 					TrainingExport.logShop("shop_sell_all", item.getClass().getSimpleName());
+					StreamingEvents.notifyShop("shop_sell_all", item, priceAll, item.quantity());
 					sell( item, finalShop );
 					hide();
 				}
@@ -308,6 +312,7 @@ public class WndTradeItem extends WndInfoItem {
 		TrainingExport.logShop("shop_buy", item.getClass().getSimpleName());
 
 		int price = Shopkeeper.sellPrice( item );
+		StreamingEvents.notifyShop("shop_buy", item, price, item.quantity());
 		Dungeon.gold -= price;
 		Catalog.countUses(Gold.class, price);
 		

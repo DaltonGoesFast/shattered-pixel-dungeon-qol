@@ -27,6 +27,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.FlavourBuff;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Bestiary;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndInfoTrap;
 import com.watabou.noosa.audio.Sample;
 import com.watabou.utils.Bundlable;
@@ -96,6 +97,13 @@ public abstract class Trap implements Bundlable {
 			if (Dungeon.level.heroFOV[pos]) {
 				Sample.INSTANCE.play(Assets.Sounds.TRAP);
 			}
+			boolean heroOnTrap = Dungeon.hero != null && Dungeon.hero.pos == pos;
+			StreamingEvents.notifyTrapTriggered(
+					getClass().getSimpleName(),
+					name(),
+					pos,
+					visible,
+					heroOnTrap);
 			if (disarmedByActivation) disarm();
 			Dungeon.level.discover(pos);
 			Bestiary.setSeen(getClass());

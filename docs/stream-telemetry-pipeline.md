@@ -1,6 +1,8 @@
 # Shattered Pixel Dungeon — Stream Telemetry & Automated Video Pipeline
 
-A fully automated capture, transcription, and post-production pipeline for live streamers. It bridges in-game combat and dungeon events with OBS multi-track recording and AI speech-to-text, producing 1-click **DaVinci Resolve** timelines and polished **TikTok / YouTube Shorts** with animated captions.
+Capture, transcription, and post-production pipeline for live streams. The game engine and OBS sync events into `telemetry.jsonl`; post-stream processing builds a story dossier, optional Gemini Edit Decision List, speech-snapped DaVinci Resolve XML, and captioned vertical Shorts.
+
+**Keep raw `game_log` events** — they stay in telemetry and `session_story.json` unfiltered.
 
 ---
 
@@ -9,34 +11,31 @@ A fully automated capture, transcription, and post-production pipeline for live 
 ```mermaid
 flowchart TD
     subgraph Live Stream Capture
-        G[SPD Game Engine<br/>GLog & StreamingEvents] -->|WebSocket :5001| TD[Telemetry Daemon<br/>telemetry_daemon.py]
-        OBS[OBS Studio<br/>WebSocket :4456] -->|Record Start/Stop| TD
+        G[SPD Game Engine<br/>GLog gated by Streaming enabled] -->|WebSocket :5001| TD[Telemetry Daemon<br/>telemetry_daemon.py]
+        OBS[OBS Studio<br/>WebSocket :4456] -->|Record Start/Stop + outputPath| TD
         MIC[Elgato Wave 3 Mic<br/>Track 2 Clean] -->|OBS Audio| REC[(Master Video .mp4<br/>Tracks 1-4)]
-        BT[Aitum Backtrack<br/>Hotkey Trigger] -->|Saves Raw Clip| SHORTS[(Vertical Shorts .mp4)]
-        TD -->|Millisecond Sync| TL[(telemetry.jsonl)]
+        BT[Aitum Backtrack] -->|Saves Raw Clip| SHORTS[(Vertical Shorts .mp4)]
+        TD -->|video_path + session_sync skew| TL[(telemetry.jsonl)]
     end
 
     subgraph Post-Stream Processing
-        SD[Stream Deck Button] -->|Triggers| PS[process_stream.py]
+        PF[check_stream_pipeline.py] -.->|preflight| SD
+        SD[Stream Deck / process_stream.py] --> PS[Session bind via OBS path]
         REC --> PS
         TL --> PS
         SHORTS --> PS
-        LEX[game_vocabulary.txt<br/>SPD Lexicon] --> WHISPER[Faster-Whisper<br/>NVIDIA GPU CUDA]
+        LEX[game_vocabulary.txt<br/>post-transcript lexicon] --> WHISPER[Faster-Whisper GPU]
         PS --> WHISPER
-        PS --> STORY[(session_story.json<br/>Unified Story Dossier)]
+        PS --> STORY[(session_story.json)]
+        STORY --> GEM[generate_cuts_gemini.py<br/>fail-soft]
+        GEM -->|cuts.json or heuristics| XML_GEN[generate_resolve_xml.py<br/>speech-snapped]
     end
 
     subgraph Video Post-Production
-        STORY --> XML_GEN[generate_resolve_xml.py]
-        REC --> XML_GEN
-        XML_GEN --> DR_XML[(timeline_resolve.xml<br/>4 Audio Tracks + Markers)]
-        DR_XML --> DAVINCI[DaVinci Resolve<br/>Rough Cut Ready for Polish]
-
+        XML_GEN --> DR_XML[(timeline_resolve.xml)]
+        DR_XML --> DAVINCI[DaVinci Resolve]
         SHORTS --> SHORTS_POLISH[polish_shorts.py]
-        WHISPER --> SHORTS_POLISH
-        SHORTS_POLISH --> SUB_ASS[(Animated ASS / SRT)]
-        SHORTS_POLISH --> NVENC[GPU NVENC Encoder]
-        NVENC --> FINAL_SHORT[(Final Captioned Short .mp4<br/>TikTok / Shorts Ready)]
+        SHORTS_POLISH --> FINAL_SHORT[(Captioned Short)]
     end
 ```
 
@@ -44,33 +43,29 @@ flowchart TD
 
 ## Audio Track Mapping
 
-OBS is configured to record **4 separate audio tracks** into a single master MP4 file:
-
 | Track # | Name | Source / Device | Purpose |
 | :--- | :--- | :--- | :--- |
 | **Track 1** | **Master Mix** | Full Broadcast Mix | Complete reference mix including music and alerts. |
-| **Track 2** | **Clean Voice** | Dalton's Mic (Wave:3) | Isolated speech for Whisper transcription and AI noise removal. |
+| **Track 2** | **Clean Voice** | Dalton's Mic (Wave:3) | Isolated speech for Whisper transcription. |
 | **Track 3** | **Alerts & Bot** | Streamer.bot / TTS / SFX | Channel point redemptions, chat spawns, sound alerts. |
-| **Track 4** | **Game Audio** | Desktop / Java Process | SPD background music and sound effects. |
+| **Track 4** | **Game Audio** | Desktop / Java Process | SPD music and SFX. |
 
 ---
 
 ## Directory Organization
 
-All stream recordings are automatically organized into structured session folders under `~/Videos/Stream_Sessions/`:
-
 ```
 C:\Users\dalto\Videos\Stream_Sessions\
 └── 2026-10-29_Stream_11-30-52/
-    ├── 2026-10-29 11-30-52.mp4          # Master full-length recording (Tracks 1-4)
-    ├── telemetry.jsonl                   # Synced in-game event log with video timestamps
-    ├── session_story.json                # Master AI editing dossier (speech + events)
-    ├── timeline_resolve.xml              # 1-click DaVinci Resolve import file
+    ├── 2026-10-29 11-30-52.mp4
+    ├── telemetry.jsonl
+    ├── session_story.json
+    ├── cuts.json                 # optional Gemini EDL
+    ├── timeline_resolve.xml
+    ├── captions.srt              # EDIT timeline clock — import on timeline_resolve.xml
+    ├── captions_full.srt         # Full master VOD clock (optional reference)
     └── shorts/
-        ├── Backtrack 2026-10-29 11-45-10.mp4            # Raw vertical clip
-        ├── Backtrack 2026-10-29 11-45-10.srt            # Standard SRT captions
-        ├── Backtrack 2026-10-29 11-45-10.ass            # Styled karaoke highlight subtitles
-        └── Backtrack 2026-10-29 11-45-10_captioned.mp4  # GPU-rendered final short ready to post
+        └── Backtrack *.mp4 + matching .srt
 ```
 
 ---
@@ -78,108 +73,107 @@ C:\Users\dalto\Videos\Stream_Sessions\
 ## Component Details
 
 ### 1. In-Game Telemetry (`GLog.java` & `StreamingBootstrapper.java`)
-- **Location**: [`core/.../GLog.java`](file:///c:/Users/dalto/Documents/My%20Games/SPD/march26%20mod/shattered-pixel-dungeon-qol/core/src/main/java/com/shatteredpixel/shatteredpixeldungeon/utils/GLog.java) and [`desktop/.../StreamingBootstrapper.java`](file:///c:/Users/dalto/Documents/My%20Games/SPD/march26%20mod/shattered-pixel-dungeon-qol/desktop/src/main/java/com/shatteredpixel/shatteredpixeldungeon/desktop/StreamingBootstrapper.java)
-- **Function**: Every game message (combat damage, items identified, hero low HP, player death, boss defeats, traps triggered, mob spawns) is queued onto a thread-safe `ConcurrentLinkedQueue` and broadcast over WebSocket `ws://127.0.0.1:5001`.
+- Game log lines are broadcast only when **Streaming enabled** is on in SPD settings (`SPDSettings.streamingEnabled()`).
+- Death / boss events remain on their existing WebSocket paths.
+- Raw `game_log` messages are queued and sent over `ws://127.0.0.1:5001`.
 
 ### 2. Telemetry Daemon (`telemetry_daemon.py`)
-- **Location**: [`Lastest UI/telemetry_daemon.py`](file:///c:/Users/dalto/Documents/My%20Games/SPD/march26%20mod/shattered-pixel-dungeon-qol/Lastest%20UI/telemetry_daemon.py)
-- **Function**: Runs silently as a background thread inside `server.py`. Listens to OBS WebSocket (`:4456`) and the game engine (`:5001`). When OBS starts recording, it records the exact system start time and writes incoming events to `telemetry.jsonl` with millisecond `video_time_sec` offsets.
+- Background thread inside `server.py`.
+- On OBS record start: stores wall-clock start + OBS `outputPath`.
+- When the MP4 appears: writes `session_sync` with `file_*_ms` and `clock_skew_ms`.
+- Events include millisecond `video_time_sec` offsets.
 
-### 3. Vocabulary Primer (`game_vocabulary.txt`)
-- **Location**: [`scripts/game_vocabulary.txt`](file:///c:/Users/dalto/Documents/My%20Games/SPD/march26%20mod/shattered-pixel-dungeon-qol/scripts/game_vocabulary.txt)
-- **Function**: Comprehensive dictionary of SPD items, potion colors (*"azure potion"*), scrolls, bosses (*"Goo"*, *Tengu*, *DM-300*, *King of Dwarves*, *Yog-Dzewa*), enemies, and streaming terms. Loaded as Whisper's `initial_prompt` to force 100% transcription accuracy on uncommon dungeon words.
+### 3. Vocabulary (`game_vocabulary.txt` + `game_vocab_utils.py`)
+- Whisper uses a **short** initial prompt: `"Shattered Pixel Dungeon live commentary."`
+- After transcription, terms from `game_vocabulary.txt` are applied as lexicon corrections (not dumped into the Whisper prompt).
 
 ### 4. Post-Stream Processor (`process_stream.py`)
-- **Location**: [`scripts/process_stream.py`](file:///c:/Users/dalto/Documents/My%20Games/SPD/march26%20mod/shattered-pixel-dungeon-qol/scripts/process_stream.py)
-- **Function**:
-  1. Finds the latest stream video in `~/Videos`.
-  2. Extracts Track 2 (clean mic) using `ffmpeg`.
-  3. Preloads NVIDIA CUDA runtime DLLs and runs GPU Faster-Whisper transcription.
-  4. Collects matching Aitum Backtrack clips created during the stream window.
-  5. Assembles `session_story.json` aligning spoken lines and dungeon events chronologically.
-  6. Organizes all assets into `~/Videos/Stream_Sessions/<session_slug>/`.
-  7. Invokes `generate_resolve_xml.py` to auto-produce `timeline_resolve.xml`.
-  8. Invokes `polish_shorts.py` to auto-caption vertical clips.
+Session resolution order:
+1. CLI: `python scripts/process_stream.py [session_folder | video.mp4 | telemetry.jsonl]`
+2. Newest telemetry whose `session_start.video_path` exists on disk
+3. Fallback: newest non-Backtrack mp4 in `~/Videos` (**loud warning**)
 
-### 5. DaVinci Resolve Exporter (`generate_resolve_xml.py`)
-- **Location**: [`scripts/generate_resolve_xml.py`](file:///c:/Users/dalto/Documents/My%20Games/SPD/march26%20mod/shattered-pixel-dungeon-qol/scripts/generate_resolve_xml.py)
-- **Function**: Generates Apple Final Cut Pro XML (`xmeml` version 4) compatible with DaVinci Resolve:
-  - Preserves all 4 discrete audio tracks using `<sourcetrack>` indexing.
-  - Generates timeline rough cuts around intro, boss battles, low-HP clutches, and vertical clips.
-  - Adds color-coded sequence markers (Green for Bosses, Red for Death/Near-Death, Cyan for Backtrack clips).
-  - Can be driven by automated heuristic cuts or custom AI Edit Decision Lists (`cuts.json`).
+Then: Track 2 extract → GPU Whisper → apply clock skew → package session → **Gemini `cuts.json` (fail-soft)** → speech-snapped Resolve XML → `captions.srt` → Shorts `.srt` sidecars (no burn-in).
 
-### 6. Shorts Polishing Engine (`polish_shorts.py`)
-- **Location**: [`scripts/polish_shorts.py`](file:///c:/Users/dalto/Documents/My%20Games/SPD/march26%20mod/shattered-pixel-dungeon-qol/scripts/polish_shorts.py)
-- **Function**:
-  - Runs word-timestamped transcription on vertical MP4 clips.
-  - Chunks dialogue into 3–4 word bite-sized phrases.
-  - Generates `.ass` subtitles with dynamic yellow karaoke pop (`{\c&H0024E5FF&}`) on the active spoken word, styled in bold Impact with heavy black outline and positioned safely above mobile UI overlays.
-  - Uses NVIDIA NVENC hardware encoder to burn subtitles into `<clip>_captioned.mp4` at near-instant rendering speeds.
+### 5. Gemini EDL (`generate_cuts_gemini.py`)
+- Reads `GEMINI_API_KEY` from the environment (or gitignored `secrets.local.json`).
+- Uses `editor_agent_prompt.md` + compact `session_story` payload.
+- On missing key / API error: process continues with heuristic cuts.
+
+### 6. DaVinci Resolve Exporter (`generate_resolve_xml.py`)
+- 4 discrete audio tracks preserved.
+- Heuristic or Gemini cuts are **snapped to speech** (≈0.6s pre-roll / ≈1.0s post-roll).
+- Markers for bosses, death / near-death, Backtrack highlights.
+
+### 7. Captions / Shorts (`process_stream.py` + `polish_shorts.py`)
+- `captions.srt` — speech remapped onto the **edited** Resolve timeline (same cuts as `timeline_resolve.xml`). Import this as the Subtitle track.
+- `captions_full.srt` — same transcript on the **full master VOD** clock (reference only).
+- Shorts: `.srt` sidecars only by default. Optional `python scripts/polish_shorts.py --burn` for ASS + `*_captioned.mp4`.
+
+### 8. Shared CUDA helper (`whisper_cuda.py`)
+- Used by `process_stream.py`, `polish_shorts.py`, and `check_stream_pipeline.py`.
 
 ---
 
 ## Daily Operational Guide
 
-### 1. Starting a Stream
-1. Launch the UI server:
-   ```powershell
-   python "Lastest UI/server.py"
-   ```
-2. Launch the game jar:
-   ```powershell
-   java -jar desktop/build/libs/desktop-4.0.2-QoL-8.jar
-   ```
-3. In OBS, start recording. (The telemetry daemon auto-detects the recording event).
+### Preflight (optional, recommended)
+```powershell
+python scripts/check_stream_pipeline.py
+```
+Checks OBS WS, game WS, ffmpeg, Videos/telemetry writability, Gemini key, CUDA DLLs.
 
-### 2. Ending a Stream
-1. In OBS, stop recording.
-2. Press your **Process Stream** Stream Deck button (or run `python scripts/process_stream.py`).
-3. Leave the terminal open while it processes. It will finish with:
-   ```
-   =================================================================
-      PROCESSING COMPLETE! SESSION PACKAGED & READY
-   =================================================================
-   ```
+### Starting a Stream
+1. Enable **Streaming** in SPD settings (required for live `game_log` telemetry).
+2. Launch UI server: `python "Lastest UI/server.py"`
+3. Launch game jar.
+4. Start recording in OBS (daemon binds to that file’s `outputPath`).
 
-### 3. Editing in DaVinci Resolve
-1. Open DaVinci Resolve and create or open your project.
-2. Press <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>I</kbd> (**File -> Import -> Timeline...**).
-3. Select `timeline_resolve.xml` from the session folder:
-   `C:\Users\dalto\Videos\Stream_Sessions\<session_name>\timeline_resolve.xml`
-4. Make your trims, balance track audio, and add transitions.
-
-### 4. Custom AI Cut Workflow
-If you want an AI editing agent to craft a tailored narrative cut:
-1. Pass `session_story.json` and [`scripts/editor_agent_prompt.md`](file:///c:/Users/dalto/Documents/My%20Games/SPD/march26%20mod/shattered-pixel-dungeon-qol/scripts/editor_agent_prompt.md) to your AI agent.
-2. Save the agent's output as `cuts.json` inside the session folder.
-3. Run:
+### Ending a Stream
+1. Stop recording in OBS.
+2. Run Process Stream:
    ```powershell
-   python scripts/generate_resolve_xml.py "C:\Users\dalto\Videos\Stream_Sessions\<session_name>" cuts.json
+   python scripts/process_stream.py
    ```
-4. Re-import the newly updated `timeline_resolve.xml` in DaVinci Resolve.
+   Or pass an explicit session/video/telemetry path.
+3. Wait for `PROCESSING COMPLETE`.
+
+### Editing in DaVinci Resolve
+1. **File → Import → Timeline...** (`Ctrl+Shift+I`)
+2. Open `timeline_resolve.xml` from the session folder.
+
+### Manual AI override
+Still supported: edit/replace `cuts.json`, then:
+```powershell
+python scripts/generate_resolve_xml.py "C:\Users\dalto\Videos\Stream_Sessions\<session_name>"
+```
 
 ---
 
-## Troubleshooting & Maintenance
+## Troubleshooting
 
-### Port Conflicts (WebSocket :5001)
-- If telemetry events are not being received from the game, check for dangling `javaw.exe` instances holding port `5001`:
-  ```powershell
-  Get-Process -Name javaw | Stop-Process -Force
-  ```
-- Always start the UI server before or alongside the game.
+### Port Conflicts (:5001)
+```powershell
+Get-Process -Name javaw | Stop-Process -Force
+```
 
-### OBS WebSocket Connection (:4456)
-- OBS WebSocket server must be enabled on port `4456` with authentication disabled (or matching credentials).
-- In OBS: **Tools -> WebSocket Server Settings -> Server Port: 4456**, **Enable WebSocket server: Checked**.
+### OBS WebSocket (:4456)
+Enable WebSocket server in OBS Tools settings.
 
-### Faster-Whisper GPU CUDA Acceleration
-- If `cublas64_12.dll` or `cudnn64_9.dll` errors appear, ensure the NVIDIA runtime wheels are installed:
-  ```powershell
-  pip install nvidia-cublas-cu12 nvidia-cudnn-cu12
-  ```
-- Both `process_stream.py` and `polish_shorts.py` include automatic DLL discovery and preloading via `setup_cuda_dlls()`, with seamless fallback to CPU (`int8`) if a GPU runtime error occurs.
+### Faster-Whisper CUDA
+```powershell
+pip install nvidia-cublas-cu12 nvidia-cudnn-cu12
+```
 
-### Adding New Vocabulary
-- To teach Whisper new terms, simply add them as new lines in [`scripts/game_vocabulary.txt`](file:///c:/Users/dalto/Documents/My%20Games/SPD/march26%20mod/shattered-pixel-dungeon-qol/scripts/game_vocabulary.txt). Lines starting with `#` are treated as comments.
+### Gemini
+```powershell
+# User env (restart terminals / Stream Deck after setting)
+[System.Environment]::SetEnvironmentVariable("GEMINI_API_KEY", "YOUR_KEY", "User")
+```
+Or create gitignored `Lastest UI/secrets.local.json`:
+```json
+{ "GEMINI_API_KEY": "YOUR_KEY" }
+```
+
+### Adding vocabulary
+Add lines to `scripts/game_vocabulary.txt` (comments with `#`). Used for post-transcript correction.

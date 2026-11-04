@@ -42,6 +42,7 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.quest.AmbitiousImpR
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.ImpSprite;
+import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndImpOld;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndQuest;
 import com.watabou.noosa.Game;
@@ -380,6 +381,7 @@ public class Imp extends NPC {
 
 			Statistics.questScores[3] = 4000;
 			Notes.remove( Notes.Landmark.IMP );
+			StreamingEvents.notifyQuestComplete( "imp" );
 		}
 
 		public static void complete( int score ){
@@ -388,6 +390,7 @@ public class Imp extends NPC {
 			Imp.Quest.score = score;
 			Statistics.questScores[3] += score;
 			Notes.remove( Notes.Landmark.IMP );
+			StreamingEvents.notifyQuestComplete( "imp" );
 		}
 		
 		public static boolean isCompleted() {
