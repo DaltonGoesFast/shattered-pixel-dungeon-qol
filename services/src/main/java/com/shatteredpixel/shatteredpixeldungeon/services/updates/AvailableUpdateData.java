@@ -28,6 +28,14 @@ public class AvailableUpdateData {
 
 	public String desc;
 
+	/** Release page. Opened when no platform asset is available. */
 	public String URL;
+
+	/**
+	 * Direct asset URL for this platform (APK, Windows zip, or desktop jar).
+	 * Null when the release page should be opened instead.
+	 * Desktop opens this in the browser. Android downloads it and launches the installer.
+	 */
+	public String downloadURL;
 
 }

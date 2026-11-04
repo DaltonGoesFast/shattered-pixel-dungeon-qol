@@ -25,6 +25,9 @@
 -keep class com.badlogic.gdx.scenes.scene2d.ui.TextField$TextFieldStyle { *; }
 -keepnames class com.badlogic.gdx.scenes.scene2d.ui.TextField { *; }
 
+# update APK is shared with the system installer through this provider
+-keep class com.shatteredpixel.shatteredpixeldungeon.android.UpdateFileProvider { *; }
+
 # needed for libGDX controllers
 -keep class com.badlogic.gdx.controllers.android.AndroidControllers { *; }
 
