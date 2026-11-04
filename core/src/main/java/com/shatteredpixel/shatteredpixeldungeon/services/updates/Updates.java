@@ -24,8 +24,6 @@ package com.shatteredpixel.shatteredpixeldungeon.services.updates;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.watabou.utils.Callback;
 
-import java.util.Date;
-
 public class Updates {
 
 	public static UpdateService service;
@@ -34,8 +32,8 @@ public class Updates {
 		return service != null;
 	}
 
-	private static Date lastCheck = null;
-	private static final long CHECK_DELAY = 1000*60*60; //1 hour
+	// One network check per process. A failure, including being offline, does not retry.
+	private static boolean checkedThisLaunch = false;
 
 	public static boolean supportsUpdatePrompts(){
 		return supportsUpdates() && service.supportsUpdatePrompts();
@@ -47,7 +45,9 @@ public class Updates {
 
 	public static void checkForUpdate(){
 		if (!supportsUpdatePrompts()) return;
-		if (lastCheck != null && (new Date().getTime() - lastCheck.getTime()) < CHECK_DELAY) return;
+		if (!SPDSettings.updates()) return;
+		if (checkedThisLaunch) return;
+		checkedThisLaunch = true;
 
 		//We do this so that automatically enabled beta checking (for users who DLed a beta) persists afterward
 		if (SPDSettings.betas()){
@@ -57,18 +57,16 @@ public class Updates {
 		service.checkForUpdate(!SPDSettings.WiFi(), SPDSettings.betas(), new UpdateService.UpdateResultCallback() {
 			@Override
 			public void onUpdateAvailable(AvailableUpdateData update) {
-				lastCheck = new Date();
 				updateData = update;
 			}
 
 			@Override
 			public void onNoUpdateFound() {
-				lastCheck = new Date();
 			}
 
 			@Override
 			public void onConnectionFailed() {
-				lastCheck = null;
+				// Stay quiet. checkedThisLaunch is already set, so this launch does not retry.
 			}
 		});
 	}
@@ -89,7 +87,6 @@ public class Updates {
 
 	public static void clearUpdate(){
 		updateData = null;
-		lastCheck = null;
 	}
 
 	public static boolean supportsReviews() {

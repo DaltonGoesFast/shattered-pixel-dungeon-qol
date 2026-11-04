@@ -80,6 +80,20 @@ public abstract class PlatformSupport {
 		return Gdx.net.openURI( uri );
 	}
 
+	/**
+	 * Start an update. The default opens the platform asset in the browser
+	 * (so a desktop jar is never replaced while it is running) and falls back
+	 * to the release page. Android overrides this to download an APK and hand
+	 * it to the system installer.
+	 */
+	public void launchUpdate(String pageURL, String downloadURL) {
+		if (downloadURL != null && downloadURL.length() > 0) {
+			openURI(downloadURL);
+		} else if (pageURL != null && pageURL.length() > 0) {
+			openURI(pageURL);
+		}
+	}
+
 	public void setOnscreenKeyboardVisible(boolean value, boolean multiline){
 		//by default ignore multiline
 		Gdx.input.setOnscreenKeyboardVisible(value, Input.OnscreenKeyboardType.Default);

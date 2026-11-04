@@ -412,9 +412,13 @@ public class TitleScene extends PixelScene {
 		public void update() {
 			super.update();
 
-			if (!updateShown && Updates.updateAvailable()){
+			boolean available = SPDSettings.updates() && Updates.updateAvailable();
+			if (!updateShown && available){
 				updateShown = true;
 				text(Messages.get(TitleScene.class, "update"));
+			} else if (updateShown && !available){
+				updateShown = false;
+				text(Messages.get(TitleScene.class, "changes"));
 			}
 
 			if (updateShown){
@@ -424,14 +428,18 @@ public class TitleScene extends PixelScene {
 
 		@Override
 		protected void onClick() {
-			if (Updates.updateAvailable()){
+			if (SPDSettings.updates() && Updates.updateAvailable()){
 				AvailableUpdateData update = Updates.updateData();
+				// Android installs the APK. Desktop opens the asset download in the browser.
+				String updateAction = DeviceCompat.isAndroid()
+						? Messages.get(TitleScene.class, "install")
+						: Messages.get(this, "update");
 
 				ShatteredPixelDungeon.scene().addToFront( new WndOptions(
 						Icons.get(Icons.CHANGES),
 						update.versionName == null ? Messages.get(this,"title") : Messages.get(this,"versioned_title", update.versionName),
 						update.desc == null ? Messages.get(this,"desc") : update.desc,
-						Messages.get(this,"update"),
+						updateAction,
 						Messages.get(this,"changes")
 				) {
 					@Override

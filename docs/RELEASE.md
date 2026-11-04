@@ -92,6 +92,22 @@ Enable **Settings → Streaming** in-game for chat integration; Android builds d
 
 **CI:** [.github/workflows/build-release.yml](../.github/workflows/build-release.yml) builds on tag push or manual dispatch. Configure Android signing secrets (below) for APK in CI.
 
+### Names the in-game update checker expects
+
+Release builds ask GitHub once per launch (Settings → Data → **Check for updates**, on by default). The check reads `https://api.github.com/repos/DaltonGoesFast/shattered-pixel-dungeon-qol/releases` and compares each release **tag** to the running `appVersionName`.
+
+A tag `v4.0.2-QoL-8` matches a build whose version is `4.0.2-QoL-8` (a trailing `-INDEV` is ignored). Newer means a higher `major.minor.patch`, or the same base version with a higher `-QoL-N` counter. A tag with no `-QoL-N` has counter 0, so `v4.0.3` is newer than `4.0.2-QoL-8`, and `v4.0.2` is not. Releases marked pre-release on GitHub are skipped unless **Include beta updates** is on. Offline failures are ignored.
+
+Attach assets with these names, where `<ver>` is the version without the leading `v` (`4.0.2-QoL-8`):
+
+| Platform | Asset name |
+|----------|------------|
+| Android | `ANDROID-Shattered-Pixel-Dungeon-QoL-<ver>.apk` |
+| Windows | `WINDOWS-Shattered-Pixel-Dungeon-QoL-<ver>-x64.zip` |
+| Desktop (Java) | `JAVA-Shattered-Pixel-Dungeon-QoL-<ver>.jar` |
+
+Android downloads that APK and opens the system installer (or the release page if install permission or the download fails). Desktop opens the Windows zip or the jar in the browser and does not replace a running jar. If the exact name is missing, any `.apk` is used on Android, a zip whose name contains `windows` (or else a `.jar`) on Windows, and any `.jar` on other desktops. Otherwise the release page is opened.
+
 ---
 
 ## GitHub Actions secrets (optional APK in CI)
