@@ -84,6 +84,14 @@ public class ScrollOfMetamorphosis extends ExoticScroll {
 
 	/** One same-tier talent from each other class, skipping talents already at that tier. Tier is 1-based. */
 	public static LinkedHashMap<Talent, Integer> offersFor( Hero hero, Talent replacing, int tier ){
+		return offersFor( hero, replacing, tier, null );
+	}
+
+	/**
+	 * Same as {@link #offersFor(Hero, Talent, int)}, but candidates listed in {@code used} are skipped.
+	 * Classes with no remaining candidates are omitted. Used by Chimera's opening T1 draft.
+	 */
+	public static LinkedHashMap<Talent, Integer> offersFor( Hero hero, Talent replacing, int tier, Set<Talent> used ){
 		LinkedHashMap<Talent, Integer> options = new LinkedHashMap<>();
 		Set<Talent> curTalentsAtTier = hero.talents.get(tier-1).keySet();
 
@@ -99,7 +107,7 @@ public class ScrollOfMetamorphosis extends ExoticScroll {
 					replacingIsInSet = true;
 					break;
 				} else {
-					if (curTalentsAtTier.contains(talent)){
+					if (curTalentsAtTier.contains(talent) || (used != null && used.contains(talent))){
 						clsTalentsAtTier.remove(talent);
 					}
 				}

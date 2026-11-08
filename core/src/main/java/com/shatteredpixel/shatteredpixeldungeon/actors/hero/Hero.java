@@ -224,6 +224,12 @@ public class Hero extends Char {
 	public ArmorAbility[] chimeraAbilities = null;
 	/** Chimera pact: one bit per HeroClass ordinal whose signature item was already granted. */
 	public int chimeraGifts = 0;
+	/** Chimera pact: T1 opening draft not yet confirmed. */
+	public boolean chimeraDraftPending = false;
+	/** Chimera pact: natural T1 slot → pre-rolled offer list; null when draft is done / inactive. */
+	public LinkedHashMap<Talent, ArrayList<Talent>> chimeraDraftOffers = null;
+	/** Chimera pact: natural T1 slot → chosen offer while drafting. */
+	public LinkedHashMap<Talent, Talent> chimeraDraftPicks = null;
 	/** Optional display name; empty/null means use class/subclass title. */
 	public String customName = null;
 	public ArrayList<LinkedHashMap<Talent, Integer>> talents = new ArrayList<>();
@@ -336,6 +342,9 @@ public class Hero extends Char {
 	private static final String CHIMERA_ABIL_A  = "chimera_abil_a";
 	private static final String CHIMERA_ABIL_B  = "chimera_abil_b";
 	private static final String CHIMERA_GIFTS   = "chimera_gifts";
+	private static final String CHIMERA_DRAFT_PENDING = "chimera_draft_pending";
+	private static final String CHIMERA_DRAFT_OFFERS  = "chimera_draft_offers";
+	private static final String CHIMERA_DRAFT_PICKS   = "chimera_draft_picks";
 
 	private static final String TALENT_AUTO_ORDER_1 = "talent_auto_order_1";
 	private static final String TALENT_AUTO_ORDER_2 = "talent_auto_order_2";
@@ -369,6 +378,28 @@ public class Hero extends Char {
 			bundle.put( CHIMERA_ABIL_A, chimeraAbilities[0] );
 			bundle.put( CHIMERA_ABIL_B, chimeraAbilities[1] );
 			bundle.put( CHIMERA_GIFTS, chimeraGifts );
+		}
+		if (chimeraDraftPending) {
+			bundle.put( CHIMERA_DRAFT_PENDING, true );
+			if (chimeraDraftOffers != null && !chimeraDraftOffers.isEmpty()) {
+				Bundle offersBundle = new Bundle();
+				for (Talent slot : chimeraDraftOffers.keySet()) {
+					ArrayList<Talent> offers = chimeraDraftOffers.get( slot );
+					String[] names = new String[offers.size()];
+					for (int i = 0; i < offers.size(); i++) {
+						names[i] = offers.get( i ).name();
+					}
+					offersBundle.put( slot.name(), names );
+				}
+				bundle.put( CHIMERA_DRAFT_OFFERS, offersBundle );
+			}
+			if (chimeraDraftPicks != null && !chimeraDraftPicks.isEmpty()) {
+				Bundle picksBundle = new Bundle();
+				for (Talent slot : chimeraDraftPicks.keySet()) {
+					picksBundle.put( slot.name(), chimeraDraftPicks.get( slot ).name() );
+				}
+				bundle.put( CHIMERA_DRAFT_PICKS, picksBundle );
+			}
 		}
 		if (customName != null && !customName.isEmpty()) {
 			bundle.put( CUSTOM_NAME, customName );
@@ -421,6 +452,37 @@ public class Hero extends Char {
 			chimeraSubs = null;
 			chimeraAbilities = null;
 			chimeraGifts = 0;
+		}
+		chimeraDraftPending = bundle.contains( CHIMERA_DRAFT_PENDING ) && bundle.getBoolean( CHIMERA_DRAFT_PENDING );
+		chimeraDraftOffers = null;
+		chimeraDraftPicks = null;
+		if (chimeraDraftPending && bundle.contains( CHIMERA_DRAFT_OFFERS )) {
+			chimeraDraftOffers = new LinkedHashMap<>();
+			Bundle offersBundle = bundle.getBundle( CHIMERA_DRAFT_OFFERS );
+			for (String slotName : offersBundle.getKeys()) {
+				try {
+					Talent slot = Talent.valueOf( slotName );
+					ArrayList<Talent> offers = new ArrayList<>();
+					for (String offerName : offersBundle.getStringArray( slotName )) {
+						offers.add( Talent.valueOf( offerName ) );
+					}
+					chimeraDraftOffers.put( slot, offers );
+				} catch (Exception ignored) {}
+			}
+			if (chimeraDraftOffers.isEmpty()) chimeraDraftOffers = null;
+		}
+		if (chimeraDraftPending && bundle.contains( CHIMERA_DRAFT_PICKS )) {
+			chimeraDraftPicks = new LinkedHashMap<>();
+			Bundle picksBundle = bundle.getBundle( CHIMERA_DRAFT_PICKS );
+			for (String slotName : picksBundle.getKeys()) {
+				try {
+					chimeraDraftPicks.put(
+							Talent.valueOf( slotName ),
+							Talent.valueOf( picksBundle.getString( slotName ) ) );
+				} catch (Exception ignored) {}
+			}
+		} else if (chimeraDraftPending) {
+			chimeraDraftPicks = new LinkedHashMap<>();
 		}
 		if (bundle.contains( CUSTOM_NAME )) {
 			customName = bundle.getString( CUSTOM_NAME );

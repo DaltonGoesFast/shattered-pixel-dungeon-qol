@@ -203,8 +203,8 @@ public class TitleScene extends PixelScene {
 		btnNews = new StyledButton(GREY_TR, "Mod Changes"){
 			@Override
 			protected void onClick() {
-				ShatteredPixelDungeon.platform.openURI(
-						"https://github.com/DaltonGoesFast/shattered-pixel-dungeon-qol/blob/master/docs/mod-changes.md");
+				ChangesScene.changesSelected = 0;
+				ShatteredPixelDungeon.switchNoFade( ChangesScene.class );
 			}
 		};
 		btnNews.icon(Icons.getSettings(Icons.SETTINGS_QOL));
@@ -416,13 +416,23 @@ public class TitleScene extends PixelScene {
 			if (!updateShown && available){
 				updateShown = true;
 				text(Messages.get(TitleScene.class, "update"));
+				if (icon != null) {
+					icon.resetColor();
+					icon.hardlight(Window.SHPX_COLOR);
+				}
 			} else if (updateShown && !available){
 				updateShown = false;
 				text(Messages.get(TitleScene.class, "changes"));
+				if (icon != null) {
+					icon.resetColor();
+				}
 			}
 
 			if (updateShown){
 				textColor(ColorMath.interpolate( 0xFFFFFF, Window.SHPX_COLOR, 0.5f + (float)Math.sin(Game.timeTotal*5)/2f));
+				if (icon != null) {
+					icon.hardlight(ColorMath.interpolate( 0xFFFFFF, Window.SHPX_COLOR, 0.5f + (float)Math.sin(Game.timeTotal*5)/2f));
+				}
 			}
 		}
 

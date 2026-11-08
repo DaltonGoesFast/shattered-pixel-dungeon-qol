@@ -42,12 +42,15 @@ import com.watabou.utils.Random;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.Set;
 
 /**
- * Chimera pact: every class talent slot is metamorphed at hero creation, and the mask and crown
- * offer two pre-rolled choices, each from a different class other than the hero's. The first choice
- * from a class grants its signature item.
+ * Chimera pact: T2/T3 class talent slots are metamorphed at hero creation; T1 is drafted on first
+ * dungeon load from anti-duplicated metamorph offers. The mask and crown offer two pre-rolled
+ * choices, each from a different class other than the hero's. The first choice from a class grants
+ * its signature item.
  */
 public class Chimera {
 
@@ -59,6 +62,11 @@ public class Chimera {
 	public static boolean active( Hero hero ){
 		ensurePairs( hero );
 		return hero != null && Dungeon.isModified(Modifiers.CHIMERA) && hero.chimeraSubs != null;
+	}
+
+	/** True while Chimera's opening T1 draft still needs to be confirmed. */
+	public static boolean draftPending( Hero hero ){
+		return hero != null && Dungeon.isModified(Modifiers.CHIMERA) && hero.chimeraDraftPending;
 	}
 
 	/** True for the current run's hero viewing their own class; class info outside a run stays natural. */
@@ -73,7 +81,8 @@ public class Chimera {
 			ArrayList<LinkedHashMap<Talent, Integer>> natural = new ArrayList<>();
 			Talent.initClassTalents( hero.heroClass, natural );
 
-			for (int tier = 1; tier <= CLASS_TALENT_TIERS; tier++){
+			// Hard-roll T2 and T3 only; T1 is drafted after the run loads.
+			for (int tier = 2; tier <= CLASS_TALENT_TIERS; tier++){
 				for (Talent slot : new ArrayList<>(natural.get(tier-1).keySet())){
 					LinkedHashMap<Talent, Integer> offers = ScrollOfMetamorphosis.offersFor( hero, slot, tier );
 					if (offers.isEmpty()) continue;
@@ -82,10 +91,50 @@ public class Chimera {
 				}
 			}
 
+			generateDraftOffers( hero, natural.get(0).keySet() );
+
 		} finally {
 			Random.popGenerator();
 		}
 		rollPairs( hero );
+	}
+
+	/** Pre-rolls T1 offer pools with no talent repeated across slots. */
+	private static void generateDraftOffers( Hero hero, Set<Talent> t1Slots ){
+		hero.chimeraDraftOffers = new LinkedHashMap<>();
+		hero.chimeraDraftPicks = new LinkedHashMap<>();
+		Set<Talent> used = new HashSet<>();
+		for (Talent slot : t1Slots){
+			LinkedHashMap<Talent, Integer> offers = ScrollOfMetamorphosis.offersFor( hero, slot, 1, used );
+			ArrayList<Talent> list = new ArrayList<>(offers.keySet());
+			hero.chimeraDraftOffers.put( slot, list );
+			used.addAll( list );
+		}
+		hero.chimeraDraftPending = true;
+	}
+
+	/** Writes confirmed T1 picks into metamorphedTalents and clears draft state. */
+	public static void applyDraft( Hero hero ){
+		if (!draftPending( hero ) || hero.chimeraDraftOffers == null || hero.chimeraDraftPicks == null){
+			return;
+		}
+		for (Talent slot : hero.chimeraDraftOffers.keySet()){
+			Talent pick = hero.chimeraDraftPicks.get( slot );
+			if (pick == null) return;
+			hero.metamorphedTalents.put( slot, pick );
+		}
+		rebuildClassTiers( hero );
+		hero.chimeraDraftPending = false;
+		hero.chimeraDraftOffers = null;
+		hero.chimeraDraftPicks = null;
+	}
+
+	public static boolean draftComplete( Hero hero ){
+		if (hero == null || hero.chimeraDraftOffers == null || hero.chimeraDraftPicks == null) return false;
+		for (Talent slot : hero.chimeraDraftOffers.keySet()){
+			if (!hero.chimeraDraftPicks.containsKey( slot )) return false;
+		}
+		return true;
 	}
 
 	/** Two subclasses and two armor abilities, each pair from different classes, on their own seeded generator.

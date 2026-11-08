@@ -33,6 +33,8 @@ import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.TitleScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.WelcomeScene;
 import com.shatteredpixel.shatteredpixeldungeon.services.news.News;
+import com.shatteredpixel.shatteredpixeldungeon.services.updates.AvailableUpdateData;
+import com.shatteredpixel.shatteredpixeldungeon.services.updates.UpdateService;
 import com.shatteredpixel.shatteredpixeldungeon.services.updates.Updates;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.CharSprite;
 import com.shatteredpixel.shatteredpixeldungeon.ui.BuffIndicator;
@@ -841,6 +843,7 @@ public class WndSettings extends WndTabbed {
 		ColorBlock sep1;
 		CheckBox chkNews;
 		CheckBox chkUpdates;
+		RedButton btnCheckNow;
 		CheckBox chkBetas;
 		CheckBox chkWifi;
 
@@ -877,6 +880,47 @@ public class WndSettings extends WndTabbed {
 				};
 				chkUpdates.checked(SPDSettings.updates());
 				add(chkUpdates);
+
+				btnCheckNow = new RedButton(Messages.get(this, "check_now"), 9) {
+					@Override
+					protected void onClick() {
+						enable(false);
+						text(Messages.get(DataTab.this, "checking"));
+						Updates.checkForUpdate(true, new UpdateService.UpdateResultCallback() {
+							@Override
+							public void onUpdateAvailable(AvailableUpdateData update) {
+								Game.runOnRenderThread(() -> {
+									text(Messages.get(DataTab.this, "check_now"));
+									enable(true);
+									ShatteredPixelDungeon.scene().addToFront(new WndMessage(
+											Messages.get(DataTab.this, "update_found",
+													update.versionName != null ? update.versionName : "")));
+								});
+							}
+
+							@Override
+							public void onNoUpdateFound() {
+								Game.runOnRenderThread(() -> {
+									text(Messages.get(DataTab.this, "check_now"));
+									enable(true);
+									ShatteredPixelDungeon.scene().addToFront(
+											new WndMessage(Messages.get(DataTab.this, "up_to_date")));
+								});
+							}
+
+							@Override
+							public void onConnectionFailed() {
+								Game.runOnRenderThread(() -> {
+									text(Messages.get(DataTab.this, "check_now"));
+									enable(true);
+									ShatteredPixelDungeon.scene().addToFront(
+											new WndMessage(Messages.get(DataTab.this, "check_failed")));
+								});
+							}
+						});
+					}
+				};
+				add(btnCheckNow);
 
 				if (Updates.supportsBetaChannel()){
 					chkBetas = new CheckBox(Messages.get(this, "betas")) {
@@ -922,6 +966,11 @@ public class WndSettings extends WndTabbed {
 					chkUpdates.setRect(0, chkNews.bottom() + GAP, width, BTN_HEIGHT);
 					pos = chkUpdates.bottom();
 				}
+			}
+
+			if (btnCheckNow != null){
+				btnCheckNow.setRect(0, pos + GAP, width, BTN_HEIGHT);
+				pos = btnCheckNow.bottom();
 			}
 
 			if (chkBetas != null){

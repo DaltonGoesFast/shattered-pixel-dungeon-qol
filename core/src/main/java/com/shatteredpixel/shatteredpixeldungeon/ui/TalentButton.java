@@ -22,11 +22,13 @@
 package com.shatteredpixel.shatteredpixeldungeon.ui;
 
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
+import com.shatteredpixel.shatteredpixeldungeon.Chimera;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
+import com.shatteredpixel.shatteredpixeldungeon.windows.WndChimeraDraft;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Speck;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.exotic.ScrollOfMetamorphosis;
@@ -69,7 +71,8 @@ public class TalentButton extends Button {
 		INFO,
 		UPGRADE,
 		METAMORPH_CHOOSE,
-		METAMORPH_REPLACE
+		METAMORPH_REPLACE,
+		CHIMERA_DRAFT_OFFER
 	}
 
 	public TalentButton(int tier, Talent talent, int points, Mode mode){
@@ -140,6 +143,7 @@ public class TalentButton extends Button {
 		super.onClick();
 
 		if (mode == Mode.UPGRADE
+				&& !Chimera.draftPending( Dungeon.hero )
 				&& SPDSettings.autoTalentPlan()
 				&& Dungeon.hero != null
 				&& Dungeon.hero.isAlive()
@@ -233,7 +237,31 @@ public class TalentButton extends Button {
 
 	/** Full talent window: description and upgrade / metamorph action when applicable. */
 	private Window createTalentWindow() {
-		if (mode == Mode.UPGRADE
+		if (mode == Mode.CHIMERA_DRAFT_OFFER && Dungeon.hero != null && Dungeon.hero.isAlive()) {
+			return new WndInfoTalent(talent, pointsInTalent, new WndInfoTalent.TalentButtonCallback() {
+				@Override
+				public String prompt() {
+					return Messages.titleCase(Messages.get(WndChimeraDraft.class, "choose_offer"));
+				}
+				@Override
+				public boolean metamorphDesc() {
+					return true;
+				}
+				@Override
+				public void call() {
+					Talent slot = WndChimeraDraft.WndChimeraDraftOffers.INSTANCE != null
+							? WndChimeraDraft.WndChimeraDraftOffers.INSTANCE.slot
+							: null;
+					if (slot != null && WndChimeraDraft.INSTANCE != null) {
+						WndChimeraDraft.INSTANCE.pick(slot, talent);
+					}
+					if (WndChimeraDraft.WndChimeraDraftOffers.INSTANCE != null) {
+						WndChimeraDraft.WndChimeraDraftOffers.INSTANCE.hide();
+					}
+				}
+			});
+		} else if (mode == Mode.UPGRADE
+				&& !Chimera.draftPending( Dungeon.hero )
 				&& Dungeon.hero != null
 				&& Dungeon.hero.isAlive()
 				&& Dungeon.hero.talentPointsAvailable(tier) > 0

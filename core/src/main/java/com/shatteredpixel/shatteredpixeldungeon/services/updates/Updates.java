@@ -44,9 +44,21 @@ public class Updates {
 	}
 
 	public static void checkForUpdate(){
-		if (!supportsUpdatePrompts()) return;
-		if (!SPDSettings.updates()) return;
-		if (checkedThisLaunch) return;
+		checkForUpdate(false, null);
+	}
+
+	/**
+	 * @param force when true, rechecks even if this launch already checked, ignores the
+	 *              auto-check setting, and allows metered networks (for Settings → Check now).
+	 * @param callback optional; called after the network result. Auto-check passes null.
+	 */
+	public static void checkForUpdate(boolean force, UpdateService.UpdateResultCallback callback){
+		if (!supportsUpdatePrompts()) {
+			if (callback != null) callback.onConnectionFailed();
+			return;
+		}
+		if (!force && !SPDSettings.updates()) return;
+		if (!force && checkedThisLaunch) return;
 		checkedThisLaunch = true;
 
 		//We do this so that automatically enabled beta checking (for users who DLed a beta) persists afterward
@@ -54,19 +66,28 @@ public class Updates {
 			SPDSettings.betas(true);
 		}
 
-		service.checkForUpdate(!SPDSettings.WiFi(), SPDSettings.betas(), new UpdateService.UpdateResultCallback() {
+		// Auto-check still respects "Only check on WiFi". Manual Check now always allows cellular.
+		boolean useMetered = force || !SPDSettings.WiFi();
+
+		service.checkForUpdate(useMetered, SPDSettings.betas(), new UpdateService.UpdateResultCallback() {
 			@Override
 			public void onUpdateAvailable(AvailableUpdateData update) {
 				updateData = update;
+				if (callback != null) callback.onUpdateAvailable(update);
 			}
 
 			@Override
 			public void onNoUpdateFound() {
+				if (force) {
+					updateData = null;
+				}
+				if (callback != null) callback.onNoUpdateFound();
 			}
 
 			@Override
 			public void onConnectionFailed() {
-				// Stay quiet. checkedThisLaunch is already set, so this launch does not retry.
+				// Auto-check stays quiet. checkedThisLaunch is already set, so this launch does not retry.
+				if (callback != null) callback.onConnectionFailed();
 			}
 		});
 	}

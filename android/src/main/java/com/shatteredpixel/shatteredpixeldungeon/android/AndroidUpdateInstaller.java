@@ -78,6 +78,7 @@ public final class AndroidUpdateInstaller {
 					awaitingPermission = false;
 					pendingPage = null;
 					pendingDownload = null;
+					Toast.makeText(activity, "Install permission unavailable. Opening the release page.", Toast.LENGTH_LONG).show();
 					open(pageURL);
 				}
 				return;
@@ -114,6 +115,9 @@ public final class AndroidUpdateInstaller {
 		pendingPage = null;
 		pendingDownload = null;
 		if (!granted || activity == null || download == null) {
+			if (activity != null) {
+				Toast.makeText(activity, "Install permission denied. Opening the release page.", Toast.LENGTH_LONG).show();
+			}
 			open(page);
 			return;
 		}
@@ -133,10 +137,13 @@ public final class AndroidUpdateInstaller {
 		new Thread(() -> {
 			try {
 				File apk = download(activity, downloadURL);
-				activity.runOnUiThread(() -> install(activity, apk, pageURL));
+				activity.runOnUiThread(() -> {
+					Toast.makeText(activity, "Opening installer…", Toast.LENGTH_SHORT).show();
+					install(activity, apk, pageURL);
+				});
 			} catch (Exception e) {
 				activity.runOnUiThread(() -> {
-					Toast.makeText(activity, "Couldn't download the update.", Toast.LENGTH_SHORT).show();
+					Toast.makeText(activity, "Couldn't download the update. Opening the release page.", Toast.LENGTH_LONG).show();
 					open(pageURL);
 				});
 			}
@@ -198,6 +205,7 @@ public final class AndroidUpdateInstaller {
 			intent.setClipData(ClipData.newRawUri("", uri));
 			activity.startActivity(intent);
 		} catch (Exception e) {
+			Toast.makeText(activity, "Couldn't open the installer. Opening the release page.", Toast.LENGTH_LONG).show();
 			open(pageURL);
 		}
 	}

@@ -34,6 +34,7 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.RenderedTextBlock;
 import com.shatteredpixel.shatteredpixeldungeon.ui.ScrollPane;
 import com.shatteredpixel.shatteredpixeldungeon.ui.StyledButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.changelist.ChangeInfo;
+import com.shatteredpixel.shatteredpixeldungeon.ui.changelist.Mod_Changes;
 import com.shatteredpixel.shatteredpixeldungeon.ui.changelist.Pixel_Dungeon_Changes;
 import com.shatteredpixel.shatteredpixeldungeon.ui.changelist.WndChanges;
 import com.shatteredpixel.shatteredpixeldungeon.ui.changelist.WndChangesTabbed;
@@ -158,30 +159,33 @@ public class ChangesScene extends PixelScene {
 		
 		switch (changesSelected){
 			case 0: default:
-				v4_X_Changes.addAllChanges(changeInfos);
+				Mod_Changes.addAllChanges(changeInfos);
 				break;
 			case 1:
-				v3_X_Changes.addAllChanges(changeInfos);
+				v4_X_Changes.addAllChanges(changeInfos);
 				break;
 			case 2:
-				v2_X_Changes.addAllChanges(changeInfos);
+				v3_X_Changes.addAllChanges(changeInfos);
 				break;
 			case 3:
-				v1_X_Changes.addAllChanges(changeInfos);
+				v2_X_Changes.addAllChanges(changeInfos);
 				break;
 			case 4:
-				v0_9_X_Changes.addAllChanges(changeInfos);
+				v1_X_Changes.addAllChanges(changeInfos);
 				break;
 			case 5:
-				v0_8_X_Changes.addAllChanges(changeInfos);
+				v0_9_X_Changes.addAllChanges(changeInfos);
 				break;
 			case 6:
-				v0_7_X_Changes.addAllChanges(changeInfos);
+				v0_8_X_Changes.addAllChanges(changeInfos);
 				break;
 			case 7:
-				v0_6_X_Changes.addAllChanges(changeInfos);
+				v0_7_X_Changes.addAllChanges(changeInfos);
 				break;
 			case 8:
+				v0_6_X_Changes.addAllChanges(changeInfos);
+				break;
+			case 9:
 				v0_5_X_Changes.addAllChanges(changeInfos);
 				v0_4_X_Changes.addAllChanges(changeInfos);
 				v0_3_X_Changes.addAllChanges(changeInfos);
@@ -245,22 +249,23 @@ public class ChangesScene extends PixelScene {
 
 		float left = list.left()-4f;
 
-		if (changesSelected <= 3){
+		if (changesSelected <= 4){
 
-			left = setupChangesSelectionButton(0, "v4.X", left, list.bottom(), 24);
-			left = setupChangesSelectionButton(1, "v3.X", left, list.bottom(), 24);
-			left = setupChangesSelectionButton(2, "v2.X", left, list.bottom(), 24);
-			left = setupChangesSelectionButton(3, "v1.X", left, list.bottom(), 24);
-			left = setupChangesSelectionButton(4, "PreRelease->", left, list.bottom(), 53);
+			left = setupChangesSelectionButton(0, "QoL", left, list.bottom(), 22);
+			left = setupChangesSelectionButton(1, "v4.X", left, list.bottom(), 24);
+			left = setupChangesSelectionButton(2, "v3.X", left, list.bottom(), 24);
+			left = setupChangesSelectionButton(3, "v2.X", left, list.bottom(), 24);
+			left = setupChangesSelectionButton(4, "v1.X", left, list.bottom(), 24);
+			left = setupChangesSelectionButton(5, "->", left, list.bottom(), 20);
 
 		} else {
 
-			left = setupChangesSelectionButton(3, "<-Release", left, list.bottom(), 40);
-			left = setupChangesSelectionButton(4, "v0.9", left, list.bottom(), 22);
-			left = setupChangesSelectionButton(5, "v0.8", left, list.bottom(), 22);
-			left = setupChangesSelectionButton(6, "v0.7", left, list.bottom(), 22);
-			left = setupChangesSelectionButton(7, "v0.6", left, list.bottom(), 22);
-			left = setupChangesSelectionButton(8, "v0.5-", left, list.bottom(), 23);
+			left = setupChangesSelectionButton(4, "<-", left, list.bottom(), 20);
+			left = setupChangesSelectionButton(5, "v0.9", left, list.bottom(), 24);
+			left = setupChangesSelectionButton(6, "v0.8", left, list.bottom(), 24);
+			left = setupChangesSelectionButton(7, "v0.7", left, list.bottom(), 24);
+			left = setupChangesSelectionButton(8, "v0.6", left, list.bottom(), 24);
+			left = setupChangesSelectionButton(9, "v0.5-", left, list.bottom(), 26);
 
 		}
 

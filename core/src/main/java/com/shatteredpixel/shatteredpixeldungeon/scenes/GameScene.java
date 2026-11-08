@@ -24,6 +24,7 @@ package com.shatteredpixel.shatteredpixeldungeon.scenes;
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
+import com.shatteredpixel.shatteredpixeldungeon.Chimera;
 import com.shatteredpixel.shatteredpixeldungeon.Chrome;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.FirstDescent;
@@ -122,6 +123,7 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
 import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingUI;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndBag;
+import com.shatteredpixel.shatteredpixeldungeon.windows.WndChimeraDraft;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndGame;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndHero;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndInfoCell;
@@ -841,6 +843,12 @@ public class GameScene extends PixelScene {
 		TrinketCatalyst cata = Dungeon.hero.belongings.getItem(TrinketCatalyst.class);
 		if (cata != null && cata.hasRolledTrinkets()){
 			addToFront(new TrinketCatalyst.WndTrinket(cata));
+		}
+
+		if (Chimera.draftPending(Dungeon.hero)
+				&& Dungeon.hero.chimeraDraftOffers != null
+				&& !Dungeon.hero.chimeraDraftOffers.isEmpty()){
+			addToFront(new WndChimeraDraft());
 		}
 
 		if (!invVisible) toggleInvPane();
