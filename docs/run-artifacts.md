@@ -178,7 +178,8 @@ Unused on purpose: Snake, Swarm, Guard, DM-200, Golem (region already full). Flo
 
 - **Player:** The dungeon itself grows stronger as you descend. Every enemy shares that growth.
 - Not turn-based. Steps when **depth increases for the first time** (`Statistics.deepestFloor`), same clock as Metamorphosis / Enigma. Quest branches and ascent do not step.
-- `multiplier = 1 + min(0.50, 0.02 * (deepestFloor - 1))`. Floor 1 = 1.00, Goo (5) = 1.08, Yog (25) = 1.48, floor 26 = 1.50.
+- `multiplier = 1 + min(0.50, 0.02 * (deepestFloor - 1))` on loop 1. Floor 1 = 1.00, Goo (5) = 1.08, Yog (25) = 1.48, floor 26 = 1.50.
+- Loop 2+ does not restart at 0 when `deepestFloor` resets. Floor 1 starts at `evolution_base` (at least +50%, or the previous loop's ending percent when that is higher) and then `+1%` per new deepest floor. The base is banked at the Amulet, before the reset, and a looped save with no base yet is corrected to 50 on load.
 - One global value. The next hit anywhere (including mobs left upstairs) uses the new step. Nothing stored on the mob.
 - Eligible: every `alignment == ENEMY` (bosses, quest hostiles, mimics, statues, wraiths). Hero / allies / neutrals unchanged.
 - Four stats at the same multiplier: outgoing damage (melee **and** zaps/beams/boss specials), accuracy, evasion, and **effective HP** (damage taken = `1/mult`, matching Growing’s champion blurb). Health bars do not grow.

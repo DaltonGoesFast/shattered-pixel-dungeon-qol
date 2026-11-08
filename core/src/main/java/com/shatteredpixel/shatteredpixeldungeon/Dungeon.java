@@ -689,6 +689,7 @@ public class Dungeon {
 			Command.store( bundle );
 			Rebirth.store( bundle );
 			Legacy.store( bundle );
+			Modifiers.storeEvolution( bundle );
 			bundle.put( MOBS_TO_CHAMPION, mobsToChampion );
 			bundle.put( HERO, hero );
 			bundle.put( DEPTH, depth );
@@ -801,6 +802,7 @@ public class Dungeon {
 		Command.restore( bundle );
 		Rebirth.restore( bundle );
 		Legacy.restore( bundle );
+		Modifiers.restoreEvolution( bundle );
 		Dungeon.mobsToChampion = bundle.getFloat( MOBS_TO_CHAMPION );
 		
 		Dungeon.level = null;
@@ -882,6 +884,7 @@ public class Dungeon {
 		Statistics.restoreFromBundle( bundle );
 		Generator.restoreFromBundle( bundle );
 
+		Modifiers.migrateEvolutionOnLoad();
 		Modifiers.ensureEvolutionTracker( hero );
 		DebugRunMark.ensureOn( hero );
 
