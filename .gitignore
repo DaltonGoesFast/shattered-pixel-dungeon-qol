@@ -12,6 +12,11 @@
 .gradle/
 build/
 release/
+core/bin/
+
+# JVM crash dumps
+hs_err_pid*.log
+replay_pid*.log
 
 # Local configuration file (sdk path, etc)
 local.properties
