@@ -870,7 +870,9 @@ public class WndSettings extends WndTabbed {
 					protected void onClick() {
 						super.onClick();
 						SPDSettings.updates(checked());
-						Updates.clearUpdate();
+						// Turning this on can be the launch's single check, if the title
+						// screen skipped it because the setting was off.
+						if (checked()) Updates.checkForUpdate();
 					}
 				};
 				chkUpdates.checked(SPDSettings.updates());
@@ -882,7 +884,6 @@ public class WndSettings extends WndTabbed {
 						protected void onClick() {
 							super.onClick();
 							SPDSettings.betas(checked());
-							Updates.clearUpdate();
 						}
 					};
 					chkBetas.checked(SPDSettings.betas());

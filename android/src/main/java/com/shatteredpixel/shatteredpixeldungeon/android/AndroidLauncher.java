@@ -183,12 +183,19 @@ public class AndroidLauncher extends AndroidApplication {
 			finishAndRemoveTask();
 		}
 		super.onResume();
+		AndroidUpdateInstaller.onResume();
 	}
 
 	@SuppressLint("GestureBackNavigation")
 	@Override
 	public void onBackPressed() {
 		//do nothing, game should catch all back presses
+	}
+
+	@Override
+	protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+		super.onActivityResult(requestCode, resultCode, data);
+		AndroidUpdateInstaller.onActivityResult(requestCode);
 	}
 
 	@Override

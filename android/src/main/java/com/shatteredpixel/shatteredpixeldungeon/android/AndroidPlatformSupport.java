@@ -196,6 +196,11 @@ public class AndroidPlatformSupport extends PlatformSupport {
 	}
 
 	@Override
+	public void launchUpdate(String pageURL, String downloadURL) {
+		AndroidUpdateInstaller.launch(pageURL, downloadURL);
+	}
+
+	@Override
 	public boolean supportsVibration() {
 		return true; //always true on Android
 	}
