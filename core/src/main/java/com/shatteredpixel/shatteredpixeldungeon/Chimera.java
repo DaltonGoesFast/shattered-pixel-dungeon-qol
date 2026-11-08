@@ -28,6 +28,8 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.abilities.ArmorAbility;
 import com.shatteredpixel.shatteredpixeldungeon.items.BrokenSeal;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
+import com.shatteredpixel.shatteredpixeldungeon.items.KingsCrown;
+import com.shatteredpixel.shatteredpixeldungeon.items.TengusMask;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.Artifact;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.CloakOfShadows;
@@ -44,7 +46,8 @@ import java.util.LinkedHashMap;
 
 /**
  * Chimera pact: every class talent slot is metamorphed at hero creation, and the mask and crown
- * offer two pre-rolled choices from any class. The first choice from a class grants its signature item.
+ * offer two pre-rolled choices, each from a different class other than the hero's. The first choice
+ * from a class grants its signature item.
  */
 public class Chimera {
 
@@ -85,7 +88,9 @@ public class Chimera {
 		rollPairs( hero );
 	}
 
-	/** Two subclasses and two armor abilities from the other five classes, on their own seeded generator. */
+	/** Two subclasses and two armor abilities, each pair from different classes, on their own seeded generator.
+	 *  The hero's own class stays out of the pool. A same-class second draw is discarded and redrawn, so a
+	 *  seed whose pair was already two classes keeps the same generator stream. */
 	private static void rollPairs( Hero hero ){
 		Random.pushGenerator( Dungeon.seed + PAIR_SALT );
 		try {
@@ -99,11 +104,23 @@ public class Chimera {
 
 			HeroSubClass subA = Random.element( subs );
 			subs.remove( subA );
-			hero.chimeraSubs = new HeroSubClass[]{ subA, Random.element( subs ) };
+			HeroSubClass subB = Random.element( subs );
+			if (classOf( subA ) == classOf( subB )){
+				HeroClass taken = classOf( subA );
+				subs.removeIf( sub -> classOf( sub ) == taken );
+				if (!subs.isEmpty()) subB = Random.element( subs );
+			}
+			hero.chimeraSubs = new HeroSubClass[]{ subA, subB };
 
 			ArmorAbility abilA = Random.element( abils );
 			abils.remove( abilA );
-			hero.chimeraAbilities = new ArmorAbility[]{ abilA, Random.element( abils ) };
+			ArmorAbility abilB = Random.element( abils );
+			if (classOf( abilA ) == classOf( abilB )){
+				HeroClass taken = classOf( abilA );
+				abils.removeIf( abil -> classOf( abil ) == taken );
+				if (!abils.isEmpty()) abilB = Random.element( abils );
+			}
+			hero.chimeraAbilities = new ArmorAbility[]{ abilA, abilB };
 		} finally {
 			Random.popGenerator();
 		}
@@ -130,6 +147,36 @@ public class Chimera {
 
 	public static ArmorAbility[] abilityChoices( Hero hero ){
 		return active( hero ) ? hero.chimeraAbilities : hero.heroClass.armorAbilities();
+	}
+
+	/** Subclasses the hero info window may name. Unreached Chimera rolls stay hidden. */
+	public static HeroSubClass[] visibleSubclasses( HeroClass cls ){
+		if (!inRunFor( cls )) return cls.subClasses();
+		Hero hero = Dungeon.hero;
+		boolean offering = (hero.subClass == null || hero.subClass == HeroSubClass.NONE)
+				&& hero.belongings.getItem( TengusMask.class ) != null;
+		ArrayList<HeroSubClass> shown = new ArrayList<>();
+		for (HeroSubClass sub : hero.chimeraSubs){
+			if (offering || sub == hero.subClass) shown.add( sub );
+		}
+		return shown.toArray( new HeroSubClass[0] );
+	}
+
+	/** Armor abilities the hero info window may name. Unreached Chimera rolls stay hidden. */
+	public static ArmorAbility[] visibleAbilities( HeroClass cls ){
+		if (!inRunFor( cls )) return cls.armorAbilities();
+		Hero hero = Dungeon.hero;
+		boolean offering = hero.armorAbility == null
+				&& hero.belongings.getItem( KingsCrown.class ) != null;
+		ArrayList<ArmorAbility> shown = new ArrayList<>();
+		for (ArmorAbility abil : hero.chimeraAbilities){
+			if (offering || sameAbility( abil, hero.armorAbility )) shown.add( abil );
+		}
+		return shown.toArray( new ArmorAbility[0] );
+	}
+
+	private static boolean sameAbility( ArmorAbility rolled, ArmorAbility chosen ){
+		return chosen != null && rolled.getClass() == chosen.getClass();
 	}
 
 	public static HeroClass classOf( HeroSubClass sub ){

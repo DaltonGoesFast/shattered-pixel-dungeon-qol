@@ -23,7 +23,6 @@ package com.shatteredpixel.shatteredpixeldungeon.windows;
 
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Chimera;
-import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroClass;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroSubClass;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
@@ -293,7 +292,7 @@ public class WndHeroInfo extends WndTabbed {
 			message = PixelScene.renderTextBlock(Messages.get(WndHeroInfo.class, "subclasses_msg"), 6);
 			add(message);
 
-			HeroSubClass[] subClasses = Chimera.inRunFor(cls) ? Dungeon.hero.chimeraSubs : cls.subClasses();
+			HeroSubClass[] subClasses = Chimera.visibleSubclasses(cls);
 
 			subClsDescs = new RenderedTextBlock[subClasses.length];
 			subClsInfos = new IconButton[subClasses.length];
@@ -353,7 +352,7 @@ public class WndHeroInfo extends WndTabbed {
 			message = PixelScene.renderTextBlock(Messages.get(WndHeroInfo.class, "abilities_msg"), 6);
 			add(message);
 
-			ArmorAbility[] abilities = Chimera.inRunFor(cls) ? Dungeon.hero.chimeraAbilities : cls.armorAbilities();
+			ArmorAbility[] abilities = Chimera.visibleAbilities(cls);
 
 			abilityDescs = new RenderedTextBlock[abilities.length];
 			abilityInfos = new IconButton[abilities.length];
