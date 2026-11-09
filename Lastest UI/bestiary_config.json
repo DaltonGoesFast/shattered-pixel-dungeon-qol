@@ -1,7 +1,7 @@
 {
   "heat_window_sec": 900,
-  "sprint_donor_reward": 100,
-  "sprint_donor_reward_per_level": 100,
+  "sprint_donor_reward": 50,
+  "sprint_donor_reward_per_level": 50,
   "per_user_bar_cap_fraction": 0.0,
   "repeat_mob_diminishing": false,
   "soft_floor": {
@@ -109,7 +109,7 @@
     {
       "level": 5,
       "zone": "Halls",
-      "bar_threshold": 400,
+      "bar_threshold": 500,
       "pip_count": 10,
       "monsters": [
         "eye",

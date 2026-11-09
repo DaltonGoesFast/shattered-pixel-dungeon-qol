@@ -104,6 +104,8 @@ public class MagesStaff extends MeleeWeapon {
 	@Override
 	public ArrayList<String> actions(Hero hero) {
 		ArrayList<String> actions = super.actions( hero );
+		// Staff has no Duelist weapon ability; Zap is its special action.
+		actions.remove(AC_ABILITY);
 		actions.add(AC_IMBUE);
 		if (wand!= null && wand.curCharges > 0) {
 			actions.add( AC_ZAP );
