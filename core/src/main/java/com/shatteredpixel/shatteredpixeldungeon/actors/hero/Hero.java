@@ -469,7 +469,7 @@ public class Hero extends Char {
 					chimeraDraftOffers.put( slot, offers );
 				} catch (Exception ignored) {}
 			}
-			if (chimeraDraftOffers.isEmpty()) chimeraDraftOffers = null;
+			// Leave empty maps as-is; Chimera.ensureDraftOffers repairs after load.
 		}
 		if (chimeraDraftPending && bundle.contains( CHIMERA_DRAFT_PICKS )) {
 			chimeraDraftPicks = new LinkedHashMap<>();

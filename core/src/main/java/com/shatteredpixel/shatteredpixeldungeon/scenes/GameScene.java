@@ -845,9 +845,7 @@ public class GameScene extends PixelScene {
 			addToFront(new TrinketCatalyst.WndTrinket(cata));
 		}
 
-		if (Chimera.draftPending(Dungeon.hero)
-				&& Dungeon.hero.chimeraDraftOffers != null
-				&& !Dungeon.hero.chimeraDraftOffers.isEmpty()){
+		if (Chimera.draftPending(Dungeon.hero) && Chimera.ensureDraftOffers(Dungeon.hero)){
 			addToFront(new WndChimeraDraft());
 		}
 

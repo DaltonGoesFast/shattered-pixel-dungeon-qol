@@ -874,6 +874,7 @@ public class Dungeon {
 		
 		hero = null;
 		hero = (Hero)bundle.get( HERO );
+		Chimera.ensureDraftOffers( hero );
 		
 		depth = bundle.getInt( DEPTH );
 		branch = bundle.getInt( BRANCH );

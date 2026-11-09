@@ -55,6 +55,7 @@ import java.util.Set;
 public class Chimera {
 
 	private static final long SEED_SALT = 0x4368696DL; // "Chim"
+	private static final long DRAFT_SALT = 0x44726166L; // "Draf"
 	private static final long PAIR_SALT = 0x50616972L; // "Pair"
 
 	private static final int CLASS_TALENT_TIERS = 3;
@@ -76,12 +77,12 @@ public class Chimera {
 
 	/** Runs once in initHero, after the class talents and before the class kit. */
 	public static void rollOpening( Hero hero ){
+		ArrayList<LinkedHashMap<Talent, Integer>> natural = new ArrayList<>();
+		Talent.initClassTalents( hero.heroClass, natural );
+
+		// Hard-roll T2 and T3 only; T1 uses its own salt so missing offers can be repaired identically.
 		Random.pushGenerator( Dungeon.seed + SEED_SALT );
 		try {
-			ArrayList<LinkedHashMap<Talent, Integer>> natural = new ArrayList<>();
-			Talent.initClassTalents( hero.heroClass, natural );
-
-			// Hard-roll T2 and T3 only; T1 is drafted after the run loads.
 			for (int tier = 2; tier <= CLASS_TALENT_TIERS; tier++){
 				for (Talent slot : new ArrayList<>(natural.get(tier-1).keySet())){
 					LinkedHashMap<Talent, Integer> offers = ScrollOfMetamorphosis.offersFor( hero, slot, tier );
@@ -90,9 +91,13 @@ public class Chimera {
 					rebuildClassTiers( hero );
 				}
 			}
+		} finally {
+			Random.popGenerator();
+		}
 
+		Random.pushGenerator( Dungeon.seed + DRAFT_SALT );
+		try {
 			generateDraftOffers( hero, natural.get(0).keySet() );
-
 		} finally {
 			Random.popGenerator();
 		}
@@ -111,6 +116,36 @@ public class Chimera {
 			used.addAll( list );
 		}
 		hero.chimeraDraftPending = true;
+	}
+
+	/**
+	 * Rebuilds missing T1 draft offers (e.g. bad mid-draft save). Keeps picks that are still valid.
+	 * Uses {@link #DRAFT_SALT} so repair matches a fresh {@link #rollOpening(Hero)} for this seed.
+	 */
+	public static boolean ensureDraftOffers( Hero hero ){
+		if (!draftPending( hero )) return false;
+		if (hero.chimeraDraftOffers != null && !hero.chimeraDraftOffers.isEmpty()) return true;
+
+		LinkedHashMap<Talent, Talent> priorPicks = hero.chimeraDraftPicks;
+		Random.pushGenerator( Dungeon.seed + DRAFT_SALT );
+		try {
+			ArrayList<LinkedHashMap<Talent, Integer>> natural = new ArrayList<>();
+			Talent.initClassTalents( hero.heroClass, natural );
+			generateDraftOffers( hero, natural.get(0).keySet() );
+		} finally {
+			Random.popGenerator();
+		}
+		if (priorPicks != null && hero.chimeraDraftOffers != null) {
+			hero.chimeraDraftPicks = new LinkedHashMap<>();
+			for (Talent slot : hero.chimeraDraftOffers.keySet()) {
+				Talent pick = priorPicks.get( slot );
+				ArrayList<Talent> offers = hero.chimeraDraftOffers.get( slot );
+				if (pick != null && offers != null && offers.contains( pick )) {
+					hero.chimeraDraftPicks.put( slot, pick );
+				}
+			}
+		}
+		return hero.chimeraDraftOffers != null && !hero.chimeraDraftOffers.isEmpty();
 	}
 
 	/** Writes confirmed T1 picks into metamorphedTalents and clears draft state. */

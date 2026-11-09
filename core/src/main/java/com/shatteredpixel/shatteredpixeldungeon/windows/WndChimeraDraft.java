@@ -129,6 +129,7 @@ public class WndChimeraDraft extends Window {
 	}
 
 	public void openOffers( Talent slot ) {
+		if (!Chimera.ensureDraftOffers( Dungeon.hero )) return;
 		GameScene.show( new WndChimeraDraftOffers( slot ) );
 	}
 
@@ -254,7 +255,9 @@ public class WndChimeraDraft extends Window {
 			add( text );
 
 			LinkedHashMap<Talent, Integer> offers = new LinkedHashMap<>();
-			ArrayList<Talent> list = Dungeon.hero.chimeraDraftOffers.get( slot );
+			ArrayList<Talent> list = Dungeon.hero.chimeraDraftOffers != null
+					? Dungeon.hero.chimeraDraftOffers.get( slot )
+					: null;
 			if (list != null) {
 				for (Talent t : list) {
 					offers.put( t, 0 );
