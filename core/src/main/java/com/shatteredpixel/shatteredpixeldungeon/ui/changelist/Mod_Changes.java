@@ -33,6 +33,7 @@ public class Mod_Changes {
 
 	public static void addAllChanges( ArrayList<ChangeInfo> changeInfos ){
 		addOverview(changeInfos);
+		add_v4_0_2_QoL_12(changeInfos);
 		add_Chimera_T1_Draft(changeInfos);
 		add_v4_0_2_QoL_10(changeInfos);
 		add_v4_0_2_QoL_8(changeInfos);
@@ -40,6 +41,39 @@ public class Mod_Changes {
 		add_v4_0_0_QoL_6(changeInfos);
 		add_v4_0_0_QoL_5(changeInfos);
 		add_v4_0_0(changeInfos);
+	}
+
+	private static void add_v4_0_2_QoL_12( ArrayList<ChangeInfo> changeInfos ) {
+		ChangeInfo changes = new ChangeInfo("4.0.2-QoL-12", true, "");
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes = new ChangeInfo(Messages.get(ChangesScene.class, "new"), false, null);
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.ENTER), "Play Along Mode (Soul Pact)",
+				"**-** Join live stream runs from the pulsing **DaltonGoesFast [LIVE]** button on Desktop or Android\n" +
+				"**-** Shared seed, challenges, and pacts in an isolated save slot (slot 99) so personal saves stay untouched\n" +
+				"**-** See Dalton and fellow players as live floor ghosts with spectral tombstones and **Spirit Cam** spectator mode\n" +
+				"**-** **Soul Pact:** if the host dies for real, every connected player dies with them (spared when a Blessed Ankh pops)"));
+
+		changes.addButton( new ChangeButton(Icons.getSettings(Icons.SETTINGS_QOL), "Mod Changes guide & ability tabs",
+				"**-** New in-game **Mod Changes** guide scene linked from the title screen\n" +
+				"**-** **Equipped Ability Tabs** on the inventory pane with optional keybinds (Desktop / Settings → QoL)\n" +
+				"**-** Desktop crash dialog now includes **Copy Log** and a quick **Discord** report button"));
+
+		changes = new ChangeInfo(Messages.get(ChangesScene.class, "changes"), false, null);
+		changes.hardlight(CharSprite.WARNING);
+		changeInfos.add(changes);
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.TALENT), "Chimera pact updates",
+				"**-** Opening T1 draft now offers 4 choices per slot from all classes including native, plus a **Random** draft button\n" +
+				"**-** Tengu's mask and the King's crown now offer 3 distinct class choices (at most one from your own class)"));
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.PACTS), "Pact & HUD polish",
+				"**-** **Command + Forbidden Runes** keeps Magical Infusion out of Command\n" +
+				"**-** **Grave** avoids dropping duplicate chalices on an unblessed Ankh revive"));
 	}
 
 	private static void add_Chimera_T1_Draft( ArrayList<ChangeInfo> changeInfos ) {
