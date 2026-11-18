@@ -939,6 +939,29 @@ public class HeroSelectScene extends PixelScene {
 				add(randomButton);
 			}
 
+			if (com.watabou.utils.DeviceCompat.isDesktop()) {
+				StyledButton playAlongButton = new StyledButton(Chrome.Type.BLANK,
+						"Play Along Lobby: " + (SPDSettings.playAlongHostEnabled() ? "ON" : "OFF"), 6) {
+					@Override
+					protected void onClick() {
+						boolean next = !SPDSettings.playAlongHostEnabled();
+						SPDSettings.playAlongHostEnabled(next);
+						text("Play Along Lobby: " + (next ? "ON" : "OFF"));
+						if (next) {
+							icon(Icons.get(Icons.CHALLENGE_COLOR));
+							com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.ensureHostServerStarted();
+						} else {
+							icon(Icons.get(Icons.CHALLENGE_GREY));
+						}
+						layout();
+					}
+				};
+				playAlongButton.leftJustify = true;
+				playAlongButton.icon(Icons.get(SPDSettings.playAlongHostEnabled() ? Icons.CHALLENGE_COLOR : Icons.CHALLENGE_GREY));
+				buttons.add(playAlongButton);
+				add(playAlongButton);
+			}
+
 			for (int i = 1; i < buttons.size(); i++){
 				ColorBlock spc = new ColorBlock(1, 1, 0xFF000000);
 				add(spc);

@@ -1,0 +1,309 @@
+/*
+ * Pixel Dungeon
+ * Copyright (C) 2012-2015 Oleg Dolya
+ *
+ * Shattered Pixel Dungeon
+ * Copyright (C) 2014-2026 Evan Debenham
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ */
+
+package com.shatteredpixel.shatteredpixeldungeon.playalong;
+
+import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.SessionInfo;
+import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.WireMessage;
+
+import org.java_websocket.client.WebSocketClient;
+import org.java_websocket.handshake.ServerHandshake;
+
+import java.net.URI;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+
+/**
+ * Cross-platform WebSocket client for Play Along Mode (Desktop & Android).
+ */
+public class PlayAlongClient {
+
+	public interface StatusCallback {
+		void onResult(SessionInfo info);
+	}
+
+	public interface ClientListener {
+		void onJoinAck(WireMessage msg);
+		void onJoinError(String error);
+		void onWorldState(WireMessage msg);
+		void onHostAnkhPopped(WireMessage msg);
+		void onHostDied(WireMessage msg);
+		void onPlayerDiedNotice(WireMessage msg);
+		void onPlayerWonNotice(WireMessage msg);
+		void onConnectionLost(boolean permanentlyFailed);
+	}
+
+	private static final int PING_TIMEOUT_MS = 1600;
+
+	private final ClientListener listener;
+	private volatile WebSocketClient socket;
+	private volatile boolean intentionalClose = false;
+	private volatile boolean reconnecting = false;
+	private volatile long disconnectedSinceMs = 0L;
+
+	private volatile String lastAddress;
+	private volatile String lastUserId;
+	private volatile String lastUsername;
+	private volatile String lastHeroClass;
+	private volatile String lastModVersion;
+	private volatile String lastSessionId;
+	private volatile int lastDepth = 1;
+	private volatile int lastBranch = 0;
+	private volatile int lastPos = 0;
+
+	public PlayAlongClient(ClientListener listener) {
+		this.listener = listener;
+	}
+
+	public static void pingStatus(final String address, final StatusCallback callback) {
+		Thread t = new Thread(() -> {
+			SessionInfo result = null;
+			WebSocketClient pingSocket = null;
+			try {
+				URI uri = PlayAlongProtocol.buildWebSocketUri(address);
+				CountDownLatch latch = new CountDownLatch(1);
+				AtomicReference<SessionInfo> ref = new AtomicReference<>();
+
+				pingSocket = new WebSocketClient(uri) {
+					@Override
+					public void onOpen(ServerHandshake handshakedata) {
+						WireMessage ping = new WireMessage();
+						ping.type = "status_ping";
+						send(PlayAlongProtocol.GSON.toJson(ping));
+					}
+
+					@Override
+					public void onMessage(String message) {
+						try {
+							WireMessage msg = PlayAlongProtocol.GSON.fromJson(message, WireMessage.class);
+							if (msg != null && "status_pong".equals(msg.type)) {
+								ref.set(msg.session);
+								latch.countDown();
+							}
+						} catch (Exception ignored) {
+						}
+					}
+
+					@Override
+					public void onClose(int code, String reason, boolean remote) {
+						latch.countDown();
+					}
+
+					@Override
+					public void onError(Exception ex) {
+						latch.countDown();
+					}
+				};
+				pingSocket.setConnectionLostTimeout(0);
+				if (pingSocket.connectBlocking(PING_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+					latch.await(PING_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+					result = ref.get();
+				}
+			} catch (Exception ignored) {
+			} finally {
+				if (pingSocket != null) {
+					try {
+						pingSocket.close();
+					} catch (Exception ignored) {
+					}
+				}
+			}
+			if (callback != null) {
+				callback.onResult(result);
+			}
+		}, "PlayAlongStatusPing");
+		t.setDaemon(true);
+		t.start();
+	}
+
+	public synchronized void connect(String address, String userId, String username,
+	                                 String heroClass, String modVersion, String sessionId,
+	                                 int depth, int branch, int pos, boolean isRejoin) {
+		closeInternal();
+		this.intentionalClose = false;
+		this.disconnectedSinceMs = 0L;
+		this.lastAddress = address;
+		this.lastUserId = userId;
+		this.lastUsername = username;
+		this.lastHeroClass = heroClass;
+		this.lastModVersion = modVersion;
+		this.lastSessionId = sessionId;
+		this.lastDepth = depth;
+		this.lastBranch = branch;
+		this.lastPos = pos;
+
+		openSocket(isRejoin);
+	}
+
+	public synchronized void reconnectIfNeeded(int depth, int branch, int pos) {
+		if (intentionalClose || lastAddress == null) return;
+		this.lastDepth = depth;
+		this.lastBranch = branch;
+		this.lastPos = pos;
+		WebSocketClient cur = socket;
+		if (cur != null && cur.isOpen()) return;
+		openSocket(true);
+	}
+
+	private void openSocket(final boolean isRejoin) {
+		try {
+			URI uri = PlayAlongProtocol.buildWebSocketUri(lastAddress);
+			final AtomicBoolean opened = new AtomicBoolean(false);
+			WebSocketClient ws = new WebSocketClient(uri) {
+				@Override
+				public void onOpen(ServerHandshake handshakedata) {
+					opened.set(true);
+					disconnectedSinceMs = 0L;
+					reconnecting = false;
+
+					WireMessage join = new WireMessage();
+					join.type = isRejoin ? "rejoin" : "join";
+					join.sessionId = lastSessionId;
+					join.userId = lastUserId;
+					join.username = lastUsername;
+					join.heroClass = lastHeroClass;
+					join.modVersion = lastModVersion;
+					join.depth = lastDepth;
+					join.branch = lastBranch;
+					join.pos = lastPos;
+					send(PlayAlongProtocol.GSON.toJson(join));
+				}
+
+				@Override
+				public void onMessage(String message) {
+					if (message == null || message.length() > 65536) return;
+					try {
+						WireMessage msg = PlayAlongProtocol.GSON.fromJson(message, WireMessage.class);
+						if (msg == null || msg.type == null || listener == null) return;
+						switch (msg.type) {
+							case "join_ack":
+								listener.onJoinAck(msg);
+								break;
+							case "join_error":
+								intentionalClose = true;
+								listener.onJoinError(msg.error);
+								close();
+								break;
+							case "world_state":
+								listener.onWorldState(msg);
+								break;
+							case "host_ankh_popped":
+								listener.onHostAnkhPopped(msg);
+								break;
+							case "host_died":
+								intentionalClose = true;
+								listener.onHostDied(msg);
+								break;
+							case "player_died_notice":
+								listener.onPlayerDiedNotice(msg);
+								break;
+							case "player_won_notice":
+								listener.onPlayerWonNotice(msg);
+								break;
+						}
+					} catch (Exception ignored) {
+					}
+				}
+
+				@Override
+				public void onClose(int code, String reason, boolean remote) {
+					if (!intentionalClose) {
+						scheduleReconnect();
+					}
+				}
+
+				@Override
+				public void onError(Exception ex) {
+					if (!opened.get() && !intentionalClose) {
+						scheduleReconnect();
+					}
+				}
+			};
+			ws.setConnectionLostTimeout(20);
+			this.socket = ws;
+			ws.connect();
+		} catch (Exception e) {
+			scheduleReconnect();
+		}
+	}
+
+	private void scheduleReconnect() {
+		if (intentionalClose || reconnecting) return;
+		reconnecting = true;
+		if (disconnectedSinceMs == 0L) {
+			disconnectedSinceMs = System.currentTimeMillis();
+		}
+		Thread t = new Thread(() -> {
+			try {
+				Thread.sleep(3000);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				reconnecting = false;
+				return;
+			}
+			reconnecting = false;
+			if (intentionalClose) return;
+			long elapsed = System.currentTimeMillis() - disconnectedSinceMs;
+			if (elapsed > PlayAlongProtocol.RECONNECT_GRACE_MS) {
+				intentionalClose = true;
+				if (listener != null) listener.onConnectionLost(true);
+				return;
+			}
+			if (listener != null) listener.onConnectionLost(false);
+			openSocket(true);
+		}, "PlayAlongReconnect");
+		t.setDaemon(true);
+		t.start();
+	}
+
+	public void send(WireMessage msg) {
+		WebSocketClient ws = socket;
+		if (ws != null && ws.isOpen()) {
+			try {
+				ws.send(PlayAlongProtocol.GSON.toJson(msg));
+			} catch (Exception ignored) {
+			}
+		}
+	}
+
+	public boolean isConnected() {
+		WebSocketClient ws = socket;
+		return ws != null && ws.isOpen();
+	}
+
+	public synchronized void close() {
+		this.intentionalClose = true;
+		closeInternal();
+	}
+
+	private void closeInternal() {
+		WebSocketClient ws = this.socket;
+		this.socket = null;
+		if (ws != null) {
+			try {
+				ws.close();
+			} catch (Exception ignored) {
+			}
+		}
+	}
+}

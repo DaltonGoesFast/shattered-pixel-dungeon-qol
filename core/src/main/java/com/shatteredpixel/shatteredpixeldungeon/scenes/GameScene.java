@@ -82,6 +82,10 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.rooms.secret.SecretRoom;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.Trap;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.plants.Plant;
+import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongGhostLayer;
+import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongHudIndicator;
+import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol;
+import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.CharSprite;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.DiscardedItemSprite;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.HeroSprite;
@@ -110,6 +114,7 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.InventoryPane;
 import com.shatteredpixel.shatteredpixeldungeon.ui.LootIndicator;
 import com.shatteredpixel.shatteredpixeldungeon.ui.MenuPane;
 import com.shatteredpixel.shatteredpixeldungeon.ui.QuickSlotButton;
+import com.shatteredpixel.shatteredpixeldungeon.ui.RenderedTextBlock;
 import com.shatteredpixel.shatteredpixeldungeon.ui.ResumeIndicator;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RightClickMenu;
 import com.shatteredpixel.shatteredpixeldungeon.ui.StatusPane;
@@ -135,6 +140,7 @@ import com.shatteredpixel.shatteredpixeldungeon.windows.WndKeyBindings;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndMessage;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndOptions;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndResurrect;
+import com.shatteredpixel.shatteredpixeldungeon.windows.WndTitledMessage;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndUpgrade;
 import com.watabou.gltextures.TextureCache;
 import com.watabou.glwrap.Blending;
@@ -213,6 +219,8 @@ public class GameScene extends PixelScene {
 	private Group traps;
 	private Group heaps;
 	private Group mobs;
+	private PlayAlongGhostLayer playAlongGhosts;
+	private PlayAlongHudIndicator playAlongHud;
 	private Group floorEmitters;
 	private Group emitters;
 	private Group effects;
@@ -390,6 +398,9 @@ public class GameScene extends PixelScene {
 		fog = new FogOfWar( Dungeon.level.width(), Dungeon.level.height() );
 		add( fog );
 
+		playAlongGhosts = new PlayAlongGhostLayer();
+		add( playAlongGhosts );
+
 		spells = new Group();
 		add( spells );
 
@@ -507,6 +518,10 @@ public class GameScene extends PixelScene {
 				com.shatteredpixel.shatteredpixeldungeon.ui.DangerIndicator.HEIGHT );
 		danger.setPos( menu.left() + MenuPane.WIDTH - danger.width(), menu.top() + 21 + 1 );
 		add(danger);
+
+		playAlongHud = new PlayAlongHudIndicator();
+		playAlongHud.camera = uiCamera;
+		add(playAlongHud);
 
 		float extraRight = uiCamera.width - (menuBarMaxLeft + MenuPane.WIDTH);
 		if (extraRight > 0){
@@ -853,7 +868,7 @@ public class GameScene extends PixelScene {
 		fadeIn();
 
 		//re-show WndResurrect if needed
-		if (!Dungeon.hero.isAlive()){
+		if (!Dungeon.hero.isAlive() && !PlayAlongService.isSpectating()){
 			//check if hero has an unblessed ankh
 			Ankh ankh = null;
 			for (Ankh i : Dungeon.hero.belongings.getAllItems(Ankh.class)){
@@ -867,6 +882,8 @@ public class GameScene extends PixelScene {
 				gameOver();
 			}
 		}
+
+		PlayAlongService.onSceneCreated();
 
 	}
 	
@@ -1046,6 +1063,11 @@ public class GameScene extends PixelScene {
 			cellSelector.enable( false );
 		} else {
 			cellSelector.enable(Dungeon.hero.ready);
+		}
+
+		if (playAlongHud != null && playAlongHud.visible && menu != null) {
+			float hudY = menu.top() + 22f + (danger != null && danger.visible ? danger.height() + 2f : 0f);
+			playAlongHud.setPos(menu.left() + MenuPane.WIDTH - playAlongHud.width(), hudY);
 		}
 
 		if (!toDestroy.isEmpty()) {
@@ -1831,6 +1853,7 @@ public class GameScene extends PixelScene {
 		StyledButton restart = new StyledButton(Chrome.Type.GREY_BUTTON_TR, Messages.get(StartScene.class, "new"), 9){
 			@Override
 			protected void onClick() {
+				PlayAlongService.disconnect();
 				GamesInProgress.selectedClass = Dungeon.hero.heroClass;
 				GamesInProgress.curSlot = GamesInProgress.firstEmpty();
 				if (GamesInProgress.curSlot == -1){
@@ -1857,6 +1880,17 @@ public class GameScene extends PixelScene {
 		);
 		scene.add(restart);
 
+		final RenderedTextBlock wipeText;
+		if (PlayAlongService.isHosting() && PlayAlongService.getLastWipeCount() >= 0) {
+			int killed = PlayAlongService.getLastWipeCount();
+			String txt = killed + (killed == 1 ? " PLAYER KILLED WITH YOU" : " PLAYERS KILLED WITH YOU");
+			wipeText = PixelScene.renderTextBlock(txt, 6);
+			wipeText.hardlight(0xFF4444);
+			wipeText.alpha(0);
+		} else {
+			wipeText = null;
+		}
+
 		StyledButton menu = new StyledButton(Chrome.Type.GREY_BUTTON_TR, Messages.get(WndKeyBindings.class, "menu"), 9){
 			@Override
 			protected void onClick() {
@@ -1865,7 +1899,9 @@ public class GameScene extends PixelScene {
 
 			@Override
 			public void update() {
-				alpha((float)Math.pow(gameOver.am, 2));
+				float a = (float)Math.pow(gameOver.am, 2);
+				alpha(a);
+				if (wipeText != null) wipeText.alpha(a);
 				super.update();
 			}
 		};
@@ -1878,6 +1914,39 @@ public class GameScene extends PixelScene {
 				restart.bottom() + 2
 		);
 		scene.add(menu);
+
+		if (wipeText != null) {
+			wipeText.setPos(
+					align(uiCamera, (uiCamera.width - wipeText.width()) / 2),
+					menu.bottom() + 6
+			);
+			wipeText.camera = uiCamera;
+			scene.add(wipeText);
+		}
+
+		if (PlayAlongService.isClient() && PlayAlongService.isHostAliveForSpectate()) {
+			StyledButton spiritCam = new StyledButton(Chrome.Type.GREY_BUTTON_TR, "Spirit Cam", 9) {
+				@Override
+				protected void onClick() {
+					PlayAlongService.enterSpiritCam();
+				}
+
+				@Override
+				public void update() {
+					alpha((float)Math.pow(gameOver.am, 2));
+					super.update();
+				}
+			};
+			spiritCam.icon(Icons.get(Icons.COMPASS));
+			spiritCam.alpha(0);
+			spiritCam.camera = uiCamera;
+			spiritCam.setSize(Math.max(80, spiritCam.reqWidth()), 20);
+			spiritCam.setPos(
+					align(uiCamera, (spiritCam.camera.width - spiritCam.width()) / 2),
+					menu.bottom() + 2
+			);
+			scene.add(spiritCam);
+		}
 	}
 	
 	public static void bossSlain() {
@@ -2060,6 +2129,9 @@ public class GameScene extends PixelScene {
 		Trap trap = Dungeon.level.traps.get( cell );
 		if (trap != null && trap.visible) objects.add(trap);
 
+		PlayAlongProtocol.TombstoneState tomb = PlayAlongService.getTombstoneAt(Dungeon.depth, Dungeon.branch, cell);
+		if (tomb != null) objects.add(tomb);
+
 		return objects;
 	}
 
@@ -2071,6 +2143,9 @@ public class GameScene extends PixelScene {
 			else if (obj instanceof Heap)   names.add(Messages.titleCase( ((Heap)obj).title() ));
 			else if (obj instanceof Plant)  names.add(Messages.titleCase( ((Plant) obj).name() ));
 			else if (obj instanceof Trap)   names.add(Messages.titleCase( ((Trap) obj).name() ));
+			else if (obj instanceof PlayAlongProtocol.TombstoneState) {
+				names.add("Tombstone (" + ((PlayAlongProtocol.TombstoneState) obj).username + ")");
+			}
 		}
 		return names;
 	}
@@ -2093,6 +2168,13 @@ public class GameScene extends PixelScene {
 			GameScene.show( new WndInfoTrap((Trap) o));
 			//traps are often harmful to trigger, so let the player ID just by examine
 			Bestiary.setSeen(o.getClass());
+		} else if ( o instanceof PlayAlongProtocol.TombstoneState ) {
+			PlayAlongProtocol.TombstoneState tomb = (PlayAlongProtocol.TombstoneState) o;
+			GameScene.show( new WndTitledMessage(
+					new ItemSprite(com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSpriteSheet.TOMB, null),
+					tomb.username + "'s Grave",
+					"Here fell " + tomb.username + " (" + tomb.heroClass + ") on Depth " + tomb.depth + ".\n\nCause: " + tomb.cause
+			));
 		} else {
 			GameScene.show( new WndMessage( Messages.get(GameScene.class, "dont_know") ) ) ;
 		}

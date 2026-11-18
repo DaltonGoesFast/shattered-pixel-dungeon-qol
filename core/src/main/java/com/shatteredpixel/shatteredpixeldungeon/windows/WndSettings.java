@@ -846,6 +846,9 @@ public class WndSettings extends WndTabbed {
 		RedButton btnCheckNow;
 		CheckBox chkBetas;
 		CheckBox chkWifi;
+		ColorBlock sepPlayAlong;
+		RedButton btnPlayAlongServer;
+		CheckBox chkPlayAlongHost;
 
 		@Override
 		protected void createChildren() {
@@ -946,6 +949,50 @@ public class WndSettings extends WndTabbed {
 				chkWifi.checked(SPDSettings.WiFi());
 				add(chkWifi);
 			}
+
+			sepPlayAlong = new ColorBlock(1, 1, 0xFF000000);
+			add(sepPlayAlong);
+
+			btnPlayAlongServer = new RedButton("Play Along: " + SPDSettings.playAlongAddress(), 8) {
+				@Override
+				protected void onClick() {
+					ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
+							"Play Along Server",
+							"Enter Dalton's Playit.gg host:port (leave empty to reset to default):",
+							SPDSettings.playAlongAddress(),
+							64,
+							false,
+							"Save",
+							"Reset Default") {
+						@Override
+						public void onSelect(boolean positive, String text) {
+							if (positive) {
+								SPDSettings.playAlongAddress(text);
+							} else {
+								SPDSettings.playAlongAddress(SPDSettings.DEFAULT_PLAY_ALONG_ADDRESS);
+							}
+							btnPlayAlongServer.text("Play Along: " + SPDSettings.playAlongAddress());
+							com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.pollLiveStatus(true);
+						}
+					});
+				}
+			};
+			add(btnPlayAlongServer);
+
+			if (DeviceCompat.isDesktop()) {
+				chkPlayAlongHost = new CheckBox("Host Play Along Lobby") {
+					@Override
+					protected void onClick() {
+						super.onClick();
+						SPDSettings.playAlongHostEnabled(checked());
+						if (checked()) {
+							com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.ensureHostServerStarted();
+						}
+					}
+				};
+				chkPlayAlongHost.checked(SPDSettings.playAlongHostEnabled());
+				add(chkPlayAlongHost);
+			}
 		}
 
 		@Override
@@ -981,6 +1028,18 @@ public class WndSettings extends WndTabbed {
 			if (chkWifi != null){
 				chkWifi.setRect(0, pos + GAP, width, BTN_HEIGHT);
 				pos = chkWifi.bottom();
+			}
+
+			sepPlayAlong.size(width, 1);
+			sepPlayAlong.y = pos + GAP;
+			pos = sepPlayAlong.y + 1;
+
+			btnPlayAlongServer.setRect(0, pos + GAP, width, BTN_HEIGHT);
+			pos = btnPlayAlongServer.bottom();
+
+			if (chkPlayAlongHost != null){
+				chkPlayAlongHost.setRect(0, pos + GAP, width, BTN_HEIGHT);
+				pos = chkPlayAlongHost.bottom();
 			}
 
 			height = pos;

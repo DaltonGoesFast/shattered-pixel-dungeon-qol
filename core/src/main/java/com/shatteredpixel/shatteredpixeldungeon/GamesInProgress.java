@@ -39,6 +39,7 @@ public class GamesInProgress {
 	public static final int SLOTS_PER_PAGE = 6;
 	public static final int PAGE_COUNT = 2;
 	public static final int MAX_SLOTS = SLOTS_PER_PAGE * PAGE_COUNT;
+	public static final int PLAY_ALONG_SLOT = 99;
 	
 	//null means we have loaded info and it is empty, no entry means unknown.
 	private static HashMap<Integer, Info> slotStates = new HashMap<>();

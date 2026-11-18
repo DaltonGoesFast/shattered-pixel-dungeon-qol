@@ -818,6 +818,9 @@ public class Hero extends Char {
 	
 	@Override
 	public boolean attack(Char enemy, float dmgMulti, float dmgBonus, float accMulti) {
+		if (enemy != null) {
+			com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onHeroAttacked(enemy.pos);
+		}
 		boolean result = super.attack(enemy, dmgMulti, dmgBonus, accMulti);
 		if (!(belongings.attackingWeapon() instanceof MissileWeapon)){
 			if (buff(Talent.PreciseAssaultTracker.class) != null){
@@ -2569,6 +2572,7 @@ public class Hero extends Char {
 				Catalog.countUse(Ankh.class);
 
 				ankh.detach(belongings.backpack);
+				com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onHeroAnkhPopped();
 
 				for (Char ch : Actor.chars()) {
 					if (ch instanceof DriedRose.GhostHero) {
@@ -2611,6 +2615,7 @@ public class Hero extends Char {
 	
 	public static void reallyDie( Object cause ) {
 		StreamingEvents.notifyHeroDied();
+		com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onHeroReallyDied(cause);
 
 		int length = Dungeon.level.length();
 		int[] map = Dungeon.level.map;
@@ -2702,6 +2707,7 @@ public class Hero extends Char {
 	@Override
 	public void move(int step, boolean travelling) {
 		boolean wasHighGrass = Dungeon.level.map[step] == Terrain.HIGH_GRASS;
+		com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onHeroMoved(this.pos, step);
 
 		super.move( step, travelling);
 		

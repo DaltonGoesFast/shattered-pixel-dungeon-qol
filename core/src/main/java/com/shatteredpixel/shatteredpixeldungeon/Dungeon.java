@@ -224,6 +224,10 @@ public class Dungeon {
 
 	//dailyTime is passed in so a debug daily can use today's seed without consuming the daily
 	public static void initSeed( long dailyTime ){
+		if (com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.isClientJoining()) {
+			com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.applyClientRulesToDungeon();
+			return;
+		}
 		if (daily) {
 			//Ensures that daily seeds are not in the range of user-enterable seeds
 			seed = dailyTime + DungeonSeed.TOTAL_SEEDS;
@@ -247,6 +251,8 @@ public class Dungeon {
 		if (looping){
 			challenges = Legacy.carriedChallenges();
 			modifiers = Legacy.carriedModifiers();
+		} else if (com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.isClientJoining()) {
+			com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.applyClientRulesToDungeon();
 		} else {
 			challenges = SPDSettings.challenges();
 			modifiers = Modifiers.stripSeedBanned( SPDSettings.modifiers() );
@@ -323,6 +329,12 @@ public class Dungeon {
 
 		Rebirth.reset();
 		if (!looping) Rebirth.deliverIfNeeded();
+
+		if (com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.isClientJoining()) {
+			com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.clearClientJoinPending();
+		} else {
+			com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onHostRunStarted();
+		}
 	}
 
 	public static boolean isChallenged( int mask ) {

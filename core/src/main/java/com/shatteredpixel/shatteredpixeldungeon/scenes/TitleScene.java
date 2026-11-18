@@ -29,6 +29,9 @@ import com.shatteredpixel.shatteredpixeldungeon.GamesInProgress;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.effects.BannerSprites;
+import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol;
+import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService;
+import com.shatteredpixel.shatteredpixeldungeon.playalong.WndPlayAlongJoin;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Fireball;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Languages;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
@@ -180,6 +183,7 @@ public class TitleScene extends PixelScene {
 
 		btnSupport = new SupportButton(GREY_TR, "DaltonGoesFast");
 		add(btnSupport);
+		PlayAlongService.pollLiveStatus(true);
 
 		btnRankings = new StyledButton(GREY_TR,Messages.get(this, "rankings")){
 			@Override
@@ -503,6 +507,8 @@ public class TitleScene extends PixelScene {
 
 	private static class SupportButton extends StyledButton{
 
+		private boolean liveShown = false;
+
 		public SupportButton( Chrome.Type type, String label ){
 			super(type, label);
 			Image youtube = new Image(Assets.Interfaces.SOCIAL_ICONS);
@@ -512,8 +518,47 @@ public class TitleScene extends PixelScene {
 		}
 
 		@Override
+		public void update() {
+			super.update();
+
+			PlayAlongService.pollLiveStatus(false);
+			PlayAlongProtocol.SessionInfo live = PlayAlongService.getLiveSession();
+			boolean isLive = live != null && live.active;
+
+			if (isLive != liveShown) {
+				liveShown = isLive;
+				text(isLive ? "DaltonGoesFast [LIVE]" : "DaltonGoesFast");
+				if (!isLive) {
+					bg.resetColor();
+					textColor(Window.TITLE_COLOR);
+					if (icon != null) icon.resetColor();
+				}
+			}
+
+			if (isLive) {
+				float pulse = 0.5f + 0.5f * (float) Math.sin(Game.timeTotal * 5f);
+				bg.hardlight(ColorMath.interpolate(0xCC2222, 0xFF4444, pulse));
+				textColor(ColorMath.interpolate(0xFFFFFF, 0xFFBBBB, pulse));
+				if (icon != null) {
+					icon.hardlight(ColorMath.interpolate(0xFFFFFF, 0xFF4444, pulse));
+				}
+			}
+		}
+
+		@Override
 		protected void onClick() {
+			PlayAlongProtocol.SessionInfo live = PlayAlongService.getLiveSession();
+			if (live != null && live.active) {
+				ShatteredPixelDungeon.scene().addToFront(new WndPlayAlongJoin(live));
+			} else {
+				ShatteredPixelDungeon.platform.openURI("https://www.youtube.com/@DaltonGoesFast");
+			}
+		}
+
+		@Override
+		protected boolean onLongClick() {
 			ShatteredPixelDungeon.platform.openURI("https://www.youtube.com/@DaltonGoesFast");
+			return true;
 		}
 	}
 }
