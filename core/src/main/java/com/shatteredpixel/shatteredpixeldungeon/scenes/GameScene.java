@@ -2228,6 +2228,12 @@ public class GameScene extends PixelScene {
 			} else if (objects.get(0) instanceof Trap) {
 				title = textLines.remove(0);
 				image = TerrainFeaturesTilemap.tile(cell, Dungeon.level.map[cell]);
+			} else if (objects.get(0) instanceof PlayAlongProtocol.TombstoneState) {
+				title = textLines.remove(0);
+				image = new ItemSprite(com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSpriteSheet.TOMB, null);
+			} else {
+				title = textLines.isEmpty() ? WndInfoCell.cellName(cell) : textLines.remove(0);
+				image = WndInfoCell.cellImage(cell);
 			}
 
 			//determine first text line
@@ -2257,6 +2263,10 @@ public class GameScene extends PixelScene {
 				textLines.add(0, Messages.get(GameScene.class, "trample"));
 			} else if (objects.get(0) instanceof Trap) {
 				textLines.add(0, Messages.get(GameScene.class, "interact"));
+			} else if (objects.get(0) instanceof PlayAlongProtocol.TombstoneState) {
+				textLines.add(0, Messages.get(GameScene.class, "go_here"));
+			} else {
+				textLines.add(0, Messages.get(GameScene.class, "go_here"));
 			}
 
 			//final text formatting
