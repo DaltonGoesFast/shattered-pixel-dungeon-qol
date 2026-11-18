@@ -119,6 +119,9 @@ public class GhostSprite extends Group implements Tweener.Listener, MovieClip.Li
 			currentTile = targetPos;
 			body.point(tileToSpritePos(targetPos));
 			body.play(animIdle);
+			if (isHost && PlayAlongService.isSpectating() && Camera.main != null) {
+				Camera.main.panFollow(body, 5f);
+			}
 		} else if (targetPos != currentTile) {
 			int fx = currentTile % Dungeon.level.width();
 			int tx = targetPos % Dungeon.level.width();
@@ -134,6 +137,9 @@ public class GhostSprite extends Group implements Tweener.Listener, MovieClip.Li
 			motion = new PosTweener(body, tileToSpritePos(targetPos), MOVE_DURATION);
 			motion.listener = this;
 			add(motion);
+			if (isHost && PlayAlongService.isSpectating() && Camera.main != null) {
+				Camera.main.panFollow(body, 20f);
+			}
 		}
 
 		if ("ATTACK".equals(state.action) && state.lastUpdateMs != lastUpdateMs) {

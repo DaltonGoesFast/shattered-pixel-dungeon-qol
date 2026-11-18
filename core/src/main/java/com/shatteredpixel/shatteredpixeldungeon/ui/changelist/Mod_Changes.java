@@ -33,6 +33,7 @@ public class Mod_Changes {
 
 	public static void addAllChanges( ArrayList<ChangeInfo> changeInfos ){
 		addOverview(changeInfos);
+		add_v4_0_2_QoL_14(changeInfos);
 		add_v4_0_2_QoL_13(changeInfos);
 		add_v4_0_2_QoL_12(changeInfos);
 		add_Chimera_T1_Draft(changeInfos);
@@ -42,6 +43,21 @@ public class Mod_Changes {
 		add_v4_0_0_QoL_6(changeInfos);
 		add_v4_0_0_QoL_5(changeInfos);
 		add_v4_0_0(changeInfos);
+	}
+
+	private static void add_v4_0_2_QoL_14( ArrayList<ChangeInfo> changeInfos ) {
+		ChangeInfo changes = new ChangeInfo("4.0.2-QoL-14", true, "");
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes = new ChangeInfo(Messages.get(ChangesScene.class, "changes"), false, null);
+		changes.hardlight(CharSprite.WARNING);
+		changeInfos.add(changes);
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.COMPASS), "Spirit Cam improvements",
+				"**-** Spirit Cam now automatically follows the host between floors\n" +
+				"**-** Camera smoothly tracks the host ghost as they move\n" +
+				"**-** Every spectated floor is automatically magic-mapped with secrets revealed"));
 	}
 
 	private static void add_v4_0_2_QoL_13( ArrayList<ChangeInfo> changeInfos ) {

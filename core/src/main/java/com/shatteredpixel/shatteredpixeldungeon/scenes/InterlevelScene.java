@@ -732,6 +732,11 @@ public class InterlevelScene extends PixelScene {
 	private void returnTo() throws IOException {
 		Mob.holdAllies( Dungeon.level );
 		Dungeon.saveAll();
+		if (com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.isSpectating() && Dungeon.level != null) {
+			try {
+				Dungeon.saveLevel( GamesInProgress.curSlot );
+			} catch (Exception ignored) {}
+		}
 
 		if (debugGenerateSkipped) {
 			try {
@@ -754,7 +759,11 @@ public class InterlevelScene extends PixelScene {
 		Dungeon.depth = returnDepth;
 		Dungeon.branch = returnBranch;
 		if (Dungeon.levelHasBeenGenerated(Dungeon.depth, Dungeon.branch)) {
-			level = Dungeon.loadLevel( GamesInProgress.curSlot );
+			try {
+				level = Dungeon.loadLevel( GamesInProgress.curSlot );
+			} catch (Exception e) {
+				level = Dungeon.newLevel();
+			}
 		} else {
 			level = Dungeon.newLevel();
 		}

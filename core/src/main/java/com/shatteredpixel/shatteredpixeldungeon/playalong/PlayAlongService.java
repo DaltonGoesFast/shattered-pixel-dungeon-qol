@@ -29,6 +29,8 @@ import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroClass;
+import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
+import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.GhostState;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.SessionInfo;
@@ -464,6 +466,14 @@ public final class PlayAlongService {
 			executeClientWipe(pending);
 			return;
 		}
+		if (role == Role.SPECTATOR) {
+			magicMapCurrentFloor();
+			if (isHostAliveForSpectate() && (Dungeon.depth != hostDepth || Dungeon.branch != hostBranch)) {
+				followHostFloor();
+				return;
+			}
+		}
+
 		if (role == Role.HOST && hostServer != null) {
 			GhostState hg = buildLocalGhostState("IDLE", Dungeon.hero.pos, true);
 			hostGhost = hg;
@@ -566,9 +576,41 @@ public final class PlayAlongService {
 		}
 	}
 
+	public static void magicMapCurrentFloor() {
+		if (Dungeon.level == null) return;
+		int length = Dungeon.level.length();
+		int[] map = Dungeon.level.map;
+		boolean[] mapped = Dungeon.level.mapped;
+		boolean[] visited = Dungeon.level.visited;
+		boolean[] discoverable = Dungeon.level.discoverable;
+
+		for (int i = 0; i < length; i++) {
+			int terr = map[i];
+			if (discoverable[i]) {
+				mapped[i] = true;
+				visited[i] = true;
+				if ((Terrain.flags[terr] & Terrain.SECRET) != 0) {
+					Dungeon.level.discover(i);
+					if (Game.scene() instanceof GameScene) {
+						GameScene.discoverTile(i, terr);
+					}
+				}
+			}
+		}
+		if (Dungeon.level.heaps != null) {
+			for (Heap h : Dungeon.level.heaps.valueList()) {
+				if (h != null) h.seen = true;
+			}
+		}
+		if (Game.scene() instanceof GameScene) {
+			GameScene.updateFog();
+		}
+	}
+
 	public static void enterSpiritCam() {
 		if (role != Role.CLIENT || !isHostAliveForSpectate()) return;
 		role = Role.SPECTATOR;
+		magicMapCurrentFloor();
 		if (Dungeon.depth != hostDepth || Dungeon.branch != hostBranch) {
 			followHostFloor();
 		} else {
@@ -578,11 +620,21 @@ public final class PlayAlongService {
 
 	public static void followHostFloor() {
 		if (role != Role.SPECTATOR || !isHostAliveForSpectate()) return;
+		if (!(Game.scene() instanceof GameScene)) return;
 		InterlevelScene.mode = InterlevelScene.Mode.RETURN;
 		InterlevelScene.returnDepth = Math.max(1, hostDepth);
 		InterlevelScene.returnBranch = Math.max(0, hostBranch);
-		InterlevelScene.returnPos = -1;
+		InterlevelScene.returnPos = Math.max(0, hostPos);
+		InterlevelScene.debugGenerateSkipped = true;
 		Game.switchScene(InterlevelScene.class);
+	}
+
+	public static void checkSpectatorFloorFollow() {
+		if (role == Role.SPECTATOR && isHostAliveForSpectate()
+				&& (Dungeon.depth != hostDepth || Dungeon.branch != hostBranch)
+				&& Game.scene() instanceof GameScene) {
+			followHostFloor();
+		}
 	}
 
 	public static void disconnect() {
@@ -672,6 +724,10 @@ public final class PlayAlongService {
 			}
 		}
 		aliveCount = alive;
+		if (role == Role.SPECTATOR && isHostAliveForSpectate()
+				&& (Dungeon.depth != hostDepth || Dungeon.branch != hostBranch)) {
+			Game.runOnRenderThread(PlayAlongService::checkSpectatorFloorFollow);
+		}
 	}
 
 	private static void resetRuntimeCollections() {

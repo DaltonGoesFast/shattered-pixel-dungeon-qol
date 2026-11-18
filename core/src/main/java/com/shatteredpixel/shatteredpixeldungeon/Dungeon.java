@@ -564,6 +564,9 @@ public class Dungeon {
 		
 		hero.curAction = hero.lastAction = null;
 
+		if (com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.isSpectating()) {
+			com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.magicMapCurrentFloor();
+		}
 		observe();
 		try {
 			saveAll();
