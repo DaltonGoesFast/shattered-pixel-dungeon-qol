@@ -40,6 +40,7 @@ var _active_command_icon_layout: String = "none"
 
 func _ready() -> void:
 	GameWebSocketClient.command_result.connect(_on_command_result)
+	GameWebSocketClient.typed_message_received.connect(_on_typed_message_received)
 	StreamerBotUdp.command_attempt.connect(_on_streamerbot_command)
 	get_node("/root/SpawnResultFileBridge").spawn_result_file_parsed.connect(
 		_on_spawn_result_file_parsed
@@ -972,3 +973,49 @@ func _hide_panel() -> void:
 func _burst_fx(_kind: String) -> void:
 	# Particle burst on command toasts is disabled.
 	return
+
+
+func _on_typed_message_received(type_name: String, data: Dictionary) -> void:
+	if type_name == "playalong_wipe":
+		CompanionAudio.play_shatter(true)
+		var victims := int(data.get("victims", 0))
+		var depth := int(data.get("depth", 1))
+		var names := str(data.get("victim_names", "")).strip_edges()
+		var sub := ("Depth %d • Victims: %s" % [depth, names]) if not names.is_empty() else ("Dalton fell on Depth %d!" % depth)
+		_enqueue({
+			"kind": "error",
+			"headline": "☠ SOUL PACT BROKEN — %d PLAYERS KILLED ☠" % victims,
+			"subtitle": sub,
+			"command": "",
+			"monster_hint": "",
+			"command_icon_rune": null,
+			"command_icon_item": null,
+			"mob_idle_frames": [],
+		})
+	elif type_name == "playalong_victory":
+		CompanionAudio.play_shatter(true)
+		var username := str(data.get("username", "A chatter")).strip_edges()
+		if username.is_empty():
+			username = "A chatter"
+		_enqueue({
+			"kind": "confirm",
+			"headline": "🏆 %s WON PLAY ALONG! 🏆" % username,
+			"subtitle": "Secured the Amulet of Yendor before Dalton died!",
+			"command": "",
+			"monster_hint": "",
+			"command_icon_rune": null,
+			"command_icon_item": null,
+			"mob_idle_frames": [],
+		})
+	elif type_name == "playalong_ankh":
+		var active := int(data.get("active_players", 0))
+		_enqueue({
+			"kind": "confirm",
+			"headline": "✨ DALTON'S ANKH POPPED! ✨",
+			"subtitle": "%d Play Along racers spared!" % active,
+			"command": "",
+			"monster_hint": "",
+			"command_icon_rune": null,
+			"command_icon_item": null,
+			"mob_idle_frames": [],
+		})

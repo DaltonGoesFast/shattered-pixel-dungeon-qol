@@ -150,6 +150,18 @@ public class ShatteredPixelDungeon extends Game {
 	}
 	
 	@Override
+	public void pause() {
+		super.pause();
+		com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onAppPause();
+	}
+
+	@Override
+	public void resume() {
+		super.resume();
+		com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onAppResume();
+	}
+
+	@Override
 	public void destroy(){
 		super.destroy();
 		GameScene.endActorThread();

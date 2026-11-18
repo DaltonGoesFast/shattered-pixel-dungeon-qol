@@ -746,4 +746,51 @@ public class SPDSettings extends GameSettings {
 	public static boolean playerDebug() {
 		return getBoolean( KEY_PLAYER_DEBUG, false );
 	}
+
+	//Play Along Mode
+	public static final String DEFAULT_PLAY_ALONG_ADDRESS = "spdqol.playit.plus:47974";
+	public static final int DEFAULT_PLAY_ALONG_PORT = 5005;
+
+	public static final String KEY_PLAY_ALONG_ADDRESS = "play_along_address";
+	public static final String KEY_PLAY_ALONG_PORT = "play_along_port";
+	public static final String KEY_PLAY_ALONG_HOST_ENABLED = "play_along_host_enabled";
+	public static final String KEY_PLAY_ALONG_USERNAME = "play_along_username";
+
+	public static void playAlongAddress( String value ) {
+		String trimmed = value == null ? "" : value.trim();
+		put( KEY_PLAY_ALONG_ADDRESS, trimmed.isEmpty() ? DEFAULT_PLAY_ALONG_ADDRESS : trimmed );
+	}
+
+	public static String playAlongAddress() {
+		String s = getString( KEY_PLAY_ALONG_ADDRESS, DEFAULT_PLAY_ALONG_ADDRESS );
+		if (s == null || s.trim().isEmpty() || "dalton-dungeon.playit.gg:5005".equals(s.trim())) {
+			return DEFAULT_PLAY_ALONG_ADDRESS;
+		}
+		return s.trim();
+	}
+
+	public static void playAlongPort( int value ) {
+		put( KEY_PLAY_ALONG_PORT, Math.max(5002, Math.min(5020, value)) );
+	}
+
+	public static int playAlongPort() {
+		return getInt( KEY_PLAY_ALONG_PORT, DEFAULT_PLAY_ALONG_PORT, 5002, 5020 );
+	}
+
+	public static void playAlongHostEnabled( boolean value ) {
+		put( KEY_PLAY_ALONG_HOST_ENABLED, value );
+	}
+
+	public static boolean playAlongHostEnabled() {
+		return getBoolean( KEY_PLAY_ALONG_HOST_ENABLED, false );
+	}
+
+	public static void playAlongUsername( String value ) {
+		put( KEY_PLAY_ALONG_USERNAME, value == null ? "" : value.trim() );
+	}
+
+	public static String playAlongUsername() {
+		String s = getString( KEY_PLAY_ALONG_USERNAME, "" );
+		return s == null ? "" : s.trim();
+	}
 }

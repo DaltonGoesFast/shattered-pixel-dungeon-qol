@@ -62,6 +62,7 @@ public class DesktopWindowListener implements Lwjgl3WindowListener {
 			try {
 				TrainingExportBootstrapper.stop();
 				StreamingBootstrapper.stop();
+				com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.stopHostServer();
 			} catch (Throwable t) {
 				t.printStackTrace();
 			}

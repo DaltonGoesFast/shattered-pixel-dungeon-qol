@@ -83,6 +83,7 @@ public class Amulet extends Item {
 			
 			if (!Statistics.amuletObtained) {
 				StreamingEvents.notifyAmuletObtained();
+				com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onAmuletObtained();
 				final boolean legacy = Legacy.active();
 				if (!legacy) Statistics.amuletObtained = true;
 				hero.spend(-hero.cooldown());

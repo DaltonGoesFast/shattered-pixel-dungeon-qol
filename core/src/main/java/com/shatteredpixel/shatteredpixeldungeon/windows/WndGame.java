@@ -93,6 +93,7 @@ public class WndGame extends Window {
 			addButton( curBtn = new RedButton( Messages.get(this, "start") ) {
 				@Override
 				protected void onClick() {
+					com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.disconnect();
 					GamesInProgress.selectedClass = Dungeon.hero.heroClass;
 					GamesInProgress.curSlot = GamesInProgress.firstEmpty();
 					if (GamesInProgress.curSlot == -1){
@@ -126,6 +127,7 @@ public class WndGame extends Window {
 				}
 				// End training run + close steps.jsonl while process stays at title.
 				TrainingExport.onSessionEnd();
+				com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.disconnect();
 				Game.switchScene(TitleScene.class);
 			}
 		});
