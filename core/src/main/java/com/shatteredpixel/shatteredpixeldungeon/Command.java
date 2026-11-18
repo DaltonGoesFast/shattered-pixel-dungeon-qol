@@ -46,6 +46,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.rings.Ring;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.Scroll;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfUpgrade;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.exotic.ExoticScroll;
+import com.shatteredpixel.shatteredpixeldungeon.items.spells.MagicalInfusion;
 import com.shatteredpixel.shatteredpixeldungeon.items.spells.Spell;
 import com.shatteredpixel.shatteredpixeldungeon.items.stones.Runestone;
 import com.shatteredpixel.shatteredpixeldungeon.items.trinkets.Trinket;
@@ -382,6 +383,11 @@ public class Command {
 			Item sample = (Item) Reflection.newInstance(cls);
 			return sample != null && Challenges.isItemBlocked(sample);
 		});
+
+		// Magical Infusion is an upgrade; Forbidden Runes already cuts SoUs, so keep it out of Command.
+		if (Dungeon.isChallenged(Challenges.NO_SCROLLS)){
+			list.remove(MagicalInfusion.class);
+		}
 
 		limitUpgradeScrolls(item, list, qty);
 

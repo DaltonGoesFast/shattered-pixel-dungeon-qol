@@ -70,12 +70,12 @@ public class Mod_Changes {
 		changes.addButton( new ChangeButton(Icons.getSettings(Icons.SETTINGS_QOL), "What this mod adds",
 				"This is a community QoL build of Shattered Pixel Dungeon. Official Shattered notes stay on the **v4.X** tab.\n" +
 				"\n" +
-				"**-** **Pacts** — optional run rules on hero select after your first win. They are not challenges and do not change challenge score or Champion badges.\n" +
+				"**-** **Pacts** — optional run rules on hero select. They are not challenges and do not change challenge score or Champion badges.\n" +
 				"**-** **Quality of Life** — Settings → Quality of Life for quickslots, buff numbers, target HP bar, auto-talents, and more.\n" +
 				"**-** **Updates** — the title Update button can install a newer APK on Android, or open the Windows download in your browser."));
 
 		changes.addButton( new ChangeButton(Icons.get(Icons.PACTS), "Pacts at a glance",
-				"Pacts unlock after one win. Mix them freely, or roll a random set. Command, Rebirth, and Legacy stay off on daily and custom-seed runs.\n" +
+				"Pacts are available on hero select. Mix them freely, or roll a random set. Command, Rebirth, and Legacy stay off on daily and custom-seed runs.\n" +
 				"\n" +
 				"**Hero:** Death, Frailty, Glass, Devotion, Crimson, Grave, Chimera\n" +
 				"**Foes:** Honor, Evolution, Dissonance, Kin, Swarms, Spite, Soul\n" +
@@ -97,9 +97,9 @@ public class Mod_Changes {
 				"**-** On Windows, **Download update** opens the release zip or jar in your browser\n" +
 				"**-** Settings → Data → **Check now** forces a recheck, including on mobile data"));
 
-		changes.addButton( new ChangeButton(Icons.getSettings(Icons.SETTINGS_QOL), "Mod Changes tab",
-				"**-** Change History has a **QoL** tab for these notes\n" +
-				"**-** Title **Mod Changes** opens that tab instead of GitHub\n" +
+		changes.addButton( new ChangeButton(Icons.getSettings(Icons.SETTINGS_QOL), "Mod Changes guide",
+				"**-** Title **Mod Changes** opens the in-game feature guide\n" +
+				"**-** Change History still has a **QoL** tab for these version notes\n" +
 				"**-** Official Shattered patch notes stay under **v4.X** and older tabs"));
 
 		changes = new ChangeInfo(Messages.get(ChangesScene.class, "changes"), false, null);
@@ -185,7 +185,7 @@ public class Mod_Changes {
 
 		changes.addButton( new ChangeButton(Icons.get(Icons.PACTS), "Pact edge cases",
 				"**-** **Command + On Diet** — food stays out of Command\n" +
-				"**-** **Command + Forbidden Runes** — upgrade scrolls still cap at 8\n" +
+				"**-** **Command + Forbidden Runes** — upgrade scrolls still cap at 8; Magical Infusion stays out of Command\n" +
 				"**-** **Honor** — Gnoll Exile shows its champion affix while still passive\n" +
 				"**-** **Sacrifice + Cracked Spyglass** — spyglass items stay hidden on the floor\n" +
 				"**-** **Command** now covers statue weapons, armored-statue armor, hermit crab shells, gnoll exile loot, and similar rare prizes\n" +
@@ -223,7 +223,7 @@ public class Mod_Changes {
 		changeInfos.add(changes);
 
 		changes.addButton( new ChangeButton(Icons.get(Icons.PACTS), "Pacts",
-				"Optional run rules, separate from challenges. Unlock after one win. Pick them on hero select.\n" +
+				"Optional run rules, separate from challenges. Pick them on hero select.\n" +
 				"\n" +
 				"**-** Honor, Glass, Frailty, Death, Devotion\n" +
 				"**-** Spite, Soul, Kin, Dissonance, Evolution, Swarms\n" +

@@ -24,6 +24,7 @@ const _LIVE_FILL_CHROMA_DEBUG := Color(1.0, 8.0 / 255.0, 147.0 / 255.0, 1.0)
 @onready var _first_words_layer: CanvasLayer = $CanvasLayerFirstWords
 @onready var _alerts_layer: CanvasLayer = $CanvasLayerAlerts
 @onready var _tip_toasts_layer: CanvasLayer = $CanvasLayerTipToasts
+@onready var _talents_layer: CanvasLayer = $CanvasLayerTalents
 @onready var _id_overlay: Control = $CanvasLayerID/IdentificationOverlay
 
 var _obs: Node
@@ -141,6 +142,9 @@ func _apply_obs_visibility() -> void:
 	var show_starting_soon := CompanionConfig.element_visible_on_scene(
 		self, "starting_soon", kind
 	)
+	var show_talents := CompanionConfig.element_visible_on_scene(
+		self, "talents", kind
+	)
 
 	if not _obs_scene_known:
 		# Match prior disconnect: title on (if enabled), live water off, overlays follow gates with unknown→any.
@@ -159,6 +163,7 @@ func _apply_obs_visibility() -> void:
 		show_nine_deaths = CompanionConfig.element_enabled(self, "nine_challenge_deaths")
 		show_viewer_counts = CompanionConfig.element_enabled(self, "viewer_counts")
 		show_starting_soon = CompanionConfig.element_enabled(self, "starting_soon")
+		show_talents = CompanionConfig.element_enabled(self, "talents")
 		show_title = CompanionConfig.element_enabled(self, "title")
 
 	_title_backdrop.visible = show_title
@@ -177,6 +182,8 @@ func _apply_obs_visibility() -> void:
 	_nine_challenge_deaths_layer.visible = show_nine_deaths
 	_viewer_counts_layer.visible = show_viewer_counts
 	_starting_soon_layer.visible = show_starting_soon
+	if _talents_layer:
+		_talents_layer.visible = show_talents
 	_sync_live_chroma_overlay()
 	_sync_horizontal_chroma_fill()
 	if show_id and _id_overlay and _id_overlay.has_method("sync_visibility_after_obs"):

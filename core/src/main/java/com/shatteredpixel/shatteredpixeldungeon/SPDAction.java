@@ -88,6 +88,10 @@ public class SPDAction extends GameAction {
 	public static final GameAction TAG_LOOT     = new SPDAction("tag_loot");
 	public static final GameAction TAG_RESUME   = new SPDAction("tag_resume");
 
+	public static final GameAction ABILITY_TAB_1 = new SPDAction("ability_tab_1");
+	public static final GameAction ABILITY_TAB_2 = new SPDAction("ability_tab_2");
+	public static final GameAction ABILITY_TAB_3 = new SPDAction("ability_tab_3");
+
 	public static final GameAction CYCLE        = new SPDAction("cycle");
 
 	public static final GameAction HERO_INFO    = new SPDAction("hero_info");

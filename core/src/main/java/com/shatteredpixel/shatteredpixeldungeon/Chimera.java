@@ -59,6 +59,20 @@ public class Chimera {
 	private static final long PAIR_SALT = 0x50616972L; // "Pair"
 
 	private static final int CLASS_TALENT_TIERS = 3;
+	private static final int DRAFT_OPTIONS_PER_SLOT = 4;
+
+	private static final LinkedHashMap<Talent, HeroClass> TALENT_CLASSES = new LinkedHashMap<>();
+	static {
+		for (HeroClass cls : HeroClass.values()){
+			ArrayList<LinkedHashMap<Talent, Integer>> clsTalents = new ArrayList<>();
+			Talent.initClassTalents( cls, clsTalents );
+			for (LinkedHashMap<Talent, Integer> tier : clsTalents){
+				for (Talent t : tier.keySet()){
+					TALENT_CLASSES.put( t, cls );
+				}
+			}
+		}
+	}
 
 	public static boolean active( Hero hero ){
 		ensurePairs( hero );
@@ -104,16 +118,26 @@ public class Chimera {
 		rollPairs( hero );
 	}
 
-	/** Pre-rolls T1 offer pools with no talent repeated across slots. */
+	/** Pre-rolls T1 offer pools (4 choices per slot) from all classes including native, with no repeats across slots. */
 	private static void generateDraftOffers( Hero hero, Set<Talent> t1Slots ){
 		hero.chimeraDraftOffers = new LinkedHashMap<>();
 		hero.chimeraDraftPicks = new LinkedHashMap<>();
-		Set<Talent> used = new HashSet<>();
+
+		ArrayList<Talent> pool = new ArrayList<>();
+		for (HeroClass cls : HeroClass.values()){
+			ArrayList<LinkedHashMap<Talent, Integer>> clsTalents = new ArrayList<>();
+			Talent.initClassTalents( cls, clsTalents );
+			pool.addAll( clsTalents.get(0).keySet() );
+		}
+		Random.shuffle( pool );
+
+		int index = 0;
 		for (Talent slot : t1Slots){
-			LinkedHashMap<Talent, Integer> offers = ScrollOfMetamorphosis.offersFor( hero, slot, 1, used );
-			ArrayList<Talent> list = new ArrayList<>(offers.keySet());
+			ArrayList<Talent> list = new ArrayList<>();
+			for (int i = 0; i < DRAFT_OPTIONS_PER_SLOT && index < pool.size(); i++){
+				list.add( pool.get( index++ ) );
+			}
 			hero.chimeraDraftOffers.put( slot, list );
-			used.addAll( list );
 		}
 		hero.chimeraDraftPending = true;
 	}
@@ -156,7 +180,11 @@ public class Chimera {
 		for (Talent slot : hero.chimeraDraftOffers.keySet()){
 			Talent pick = hero.chimeraDraftPicks.get( slot );
 			if (pick == null) return;
-			hero.metamorphedTalents.put( slot, pick );
+			if (pick != slot) {
+				hero.metamorphedTalents.put( slot, pick );
+			} else {
+				hero.metamorphedTalents.remove( slot );
+			}
 		}
 		rebuildClassTiers( hero );
 		hero.chimeraDraftPending = false;
@@ -172,48 +200,38 @@ public class Chimera {
 		return true;
 	}
 
-	/** Two subclasses and two armor abilities, each pair from different classes, on their own seeded generator.
-	 *  The hero's own class stays out of the pool. A same-class second draw is discarded and redrawn, so a
-	 *  seed whose pair was already two classes keeps the same generator stream. */
+	private static final int CHOICES_COUNT = 3;
+
+	/** Three subclasses and three armor abilities, each trio from distinct classes (at most one native),
+	 *  on their own seeded generator. */
 	private static void rollPairs( Hero hero ){
 		Random.pushGenerator( Dungeon.seed + PAIR_SALT );
 		try {
-			ArrayList<HeroSubClass> subs = new ArrayList<>();
-			ArrayList<ArmorAbility> abils = new ArrayList<>();
-			for (HeroClass cls : HeroClass.values()){
-				if (cls == hero.heroClass) continue;
-				subs.addAll( Arrays.asList( cls.subClasses() ) );
-				abils.addAll( Arrays.asList( cls.armorAbilities() ) );
+			ArrayList<HeroClass> subClassesList = new ArrayList<>( Arrays.asList( HeroClass.values() ) );
+			Random.shuffle( subClassesList );
+			HeroSubClass[] subs = new HeroSubClass[CHOICES_COUNT];
+			for (int i = 0; i < CHOICES_COUNT; i++){
+				subs[i] = Random.element( subClassesList.get(i).subClasses() );
 			}
+			hero.chimeraSubs = subs;
 
-			HeroSubClass subA = Random.element( subs );
-			subs.remove( subA );
-			HeroSubClass subB = Random.element( subs );
-			if (classOf( subA ) == classOf( subB )){
-				HeroClass taken = classOf( subA );
-				subs.removeIf( sub -> classOf( sub ) == taken );
-				if (!subs.isEmpty()) subB = Random.element( subs );
+			ArrayList<HeroClass> abilClassesList = new ArrayList<>( Arrays.asList( HeroClass.values() ) );
+			Random.shuffle( abilClassesList );
+			ArmorAbility[] abils = new ArmorAbility[CHOICES_COUNT];
+			for (int i = 0; i < CHOICES_COUNT; i++){
+				abils[i] = Random.element( abilClassesList.get(i).armorAbilities() );
 			}
-			hero.chimeraSubs = new HeroSubClass[]{ subA, subB };
-
-			ArmorAbility abilA = Random.element( abils );
-			abils.remove( abilA );
-			ArmorAbility abilB = Random.element( abils );
-			if (classOf( abilA ) == classOf( abilB )){
-				HeroClass taken = classOf( abilA );
-				abils.removeIf( abil -> classOf( abil ) == taken );
-				if (!abils.isEmpty()) abilB = Random.element( abils );
-			}
-			hero.chimeraAbilities = new ArmorAbility[]{ abilA, abilB };
+			hero.chimeraAbilities = abils;
 		} finally {
 			Random.popGenerator();
 		}
 	}
 
-	/** A Chimera run saved before its pairs existed gets them now, from the same seed. */
+	/** A Chimera run saved before its choices existed gets them now, from the same seed. */
 	private static void ensurePairs( Hero hero ){
 		if (hero != null && Dungeon.isModified(Modifiers.CHIMERA)
-				&& (hero.chimeraSubs == null || hero.chimeraAbilities == null)){
+				&& (hero.chimeraSubs == null || hero.chimeraAbilities == null
+				|| hero.chimeraSubs.length < CHOICES_COUNT || hero.chimeraAbilities.length < CHOICES_COUNT)){
 			rollPairs( hero );
 		}
 	}
@@ -282,9 +300,19 @@ public class Chimera {
 		return null;
 	}
 
+	public static HeroClass classOf( Talent talent ){
+		return talent != null ? TALENT_CLASSES.get( talent ) : null;
+	}
+
+	public static boolean isMetamorphedDesc( Hero hero, Talent talent ){
+		if (hero == null || talent == null) return false;
+		HeroClass cls = classOf( talent );
+		return cls != null && cls != hero.heroClass;
+	}
+
 	/** Gives the class's signature item the first time a choice comes from that class. */
 	public static void grantSignature( Hero hero, HeroClass cls ){
-		if (!active( hero ) || cls == null) return;
+		if (!active( hero ) || cls == null || cls == hero.heroClass) return;
 		int bit = 1 << cls.ordinal();
 		if ((hero.chimeraGifts & bit) != 0) return;
 		hero.chimeraGifts |= bit;

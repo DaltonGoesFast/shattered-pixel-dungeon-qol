@@ -467,14 +467,26 @@ def record_poll_result(body: dict) -> dict[str, Any]:
             return {"ok": False, "reason": "poll_id_mismatch"}
 
         reports = state.setdefault("reports", {})
+        total_votes = body.get("totalVotes")
+        try:
+            total_votes_i = int(total_votes) if total_votes is not None else None
+        except (TypeError, ValueError):
+            total_votes_i = None
         reports[platform] = {
             "votes": votes,
+            "total_votes": total_votes_i,
             "received_at": int(time.time()),
             "raw_keys": sorted(votes.keys()),
         }
         _write_json(POLL_STATE_FILE, state)
         both = "twitch" in reports and "youtube" in reports
         report_keys = list(reports.keys())
+
+    sum_votes = sum(votes.values())
+    print(
+        f"hero_name poll-result {platform}: options={len(votes)} "
+        f"sumVotes={sum_votes} totalVotes={body.get('totalVotes')} keys={sorted(votes.keys())}"
+    )
 
     if both:
         return finalize_poll(poll_id=str(poll_id), reason="both_platforms")

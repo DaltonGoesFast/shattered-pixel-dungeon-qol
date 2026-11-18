@@ -339,8 +339,10 @@ public class Hero extends Char {
 	private static final String ABILITY     = "armorAbility";
 	private static final String CHIMERA_SUB_A   = "chimera_sub_a";
 	private static final String CHIMERA_SUB_B   = "chimera_sub_b";
+	private static final String CHIMERA_SUB_C   = "chimera_sub_c";
 	private static final String CHIMERA_ABIL_A  = "chimera_abil_a";
 	private static final String CHIMERA_ABIL_B  = "chimera_abil_b";
+	private static final String CHIMERA_ABIL_C  = "chimera_abil_c";
 	private static final String CHIMERA_GIFTS   = "chimera_gifts";
 	private static final String CHIMERA_DRAFT_PENDING = "chimera_draft_pending";
 	private static final String CHIMERA_DRAFT_OFFERS  = "chimera_draft_offers";
@@ -373,10 +375,12 @@ public class Hero extends Char {
 		bundle.put( SUBCLASS, subClass );
 		bundle.put( ABILITY, armorAbility );
 		if (chimeraSubs != null && chimeraAbilities != null) {
-			bundle.put( CHIMERA_SUB_A, chimeraSubs[0] );
-			bundle.put( CHIMERA_SUB_B, chimeraSubs[1] );
-			bundle.put( CHIMERA_ABIL_A, chimeraAbilities[0] );
-			bundle.put( CHIMERA_ABIL_B, chimeraAbilities[1] );
+			if (chimeraSubs.length > 0) bundle.put( CHIMERA_SUB_A, chimeraSubs[0] );
+			if (chimeraSubs.length > 1) bundle.put( CHIMERA_SUB_B, chimeraSubs[1] );
+			if (chimeraSubs.length > 2) bundle.put( CHIMERA_SUB_C, chimeraSubs[2] );
+			if (chimeraAbilities.length > 0) bundle.put( CHIMERA_ABIL_A, chimeraAbilities[0] );
+			if (chimeraAbilities.length > 1) bundle.put( CHIMERA_ABIL_B, chimeraAbilities[1] );
+			if (chimeraAbilities.length > 2) bundle.put( CHIMERA_ABIL_C, chimeraAbilities[2] );
 			bundle.put( CHIMERA_GIFTS, chimeraGifts );
 		}
 		if (chimeraDraftPending) {
@@ -441,12 +445,23 @@ public class Hero extends Char {
 		subClass = bundle.getEnum( SUBCLASS, HeroSubClass.class );
 		armorAbility = (ArmorAbility)bundle.get( ABILITY );
 		if (bundle.contains( CHIMERA_SUB_A )) {
-			chimeraSubs = new HeroSubClass[]{
-					bundle.getEnum( CHIMERA_SUB_A, HeroSubClass.class ),
-					bundle.getEnum( CHIMERA_SUB_B, HeroSubClass.class ) };
-			chimeraAbilities = new ArmorAbility[]{
-					(ArmorAbility)bundle.get( CHIMERA_ABIL_A ),
-					(ArmorAbility)bundle.get( CHIMERA_ABIL_B ) };
+			if (bundle.contains( CHIMERA_SUB_C )) {
+				chimeraSubs = new HeroSubClass[]{
+						bundle.getEnum( CHIMERA_SUB_A, HeroSubClass.class ),
+						bundle.getEnum( CHIMERA_SUB_B, HeroSubClass.class ),
+						bundle.getEnum( CHIMERA_SUB_C, HeroSubClass.class ) };
+				chimeraAbilities = new ArmorAbility[]{
+						(ArmorAbility)bundle.get( CHIMERA_ABIL_A ),
+						(ArmorAbility)bundle.get( CHIMERA_ABIL_B ),
+						(ArmorAbility)bundle.get( CHIMERA_ABIL_C ) };
+			} else {
+				chimeraSubs = new HeroSubClass[]{
+						bundle.getEnum( CHIMERA_SUB_A, HeroSubClass.class ),
+						bundle.getEnum( CHIMERA_SUB_B, HeroSubClass.class ) };
+				chimeraAbilities = new ArmorAbility[]{
+						(ArmorAbility)bundle.get( CHIMERA_ABIL_A ),
+						(ArmorAbility)bundle.get( CHIMERA_ABIL_B ) };
+			}
 			chimeraGifts = bundle.getInt( CHIMERA_GIFTS );
 		} else {
 			chimeraSubs = null;

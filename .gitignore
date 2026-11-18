@@ -112,7 +112,9 @@ Lastest UI/hero_name_pending.json
 Lastest UI/hero_name_poll_state.json
 Lastest UI/hero_name_winner.txt
 Lastest UI/hero_name_poll_result_body.json
+Lastest UI/hero_name_poll_result_body_*.json
 Lastest UI/hero_name_apply_body.json
+Lastest UI/streamdeck_cost_free_last_error.txt
 Lastest UI/totalsummons.txt
 Lastest UI/totalfard.txt
 Lastest UI/spend_command.lock

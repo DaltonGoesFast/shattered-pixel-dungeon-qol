@@ -20,6 +20,7 @@
 [ext_resource type="Script" path="res://scripts/first_words_overlay.gd" id="20_first_words"]
 [ext_resource type="Script" path="res://scripts/viewer_counts_panel.gd" id="21_viewer_counts"]
 [ext_resource type="Script" path="res://scripts/starting_soon_banner.gd" id="22_starting_soon"]
+[ext_resource type="Script" path="res://scripts/talents_hud.gd" id="23_talents"]
 
 [sub_resource type="StyleBoxTexture" id="StyleBoxTexture_alert_toast"]
 texture = ExtResource("6_toast_chrome")
@@ -286,6 +287,18 @@ offset_bottom = 0.0
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxTexture_alert_toast")
 script = ExtResource("21_viewer_counts")
+
+[node name="CanvasLayerTalents" type="CanvasLayer" parent="."]
+layer = 4
+
+[node name="TalentsHud" type="PanelContainer" parent="CanvasLayerTalents"]
+visible = false
+layout_mode = 1
+anchors_preset = 0
+offset_right = 0.0
+offset_bottom = 0.0
+mouse_filter = 1
+script = ExtResource("23_talents")
 
 [node name="CanvasLayerStartingSoon" type="CanvasLayer" parent="."]
 layer = 8

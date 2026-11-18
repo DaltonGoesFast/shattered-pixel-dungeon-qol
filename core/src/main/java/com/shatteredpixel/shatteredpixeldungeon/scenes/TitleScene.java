@@ -200,11 +200,11 @@ public class TitleScene extends PixelScene {
 		btnJournal.icon(Icons.get(Icons.JOURNAL));
 		add(btnJournal);
 
-		btnNews = new StyledButton(GREY_TR, "Mod Changes"){
+		btnNews = new StyledButton(GREY_TR, Messages.get(this, "mod_changes")){
 			@Override
 			protected void onClick() {
-				ChangesScene.changesSelected = 0;
-				ShatteredPixelDungeon.switchNoFade( ChangesScene.class );
+				ModChangesScene.tabSelected = 0;
+				ShatteredPixelDungeon.switchNoFade( ModChangesScene.class );
 			}
 		};
 		btnNews.icon(Icons.getSettings(Icons.SETTINGS_QOL));
@@ -464,7 +464,7 @@ public class TitleScene extends PixelScene {
 				});
 
 			} else {
-				ChangesScene.changesSelected = 0;
+				ChangesScene.changesSelected = 1;
 				ShatteredPixelDungeon.switchNoFade( ChangesScene.class );
 			}
 		}

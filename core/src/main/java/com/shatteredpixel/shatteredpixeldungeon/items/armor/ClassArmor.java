@@ -50,7 +50,7 @@ import java.util.ArrayList;
 
 abstract public class ClassArmor extends Armor {
 
-	private static final String AC_ABILITY = "ABILITY";
+	public static final String AC_ABILITY = "ABILITY";
 	private static final String AC_TRANSFER = "TRANSFER";
 	
 	{

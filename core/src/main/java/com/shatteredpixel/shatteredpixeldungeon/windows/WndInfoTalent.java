@@ -21,6 +21,7 @@
 
 package com.shatteredpixel.shatteredpixeldungeon.windows;
 
+import com.shatteredpixel.shatteredpixeldungeon.Chimera;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
@@ -56,7 +57,7 @@ public class WndInfoTalent extends Window {
 		add( titlebar );
 
 		boolean metaDesc = (buttonCallback != null && buttonCallback.metamorphDesc()) ||
-				(Dungeon.hero != null && Dungeon.hero.metamorphedTalents.containsValue(talent));
+				(Dungeon.hero != null && Dungeon.hero.metamorphedTalents.containsValue(talent) && Chimera.isMetamorphedDesc(Dungeon.hero, talent));
 
 		RenderedTextBlock txtInfo = PixelScene.renderTextBlock(talent.desc(metaDesc), 6);
 		txtInfo.maxWidth(width);

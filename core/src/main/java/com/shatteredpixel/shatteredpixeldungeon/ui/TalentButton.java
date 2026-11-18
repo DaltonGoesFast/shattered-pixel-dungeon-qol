@@ -245,7 +245,7 @@ public class TalentButton extends Button {
 				}
 				@Override
 				public boolean metamorphDesc() {
-					return true;
+					return Chimera.isMetamorphedDesc( Dungeon.hero, talent );
 				}
 				@Override
 				public void call() {

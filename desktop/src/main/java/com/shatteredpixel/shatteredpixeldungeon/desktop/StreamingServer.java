@@ -104,6 +104,15 @@ public class StreamingServer extends WebSocketServer {
 		}
 	}
 
+	private void safeSend(org.java_websocket.WebSocket conn, String text) {
+		if (conn != null && conn.isOpen() && text != null && !text.isEmpty()) {
+			try {
+				conn.send(text);
+			} catch (Throwable ignored) {
+			}
+		}
+	}
+
 	@Override
 	public void onOpen(org.java_websocket.WebSocket conn, org.java_websocket.handshake.ClientHandshake handshake) {
 		// Send a fresh snapshot from the game thread so new clients get current run, not stale lastPayload
@@ -112,18 +121,16 @@ public class StreamingServer extends WebSocketServer {
 				try {
 					Map<String, Object> snapshot = GameStateSnapshot.build();
 					String json = GSON.toJson(snapshot);
-					if (json != null && !json.isEmpty()) conn.send(json);
-					conn.send( uiStateJson(
+					safeSend(conn, json);
+					safeSend(conn, uiStateJson(
 							GameStateSnapshot.currentSceneId(),
 							GameStateSnapshot.currentOpenWindows() ) );
 				} catch (Throwable t) {
-					String json = lastPayload.get();
-					if (json != null && !json.isEmpty()) conn.send(json);
+					safeSend(conn, lastPayload.get());
 				}
 			});
 		} else {
-			String json = lastPayload.get();
-			if (json != null && !json.isEmpty()) conn.send(json);
+			safeSend(conn, lastPayload.get());
 		}
 	}
 

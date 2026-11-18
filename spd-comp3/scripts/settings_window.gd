@@ -387,6 +387,22 @@ var _vnine_my: SpinBox
 var _vviewers_corner: OptionButton
 var _vviewers_mx: SpinBox
 var _vviewers_my: SpinBox
+var _talents_vis: CheckBox
+var _talents_pin_preview: CheckBox
+var _talents_corner: OptionButton
+var _talents_mx: SpinBox
+var _talents_my: SpinBox
+var _talents_scale: SpinBox
+var _talents_h_sep: SpinBox
+var _talents_v_sep: SpinBox
+var _talents_pad_h: SpinBox
+var _talents_pad_v: SpinBox
+var _talents_chrome_style: OptionButton
+var _talents_chrome_scale: SpinBox
+var _vert_show_talents: CheckBox
+var _vtalents_corner: OptionButton
+var _vtalents_mx: SpinBox
+var _vtalents_my: SpinBox
 
 
 func _ready() -> void:
@@ -1590,6 +1606,46 @@ func _build_ui() -> void:
 		]
 	)
 
+	var talents_sc := _make_scroll_vbox() as ScrollContainer
+	_add_settings_page("Talents", talents_sc)
+
+	_talents_vis = CheckBox.new()
+	_talents_pin_preview = CheckBox.new()
+	_talents_corner = _opt(PackedStringArray(["Top-left", "Top-right", "Bottom-left", "Bottom-right"]))
+	_talents_mx = _spin_i(0, 4000)
+	_talents_my = _spin_i(0, 4000)
+	_talents_scale = _spin_f(0.5, 6.0, 0.1)
+	_talents_h_sep = _spin_i(0, 32)
+	_talents_v_sep = _spin_i(0, 32)
+	_talents_pad_h = _spin_i(0, 64)
+	_talents_pad_v = _spin_i(0, 64)
+	_talents_chrome_style = _opt(PackedStringArray(_SpdUiArt.CHROME_STYLE_LABELS))
+	_talents_chrome_scale = _spin_f(0.5, 4.0, 0.05)
+
+	_talents_pin_preview.toggled.connect(
+		func(pinned: bool) -> void:
+			CompanionConfig.set_preview_pin("talents", pinned)
+	)
+
+	_add_section_header(talents_sc, "Talents overlay")
+	_add_rows(
+		talents_sc,
+		[
+			["Show talents overlay", _talents_vis],
+			["Pin sample preview (for positioning)", _talents_pin_preview],
+			["Panel corner", _talents_corner],
+			["Margin X (px)", _talents_mx],
+			["Margin Y (px)", _talents_my],
+			["Scale multiplier", _talents_scale],
+			["Horizontal icon gap (px)", _talents_h_sep],
+			["Vertical tier gap (px)", _talents_v_sep],
+			["Padding horizontal (px)", _talents_pad_h],
+			["Padding vertical (px)", _talents_pad_v],
+			["Chrome background style", _talents_chrome_style],
+			["Chrome scale (border)", _talents_chrome_scale],
+		]
+	)
+
 	# --- Vertical companion (1080×1920 atlas pane) ---
 	var vert_sc := _make_scroll_vbox() as ScrollContainer
 	_add_settings_page("Vertical", vert_sc)
@@ -1611,6 +1667,10 @@ func _build_ui() -> void:
 	_vert_show_nine = CheckBox.new()
 	_vert_show_viewers = CheckBox.new()
 	_vert_show_soon = CheckBox.new()
+	_vert_show_talents = CheckBox.new()
+	_vtalents_corner = _opt(PackedStringArray(["Top-left", "Top-right", "Bottom-left", "Bottom-right"]))
+	_vtalents_mx = _spin_i(0, 4000)
+	_vtalents_my = _spin_i(0, 4000)
 	_vsoon_x = _spin_i(-2000, 4000)
 	_vsoon_y = _spin_i(-2000, 4000)
 	_vsoon_scale = _spin_f(0.25, 12.0, 0.05)
@@ -1696,6 +1756,7 @@ func _build_ui() -> void:
 			["9c deaths", _vert_show_nine],
 			["Viewer counts", _vert_show_viewers],
 			["Starting soon", _vert_show_soon],
+			["Talents", _vert_show_talents],
 		]
 	)
 	_add_section_header(vert_sc, "Alert zone")
@@ -1788,6 +1849,9 @@ func _build_ui() -> void:
 			["Viewer counts corner", _vviewers_corner],
 			["Viewer counts margin X", _vviewers_mx],
 			["Viewer counts margin Y", _vviewers_my],
+			["Talents corner", _vtalents_corner],
+			["Talents margin X", _vtalents_mx],
+			["Talents margin Y", _vtalents_my],
 		]
 	)
 	_add_section_header(vert_sc, "Starting soon")
@@ -2240,6 +2304,20 @@ func _sync_from_config() -> void:
 		_SpdUiArt.chrome_style_id_index(CompanionConfig.free_promos_chrome_style)
 	)
 	_free_chrome_scale.value = CompanionConfig.free_promos_chrome_scale
+	_talents_vis.button_pressed = CompanionConfig.talents_overlay_enabled
+	_talents_pin_preview.button_pressed = CompanionConfig.preview_pin_talents
+	_talents_corner.select(clampi(CompanionConfig.talents_corner, 0, 3))
+	_talents_mx.value = CompanionConfig.talents_margin_x
+	_talents_my.value = CompanionConfig.talents_margin_y
+	_talents_scale.value = CompanionConfig.talents_scale
+	_talents_h_sep.value = CompanionConfig.talents_h_separation
+	_talents_v_sep.value = CompanionConfig.talents_v_separation
+	_talents_pad_h.value = CompanionConfig.talents_padding_h_px
+	_talents_pad_v.value = CompanionConfig.talents_padding_v_px
+	_talents_chrome_style.select(
+		_SpdUiArt.chrome_style_id_index(CompanionConfig.talents_chrome_style)
+	)
+	_talents_chrome_scale.value = CompanionConfig.talents_chrome_scale
 	_dp_vis.button_pressed = CompanionConfig.double_points_panel_visible
 	_dp_poll.value = CompanionConfig.double_points_poll_sec
 	_dp_corner.select(clampi(CompanionConfig.double_points_corner, 0, 3))
@@ -2575,6 +2653,10 @@ func _sync_vertical_from_config() -> void:
 	_vert_show_nine.button_pressed = L.show_nine_challenge_deaths
 	_vert_show_viewers.button_pressed = L.show_viewer_counts
 	_vert_show_soon.button_pressed = L.show_starting_soon
+	_vert_show_talents.button_pressed = L.show_talents
+	_vtalents_corner.select(clampi(L.talents_corner, 0, 3))
+	_vtalents_mx.value = L.talents_margin_x
+	_vtalents_my.value = L.talents_margin_y
 	_vsoon_x.value = L.starting_soon_x_px
 	_vsoon_y.value = L.starting_soon_y_px
 	_vsoon_scale.value = L.starting_soon_scale
@@ -2653,6 +2735,10 @@ func _apply_vertical_to_config() -> void:
 	L.show_nine_challenge_deaths = _vert_show_nine.button_pressed
 	L.show_viewer_counts = _vert_show_viewers.button_pressed
 	L.show_starting_soon = _vert_show_soon.button_pressed
+	L.show_talents = _vert_show_talents.button_pressed
+	L.talents_corner = clampi(_vtalents_corner.selected, 0, 3)
+	L.talents_margin_x = int(_vtalents_mx.value)
+	L.talents_margin_y = int(_vtalents_my.value)
 	L.starting_soon_x_px = int(_vsoon_x.value)
 	L.starting_soon_y_px = int(_vsoon_y.value)
 	L.starting_soon_scale = clampf(float(_vsoon_scale.value), 0.25, 12.0)
@@ -2773,6 +2859,26 @@ func _on_apply_pressed() -> void:
 			_SpdUiArt.CHROME_STYLE_IDS[_free_chrome_style.selected]
 		)
 	CompanionConfig.free_promos_chrome_scale = clampf(float(_free_chrome_scale.value), 0.5, 4.0)
+	CompanionConfig.talents_overlay_enabled = _talents_vis.button_pressed
+	CompanionConfig.set_preview_pin("talents", _talents_pin_preview.button_pressed)
+	CompanionConfig.talents_corner = clampi(_talents_corner.selected, 0, 3)
+	CompanionConfig.talents_margin_x = int(_talents_mx.value)
+	CompanionConfig.talents_margin_y = int(_talents_my.value)
+	CompanionConfig.talents_scale = clampf(float(_talents_scale.value), 0.5, 6.0)
+	CompanionConfig.talents_h_separation = clampi(int(_talents_h_sep.value), 0, 32)
+	CompanionConfig.talents_v_separation = clampi(int(_talents_v_sep.value), 0, 32)
+	CompanionConfig.talents_padding_h_px = clampi(int(_talents_pad_h.value), 0, 64)
+	CompanionConfig.talents_padding_v_px = clampi(int(_talents_pad_v.value), 0, 64)
+	if (
+		_talents_chrome_style.selected >= 0
+		and _talents_chrome_style.selected < _SpdUiArt.CHROME_STYLE_IDS.size()
+	):
+		CompanionConfig.talents_chrome_style = (
+			_SpdUiArt.CHROME_STYLE_IDS[_talents_chrome_style.selected]
+		)
+	CompanionConfig.talents_chrome_scale = clampf(
+		float(_talents_chrome_scale.value), 0.5, 4.0
+	)
 	CompanionConfig.double_points_panel_visible = _dp_vis.button_pressed
 	CompanionConfig.double_points_poll_sec = maxf(0.5, float(_dp_poll.value))
 	CompanionConfig.double_points_corner = clampi(_dp_corner.selected, 0, 3)

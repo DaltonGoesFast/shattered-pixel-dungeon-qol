@@ -307,6 +307,19 @@ var starting_soon_visible: bool = false
 var starting_soon_x_px: int = 722
 var starting_soon_y_px: int = 360
 var starting_soon_scale: float = 4.0
+## Talents overlay: displays invested hero talents with icons and illuminated pips.
+var talents_overlay_enabled: bool = true
+var talents_corner: int = 2
+var talents_margin_x: int = 16
+var talents_margin_y: int = 16
+var talents_scale: float = 2.0
+var talents_h_separation: int = 2
+var talents_v_separation: int = 2
+var talents_padding_h_px: int = 4
+var talents_padding_v_px: int = 4
+var talents_chrome_style: String = ""
+var talents_chrome_scale: float = 1.0
+var preview_pin_talents: bool = false
 var viewer_counts_twitch_poll_sec: float = 20.0
 var viewer_counts_youtube_poll_sec: float = 60.0
 var viewer_counts_youtube_search_sec: float = 300.0
@@ -1207,6 +1220,35 @@ func load_settings() -> void:
 	free_promos_chrome_scale = clampf(
 		float(cfg.get_value("ui", "free_promos_chrome_scale", free_promos_chrome_scale)), 0.5, 4.0
 	)
+	talents_overlay_enabled = bool(
+		cfg.get_value("ui", "talents_overlay_enabled", talents_overlay_enabled)
+	)
+	talents_corner = clampi(
+		int(cfg.get_value("ui", "talents_corner", talents_corner)), 0, 3
+	)
+	talents_margin_x = int(cfg.get_value("ui", "talents_margin_x", talents_margin_x))
+	talents_margin_y = int(cfg.get_value("ui", "talents_margin_y", talents_margin_y))
+	talents_scale = clampf(
+		float(cfg.get_value("ui", "talents_scale", talents_scale)), 0.5, 6.0
+	)
+	talents_h_separation = clampi(
+		int(cfg.get_value("ui", "talents_h_separation", talents_h_separation)), 0, 32
+	)
+	talents_v_separation = clampi(
+		int(cfg.get_value("ui", "talents_v_separation", talents_v_separation)), 0, 32
+	)
+	talents_padding_h_px = clampi(
+		int(cfg.get_value("ui", "talents_padding_h_px", talents_padding_h_px)), 0, 64
+	)
+	talents_padding_v_px = clampi(
+		int(cfg.get_value("ui", "talents_padding_v_px", talents_padding_v_px)), 0, 64
+	)
+	talents_chrome_style = _SpdUiArt.normalize_chrome_style_id(
+		str(cfg.get_value("ui", "talents_chrome_style", talents_chrome_style))
+	)
+	talents_chrome_scale = clampf(
+		float(cfg.get_value("ui", "talents_chrome_scale", talents_chrome_scale)), 0.5, 4.0
+	)
 	double_points_panel_visible = bool(
 		cfg.get_value("ui", "double_points_panel_visible", double_points_panel_visible)
 	)
@@ -1505,6 +1547,10 @@ func _main_layout_snapshot() -> UiLayoutData:
 	L.starting_soon_x_px = starting_soon_x_px
 	L.starting_soon_y_px = starting_soon_y_px
 	L.starting_soon_scale = starting_soon_scale
+	L.talents_corner = talents_corner
+	L.talents_margin_x = talents_margin_x
+	L.talents_margin_y = talents_margin_y
+	L.show_talents = talents_overlay_enabled
 	L.chrome_boxes = chrome_boxes
 	L.show_live_water = show_live_water
 	L.show_title = show_title
@@ -1569,6 +1615,8 @@ func element_enabled(node: Node, key: String) -> bool:
 			return L.show_first_words
 		"bestiary":
 			return L.show_bestiary
+		"talents":
+			return L.show_talents
 		"summon_march":
 			return L.show_summon_march
 		"spend_indicator":
@@ -1597,6 +1645,8 @@ func preview_pin_for_element(key: String) -> bool:
 			return preview_pin_paid_notices
 		"first_words":
 			return preview_pin_first_words
+		"talents":
+			return preview_pin_talents
 		_:
 			return false
 
@@ -1611,6 +1661,8 @@ func set_preview_pin(key: String, pinned: bool) -> void:
 			preview_pin_paid_notices = pinned
 		"first_words":
 			preview_pin_first_words = pinned
+		"talents":
+			preview_pin_talents = pinned
 		_:
 			return
 	preview_visibility_changed.emit()
@@ -1671,6 +1723,8 @@ func _main_control_enabled(target: String) -> bool:
 			return nine_challenge_deaths_panel_visible
 		"viewer_counts":
 			return viewer_counts_panel_visible
+		"talents":
+			return talents_overlay_enabled
 		"starting_soon":
 			return starting_soon_visible
 	return true
@@ -1979,6 +2033,12 @@ func _load_vertical_layout(cfg: ConfigFile) -> void:
 	L.viewer_counts_margin_y = int(
 		cfg.get_value(sec, "viewer_counts_margin_y", seeded.viewer_counts_margin_y)
 	)
+	L.talents_corner = clampi(
+		int(cfg.get_value(sec, "talents_corner", seeded.talents_corner)), 0, 3
+	)
+	L.talents_margin_x = int(cfg.get_value(sec, "talents_margin_x", seeded.talents_margin_x))
+	L.talents_margin_y = int(cfg.get_value(sec, "talents_margin_y", seeded.talents_margin_y))
+	L.show_talents = bool(cfg.get_value(sec, "show_talents", seeded.show_talents))
 	L.starting_soon_x_px = int(
 		cfg.get_value(sec, "starting_soon_x_px", seeded.starting_soon_x_px)
 	)
@@ -2038,6 +2098,7 @@ func _seed_vertical_scene_show_from_toggles(L: UiLayoutData) -> void:
 		"summon_march": L.show_summon_march,
 		"spend_indicator": L.show_spend_indicator,
 		"free_promos": L.show_free_promos,
+		"talents": L.show_talents,
 		"double_points": L.show_double_points,
 		"nine_challenge_deaths": L.show_nine_challenge_deaths,
 		"viewer_counts": L.show_viewer_counts,
@@ -2105,6 +2166,10 @@ func _save_vertical_layout(cfg: ConfigFile) -> void:
 	cfg.set_value(sec, "starting_soon_x_px", L.starting_soon_x_px)
 	cfg.set_value(sec, "starting_soon_y_px", L.starting_soon_y_px)
 	cfg.set_value(sec, "starting_soon_scale", L.starting_soon_scale)
+	cfg.set_value(sec, "talents_corner", L.talents_corner)
+	cfg.set_value(sec, "talents_margin_x", L.talents_margin_x)
+	cfg.set_value(sec, "talents_margin_y", L.talents_margin_y)
+	cfg.set_value(sec, "show_talents", L.show_talents)
 	cfg.set_value(sec, "chrome_boxes", _serialize_chrome_boxes_list(L.chrome_boxes))
 	cfg.set_value(sec, "show_live_water", L.show_live_water)
 	cfg.set_value(sec, "show_title", L.show_title)
@@ -2718,6 +2783,17 @@ func save_settings() -> void:
 	cfg.set_value("ui", "free_promos_max_width_px", free_promos_max_width_px)
 	cfg.set_value("ui", "free_promos_chrome_style", free_promos_chrome_style)
 	cfg.set_value("ui", "free_promos_chrome_scale", free_promos_chrome_scale)
+	cfg.set_value("ui", "talents_overlay_enabled", talents_overlay_enabled)
+	cfg.set_value("ui", "talents_corner", talents_corner)
+	cfg.set_value("ui", "talents_margin_x", talents_margin_x)
+	cfg.set_value("ui", "talents_margin_y", talents_margin_y)
+	cfg.set_value("ui", "talents_scale", talents_scale)
+	cfg.set_value("ui", "talents_h_separation", talents_h_separation)
+	cfg.set_value("ui", "talents_v_separation", talents_v_separation)
+	cfg.set_value("ui", "talents_padding_h_px", talents_padding_h_px)
+	cfg.set_value("ui", "talents_padding_v_px", talents_padding_v_px)
+	cfg.set_value("ui", "talents_chrome_style", talents_chrome_style)
+	cfg.set_value("ui", "talents_chrome_scale", talents_chrome_scale)
 	cfg.set_value("ui", "double_points_panel_visible", double_points_panel_visible)
 	cfg.set_value("ui", "double_points_corner", double_points_corner)
 	cfg.set_value("ui", "double_points_margin_x", double_points_margin_x)
@@ -2864,6 +2940,8 @@ const REMOTE_UI_KEYS: Array[String] = [
 	"viewer_counts_font_color", "viewer_counts_chrome_style", "viewer_counts_chrome_scale",
 	"free_promos_padding_h_px", "free_promos_padding_v_px", "free_promos_font_size_px",
 	"free_promos_max_width_px", "free_promos_chrome_style", "free_promos_chrome_scale",
+	"talents_overlay_enabled", "talents_corner", "talents_margin_x", "talents_margin_y",
+	"talents_scale", "talents_h_separation", "talents_v_separation", "talents_padding_h_px", "talents_padding_v_px", "talents_chrome_style", "talents_chrome_scale",
 	"double_points_panel_visible", "double_points_corner", "double_points_margin_x", "double_points_margin_y",
 	"double_points_padding_h_px", "double_points_padding_v_px", "double_points_font_size_px",
 	"double_points_font_color", "double_points_chrome_style", "double_points_chrome_scale",

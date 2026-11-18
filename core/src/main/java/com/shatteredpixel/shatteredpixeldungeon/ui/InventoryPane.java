@@ -24,6 +24,7 @@ package com.shatteredpixel.shatteredpixeldungeon.ui;
 import com.shatteredpixel.shatteredpixeldungeon.Chrome;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.SPDAction;
+import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Belongings;
@@ -80,6 +81,7 @@ public class InventoryPane extends Component {
 	private RenderedTextBlock promptTxt;
 
 	private ArrayList<BagButton> bags;
+	private ArrayList<EquippedAbilityTag> abilityTabs;
 
 	public static final int WIDTH = 187;
 	public static final int HEIGHT = 82;
@@ -114,6 +116,13 @@ public class InventoryPane extends Component {
 
 	@Override
 	protected void createChildren() {
+
+		abilityTabs = new ArrayList<>();
+		for (int i = 0; i < 3; i++){
+			EquippedAbilityTag tab = new EquippedAbilityTag(i);
+			abilityTabs.add(tab);
+			add(tab);
+		}
 
 		bg = Chrome.get(Chrome.Type.TOAST_TR_HEAVY);
 		add(bg);
@@ -207,7 +216,7 @@ public class InventoryPane extends Component {
 	}
 
 	@Override
-	protected void layout() {
+	public void layout() {
 		width = WIDTH;
 		height = HEIGHT;
 
@@ -258,6 +267,22 @@ public class InventoryPane extends Component {
 			}
 		}
 
+		if (abilityTabs != null){
+			if (SPDSettings.equippedAbilityTabs()){
+				float tabY = y + 4;
+				for (EquippedAbilityTag tab : abilityTabs){
+					if (tab.visible){
+						tab.setRect(x - Tag.SIZE + 3, tabY, Tag.SIZE, Tag.SIZE);
+						tabY += Tag.SIZE + 1;
+					}
+				}
+			} else {
+				for (EquippedAbilityTag tab : abilityTabs){
+					tab.visible = false;
+				}
+			}
+		}
+
 		super.layout();
 	}
 	
@@ -278,6 +303,12 @@ public class InventoryPane extends Component {
 
 		for (BagButton bag : bags){
 			bag.alpha( value );
+		}
+
+		if (abilityTabs != null){
+			for (EquippedAbilityTag tab : abilityTabs){
+				tab.alpha( value );
+			}
 		}
 	}
 
@@ -379,6 +410,19 @@ public class InventoryPane extends Component {
 		gold.alpha( lastEnabled ? 1f : 0.3f );
 		energyTxt.alpha( lastEnabled ? 1f : 0.3f );
 		energy.alpha( lastEnabled ? 1f : 0.3f );
+
+		if (abilityTabs != null){
+			for (EquippedAbilityTag tab : abilityTabs){
+				if (SPDSettings.equippedAbilityTabs()){
+					tab.visible = tab.isSlotEligible();
+					if (tab.visible){
+						tab.updateVisuals();
+					}
+				} else {
+					tab.visible = false;
+				}
+			}
+		}
 
 		layout();
 	}

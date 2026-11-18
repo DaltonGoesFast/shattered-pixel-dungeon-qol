@@ -86,8 +86,15 @@ public class GraveRoster extends Buff {
 	}
 
 	private void ensureChalice(){
+		if (chaliceGiven) return;
 		if (Dungeon.level == null || Dungeon.hero == null || !Dungeon.hero.isAlive()) return;
-		if (Dungeon.hero.belongings.getItem(GraveChalice.class) != null) return;
+		// Unblessed ankh hides the real chalice from getItem and rejects collect();
+		// retrying would drop a new floor copy every hero turn.
+		if (Dungeon.hero.belongings.lostInventory()) return;
+		if (Dungeon.hero.belongings.getItem(GraveChalice.class) != null){
+			chaliceGiven = true;
+			return;
+		}
 		chaliceGiven = true;
 		GraveChalice chalice = new GraveChalice();
 		if (!chalice.collect()){

@@ -67,6 +67,9 @@ var viewer_counts_margin_y: int = 64
 var starting_soon_x_px: int = 722
 var starting_soon_y_px: int = 360
 var starting_soon_scale: float = 4.0
+var talents_corner: int = 2
+var talents_margin_x: int = 16
+var talents_margin_y: int = 16
 
 var chrome_boxes: Array = []
 
@@ -87,6 +90,7 @@ var show_double_points: bool = true
 var show_nine_challenge_deaths: bool = true
 var show_viewer_counts: bool = true
 var show_starting_soon: bool = false
+var show_talents: bool = true
 ## Vertical only: hide chat-spend badge while spend_disabled.txt exists.
 var hide_spend_when_off: bool = false
 
@@ -114,6 +118,7 @@ static func element_keys() -> PackedStringArray:
 			"nine_challenge_deaths",
 			"viewer_counts",
 			"starting_soon",
+			"talents",
 		]
 	)
 
@@ -152,6 +157,8 @@ static func element_label(key: String) -> String:
 			return "Viewer counts"
 		"starting_soon":
 			return "Starting soon"
+		"talents":
+			return "Talents"
 		_:
 			return key
 
@@ -163,7 +170,7 @@ static func default_scene_show() -> Dictionary:
 		match key:
 			"title":
 				d[key] = {"pause": true, "main": false, "other": false}
-			"live_water", "id_overlay", "bestiary":
+			"live_water", "id_overlay", "bestiary", "talents":
 				d[key] = {"pause": false, "main": true, "other": true}
 			_:
 				d[key] = {"pause": true, "main": true, "other": true}
@@ -273,6 +280,10 @@ static func default_vertical() -> UiLayoutData:
 	L.starting_soon_y_px = 480
 	L.starting_soon_scale = 3.5
 	L.show_starting_soon = false
+	L.talents_corner = 2
+	L.talents_margin_x = 16
+	L.talents_margin_y = 16
+	L.show_talents = true
 	L.chrome_boxes = []
 	L.scene_show = default_scene_show()
 	return L
@@ -360,6 +371,10 @@ func copy_from(other: UiLayoutData) -> void:
 	show_nine_challenge_deaths = other.show_nine_challenge_deaths
 	show_viewer_counts = other.show_viewer_counts
 	show_starting_soon = other.show_starting_soon
+	talents_corner = other.talents_corner
+	talents_margin_x = other.talents_margin_x
+	talents_margin_y = other.talents_margin_y
+	show_talents = other.show_talents
 	hide_spend_when_off = other.hide_spend_when_off
 	scene_show = {}
 	other.ensure_scene_show()
@@ -449,6 +464,10 @@ func to_remote_dict() -> Dictionary:
 		"show_nine_challenge_deaths": show_nine_challenge_deaths,
 		"show_viewer_counts": show_viewer_counts,
 		"show_starting_soon": show_starting_soon,
+		"talents_corner": talents_corner,
+		"talents_margin_x": talents_margin_x,
+		"talents_margin_y": talents_margin_y,
+		"show_talents": show_talents,
 		"hide_spend_when_off": hide_spend_when_off,
 		"scene_show": ss,
 	}
@@ -599,6 +618,14 @@ func apply_remote_dict(raw: Dictionary) -> void:
 		show_viewer_counts = bool(raw["show_viewer_counts"])
 	if raw.has("show_starting_soon"):
 		show_starting_soon = bool(raw["show_starting_soon"])
+	if raw.has("talents_corner"):
+		talents_corner = clampi(int(raw["talents_corner"]), 0, 3)
+	if raw.has("talents_margin_x"):
+		talents_margin_x = int(raw["talents_margin_x"])
+	if raw.has("talents_margin_y"):
+		talents_margin_y = int(raw["talents_margin_y"])
+	if raw.has("show_talents"):
+		show_talents = bool(raw["show_talents"])
 	if raw.has("hide_spend_when_off"):
 		hide_spend_when_off = bool(raw["hide_spend_when_off"])
 	if raw.has("scene_show") and typeof(raw["scene_show"]) == TYPE_DICTIONARY:

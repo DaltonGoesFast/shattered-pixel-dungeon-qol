@@ -594,7 +594,7 @@ When export `0.2.0` is committed → Phase 5 complete → proceed to **Phase 6**
 
 ---
 
-## Hero name poll (N01–N04)
+## Hero name poll (N01–N05)
 
 Chat stashes `!name` in Python (`hero_name.py`). After Goo (depth 5), `server.py` POSTs Streamer.bot `DoAction` with `option1`–`option4`. You apply the winner yourself (OBS `hero_name_winner.txt` or N04).
 
@@ -604,17 +604,21 @@ Chat stashes `!name` in Python (`hero_name.py`). After Goo (depth 5), `server.py
 **Triggers:** none (HTTP `DoAction` only)  
 **Enabled:** Yes
 
-Sub-actions (UI only — no create-poll C#):
+Sub-actions (UI only — no create-poll C#), **in this order**:
 
 1. **Twitch → Polls → Create Poll**
-   - Title: `Name the hero` (or `%pollTitle%`)
+   - Title: `Name the hero`
    - Choices: `%option1%`, `%option2%`, `%option3%`, `%option4%`
-   - Duration: `60` (or `%pollDuration%`)
-   - Channel points per vote: `0`
+   - Duration: `60`
+   - Channel points per vote: `0` (not 10 — paid votes shrink turnout and confused earlier testing)
 2. **YouTube → Polls → Create Poll**
-   - Same title / duration / four `%option#%` choices
+   - Question: `Name the hero`
+   - Options: `%option1%` … `%option4%`
+   - Broadcast: `0` (your single dual-format YouTube broadcast — two stream keys still share one broadcast)
+3. **Delay** `60000` ms (keep in sync with Twitch’s 60s duration)
+4. **YouTube → Polls → End Poll** (broadcast `0`) — YouTube does not always auto-close; this fires `YouTube Poll Closed` for N03
 
-Python already supplies args via:
+Python supplies args via:
 
 `POST http://127.0.0.1:7474/DoAction` with body `{ "action": { "name": "N01 - Hero Name Poll" }, "args": { "option1": "...", ... } }`.
 
@@ -623,34 +627,32 @@ Requires Streamer.bot **HTTP server** on `127.0.0.1:7474`.
 ### N02 — Twitch poll completed
 
 **Trigger:** Twitch → Poll Completed  
-**Queue:** `points` (or default)
+**Queue:** default (or `points`)
 
-1. Optional: **Set Argument** `heroNamePollPlatform` = `twitch`
-2. **Execute C#** — paste [`ReportHeroNamePollClosed.cs`](../Lastest%20UI/streamerbot/phase2/ReportHeroNamePollClosed.cs) (writes `hero_name_poll_result_body.json` only)
-3. **Run a Program** — `curl.exe` (same pattern as R1):
+1. **Set Argument** `heroNamePollPlatform` = `twitch`
+2. **Execute C#** — paste [`ReportHeroNamePollClosed.cs`](../Lastest%20UI/streamerbot/phase2/ReportHeroNamePollClosed.cs)  
+   Writes `hero_name_poll_result_body_twitch.json` (and a legacy shared copy). Logs `sumVotes` / `totalVotes` / per-option counts.
+3. **If** `%heroNamePollResultBodyPath%` Is Not Empty → **Run a Program** `curl.exe`:
 
 | Field | Value |
 |-------|--------|
 | Program | `C:\Windows\System32\curl.exe` |
-| Arguments | `-s -S -m 12 -X POST -H "Content-Type: application/json" --data-binary "@hero_name_poll_result_body.json" http://127.0.0.1:5000/api/hero-name/poll-result` |
+| Arguments | `-s -S -m 12 -X POST -H "Content-Type: application/json" --data-binary "@hero_name_poll_result_body_twitch.json" http://127.0.0.1:5000/api/hero-name/poll-result` |
 | Working directory | `C:\Users\dalto\Documents\My Games\SPD\march26 mod\shattered-pixel-dungeon-qol\Lastest UI` |
 | Wait | 15 s |
 
-Skips polls whose title is not `Name the hero` (C# returns false → curl should be in a True branch, or leave curl always-on and accept empty/stale body only if C# ran).
-
-**Important:** Put the curl step in an **If** `%heroNamePollResultBodyPath%` Is Not Empty (or run C# then curl only when C# returns true via Streamer.bot’s action continuation). Simplest: keep both sequential — C# returns false early for wrong titles without rewriting the body; for wrong titles, either delete the body file in the skip path or gate curl. Current C# does **not** clear the file on skip, so prefer gating:
-
-- After C#: **If** `%heroNamePollResultBodyPath%` Is Not Empty → Run curl  
-- Or set that arg only on success (already done) and clear it at action start with Set Argument empty.
-
-Skips polls whose title is not `Name the hero`.
+Skips polls whose title is not `Name the hero` (C# clears the path arg and returns false → gated curl does not run).
 
 ### N03 — YouTube poll closed
 
 **Trigger:** YouTube → Poll Closed  
-Same as N02: optional Set Argument `heroNamePollPlatform` = `youtube`, same C#, same curl.
+Same shape as N02:
 
-**Note:** YouTube **does** expose vote vars on Poll Closed (`poll.option0.text` / `poll.option0.votes`, etc.). Python waits for **both** Twitch + YouTube (or duration+grace timeout if one never reports). N03 title must be `Name the hero` or the C# skips.
+1. **Set Argument** `heroNamePollPlatform` = `youtube`
+2. Same **Execute C#** (writes `hero_name_poll_result_body_youtube.json`)
+3. Gated curl with `--data-binary "@hero_name_poll_result_body_youtube.json"` (same working directory / URL)
+
+**Note:** YouTube exposes `poll.option0.text` / `poll.option0.votes` (and `poll.totalVotes`) on Poll Closed. Python waits for **both** Twitch + YouTube (or duration+grace). Dual-format (H+V keys) does **not** split poll votes when Streamer.bot shows one broadcast.
 
 ### N04 — Apply hero name (optional Stream Deck)
 

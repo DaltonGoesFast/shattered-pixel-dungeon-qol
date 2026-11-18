@@ -55,6 +55,7 @@ public class WndChimeraDraft extends Window {
 	private static final float GAP = 2;
 
 	private RedButton btnBegin;
+	private RedButton btnRandom;
 	private float slotsTop;
 	private final ArrayList<DraftSlotButton> slotButtons = new ArrayList<>();
 
@@ -76,6 +77,16 @@ public class WndChimeraDraft extends Window {
 		slotsTop = message.bottom() + 2 * GAP;
 		layoutSlots();
 
+		btnRandom = new RedButton( Messages.get( this, "random" ) ) {
+			@Override
+			protected void onClick() {
+				super.onClick();
+				randomizeAll();
+			}
+		};
+		btnRandom.icon( Icons.SHUFFLE.get() );
+		add( btnRandom );
+
 		btnBegin = new RedButton( Messages.get( this, "begin" ) ) {
 			@Override
 			protected void onClick() {
@@ -84,8 +95,9 @@ public class WndChimeraDraft extends Window {
 				hide();
 			}
 		};
-		placeBegin();
 		add( btnBegin );
+
+		placeButtons();
 		refreshBegin();
 
 		resize( WIDTH, (int)btnBegin.bottom() + 1 );
@@ -99,8 +111,11 @@ public class WndChimeraDraft extends Window {
 		return bottom;
 	}
 
-	private void placeBegin() {
-		btnBegin.setRect( 0, bottomOfSlots() + 2 * GAP, WIDTH, 18 );
+	private void placeButtons() {
+		float top = bottomOfSlots() + 2 * GAP;
+		float btnWidth = (WIDTH - GAP) / 2f;
+		btnRandom.setRect( 0, top, btnWidth, 18 );
+		btnBegin.setRect( btnWidth + GAP, top, btnWidth, 18 );
 	}
 
 	private void layoutSlots() {
@@ -138,7 +153,27 @@ public class WndChimeraDraft extends Window {
 		if (hero.chimeraDraftPicks == null) hero.chimeraDraftPicks = new LinkedHashMap<>();
 		hero.chimeraDraftPicks.put( slot, chosen );
 		layoutSlots();
-		placeBegin();
+		placeButtons();
+		bringToFront( btnRandom );
+		bringToFront( btnBegin );
+		refreshBegin();
+		resize( WIDTH, (int)btnBegin.bottom() + 1 );
+	}
+
+	private void randomizeAll() {
+		Hero hero = Dungeon.hero;
+		if (hero.chimeraDraftOffers == null) return;
+		if (hero.chimeraDraftPicks == null) hero.chimeraDraftPicks = new LinkedHashMap<>();
+
+		for (Talent slot : hero.chimeraDraftOffers.keySet()) {
+			ArrayList<Talent> offers = hero.chimeraDraftOffers.get( slot );
+			if (offers != null && !offers.isEmpty()) {
+				hero.chimeraDraftPicks.put( slot, com.watabou.utils.Random.element( offers ) );
+			}
+		}
+		layoutSlots();
+		placeButtons();
+		bringToFront( btnRandom );
 		bringToFront( btnBegin );
 		refreshBegin();
 		resize( WIDTH, (int)btnBegin.bottom() + 1 );
@@ -217,7 +252,7 @@ public class WndChimeraDraft extends Window {
 				}
 				@Override
 				public boolean metamorphDesc() {
-					return true;
+					return Chimera.isMetamorphedDesc( Dungeon.hero, pick );
 				}
 				@Override
 				public void call() {

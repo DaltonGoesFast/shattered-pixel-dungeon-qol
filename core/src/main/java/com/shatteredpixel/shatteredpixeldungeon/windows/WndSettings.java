@@ -999,6 +999,7 @@ public class WndSettings extends WndTabbed {
 		OptionSlider optQuickslotsShown;
 		CheckBox chkSecondQuickslotBar;
 		CheckBox chkShowQuickslotSwapButton;
+		CheckBox chkEquippedAbilityTabs;
 		CheckBox chkCenterOnCycleNoEnemies;
 		CheckBox chkBossBarAllEnemies;
 		CheckBox chkBuffIconCounts;
@@ -1096,6 +1097,16 @@ public class WndSettings extends WndTabbed {
 			};
 			chkShowQuickslotSwapButton.checked(SPDSettings.showQuickslotSwapButton());
 			add(chkShowQuickslotSwapButton);
+			chkEquippedAbilityTabs = new CheckBox(Messages.get(UITab.class, "equipped_ability_tabs")) {
+				@Override
+				protected void onClick() {
+					super.onClick();
+					SPDSettings.equippedAbilityTabs(checked());
+					InventoryPane.refresh();
+				}
+			};
+			chkEquippedAbilityTabs.checked(SPDSettings.equippedAbilityTabs());
+			add(chkEquippedAbilityTabs);
 
 			chkCenterOnCycleNoEnemies = new CheckBox(Messages.get(UITab.class, "center_on_cycle_no_enemies")) {
 				@Override
@@ -1190,6 +1201,8 @@ public class WndSettings extends WndTabbed {
 
 			chkShowQuickslotSwapButton.setRect(0, pos + GAP, width, BTN_HEIGHT);
 			pos = chkShowQuickslotSwapButton.bottom();
+			chkEquippedAbilityTabs.setRect(0, pos + GAP, width, BTN_HEIGHT);
+			pos = chkEquippedAbilityTabs.bottom();
 
 			chkCenterOnCycleNoEnemies.setRect(0, pos + GAP, width, BTN_HEIGHT);
 			pos = chkCenterOnCycleNoEnemies.bottom();

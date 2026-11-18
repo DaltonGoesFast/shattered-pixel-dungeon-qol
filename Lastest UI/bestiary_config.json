@@ -1,8 +1,8 @@
 {
-  "heat_window_sec": 900,
-  "sprint_donor_reward": 50,
-  "sprint_donor_reward_per_level": 50,
-  "per_user_bar_cap_fraction": 0.0,
+  "heat_window_sec": 1200,
+  "sprint_donor_reward": 100,
+  "sprint_donor_reward_per_level": 100,
+  "per_user_bar_cap_fraction": 0.25,
   "repeat_mob_diminishing": false,
   "soft_floor": {
     "enabled": true,
@@ -19,7 +19,7 @@
     "apply_to_heat": true
   },
   "shatter_event": {
-    "enabled": false,
+    "enabled": true,
     "duration_sec": 60,
     "jackpot_chance": 0.01,
     "sidecar_chance_by_level": {
@@ -56,8 +56,8 @@
     {
       "level": 1,
       "zone": "Sewers",
-      "bar_threshold": 100,
-      "pip_count": 3,
+      "bar_threshold": 2000,
+      "pip_count": 5,
       "monsters": [
         "rat",
         "albino",
@@ -71,8 +71,8 @@
     {
       "level": 2,
       "zone": "Prison",
-      "bar_threshold": 200,
-      "pip_count": 5,
+      "bar_threshold": 3000,
+      "pip_count": 7,
       "monsters": [
         "skeleton",
         "dm100",
@@ -84,8 +84,8 @@
     {
       "level": 3,
       "zone": "Caves",
-      "bar_threshold": 250,
-      "pip_count": 5,
+      "bar_threshold": 4000,
+      "pip_count": 8,
       "monsters": [
         "bat",
         "brute",
@@ -96,8 +96,8 @@
     {
       "level": 4,
       "zone": "Metro",
-      "bar_threshold": 300,
-      "pip_count": 6,
+      "bar_threshold": 5000,
+      "pip_count": 9,
       "monsters": [
         "ghoul",
         "elemental",
@@ -109,7 +109,7 @@
     {
       "level": 5,
       "zone": "Halls",
-      "bar_threshold": 500,
+      "bar_threshold": 5000,
       "pip_count": 10,
       "monsters": [
         "eye",

@@ -41,9 +41,15 @@ import com.watabou.utils.Point;
 
 import org.lwjgl.util.tinyfd.TinyFileDialogs;
 
+import java.awt.Desktop;
+import java.awt.Toolkit;
+import java.awt.datatransfer.StringSelection;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.URI;
 import java.util.Locale;
+import javax.swing.JOptionPane;
+import javax.swing.UIManager;
 
 public class DesktopLauncher {
 
@@ -95,22 +101,27 @@ public class DesktopLauncher {
 					exceptionMsg = exceptionMsg.substring(0, 1000) + "...";
 				}
 
+				String fullLog = title + " Crash Log\n" +
+						"Version: " + Game.version + "\n" +
+						"OS: " + System.getProperty("os.name") + " (" + System.getProperty("os.arch") + ")\n\n" +
+						sw.toString();
+
+				String crashMsg;
 				if (exceptionMsg.contains("Couldn’t create window")){
-					TinyFileDialogs.tinyfd_messageBox(title + " Has Crashed!",
-							title + " was not able to initialize its graphics display, sorry about that!\n\n" +
-									"This usually happens when your graphics card has misconfigured drivers or does not support openGL 2.0+.\n\n" +
-									"If you are certain the game should work on your computer, please message the developer (Evan@ShatteredPixel.com)\n\n" +
-									"version: " + Game.version + "\n" +
-									exceptionMsg,
-							"ok", "error", false);
+					crashMsg = title + " was not able to initialize its graphics display, sorry about that!\n\n" +
+							"This usually happens when your graphics card has misconfigured drivers or does not support openGL 2.0+.\n\n" +
+							"Please copy the log or take a screenshot and post it in #daltons-mod-spd on Discord:\n" +
+							"https://discord.com/channels/1376267529445572708/1476801970386767893\n\n" +
+							"version: " + Game.version + "\n" +
+							exceptionMsg;
 				} else {
-					TinyFileDialogs.tinyfd_messageBox(title + " Has Crashed!",
-							title + " has run into an error it cannot recover from and has crashed, sorry about that!\n\n" +
-									"If you could, please email this error message to the developer (Evan@ShatteredPixel.com):\n\n" +
-									"version: " + Game.version + "\n" +
-									exceptionMsg,
-							"ok", "error", false);
+					crashMsg = title + " has run into an error it cannot recover from and has crashed, sorry about that!\n\n" +
+							"Please copy the log or take a screenshot and post it in #daltons-mod-spd on Discord:\n" +
+							"https://discord.com/channels/1376267529445572708/1476801970386767893\n\n" +
+							"version: " + Game.version + "\n" +
+							exceptionMsg;
 				}
+				showCrashDialog(title, crashMsg, fullLog);
 				System.exit(1);
 			}
 		});
@@ -131,6 +142,14 @@ public class DesktopLauncher {
 			Game.versionCode = 0;
 		}
 
+		if ("true".equalsIgnoreCase(System.getProperty("testCrash"))) {
+			throw new RuntimeException("Test crash error dialog verification!");
+		}
+		for (String arg : args) {
+			if ("--test-crash".equals(arg)) {
+				throw new RuntimeException("Test crash error dialog verification!");
+			}
+		}
 		if (UpdateImpl.supportsUpdates()){
 			Updates.service = UpdateImpl.getUpdateService();
 		}
@@ -213,5 +232,75 @@ public class DesktopLauncher {
 			config.setTransparentFramebuffer(true);
 		}
 		new Lwjgl3Application(new ShatteredPixelDungeon(new DesktopPlatformSupport()), config);
+	}
+	private static void showCrashDialog(String title, String message, String fullLog) {
+		final String dialogTitle = title + " Has Crashed!";
+		final String discordUrl = "https://discord.com/channels/1376267529445572708/1476801970386767893";
+		String copyButton = "Copy Log";
+
+		try {
+			UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+			while (true) {
+				Object[] options = new Object[]{"OK", copyButton, "Discord"};
+				int choice = JOptionPane.showOptionDialog(
+						null,
+						message,
+						dialogTitle,
+						JOptionPane.DEFAULT_OPTION,
+						JOptionPane.ERROR_MESSAGE,
+						null,
+						options,
+						options[0]
+				);
+				if (choice == 1) { // User clicked Copy Log
+					copyToClipboard(fullLog);
+					copyButton = "Copied!";
+					continue;
+				} else if (choice == 2) { // User clicked Discord
+					openWebpage(discordUrl);
+					continue;
+				}
+				break;
+			}
+			return;
+		} catch (Throwable ignored) {
+			// Fallback to TinyFileDialogs if Swing fails or is unavailable
+		}
+
+		boolean openDiscord = TinyFileDialogs.tinyfd_messageBox(
+				dialogTitle,
+				message + "\n\nOpen #daltons-mod-spd on Discord?",
+				"yesno", "error", false
+		);
+		if (openDiscord) {
+			openWebpage(discordUrl);
+		}
+	}
+
+	private static void copyToClipboard(String text) {
+		try {
+			StringSelection selection = new StringSelection(text);
+			Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, selection);
+		} catch (Throwable ignored) {}
+	}
+
+	private static void openWebpage(String url) {
+		try {
+			if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+				Desktop.getDesktop().browse(new URI(url));
+				return;
+			}
+		} catch (Throwable ignored) {}
+
+		try {
+			String os = System.getProperty("os.name").toLowerCase(Locale.ROOT);
+			if (os.contains("win")) {
+				new ProcessBuilder("rundll32", "url.dll,FileProtocolHandler", url).start();
+			} else if (os.contains("mac")) {
+				new ProcessBuilder("open", url).start();
+			} else {
+				new ProcessBuilder("xdg-open", url).start();
+			}
+		} catch (Throwable ignored) {}
 	}
 }

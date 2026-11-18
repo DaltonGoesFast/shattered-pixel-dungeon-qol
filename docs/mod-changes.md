@@ -4,7 +4,7 @@ Singleplayer additions in this build of Shattered Pixel Dungeon: quality-of-life
 
 Pacts are optional rules you choose before a run. They are not challenges. They do not change your challenge count, Champion badges, or score.
 
-You can turn pacts on from hero select after you have won a game. Mix any of them, or roll a random set. Daily runs and custom seeds cannot use Command, Rebirth, or Legacy.
+You can turn pacts on from hero select. Mix any of them, or roll a random set. Daily runs and custom seeds cannot use Command, Rebirth, or Legacy.
 
 ## Quality of life
 
@@ -36,7 +36,7 @@ Rules on you and your allies.
 - **Devotion.** Allies stay on the floor where you leave them. They do not follow you down. A corrupted ally no longer wastes away. Mirror images are not included.
 - **Crimson.** A strike that draws blood restores you, about a quarter of the damage that landed. Ordinary healing does not: potions, dew, sungrass, and the waterskin will not refill your health. A thrown potion of healing bursts on an enemy, deals a little damage, and poisons them.
 - **Grave.** Your hands do not strike. Shades swing the weapon you carry, at that weapon's reach and speed. Their hits identify it. A weapon that is too heavy for you is slower and less accurate in their hands, and it cannot strike unseen. Up to four can be out, and they return on their own clocks. A melee click, a wand zap, or a shot calls a ready shade; that same action does not also shorten the next clock. A chalice can call the next one early, at a cost in health and hunger. Most wands and the spirit bow feed a shade instead of wounding the enemy you aimed at. Warding still places wards. Living earth still builds rock armor and can call its guardian, without wounding that enemy. A zap or a cone counts once, on the enemy you aimed at.
-- **Chimera.** When the run loads, you draft each of your four opening (T1) talent slots from other-class offers. Tier 2 and 3 class talents are still rolled at random. Tengu's mask and the King's crown each offer two choices drawn from the other classes, not your own. The first time you take a subclass or armor ability from a class, you gain that class's signature item: the Warrior's broken seal, the Mage's staff, the Rogue's cloak, the Huntress's spirit bow, or the Cleric's holy tome. The Duelist grants no extra item.
+- **Chimera.** When the run loads, you draft each of your four opening (T1) talent slots from four offered talents. Tier 2 and 3 class talents are still rolled at random. Tengu's mask and the King's crown each offer three choices drawn from distinct classes (with at most one from your own). The first time you take a subclass or armor ability from a class, you gain that class's signature item: the Warrior's broken seal, the Mage's staff, the Rogue's cloak, the Huntress's spirit bow, or the Cleric's holy tome. The Duelist grants no extra item.
 
 ### Foes
 
