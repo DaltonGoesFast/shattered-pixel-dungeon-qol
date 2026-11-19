@@ -284,6 +284,7 @@ public class Goo extends Mob {
 	@Override
 	public void die( Object cause ) {
 		StreamingEvents.bossSlainDepthPending = Dungeon.depth;
+		com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onBossSlain(Dungeon.depth);
 		super.die( cause );
 		GraveRoster.unlock( 2 );
 		

@@ -219,6 +219,7 @@ public class Tengu extends Mob {
 		
 		GameScene.bossSlain();
 		StreamingEvents.bossSlainDepthPending = Dungeon.depth;
+		com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onBossSlain(Dungeon.depth);
 		super.die( cause );
 		GraveRoster.unlock( 3 );
 		

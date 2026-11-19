@@ -1092,6 +1092,25 @@
     <h3 title="Estimates for the live game depth (from WebSocket). Updates as you change sliders. Not exact combat.">Live preview</h3>
     <div id="spawnScalePreview" class="sub" title="Rough HP%, damage factor, paralysis turns, and XP at the current depth for sample mobs.">—</div>
   </section>
+
+  <section id="section-play_along" data-section="play_along">
+    <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>Play Along</h2>
+    <p class="sub" style="margin-bottom:0.5rem;">Stream points awarded once per hosted Play Along run to linked game clients (!link &lt;code&gt;) when they slay bosses or win before Dalton dies. Click <strong>Save costs</strong> to apply.</p>
+    <div class="row"><label for="pa_rewards_enabled">Milestone rewards enabled:</label><input type="checkbox" id="pa_rewards_enabled" checked></div>
+    <div class="row"><label for="pa_boss_ignore_cap" title="If checked, boss rewards ignore the viewer's chat point cap">Boss rewards bypass chat cap:</label><input type="checkbox" id="pa_boss_ignore_cap"></div>
+    <div class="row"><label for="pa_boss_goo_pts">Goo (D5) chat pts:</label><input type="number" id="pa_boss_goo_pts" min="0" max="10000" value="25"></div>
+    <div class="row"><label for="pa_boss_tengu_pts">Tengu (D10) chat pts:</label><input type="number" id="pa_boss_tengu_pts" min="0" max="10000" value="40"></div>
+    <div class="row"><label for="pa_boss_dm300_pts">DM-300 (D15) chat pts:</label><input type="number" id="pa_boss_dm300_pts" min="0" max="10000" value="60"></div>
+    <div class="row"><label for="pa_boss_king_pts">Dwarf King (D20) chat pts:</label><input type="number" id="pa_boss_king_pts" min="0" max="10000" value="80"></div>
+    <div class="row"><label for="pa_boss_yog_pts">Yog-Dzewa (D25) chat pts:</label><input type="number" id="pa_boss_yog_pts" min="0" max="10000" value="100"></div>
+    <div class="row"><label for="pa_victory_donor_pts">Victory (Amulet) donor pts:</label><input type="number" id="pa_victory_donor_pts" min="0" max="10000" value="150"></div>
+    <hr style="border:none;border-top:1px solid var(--spd-border);margin:0.75rem 0;">
+    <div class="row" style="justify-content:space-between;margin-bottom:0.35rem;">
+      <strong style="font-size:0.9rem;">Linked Game Clients (<span id="paLinkedCount">0</span>)</strong>
+      <button type="button" id="paLinkedRefresh" class="free-btn">Refresh</button>
+    </div>
+    <div id="paLinkedList" class="session-user-lists" style="max-height:140px;">—</div>
+  </section>
   <div class="column-drop-zone" data-column="left" id="dropZoneLeft">Drop here</div>
   </div>
 
@@ -1407,6 +1426,7 @@
       <div class="config-row"><label><input type="checkbox" id="cfg-section-general" checked> General costs</label></div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-monsters" checked> Monster costs</label></div>
       <div class="config-row"><label><input type="checkbox" id="cfg-section-spawn_scale" checked> Spawn scaling</label></div>
+      <div class="config-row"><label><input type="checkbox" id="cfg-section-play_along" checked> Play Along</label></div>
       <div class="config-row">
         <span style="display:block;margin-bottom:0.35rem;">Monster columns:</span>
         <div class="col-options">
@@ -2026,6 +2046,50 @@
     }
 
     let _spendDisabled = false;
+    function renderLinkedClients(clients) {
+      const countEl = document.getElementById('paLinkedCount');
+      const listEl = document.getElementById('paLinkedList');
+      const arr = Array.isArray(clients) ? clients : [];
+      if (countEl) countEl.textContent = String(arr.length);
+      if (!listEl) return;
+      if (!arr.length) {
+        listEl.textContent = 'No linked game clients yet.';
+        return;
+      }
+      listEl.innerHTML = arr.map(c => {
+        const uname = escapeHtml(c.username || '?');
+        const plat = escapeHtml(c.platform || 'twitch');
+        const badge = c.is_member ? ' [Member]' : (c.is_sub ? ' [Sub]' : '');
+        return '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding:2px 0;border-bottom:1px solid var(--spd-border);">' +
+          '<span>' + uname + ' <span style="opacity:0.7;">(' + plat + badge + ')</span></span>' +
+          '<button type="button" class="free-btn pa-unlink-btn" data-username="' + uname + '" style="padding:1px 6px;font-size:0.75rem;background:var(--spd-danger);">Unlink</button>' +
+          '</div>';
+      }).join('');
+      listEl.querySelectorAll('.pa-unlink-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const target = btn.dataset.username || '';
+          if (!target || !confirm('Unlink ' + target + ' from their game client?')) return;
+          fetch('/api/playalong/linked-clients/' + encodeURIComponent(target), { method: 'DELETE' })
+            .then(r => r.json())
+            .then(d => {
+              if (d.error) throw new Error(d.error);
+              showMsg('Unlinked ' + target, true);
+              refreshLinkedClients();
+            })
+            .catch(e => showMsg('Unlink failed: ' + e.message, false));
+        });
+      });
+    }
+
+    function refreshLinkedClients() {
+      return fetch('/api/playalong/linked-clients')
+        .then(r => r.json())
+        .then(d => {
+          if (d && Array.isArray(d.clients)) renderLinkedClients(d.clients);
+        })
+        .catch(() => {});
+    }
+
     function refreshLiveStatus() {
       Promise.all([
         fetch('/api/spend-disabled').then(r => r.json()).catch(() => null),
@@ -2034,7 +2098,8 @@
         fetch('/api/bestiary').then(r => r.json()).catch(() => null),
         fetch('/api/session').then(r => r.json()).catch(() => null),
         fetch('/api/cost-free').then(r => r.json()).catch(() => null),
-      ]).then(([spend, death, twox, bestiary, session, costFree]) => {
+        fetch('/api/playalong/linked-clients').then(r => r.json()).catch(() => null),
+      ]).then(([spend, death, twox, bestiary, session, costFree, linkedClients]) => {
         const spendBadge = document.getElementById('badgeSpend');
         if (spend && spendBadge) {
           _spendDisabled = !!spend.disabled;
@@ -2076,6 +2141,9 @@
           }
           freeUntilPaused = !!costFree.paused;
           updateFreeCountdowns();
+        }
+        if (linkedClients && Array.isArray(linkedClients.clients)) {
+          renderLinkedClients(linkedClients.clients);
         }
       });
       refreshSpawnCosts();
@@ -2450,6 +2518,53 @@
       if (cur && presets.some(p => String(p.id) === cur)) sel.value = cur;
     }
 
+    const PLAY_ALONG_REWARDS_DEFAULT = {
+      enabled: true,
+      boss_ignore_chat_cap: false,
+      boss_goo_pts: 25,
+      boss_tengu_pts: 40,
+      boss_dm300_pts: 60,
+      boss_king_pts: 80,
+      boss_yog_pts: 100,
+      victory_donor_pts: 150,
+    };
+
+    function applyPlayAlongRewardsToForm(pa) {
+      const d = Object.assign({}, PLAY_ALONG_REWARDS_DEFAULT, pa || {});
+      const setN = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+      const setC = (id, v) => { const e = document.getElementById(id); if (e) e.checked = !!v; };
+      setC('pa_rewards_enabled', d.enabled !== false);
+      setC('pa_boss_ignore_cap', !!d.boss_ignore_chat_cap);
+      setN('pa_boss_goo_pts', d.boss_goo_pts);
+      setN('pa_boss_tengu_pts', d.boss_tengu_pts);
+      setN('pa_boss_dm300_pts', d.boss_dm300_pts);
+      setN('pa_boss_king_pts', d.boss_king_pts);
+      setN('pa_boss_yog_pts', d.boss_yog_pts);
+      setN('pa_victory_donor_pts', d.victory_donor_pts);
+    }
+
+    function collectPlayAlongRewards() {
+      const intv = (id, def) => {
+        const e = document.getElementById(id);
+        const v = parseInt(e && e.value, 10);
+        return Number.isNaN(v) ? def : Math.max(0, Math.min(10000, v));
+      };
+      const chk = (id, def) => {
+        const e = document.getElementById(id);
+        return e ? !!e.checked : def;
+      };
+      return {
+        enabled: chk('pa_rewards_enabled', true),
+        boss_ignore_chat_cap: chk('pa_boss_ignore_cap', false),
+        boss_goo_pts: intv('pa_boss_goo_pts', 25),
+        boss_tengu_pts: intv('pa_boss_tengu_pts', 40),
+        boss_dm300_pts: intv('pa_boss_dm300_pts', 60),
+        boss_king_pts: intv('pa_boss_king_pts', 80),
+        boss_yog_pts: intv('pa_boss_yog_pts', 100),
+        victory_donor_pts: intv('pa_victory_donor_pts', 150),
+      };
+    }
+
     function load() {
       fetch('/api/points-config')
         .then(r => r.json())
@@ -2498,6 +2613,7 @@
           setIf('chat_cap_exempt_users', capExempt, 'bob');
           const deathCostEl = document.getElementById('death_cost_inflation_enabled');
           if (deathCostEl) deathCostEl.checked = data.death_cost_inflation_enabled !== false;
+          applyPlayAlongRewardsToForm(data.play_along_rewards);
           applySpawnScaleToForm(data.spawn_scale);
           renderCmdDisableGrid(data.command_allowed_roles || {});
           const monsters = data.cost_per_monster || {};
@@ -2610,6 +2726,7 @@
           .filter(Boolean),
         death_cost_inflation_enabled: !!document.getElementById('death_cost_inflation_enabled')?.checked,
         command_allowed_roles: collectCommandAllowedRoles(),
+        play_along_rewards: collectPlayAlongRewards(),
         spawn_scale: collectSpawnScale(),
       };
       return fetch('/api/points-config', {
@@ -2886,14 +3003,15 @@
       updateStreamModeBtn();
       applyOverallConfig();
     }
-    const OVERALL_CONFIG_DEFAULT = { columns: 3, sections: { general: true, monsters: true, spawn_scale: true, viewer: true, game: true, debug: true, 'obs-ui': true, score: true, session: true, bestiary: true, companion: true, activity: true }, order: ['general', 'monsters', 'spawn_scale', 'viewer', 'companion', 'game', 'debug', 'obs-ui', 'score', 'session', 'bestiary'], columnCounts: [3, 2, 6], monsterColumns: 2, viewerSectionWidth: 540, collapsed: {} };
+    const OVERALL_CONFIG_DEFAULT = { columns: 3, sections: { general: true, monsters: true, spawn_scale: true, play_along: true, viewer: true, game: true, debug: true, 'obs-ui': true, score: true, session: true, bestiary: true, companion: true, activity: true }, order: ['general', 'monsters', 'spawn_scale', 'play_along', 'viewer', 'companion', 'game', 'debug', 'obs-ui', 'score', 'session', 'bestiary'], columnCounts: [4, 2, 6], monsterColumns: 2, viewerSectionWidth: 540, collapsed: {} };
     function getOverallConfig() {
       try {
         const s = localStorage.getItem(OVERALL_CONFIG_STORAGE);
         if (s) {
           const c = JSON.parse(s);
           if (c && typeof c.columns === 'number' && c.sections) {
-            if (!Array.isArray(c.order)) c.order = ['general', 'monsters', 'spawn_scale', 'viewer', 'companion', 'game', 'score', 'session', 'bestiary'];
+            let migrated = false;
+            if (!Array.isArray(c.order)) c.order = ['general', 'monsters', 'spawn_scale', 'play_along', 'viewer', 'companion', 'game', 'score', 'session', 'bestiary'];
             c.order = c.order.filter(id => id !== 'helpers_hurters');
             if (c.sections && c.sections.helpers_hurters != null) delete c.sections.helpers_hurters;
             if (c.sections.session == null) c.sections.session = true;
@@ -2905,7 +3023,16 @@
               else c.order.push('spawn_scale');
               migrated = true;
             }
-            let migrated = false;
+            if (c.sections.play_along == null) { c.sections.play_along = true; migrated = true; }
+            if (!c.order.includes('play_along')) {
+              const si = c.order.indexOf('spawn_scale');
+              if (si >= 0) c.order.splice(si + 1, 0, 'play_along');
+              else c.order.push('play_along');
+              if (Array.isArray(c.columnCounts) && c.columnCounts.length === 3) {
+                c.columnCounts[0] = (c.columnCounts[0] || 0) + 1;
+              }
+              migrated = true;
+            }
             if (c.sections.debug == null) { c.sections.debug = true; migrated = true; }
             if (!c.order.includes('debug')) {
               const gi = c.order.indexOf('game');
@@ -3035,12 +3162,12 @@
         grid.classList.add('col-' + Math.max(1, Math.min(3, cfg.columns)));
         applyColumnWidths();
       }
-      ['general', 'monsters', 'viewer', 'game', 'debug', 'obs-ui', 'score', 'session', 'bestiary', 'companion', 'activity'].forEach(id => {
+      ['general', 'monsters', 'spawn_scale', 'play_along', 'viewer', 'game', 'debug', 'obs-ui', 'score', 'nine-challenge-deaths', 'session', 'bestiary', 'companion', 'activity'].forEach(id => {
         const el = document.getElementById('section-' + id);
         if (el) el.style.display = (cfg.sections[id] !== false) ? '' : 'none';
       });
       applyStreamSectionOverlay();
-      const order = cfg.order || ['general', 'monsters', 'spawn_scale', 'viewer', 'companion', 'game', 'debug', 'obs-ui', 'score', 'session', 'bestiary'];
+      const order = cfg.order || ['general', 'monsters', 'spawn_scale', 'play_along', 'viewer', 'companion', 'game', 'debug', 'obs-ui', 'score', 'session', 'bestiary'];
       if (!order.includes('debug')) {
         const gi = order.indexOf('game');
         if (gi >= 0) order.splice(gi + 1, 0, 'debug');
@@ -3613,11 +3740,14 @@
       if (file) importConfigFile(file);
       e.target.value = '';
     });
-    ['section-general', 'section-monsters', 'section-spawn_scale'].forEach(id => {
+    ['section-general', 'section-monsters', 'section-spawn_scale', 'section-play_along'].forEach(id => {
       const sec = document.getElementById(id);
       if (!sec) return;
       sec.addEventListener('input', () => setCostsDirty(true));
       sec.addEventListener('change', () => setCostsDirty(true));
+    });
+    document.getElementById('paLinkedRefresh')?.addEventListener('click', () => {
+      refreshLinkedClients().then(() => showMsg('Linked clients refreshed', true));
     });
     const bestiarySec = document.getElementById('section-bestiary');
     if (bestiarySec) {
@@ -4244,6 +4374,7 @@
       document.getElementById('cfg-section-general').checked = cfg.sections.general !== false;
       document.getElementById('cfg-section-monsters').checked = cfg.sections.monsters !== false;
       document.getElementById('cfg-section-spawn_scale').checked = cfg.sections.spawn_scale !== false;
+      document.getElementById('cfg-section-play_along').checked = cfg.sections.play_along !== false;
       document.getElementById('cfg-section-viewer').checked = cfg.sections.viewer !== false;
       document.getElementById('cfg-section-game').checked = cfg.sections.game !== false;
       document.getElementById('cfg-section-debug').checked = cfg.sections.debug !== false;
@@ -4260,7 +4391,7 @@
       if (e.target.id === 'overallConfigModal') e.target.classList.remove('open');
     });
     document.getElementById('overallConfigApply').addEventListener('click', () => {
-      const order = getSectionOrder().length ? getSectionOrder() : ['general', 'monsters', 'spawn_scale', 'viewer', 'companion', 'game', 'score', 'nine-challenge-deaths', 'session', 'bestiary'];
+      const order = getSectionOrder().length ? getSectionOrder() : ['general', 'monsters', 'spawn_scale', 'play_along', 'viewer', 'companion', 'game', 'score', 'nine-challenge-deaths', 'session', 'bestiary'];
       const monsterCols = document.querySelector('input[name="monsterCols"]:checked').value;
       const cfg = getOverallConfig();
       const applied = {
@@ -4269,6 +4400,7 @@
           general: document.getElementById('cfg-section-general').checked,
           monsters: document.getElementById('cfg-section-monsters').checked,
           spawn_scale: document.getElementById('cfg-section-spawn_scale').checked,
+          play_along: document.getElementById('cfg-section-play_along').checked,
           viewer: document.getElementById('cfg-section-viewer').checked,
           game: document.getElementById('cfg-section-game').checked,
           debug: document.getElementById('cfg-section-debug').checked,
@@ -4295,6 +4427,7 @@
       document.getElementById('cfg-section-general').checked = true;
       document.getElementById('cfg-section-monsters').checked = true;
       document.getElementById('cfg-section-spawn_scale').checked = true;
+      document.getElementById('cfg-section-play_along').checked = true;
       document.getElementById('cfg-section-viewer').checked = true;
       document.getElementById('cfg-section-game').checked = true;
       document.getElementById('cfg-section-debug').checked = true;
@@ -4308,10 +4441,11 @@
     });
     document.getElementById('overallConfigRestoreLayout').addEventListener('click', () => {
       const cfg = getOverallConfig();
-      cfg.order = ['general', 'monsters', 'spawn_scale', 'viewer', 'companion', 'game', 'debug', 'obs-ui', 'score', 'nine-challenge-deaths', 'session', 'bestiary'];
-      cfg.columnCounts = [2, 2, 4];
+      cfg.order = ['general', 'monsters', 'spawn_scale', 'play_along', 'viewer', 'companion', 'game', 'debug', 'obs-ui', 'score', 'nine-challenge-deaths', 'session', 'bestiary'];
+      cfg.columnCounts = [4, 2, 7];
       cfg.sections.companion = true;
       cfg.sections.debug = true;
+      cfg.sections.play_along = true;
       saveOverallConfig(cfg);
       document.getElementById('overallConfigModal').classList.remove('open');
       applyOverallConfig();

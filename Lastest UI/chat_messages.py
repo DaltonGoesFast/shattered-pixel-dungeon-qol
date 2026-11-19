@@ -195,6 +195,7 @@ USAGE = {
     "sabotage": "Usage: !sabotage (removes one random positive buff)",
     "doublepoints": "Usage: !doublepoints <minutes> (e.g. !doublepoints 5 for 5 minutes, max 120)",
     "name": "Usage: !name <name> - stash a hero name for the post-Goo poll (silent if accepted).",
+    "link": "Usage: !link <code> - link your installed SPD QoL game client to your stream wallet.",
 }
 
 # Aliases -> USAGE key for !help <command>

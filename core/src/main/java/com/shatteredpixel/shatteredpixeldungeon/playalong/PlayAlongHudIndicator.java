@@ -45,7 +45,14 @@ public class PlayAlongHudIndicator extends StyledButton {
 	public void update() {
 		super.update();
 
-		if (!PlayAlongService.isActive()) {
+		boolean isLocalHost = PlayAlongService.isLocalHostServerRunning();
+		if (!PlayAlongService.isActive() && !isLocalHost) {
+			PlayAlongService.pollLiveStatus(false);
+		}
+
+		boolean shouldShow = PlayAlongService.isActive()
+				|| (!isLocalHost && PlayAlongService.isStreamServerLive());
+		if (!shouldShow) {
 			visible = active = false;
 			return;
 		}
@@ -53,14 +60,20 @@ public class PlayAlongHudIndicator extends StyledButton {
 
 		int alive = PlayAlongService.getAliveCount();
 		int hDepth = PlayAlongService.getHostDepth();
+		PlayAlongProtocol.SessionInfo live = PlayAlongService.getLiveSession();
+		boolean inDungeon = PlayAlongService.isActive() || (live != null && live.inDungeon);
 
 		String next;
 		if (PlayAlongService.isHosting()) {
 			next = "LIVE: " + alive;
 		} else if (PlayAlongService.isSpectating()) {
 			next = "CAM D" + hDepth + " (" + alive + ")";
-		} else {
+		} else if (PlayAlongService.isClient()) {
 			next = "D" + hDepth + " | " + alive;
+		} else if (inDungeon && hDepth > 0) {
+			next = "LIVE D" + hDepth;
+		} else {
+			next = "LIVE";
 		}
 
 		if (!next.equals(lastLabel)) {
@@ -72,12 +85,15 @@ public class PlayAlongHudIndicator extends StyledButton {
 
 		// Pulse red warning when Dalton is critical (<30% HP) for client racers
 		GhostState hg = findHostGhost();
-		if (!PlayAlongService.isHosting() && hg != null && hg.hpPct > 0f && hg.hpPct < 0.30f) {
+		if (PlayAlongService.isActive() && !PlayAlongService.isHosting() && hg != null && hg.hpPct > 0f && hg.hpPct < 0.30f) {
 			float pulse = 0.5f + 0.5f * (float) Math.sin(Game.timeTotal * 8f);
 			bg.hardlight(ColorMath.interpolate(0xFFFFFF, 0xFF2222, pulse));
 			textColor(ColorMath.interpolate(0xFFFFFF, 0xFF5555, pulse));
 		} else if (PlayAlongService.isHosting()) {
 			bg.hardlight(0.95f, 0.55f, 0.55f);
+			textColor(Window.TITLE_COLOR);
+		} else if (!PlayAlongService.isActive()) {
+			bg.hardlight(0.85f, 0.35f, 0.35f);
 			textColor(Window.TITLE_COLOR);
 		} else {
 			bg.resetColor();
@@ -95,6 +111,9 @@ public class PlayAlongHudIndicator extends StyledButton {
 	@Override
 	protected void onClick() {
 		super.onClick();
-		GameScene.show(new WndPlayAlongStatus());
+		int tab = (PlayAlongService.isHosting() || PlayAlongService.isSpectating())
+				? WndStreamCommands.TAB_ROSTER
+				: WndStreamCommands.TAB_HELP;
+		GameScene.show(new WndStreamCommands(tab));
 	}
 }

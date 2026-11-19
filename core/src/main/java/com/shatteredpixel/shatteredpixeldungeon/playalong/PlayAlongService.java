@@ -34,6 +34,7 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.GhostState;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.SessionInfo;
+import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.StreamEconomyState;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.TombstoneState;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.WipeEvent;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.WireMessage;
@@ -123,6 +124,13 @@ public final class PlayAlongService {
 	private static volatile boolean localVictorySent = false;
 	private static volatile boolean localDeathSent = false;
 
+	private static volatile StreamEconomyState cachedEconomy = null;
+	private static final ConcurrentHashMap<String, PlayAlongClient.WireMessageCallback> pendingStreamRequests = new ConcurrentHashMap<>();
+
+	public interface EconomyCallback {
+		void onResult(StreamEconomyState state);
+	}
+
 	private static long lastMoveSendMs = 0L;
 
 	private PlayAlongService() {}
@@ -185,6 +193,31 @@ public final class PlayAlongService {
 
 	public static boolean isHostAliveForSpectate() {
 		return activeClientSession != null && activeClientSession.active && !wipeTriggeredOnClient;
+	}
+
+	public static boolean isLocalHostServerRunning() {
+		return hostServer != null;
+	}
+
+	public static boolean isStreamServerLive() {
+		SessionInfo info = liveSessionInfo;
+		return info != null && (info.active || info.serverOnline);
+	}
+
+	public static boolean isPlayAlongRunLive() {
+		SessionInfo info = liveSessionInfo;
+		return info != null && info.active;
+	}
+
+	public static StreamEconomyState getCachedEconomy() {
+		return cachedEconomy;
+	}
+
+	private static String effectiveAddress() {
+		if (DeviceCompat.isDesktop() && hostServer != null) {
+			return "127.0.0.1:" + SPDSettings.playAlongPort();
+		}
+		return SPDSettings.playAlongAddress();
 	}
 
 	public static List<GhostState> getGhostsForFloor(int depth, int branch) {
@@ -264,6 +297,13 @@ public final class PlayAlongService {
 				fields.put("duration_ms", durationMs);
 				StreamingEvents.notifyTyped("playalong_victory", fields);
 			}
+
+			@Override
+			public void onChatterBossSlain(String username, int depth, int awardedPts) {
+				Game.runOnRenderThread(() -> GLog.p(
+						"⚔ @%s defeated the Depth %d boss in Play Along (+%d pts)!",
+						username, depth, awardedPts));
+			}
 		});
 		try {
 			srv.start();
@@ -289,10 +329,14 @@ public final class PlayAlongService {
 		if (!force && (statusPolling || (now - lastPollTimeMs < 6000L))) return;
 		statusPolling = true;
 		lastPollTimeMs = now;
-		PlayAlongClient.pingStatus(SPDSettings.playAlongAddress(), info -> {
+		PlayAlongClient.pingStatus(effectiveAddress(), info -> {
 			statusPolling = false;
-			if (info != null && info.active) {
+			if (info != null && (info.active || info.serverOnline)) {
 				liveSessionInfo = info;
+				if (role == Role.NONE && info.inDungeon) {
+					hostDepth = info.hostDepth;
+					hostPos = info.hostPos;
+				}
 			} else {
 				liveSessionInfo = null;
 			}
@@ -443,6 +487,34 @@ public final class PlayAlongService {
 			}
 
 			@Override
+			public void onMilestoneRewardNotice(WireMessage msg) {
+				if (msg == null || msg.pointsAwarded <= 0) return;
+				Game.runOnRenderThread(() -> {
+					Sample.INSTANCE.play(Assets.Sounds.LEVELUP);
+					String kindLabel = "donor".equalsIgnoreCase(msg.rewardKind) ? "Donor" : "Chat";
+					GLog.p("✨ Play Along Reward: +%d %s pts (%s)! Balance: %d pts",
+							msg.pointsAwarded,
+							kindLabel,
+							msg.message != null ? msg.message : "Milestone",
+							msg.pointsBalance);
+				});
+			}
+
+			@Override
+			public void onStreamMessage(WireMessage msg) {
+				if (msg == null) return;
+				if (msg.economy != null) {
+					applyEconomyUpdate(msg.economy);
+				}
+				if (msg.requestId != null) {
+					PlayAlongClient.WireMessageCallback cb = pendingStreamRequests.remove(msg.requestId);
+					if (cb != null) {
+						cb.onResult(msg);
+					}
+				}
+			}
+
+			@Override
 			public void onConnectionLost(boolean permanentlyFailed) {
 				if (permanentlyFailed) {
 					Game.runOnRenderThread(() -> GLog.w("Disconnected from Dalton's Play Along lobby."));
@@ -451,8 +523,8 @@ public final class PlayAlongService {
 		});
 
 		String ver = Game.version != null ? Game.version : "";
-		client.connect(SPDSettings.playAlongAddress(), localUserId, username, heroClass, ver,
-				session.sessionId, Dungeon.depth, Dungeon.branch,
+		client.connect(effectiveAddress(), localUserId, username, SPDSettings.streamClientToken(),
+				heroClass, ver, session.sessionId, Dungeon.depth, Dungeon.branch,
 				Dungeon.hero != null ? Dungeon.hero.pos : 0, isRejoin);
 	}
 
@@ -556,13 +628,113 @@ public final class PlayAlongService {
 		}
 	}
 
+	public static void onBossSlain(int depth) {
+		if (role == Role.CLIENT && client != null) {
+			WireMessage msg = new WireMessage();
+			msg.type = "player_boss_slain";
+			msg.depth = depth;
+			msg.clientToken = SPDSettings.streamClientToken();
+			client.send(msg);
+		}
+	}
+
 	public static void onAmuletObtained() {
 		if (role == Role.CLIENT && client != null && !localVictorySent) {
 			localVictorySent = true;
 			WireMessage msg = new WireMessage();
 			msg.type = "player_won";
 			msg.durationMs = Math.max(0L, System.currentTimeMillis() - runStartMs);
+			msg.clientToken = SPDSettings.streamClientToken();
 			client.send(msg);
+		}
+	}
+
+	// ---- Always-On Stream Command & Economy Requests ----
+
+	public static void requestStreamEconomy(final EconomyCallback callback) {
+		WireMessage req = new WireMessage();
+		req.type = "stream_state_req";
+		req.requestId = UUID.randomUUID().toString();
+		req.clientToken = SPDSettings.streamClientToken();
+		dispatchStreamControlRequest(req, 4000, msg -> {
+			StreamEconomyState eco = (msg != null && msg.economy != null) ? msg.economy : null;
+			if (eco != null) {
+				applyEconomyUpdate(eco);
+			}
+			if (callback != null) {
+				callback.onResult(eco);
+			}
+		});
+	}
+
+	public static void requestStreamLinkCode(final PlayAlongClient.WireMessageCallback callback) {
+		WireMessage req = new WireMessage();
+		req.type = "stream_link_req";
+		req.requestId = UUID.randomUUID().toString();
+		req.clientToken = SPDSettings.streamClientToken();
+		dispatchStreamControlRequest(req, 4500, msg -> {
+			if (msg != null && msg.economy != null) {
+				applyEconomyUpdate(msg.economy);
+			}
+			if (callback != null) {
+				callback.onResult(msg);
+			}
+		});
+	}
+
+	public static void sendStreamCommand(final String rawCommand, final PlayAlongClient.WireMessageCallback callback) {
+		WireMessage req = new WireMessage();
+		req.type = "stream_cmd_req";
+		req.requestId = UUID.randomUUID().toString();
+		req.clientToken = SPDSettings.streamClientToken();
+		req.rawCommand = rawCommand != null ? rawCommand.trim() : "";
+		dispatchStreamControlRequest(req, 13000, msg -> {
+			if (msg != null && msg.economy != null) {
+				applyEconomyUpdate(msg.economy);
+			}
+			if (callback != null) {
+				callback.onResult(msg);
+			}
+		});
+	}
+
+	private static void dispatchStreamControlRequest(final WireMessage req, final int timeoutMs,
+	                                                 final PlayAlongClient.WireMessageCallback callback) {
+		PlayAlongClient active = client;
+		if ((role == Role.CLIENT || role == Role.SPECTATOR) && active != null && active.isConnected()) {
+			final String reqId = req.requestId;
+			pendingStreamRequests.put(reqId, callback);
+			active.send(req);
+			Thread timeoutWatch = new Thread(() -> {
+				try {
+					Thread.sleep(timeoutMs);
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+					return;
+				}
+				PlayAlongClient.WireMessageCallback timedOut = pendingStreamRequests.remove(reqId);
+				if (timedOut != null) {
+					timedOut.onResult(null);
+				}
+			}, "PlayAlongReqTimeout");
+			timeoutWatch.setDaemon(true);
+			timeoutWatch.start();
+			return;
+		}
+		PlayAlongClient.sendControlRequest(effectiveAddress(), req, timeoutMs, callback);
+	}
+
+	private static void applyEconomyUpdate(StreamEconomyState eco) {
+		if (eco == null) return;
+		cachedEconomy = eco;
+		if (role == Role.NONE && eco.inDungeon) {
+			hostDepth = eco.hostDepth;
+		}
+		if (eco.linked && eco.linkedUsername != null && !eco.linkedUsername.trim().isEmpty()) {
+			String uname = eco.linkedUsername.trim();
+			if (SPDSettings.playAlongUsername().isEmpty()) {
+				SPDSettings.playAlongUsername(PlayAlongProtocol.sanitizeUsername(uname, "01"));
+			}
 		}
 	}
 

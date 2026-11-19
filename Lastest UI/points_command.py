@@ -294,6 +294,37 @@ NATIVE_DEPTH = {
     "succubus": 19, "eye": 21, "scorpio": 23,
 }
 
+DEFAULT_PLAY_ALONG_REWARDS = {
+    "enabled": True,
+    "boss_ignore_chat_cap": False,
+    "boss_goo_pts": 25,
+    "boss_tengu_pts": 40,
+    "boss_dm300_pts": 60,
+    "boss_king_pts": 80,
+    "boss_yog_pts": 100,
+    "victory_donor_pts": 150,
+}
+
+
+def sanitize_play_along_rewards(raw) -> dict:
+    """Normalize and clamp play_along_rewards config."""
+    src = raw if isinstance(raw, dict) else {}
+    def _int_val(key, default):
+        try:
+            return max(0, min(10000, int(src.get(key, default))))
+        except (TypeError, ValueError):
+            return default
+    return {
+        "enabled": bool(src.get("enabled", DEFAULT_PLAY_ALONG_REWARDS["enabled"])),
+        "boss_ignore_chat_cap": bool(src.get("boss_ignore_chat_cap", DEFAULT_PLAY_ALONG_REWARDS["boss_ignore_chat_cap"])),
+        "boss_goo_pts": _int_val("boss_goo_pts", DEFAULT_PLAY_ALONG_REWARDS["boss_goo_pts"]),
+        "boss_tengu_pts": _int_val("boss_tengu_pts", DEFAULT_PLAY_ALONG_REWARDS["boss_tengu_pts"]),
+        "boss_dm300_pts": _int_val("boss_dm300_pts", DEFAULT_PLAY_ALONG_REWARDS["boss_dm300_pts"]),
+        "boss_king_pts": _int_val("boss_king_pts", DEFAULT_PLAY_ALONG_REWARDS["boss_king_pts"]),
+        "boss_yog_pts": _int_val("boss_yog_pts", DEFAULT_PLAY_ALONG_REWARDS["boss_yog_pts"]),
+        "victory_donor_pts": _int_val("victory_donor_pts", DEFAULT_PLAY_ALONG_REWARDS["victory_donor_pts"]),
+    }
+
 
 def load_config():
     """Load costs from points_config.json. Falls back to defaults if missing/invalid."""
@@ -342,6 +373,7 @@ def load_config():
         "donation_multiplier_cap": 4,
         "reset_debounce_hours": 4,
         "death_cost_inflation_enabled": True,
+        "play_along_rewards": dict(DEFAULT_PLAY_ALONG_REWARDS),
     }
     if not os.path.exists(CONFIG_FILE):
         return defaults
@@ -404,6 +436,7 @@ def load_config():
                 "death_cost_inflation_enabled",
                 defaults["death_cost_inflation_enabled"],
             )),
+            "play_along_rewards": sanitize_play_along_rewards(cfg.get("play_along_rewards")),
         }
     except Exception:
         return defaults

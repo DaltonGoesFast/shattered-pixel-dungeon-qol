@@ -1346,6 +1346,9 @@ public class WndSettings extends WndTabbed {
 					protected void onClick() {
 						super.onClick();
 						SPDSettings.streamingEnabled(checked());
+						if (checked()) {
+							com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.ensureHostServerStarted();
+						}
 					}
 				};
 				chkStreaming.checked(SPDSettings.streamingEnabled());

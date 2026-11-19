@@ -535,6 +535,7 @@ public class YogDzewa extends Mob {
 
 		GameScene.bossSlain();
 		StreamingEvents.bossSlainDepthPending = Dungeon.depth;
+		com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onBossSlain(Dungeon.depth);
 
 		if (Dungeon.isChallenged(Challenges.STRONGER_BOSSES) && Statistics.spawnersAlive == 4){
 			Badges.validateBossChallengeCompleted();

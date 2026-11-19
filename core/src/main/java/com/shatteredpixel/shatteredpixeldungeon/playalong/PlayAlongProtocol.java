@@ -39,7 +39,7 @@ import java.util.regex.Pattern;
 public final class PlayAlongProtocol {
 
 	public static final int PROTOCOL_VERSION = 1;
-	public static final int MAX_PACKET_LENGTH = 2048;
+	public static final int MAX_PACKET_LENGTH = 4096;
 	public static final long RECONNECT_GRACE_MS = 30_000L;
 
 	public static final Gson GSON = new Gson();
@@ -62,6 +62,8 @@ public final class PlayAlongProtocol {
 
 	public static class SessionInfo {
 		public boolean active;
+		public boolean serverOnline = false;
+		public boolean inDungeon = false;
 		public String sessionId = "";
 		public String version = "";
 		public long seed;
@@ -74,6 +76,39 @@ public final class PlayAlongProtocol {
 		public int hostHp = 20;
 		public int hostHt = 20;
 		public int activePlayers = 0;
+	}
+
+	public static class StreamEconomyState {
+		public boolean serverOnline = true;
+		public boolean inDungeon = false;
+		public boolean playAlongActive = false;
+		public int hostDepth = 1;
+		public int hostHp = 0;
+		public int hostHt = 0;
+		public boolean spendDisabled = false;
+		public boolean doublePointsActive = false;
+		public int doublePointsSecLeft = 0;
+		public float deathCostMult = 1f;
+		public float bankRatioManual = 0.10f;
+		public boolean linked = false;
+		public String linkedUsername = "";
+		public String linkedPlatform = "";
+		public int chatPts = 0;
+		public int donorPts = 0;
+		public int totalPts = 0;
+		public int chatCap = 300;
+		public boolean fardUsed = false;
+		public int summonCooldownSec = 0;
+		public int bestiaryLevel = 1;
+		public String bestiaryZone = "Sewers";
+		public int bestiaryXp = 0;
+		public int bestiaryThreshold = 1000;
+		public List<String> bestiaryUnlocked = new ArrayList<>();
+		public Map<String, Integer> costs = new LinkedHashMap<>();
+		public Map<String, Integer> monsterCosts = new LinkedHashMap<>();
+		public Map<String, Integer> championCosts = new LinkedHashMap<>();
+		public List<String> freeKeys = new ArrayList<>();
+		public List<String> disabledCommands = new ArrayList<>();
 	}
 
 	public static class GhostState {
@@ -136,6 +171,19 @@ public final class PlayAlongProtocol {
 		public List<GhostState> ghosts = new ArrayList<>();
 		public List<TombstoneState> tombstones = new ArrayList<>();
 		public Map<Integer, Integer> depthCounts = new LinkedHashMap<>();
+
+		// Stream command deck, account linking & milestone rewards
+		public String clientToken;
+		public String rawCommand;
+		public String requestId;
+		public String linkCode;
+		public int linkExpiresSec;
+		public boolean commandOk;
+		public String message;
+		public int pointsBalance;
+		public int pointsAwarded;
+		public String rewardKind;
+		public StreamEconomyState economy;
 	}
 
 	/**

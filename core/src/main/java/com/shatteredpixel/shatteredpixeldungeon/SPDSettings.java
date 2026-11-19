@@ -34,6 +34,7 @@ import com.watabou.utils.GameSettings;
 import com.watabou.utils.Point;
 
 import java.util.Locale;
+import java.util.UUID;
 
 public class SPDSettings extends GameSettings {
 	
@@ -755,6 +756,16 @@ public class SPDSettings extends GameSettings {
 	public static final String KEY_PLAY_ALONG_PORT = "play_along_port";
 	public static final String KEY_PLAY_ALONG_HOST_ENABLED = "play_along_host_enabled";
 	public static final String KEY_PLAY_ALONG_USERNAME = "play_along_username";
+	public static final String KEY_STREAM_CLIENT_TOKEN = "stream_client_token";
+
+	public static synchronized String streamClientToken() {
+		String tok = getString( KEY_STREAM_CLIENT_TOKEN, "" );
+		if (tok == null || tok.trim().isEmpty()) {
+			tok = UUID.randomUUID().toString();
+			put( KEY_STREAM_CLIENT_TOKEN, tok );
+		}
+		return tok.trim();
+	}
 
 	public static void playAlongAddress( String value ) {
 		String trimmed = value == null ? "" : value.trim();

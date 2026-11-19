@@ -5,6 +5,7 @@ Routes earn, spend, query, and meta commands. Spend delegates to points_command.
 """
 import json
 import os
+import secrets
 import threading
 import time
 import urllib.error
@@ -26,12 +27,14 @@ from points_command import (
     chat_pts,
     effective_total,
     get_config,
+    grant_flat_donor_points,
     ignores_chat_point_cap,
     ignores_command_cooldowns,
     is_double_points_active,
     points_lock,
     read_points,
     run_points_command,
+    sanitize_play_along_rewards,
     write_points,
     _get_user_data,
 )
@@ -40,7 +43,12 @@ SESSION_STATE_FILE = os.path.join(SCRIPT_DIR, "session_state.json")
 GAME_SUMMARY_JSON = os.path.join(SCRIPT_DIR, "game_summary.json")
 SUMMON_COUNTS_FILE = os.path.join(SCRIPT_DIR, "summon_session_counts.json")
 CHAT_AUDIT_LOG = os.path.join(SCRIPT_DIR, "chat_command_audit.jsonl")
+LINKED_CLIENTS_FILE = os.path.join(SCRIPT_DIR, "linked_clients.json")
 SUMMON_COOLDOWN_SEC = 60
+LINK_CODE_TTL_SEC = 300
+_LINK_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+_link_lock = threading.Lock()
+_pending_link_codes: dict[str, dict] = {}
 
 # Rare Twitch/YouTube duplicate chat events can run R01 twice; collapse identical spends.
 SPEND_DEDUPE_SEC = 2.0
@@ -1114,6 +1122,8 @@ def _dispatch_chat_command_inner(body: dict) -> ChatResult:
             result = handle_toppoints()
         elif cmd == "name":
             result = handle_name(username, args)
+        elif cmd == "link":
+            result = handle_link(username, args, str(body.get("platform") or ""), is_sub, is_member)
         elif cmd == "fard":
             result = handle_fard(username, is_sub, is_member)
         elif cmd in ("doublepoints", "2x"):
@@ -1153,3 +1163,266 @@ def _dispatch_chat_command_inner(body: dict) -> ChatResult:
         result.extra = extra
     _audit_chat_command(body, result, deduped=False)
     return result
+
+
+# ---------------------------------------------------------------------------
+# Installed Client Account Linking (!link <code>) & Play Along Rewards
+# ---------------------------------------------------------------------------
+
+
+def _load_linked_clients_unlocked() -> dict:
+    if not os.path.exists(LINKED_CLIENTS_FILE):
+        return {"tokens": {}}
+    try:
+        with open(LINKED_CLIENTS_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict) and isinstance(data.get("tokens"), dict):
+            return data
+    except (json.JSONDecodeError, OSError):
+        pass
+    return {"tokens": {}}
+
+
+def _save_linked_clients_unlocked(data: dict) -> None:
+    tmp = LINKED_CLIENTS_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+    os.replace(tmp, LINKED_CLIENTS_FILE)
+
+
+def get_linked_client(token: str) -> Optional[dict]:
+    tok = (token or "").strip()
+    if not tok:
+        return None
+    with _link_lock:
+        data = _load_linked_clients_unlocked()
+        entry = (data.get("tokens") or {}).get(tok)
+        return dict(entry) if isinstance(entry, dict) else None
+
+
+def list_linked_clients() -> list[dict]:
+    with _link_lock:
+        data = _load_linked_clients_unlocked()
+        tokens = data.get("tokens") or {}
+        out = []
+        for tok, rec in tokens.items():
+            if not isinstance(rec, dict):
+                continue
+            item = dict(rec)
+            item["token_prefix"] = str(tok)[:8]
+            out.append(item)
+        out.sort(key=lambda r: int(r.get("linked_at") or 0), reverse=True)
+        return out
+
+
+def unlink_client(token_or_username: str) -> int:
+    target = (token_or_username or "").strip()
+    if not target:
+        return 0
+    low = target.lower()
+    removed = 0
+    with _link_lock:
+        data = _load_linked_clients_unlocked()
+        tokens = data.get("tokens") or {}
+        for tok in list(tokens.keys()):
+            rec = tokens.get(tok) or {}
+            uname = str(rec.get("username") or "").strip().lower()
+            if tok == target or (uname and uname == low):
+                del tokens[tok]
+                removed += 1
+        if removed:
+            data["tokens"] = tokens
+            _save_linked_clients_unlocked(data)
+    return removed
+
+
+def create_link_code(token: str) -> dict:
+    tok = (token or "").strip()
+    if not tok or len(tok) > 64:
+        return {"ok": False, "error": "Invalid client token"}
+    now = int(time.time())
+    with _link_lock:
+        # Prune expired codes
+        for k in list(_pending_link_codes.keys()):
+            if int(_pending_link_codes[k].get("expires") or 0) <= now:
+                del _pending_link_codes[k]
+        # Reuse existing valid code for same token if present
+        for code, info in _pending_link_codes.items():
+            if info.get("token") == tok:
+                info["expires"] = now + LINK_CODE_TTL_SEC
+                tokens = _load_linked_clients_unlocked().get("tokens") or {}
+                linked = dict(tokens[tok]) if isinstance(tokens.get(tok), dict) else None
+                return {"ok": True, "code": code, "expires_in": LINK_CODE_TTL_SEC, "linked": linked}
+        code = ""
+        for _ in range(16):
+            cand = "".join(secrets.choice(_LINK_CODE_ALPHABET) for _ in range(6))
+            if cand not in _pending_link_codes:
+                code = cand
+                break
+        if not code:
+            return {"ok": False, "error": "Could not allocate link code"}
+        _pending_link_codes[code] = {"token": tok, "expires": now + LINK_CODE_TTL_SEC}
+        tokens = _load_linked_clients_unlocked().get("tokens") or {}
+        linked = dict(tokens[tok]) if isinstance(tokens.get(tok), dict) else None
+        return {"ok": True, "code": code, "expires_in": LINK_CODE_TTL_SEC, "linked": linked}
+
+
+def handle_link(
+    username: str,
+    args: list[str],
+    platform: str,
+    is_sub: bool,
+    is_member: bool,
+) -> ChatResult:
+    if not username:
+        return ChatResult(ok=False, message=chat_messages.USAGE["link"])
+    if not args:
+        return ChatResult(ok=False, message=chat_messages.USAGE["link"])
+    code = (args[0] or "").strip().upper()
+    if not code:
+        return ChatResult(ok=False, message=chat_messages.USAGE["link"])
+
+    now = int(time.time())
+    tok = None
+    with _link_lock:
+        for k in list(_pending_link_codes.keys()):
+            if int(_pending_link_codes[k].get("expires") or 0) <= now:
+                del _pending_link_codes[k]
+        entry = _pending_link_codes.pop(code, None)
+        if not entry or int(entry.get("expires") or 0) <= now:
+            return ChatResult(
+                ok=False,
+                message=f"@{username} Invalid or expired link code. Click 'Link Stream Account' in your game client for a fresh code.",
+                extra={"command": "link", "reason": "invalid_code"},
+            )
+        tok = str(entry.get("token") or "").strip()
+        if not tok:
+            return ChatResult(ok=False, message=f"@{username} Invalid link request.", extra={"command": "link"})
+
+        data = _load_linked_clients_unlocked()
+        tokens = data.setdefault("tokens", {})
+        user_low = username.strip().lower()
+        for existing_tok in list(tokens.keys()):
+            rec = tokens.get(existing_tok) or {}
+            if str(rec.get("username") or "").strip().lower() == user_low and existing_tok != tok:
+                del tokens[existing_tok]
+        tokens[tok] = {
+            "username": username.strip(),
+            "platform": (platform or "twitch").strip().lower(),
+            "is_sub": bool(is_sub),
+            "is_member": bool(is_member),
+            "linked_at": now,
+        }
+        _save_linked_clients_unlocked(data)
+
+    total = 0
+    try:
+        with points_lock():
+            pts_data = read_points()
+            pts, _, donation_pts, _ = _get_user_data(pts_data, username.strip().lower())
+            total = effective_total(pts, donation_pts)
+    except TimeoutError:
+        pass
+
+    return ChatResult(
+        ok=True,
+        message=f"@{username} linked to SPD QoL game client! Balance: {total} pts.",
+        pts=total,
+        extra={"command": "link", "username": username.strip()},
+    )
+
+
+_MILESTONE_MAP = {
+    "boss_5": ("Goo", "boss_goo_pts", "chat"),
+    "boss_10": ("Tengu", "boss_tengu_pts", "chat"),
+    "boss_15": ("DM-300", "boss_dm300_pts", "chat"),
+    "boss_20": ("Dwarf King", "boss_king_pts", "chat"),
+    "boss_25": ("Yog-Dzewa", "boss_yog_pts", "chat"),
+    "victory": ("Amulet Victory", "victory_donor_pts", "donor"),
+}
+
+
+def award_play_along_milestone(
+    session_id: str,
+    token: str,
+    fallback_username: str,
+    milestone: str,
+) -> dict:
+    cfg = get_config()
+    rewards = sanitize_play_along_rewards(cfg.get("play_along_rewards"))
+    if not rewards.get("enabled", True):
+        return {"ok": False, "reason": "disabled"}
+
+    ms_key = (milestone or "").strip().lower()
+    spec = _MILESTONE_MAP.get(ms_key)
+    if not spec:
+        return {"ok": False, "reason": "unknown_milestone"}
+    label, cfg_key, kind = spec
+
+    linked = get_linked_client(token)
+    if not linked or not linked.get("username"):
+        return {
+            "ok": False,
+            "reason": "unlinked",
+            "message": "Link your stream account (!link) to earn Play Along stream points!",
+        }
+
+    username = str(linked["username"]).strip()
+    user_low = username.lower()
+    sid = (session_id or "").strip() or "default"
+    claim_key = f"{sid}|{user_low}|{ms_key}"
+
+    with _link_lock:
+        state = _load_session_state()
+        claims = state.setdefault("play_along_claims", {})
+        if claim_key in claims:
+            return {"ok": False, "reason": "already_claimed"}
+
+        amount = max(0, int(rewards.get(cfg_key, 0)))
+        if amount <= 0:
+            claims[claim_key] = int(time.time())
+            _save_session_state(state)
+            return {"ok": False, "reason": "zero_reward"}
+
+        awarded = 0
+        new_total = 0
+        if kind == "donor":
+            ok, _donor_tot, added = grant_flat_donor_points(username, amount)
+            if not ok:
+                return {"ok": False, "reason": "points_busy"}
+            awarded = added
+            try:
+                with points_lock():
+                    pts_data = read_points()
+                    pts, _, donation_pts, _ = _get_user_data(pts_data, user_low)
+                    new_total = effective_total(pts, donation_pts)
+            except TimeoutError:
+                new_total = _donor_tot
+        else:
+            cap = None if rewards.get("boss_ignore_chat_cap") else chat_cap_for_user(username, cfg)
+            try:
+                with points_lock():
+                    pts_data = read_points()
+                    actual, _nudge, new_total = _apply_capped_chat_award(
+                        pts_data, user_low, username, amount, cap,
+                    )
+                    write_points(pts_data)
+                    awarded = actual
+            except TimeoutError:
+                return {"ok": False, "reason": "points_busy"}
+
+        claims[claim_key] = int(time.time())
+        _save_session_state(state)
+
+    if awarded <= 0:
+        return {"ok": False, "reason": "chat_cap_reached", "label": label, "pts": new_total}
+
+    return {
+        "ok": True,
+        "username": username,
+        "label": label,
+        "awarded": awarded,
+        "kind": kind,
+        "pts": new_total,
+    }

@@ -1877,8 +1877,11 @@ def points_config_api():
                 data.setdefault("cooldown_bypass_users", ["DaltonGoesFast"])
                 data.setdefault("chat_cap_exempt_users", ["bob"])
                 data.setdefault("death_cost_inflation_enabled", True)
+                from points_command import sanitize_play_along_rewards
+                data["play_along_rewards"] = sanitize_play_along_rewards(data.get("play_along_rewards"))
                 data["spawn_scale"] = sanitize_spawn_scale(data.get("spawn_scale"))
             else:
+                from points_command import DEFAULT_PLAY_ALONG_REWARDS
                 data = {
                     "cost_per_gold": 5,
                     "cost_per_curse": 200,
@@ -1924,6 +1927,7 @@ def points_config_api():
                     "reset_debounce_hours": 4,
                     "curse_class_kit_duration_turns": 100,
                     "death_cost_inflation_enabled": True,
+                    "play_along_rewards": dict(DEFAULT_PLAY_ALONG_REWARDS),
                     "spawn_scale": sanitize_spawn_scale(None),
                 }
             try:
@@ -1990,6 +1994,7 @@ def points_config_api():
             death_cost_enabled = bool(existing.get("death_cost_inflation_enabled", True))
 
         # Validate and sanitize
+        from points_command import sanitize_play_along_rewards
         cfg = {
             "cost_per_gold": max(1, int(data.get("cost_per_gold", 5))),
             "cost_per_curse": max(1, int(data.get("cost_per_curse", 200))),
@@ -2029,6 +2034,9 @@ def points_config_api():
             "reset_debounce_hours": max(0, float(data.get("reset_debounce_hours", 4))),
             "curse_class_kit_duration_turns": max(1, int(data.get("curse_class_kit_duration_turns", 100))),
             "death_cost_inflation_enabled": death_cost_enabled,
+            "play_along_rewards": sanitize_play_along_rewards(
+                data["play_along_rewards"] if "play_along_rewards" in data else existing.get("play_along_rewards")
+            ),
             "spawn_scale": sanitize_spawn_scale(
                 data["spawn_scale"] if "spawn_scale" in data else existing.get("spawn_scale")
             ),
@@ -4682,6 +4690,355 @@ def chat_command_api():
         return jsonify({"ok": False, "message": str(e), "pts": None, "earned": 0}), 500
 
 
+def _local_known_cursed_equipped_count() -> int:
+    data = None
+    try:
+        if os.path.exists(GAME_SUMMARY_JSON):
+            with open(GAME_SUMMARY_JSON, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+    except Exception:
+        data = None
+    if not data:
+        with data_lock:
+            data = dict(current_game_data) if current_game_data else {}
+    equipped = (data or {}).get("equipped") or {}
+    n = 0
+    for slot in ("weapon", "armor", "ring", "artifact", "misc"):
+        item = equipped.get(slot)
+        if item and item.get("cursed") and item.get("cursedKnown"):
+            n += 1
+    return n
+
+
+def _local_game_depth() -> int | None:
+    try:
+        if os.path.exists(GAME_SUMMARY_JSON):
+            with open(GAME_SUMMARY_JSON, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            d = (data.get("stats") or {}).get("depth")
+            if d is not None:
+                return int(d)
+    except Exception:
+        pass
+    with data_lock:
+        if current_game_data:
+            d = (current_game_data.get("stats") or {}).get("depth")
+            if d is not None:
+                return int(d)
+    return None
+
+
+def _double_points_seconds_left() -> int:
+    try:
+        if os.path.exists(DOUBLE_POINTS_END_FILE):
+            with open(DOUBLE_POINTS_END_FILE, "r", encoding="utf-8") as f:
+                raw = f.read().strip()
+            end_ts = int(raw) if raw else 0
+            now = int(time.time())
+            return max(0, end_ts - now)
+    except (ValueError, OSError):
+        pass
+    return 0
+
+
+def _build_playalong_client_state(token: str = "", depth_override: int | None = None) -> dict:
+    from points_command import (
+        NATIVE_DEPTH,
+        apply_death_cost_inflation,
+        chat_cap_for_user,
+        chat_pts,
+        compute_spawn_cost,
+        curse_cost_for_equipped_curses,
+        effective_cost,
+        effective_total,
+        get_config,
+        get_death_cost_multiplier,
+        is_double_points_active,
+        is_spend_disabled,
+        load_free_until,
+        points_lock,
+        read_points,
+        _get_user_data,
+    )
+    from chat_command import SUMMON_COOLDOWN_SEC, _load_session_state, get_linked_client
+    from summon_bestiary import get_state_payload
+
+    cfg = get_config()
+    now = int(time.time())
+    free_raw = load_free_until()
+    free_keys = sorted([k for k, ts in free_raw.items() if int(ts or 0) > now])
+
+    depth = depth_override if depth_override is not None else _local_game_depth()
+    cursed_cnt = _local_known_cursed_equipped_count()
+
+    cmd_spec = [
+        ("heal", "cost_per_heal"),
+        ("cleanse", "cost_per_cleanse"),
+        ("buff", "cost_per_buff"),
+        ("bee", "cost_per_ally_bee"),
+        ("ward", "cost_per_ward"),
+        ("row", "cost_per_ring_of_wealth"),
+        ("dew", "cost_per_dew"),
+        ("gold", "cost_per_gold"),
+        ("bomb", "cost_per_bomb"),
+        ("trap", "cost_per_trap"),
+        ("wand", "cost_per_wand"),
+        ("scroll", "cost_per_scroll"),
+        ("gas", "cost_per_gas"),
+        ("plant", "cost_per_plant"),
+        ("corrupt_ally", "cost_per_corrupt_ally"),
+        ("hex", "cost_per_hex"),
+        ("degrade", "cost_per_degrade"),
+        ("sabotage", "cost_per_sabotage"),
+        ("transmute", "cost_per_transmute"),
+    ]
+    costs = {}
+    for cmd_id, cfg_key in cmd_spec:
+        base = effective_cost(cfg_key, int(cfg.get(cfg_key, 0)))
+        costs[cmd_id] = apply_death_cost_inflation(cmd_id, base)
+
+    curse_base = effective_cost("cost_per_curse", int(cfg.get("cost_per_curse", 200)))
+    curse_scaled = curse_cost_for_equipped_curses(curse_base, cursed_cnt)
+    costs["curse"] = apply_death_cost_inflation("curse", curse_scaled)
+
+    monster_cfg_map = cfg.get("cost_per_monster") or {}
+    default_m_cost = int(cfg.get("default_monster_cost", 15))
+    monsters = sorted(set(list(monster_cfg_map.keys()) + list(NATIVE_DEPTH.keys())))
+    monster_costs = {}
+    champion_costs = {}
+    for m in monsters:
+        ck = f"cost_per_monster.{m}"
+        raw_spawn = (
+            compute_spawn_cost(m, depth)
+            if depth is not None
+            else int(monster_cfg_map.get(m, default_m_cost))
+        )
+        m_base = effective_cost(ck, raw_spawn)
+        c_base = effective_cost(ck, 2 * raw_spawn)
+        monster_costs[m] = apply_death_cost_inflation("spawn", m_base)
+        champion_costs[m] = apply_death_cost_inflation("champion", c_base)
+
+    allowed_roles = cfg.get("command_allowed_roles") or {}
+    disabled_commands = sorted([str(k) for k, v in allowed_roles.items() if v == "disabled"])
+
+    best = get_state_payload()
+    bestiary_summary = {
+        "level": int(best.get("level", 1) or 1),
+        "zone": str(best.get("zone") or "Sewers"),
+        "bar_xp": int(best.get("bar_xp", 0) or 0),
+        "bar_threshold": int(best.get("bar_threshold", 0) or 0),
+        "unlocked_monsters": list(best.get("unlocked_monsters") or []),
+    }
+
+    user_info = {"linked": False}
+    linked = get_linked_client(token)
+    if linked and linked.get("username"):
+        uname = str(linked["username"]).strip()
+        ukey = uname.lower()
+        chat_p, donor_p, total_p = 0, 0, 0
+        cap = chat_cap_for_user(uname, cfg) or 0
+        try:
+            with points_lock():
+                pts_data = read_points()
+                pts, _, donation_pts, _ = _get_user_data(pts_data, ukey)
+                chat_p = chat_pts(pts, donation_pts)
+                donor_p = donation_pts
+                total_p = effective_total(pts, donation_pts)
+        except TimeoutError:
+            pass
+        s_state = _load_session_state()
+        fard_used = bool((s_state.get("fard_used") or {}).get(ukey))
+        last_summon = int((s_state.get("summon_last") or {}).get(ukey, 0) or 0)
+        rem_cd = max(0, SUMMON_COOLDOWN_SEC - (now - last_summon)) if last_summon else 0
+        user_info = {
+            "linked": True,
+            "username": uname,
+            "platform": str(linked.get("platform") or "twitch"),
+            "chat_pts": chat_p,
+            "donor_pts": donor_p,
+            "total_pts": total_p,
+            "chat_cap": cap,
+            "fard_used": fard_used,
+            "summon_cooldown_sec": rem_cd,
+        }
+
+    sec_left = _double_points_seconds_left()
+    return {
+        "spend_disabled": bool(is_spend_disabled()),
+        "double_points_active": bool(is_double_points_active()) and sec_left > 0,
+        "double_points_sec_left": sec_left,
+        "death_cost_mult": round(float(get_death_cost_multiplier()), 2),
+        "bank_ratio_manual": float(cfg.get("bank_ratio_manual", 0.10)),
+        "costs": costs,
+        "monster_costs": monster_costs,
+        "champion_costs": champion_costs,
+        "free_keys": free_keys,
+        "disabled_commands": disabled_commands,
+        "bestiary": bestiary_summary,
+        "user": user_info,
+    }
+
+
+def _fire_r09_presentation_async(username: str) -> None:
+    def _send():
+        try:
+            import urllib.request
+            url = os.environ.get("STREAMERBOT_DOACTION_URL", "http://127.0.0.1:7474/DoAction")
+            body = json.dumps({
+                "action": {"name": "R09 - Presentation"},
+                "args": {"userName": username},
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                url, data=body, headers={"Content-Type": "application/json"}, method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=2):
+                pass
+        except Exception:
+            pass
+    threading.Thread(target=_send, daemon=True).start()
+
+
+@app.route('/api/playalong/client-state', methods=['GET', 'OPTIONS'])
+def playalong_client_state_api():
+    """Economy, command costs, Bestiary, and linked viewer balance for installed game clients."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        token = (request.args.get("token") or "").strip()
+        depth_raw = request.args.get("depth")
+        depth = None
+        if depth_raw is not None and str(depth_raw).strip() != "":
+            try:
+                depth = int(depth_raw)
+            except (TypeError, ValueError):
+                depth = None
+        return jsonify(_build_playalong_client_state(token=token, depth_override=depth))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/playalong/link-request', methods=['POST', 'OPTIONS'])
+def playalong_link_request_api():
+    """Generate a temporary 6-char !link code for an installed game client."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        from chat_command import create_link_code
+        body = request.get_json(force=True, silent=True) or {}
+        token = (body.get("token") or "").strip()
+        return jsonify(create_link_code(token))
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route('/api/playalong/client-command', methods=['POST', 'OPTIONS'])
+def playalong_client_command_api():
+    """Execute a !command submitted by an authenticated linked game client."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        from chat_command import dispatch_chat_command, get_linked_client
+        body = request.get_json(force=True, silent=True) or {}
+        token = (body.get("token") or "").strip()
+        raw_msg = (body.get("rawMessage") or body.get("command") or "").strip()
+        if not raw_msg.startswith("!"):
+            raw_msg = "!" + raw_msg if raw_msg else ""
+
+        linked = get_linked_client(token)
+        if not linked or not linked.get("username"):
+            return jsonify({
+                "ok": False,
+                "message": "Link your stream account first (!link <code> in chat)!",
+                "pts": None,
+                "state": _build_playalong_client_state(token=token),
+            })
+
+        username = str(linked["username"]).strip()
+        platform = str(linked.get("platform") or "twitch").strip().lower()
+        dispatch_body = {
+            "rawMessage": raw_msg,
+            "username": username,
+            "platform": platform,
+            "context": {
+                "isSubscribed": bool(linked.get("is_sub")),
+                "isMember": bool(linked.get("is_member")),
+                "isBroadcaster": False,
+            },
+        }
+        result = dispatch_chat_command(dispatch_body)
+        if (
+            result.ok
+            and isinstance(result.presentation, dict)
+            and result.presentation.get("kind") == "fard"
+        ):
+            _fire_r09_presentation_async(username)
+
+        status = "OK" if result.ok else "FAIL"
+        reply = (result.message or raw_msg or "?").strip()
+        if len(reply) > 100:
+            reply = reply[:100]
+        print(f"Chat [{status}] {username} (client): {raw_msg} — {reply}")
+
+        return jsonify({
+            "ok": bool(result.ok),
+            "message": result.message or ("Done!" if result.ok else "Command failed."),
+            "pts": result.pts,
+            "state": _build_playalong_client_state(token=token),
+        })
+    except Exception as e:
+        print(f"playalong client-command error: {e}")
+        return jsonify({"ok": False, "message": str(e), "pts": None}), 500
+
+
+@app.route('/api/playalong/milestone-reward', methods=['POST', 'OPTIONS'])
+def playalong_milestone_reward_api():
+    """Award boss/victory points to a linked Play Along client."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        from chat_command import award_play_along_milestone
+        body = request.get_json(force=True, silent=True) or {}
+        session_id = str(body.get("sessionId") or "")
+        token = str(body.get("token") or "")
+        username = str(body.get("username") or "")
+        milestone = str(body.get("milestone") or "")
+        res = award_play_along_milestone(session_id, token, username, milestone)
+        if res.get("ok"):
+            print(
+                f"PlayAlong [REWARD] {res.get('username')}: "
+                f"+{res.get('awarded')} {res.get('kind')} pts ({res.get('label')})"
+            )
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route('/api/playalong/linked-clients', methods=['GET', 'OPTIONS'])
+def playalong_linked_clients_api():
+    """List linked installed game clients for the points-config admin panel."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        from chat_command import list_linked_clients
+        clients = list_linked_clients()
+        return jsonify({"ok": True, "clients": clients})
+    except Exception as e:
+        return jsonify({"ok": False, "clients": [], "error": str(e)}), 500
+
+
+@app.route('/api/playalong/linked-clients/<path:target>', methods=['DELETE', 'OPTIONS'])
+def playalong_unlink_client_api(target):
+    """Unlink a game client by username or token."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        from chat_command import unlink_client
+        removed = unlink_client(target)
+        return jsonify({"ok": True, "removed": removed})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @app.route('/api/hero-name/poll-result', methods=['POST', 'OPTIONS'])
 def hero_name_poll_result_api():
     """Streamer.bot N02/N03: one platform's closed poll votes for hero naming."""
@@ -4959,6 +5316,8 @@ if __name__ == '__main__':
         '/api/death-cost',
         '/api/session',
         '/api/spawn-costs',
+        '/api/playalong/client-state',
+        '/api/playalong/linked-clients',
     )
 
     class _QuietAccessFilter(logging.Filter):

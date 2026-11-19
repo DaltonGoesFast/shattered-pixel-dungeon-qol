@@ -42,6 +42,10 @@ public class PlayAlongClient {
 		void onResult(SessionInfo info);
 	}
 
+	public interface WireMessageCallback {
+		void onResult(WireMessage msg);
+	}
+
 	public interface ClientListener {
 		void onJoinAck(WireMessage msg);
 		void onJoinError(String error);
@@ -50,6 +54,8 @@ public class PlayAlongClient {
 		void onHostDied(WireMessage msg);
 		void onPlayerDiedNotice(WireMessage msg);
 		void onPlayerWonNotice(WireMessage msg);
+		void onMilestoneRewardNotice(WireMessage msg);
+		void onStreamMessage(WireMessage msg);
 		void onConnectionLost(boolean permanentlyFailed);
 	}
 
@@ -64,6 +70,7 @@ public class PlayAlongClient {
 	private volatile String lastAddress;
 	private volatile String lastUserId;
 	private volatile String lastUsername;
+	private volatile String lastClientToken;
 	private volatile String lastHeroClass;
 	private volatile String lastModVersion;
 	private volatile String lastSessionId;
@@ -136,8 +143,75 @@ public class PlayAlongClient {
 		t.start();
 	}
 
+	public static void sendControlRequest(final String address, final WireMessage req,
+	                                      final int timeoutMs, final WireMessageCallback callback) {
+		Thread t = new Thread(() -> {
+			WireMessage result = null;
+			WebSocketClient ws = null;
+			try {
+				URI uri = PlayAlongProtocol.buildWebSocketUri(address);
+				CountDownLatch latch = new CountDownLatch(1);
+				AtomicReference<WireMessage> ref = new AtomicReference<>();
+				final String reqJson = PlayAlongProtocol.GSON.toJson(req);
+				final String expectedReqId = req.requestId;
+
+				ws = new WebSocketClient(uri) {
+					@Override
+					public void onOpen(ServerHandshake handshakedata) {
+						send(reqJson);
+					}
+
+					@Override
+					public void onMessage(String message) {
+						try {
+							WireMessage msg = PlayAlongProtocol.GSON.fromJson(message, WireMessage.class);
+							if (msg != null && msg.type != null
+									&& ("stream_state_resp".equals(msg.type)
+									|| "stream_link_resp".equals(msg.type)
+									|| "stream_cmd_resp".equals(msg.type))) {
+								if (expectedReqId == null || msg.requestId == null || expectedReqId.equals(msg.requestId)) {
+									ref.set(msg);
+									latch.countDown();
+								}
+							}
+						} catch (Exception ignored) {
+						}
+					}
+
+					@Override
+					public void onClose(int code, String reason, boolean remote) {
+						latch.countDown();
+					}
+
+					@Override
+					public void onError(Exception ex) {
+						latch.countDown();
+					}
+				};
+				ws.setConnectionLostTimeout(0);
+				if (ws.connectBlocking(Math.min(3000, timeoutMs), TimeUnit.MILLISECONDS)) {
+					latch.await(timeoutMs, TimeUnit.MILLISECONDS);
+					result = ref.get();
+				}
+			} catch (Exception ignored) {
+			} finally {
+				if (ws != null) {
+					try {
+						ws.close();
+					} catch (Exception ignored) {
+					}
+				}
+			}
+			if (callback != null) {
+				callback.onResult(result);
+			}
+		}, "PlayAlongControlReq");
+		t.setDaemon(true);
+		t.start();
+	}
+
 	public synchronized void connect(String address, String userId, String username,
-	                                 String heroClass, String modVersion, String sessionId,
+	                                 String clientToken, String heroClass, String modVersion, String sessionId,
 	                                 int depth, int branch, int pos, boolean isRejoin) {
 		closeInternal();
 		this.intentionalClose = false;
@@ -145,6 +219,7 @@ public class PlayAlongClient {
 		this.lastAddress = address;
 		this.lastUserId = userId;
 		this.lastUsername = username;
+		this.lastClientToken = clientToken;
 		this.lastHeroClass = heroClass;
 		this.lastModVersion = modVersion;
 		this.lastSessionId = sessionId;
@@ -181,6 +256,7 @@ public class PlayAlongClient {
 					join.sessionId = lastSessionId;
 					join.userId = lastUserId;
 					join.username = lastUsername;
+					join.clientToken = lastClientToken;
 					join.heroClass = lastHeroClass;
 					join.modVersion = lastModVersion;
 					join.depth = lastDepth;
@@ -219,6 +295,14 @@ public class PlayAlongClient {
 								break;
 							case "player_won_notice":
 								listener.onPlayerWonNotice(msg);
+								break;
+							case "milestone_reward_notice":
+								listener.onMilestoneRewardNotice(msg);
+								break;
+							case "stream_state_resp":
+							case "stream_link_resp":
+							case "stream_cmd_resp":
+								listener.onStreamMessage(msg);
 								break;
 						}
 					} catch (Exception ignored) {

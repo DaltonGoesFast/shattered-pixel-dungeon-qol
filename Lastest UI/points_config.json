@@ -48,9 +48,9 @@
   "cost_per_corrupt_ally": 40,
   "cost_per_ring_of_wealth": 100,
   "command_allowed_roles": {},
-  "points_per_message": 4,
+  "points_per_message": 5,
   "chat_cooldown_sec": 20,
-  "passive_cooldown_sec": 60,
+  "passive_cooldown_sec": 20,
   "cooldown_bypass_users": [
     "DaltonGoesFast"
   ],
@@ -58,7 +58,7 @@
     "bob"
   ],
   "first_words_bonus": 50,
-  "chat_point_cap": 300,
+  "chat_point_cap": 1000,
   "bank_ratio_manual": 0.1,
   "bank_ratio_auto": 0.05,
   "bank_ratio_auto_member": 0.1,
@@ -66,6 +66,16 @@
   "reset_debounce_hours": 4.0,
   "curse_class_kit_duration_turns": 100,
   "death_cost_inflation_enabled": false,
+  "play_along_rewards": {
+    "enabled": true,
+    "boss_ignore_chat_cap": false,
+    "boss_goo_pts": 25,
+    "boss_tengu_pts": 40,
+    "boss_dm300_pts": 60,
+    "boss_king_pts": 80,
+    "boss_yog_pts": 100,
+    "victory_donor_pts": 150
+  },
   "spawn_scale": {
     "overall_power": 0.8,
     "early_hp_min": 0.25,

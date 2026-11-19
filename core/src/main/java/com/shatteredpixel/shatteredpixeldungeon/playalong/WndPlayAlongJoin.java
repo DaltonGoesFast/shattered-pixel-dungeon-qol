@@ -27,6 +27,7 @@ import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroClass;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.SessionInfo;
+import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.StreamEconomyState;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Icons;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RedButton;
@@ -37,12 +38,13 @@ import com.shatteredpixel.shatteredpixeldungeon.utils.DungeonSeed;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndChallenges;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndPacts;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndTextInput;
+import com.watabou.noosa.Game;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Drop-in lobby window opened when clicking the glowing red DaltonGoesFast [LIVE] button.
+ * Drop-in lobby & Stream Command hub opened when clicking the glowing red DaltonGoesFast [LIVE] button.
  */
 public class WndPlayAlongJoin extends Window {
 
@@ -52,6 +54,7 @@ public class WndPlayAlongJoin extends Window {
 	private HeroClass selectedClass = HeroClass.WARRIOR;
 	private String username;
 	private RedButton btnName;
+	private RenderedTextBlock linkInfo;
 	private final List<RedButton> classButtons = new ArrayList<>();
 
 	public WndPlayAlongJoin(final SessionInfo session) {
@@ -62,7 +65,8 @@ public class WndPlayAlongJoin extends Window {
 			this.username = "Chatter";
 		}
 
-		RenderedTextBlock title = PixelScene.renderTextBlock("Play Along [LIVE]", 10);
+		String titleTxt = session.active ? "Play Along [LIVE]" : "DaltonGoesFast [LIVE]";
+		RenderedTextBlock title = PixelScene.renderTextBlock(titleTxt, 10);
 		title.hardlight(0xFF4444);
 		title.setPos((WIDTH - title.width()) / 2f, 2);
 		PixelScene.align(title);
@@ -70,107 +74,136 @@ public class WndPlayAlongJoin extends Window {
 
 		float pos = title.bottom() + GAP;
 
-		String seedDisplay = (session.customSeedText != null && !session.customSeedText.isEmpty())
-				? session.customSeedText
-				: DungeonSeed.convertToCode(session.seed);
-		String statusTxt = "Dalton: Depth " + session.hostDepth
-				+ " (" + session.hostHp + "/" + session.hostHt + " HP)\n"
-				+ "Racers: " + session.activePlayers + " • Seed: " + seedDisplay + "\n"
-				+ "Goal: Get the Amulet before Dalton dies!";
+		String statusTxt;
+		if (session.active) {
+			String seedDisplay = (session.customSeedText != null && !session.customSeedText.isEmpty())
+					? session.customSeedText
+					: DungeonSeed.convertToCode(session.seed);
+			statusTxt = "Dalton: Depth " + session.hostDepth
+					+ " (" + session.hostHp + "/" + session.hostHt + " HP)\n"
+					+ "Racers: " + session.activePlayers + " • Seed: " + seedDisplay + "\n"
+					+ "Goal: Get the Amulet before Dalton dies!";
+		} else if (session.inDungeon) {
+			statusTxt = "Dalton: Depth " + session.hostDepth
+					+ " (" + session.hostHp + "/" + session.hostHt + " HP)\n"
+					+ "Solo Stream Run — Stream commands are LIVE!";
+		} else {
+			statusTxt = "Dalton is in the menu / between runs.\n"
+					+ "Account linking & community commands are ready!";
+		}
 		RenderedTextBlock info = PixelScene.renderTextBlock(statusTxt, 6);
 		info.maxWidth(WIDTH);
 		info.setPos(0, pos);
 		add(info);
 		pos = info.bottom() + GAP;
 
-		int chalCount = Challenges.activeChallenges(session.challenges);
-		int pactCount = Modifiers.activeModifiers(Modifiers.sanitize(session.modifiers));
+		linkInfo = PixelScene.renderTextBlock(formatLinkLine(PlayAlongService.getCachedEconomy()), 6);
+		linkInfo.hardlight(0xCCCCCC);
+		linkInfo.maxWidth(WIDTH);
+		linkInfo.setPos(0, pos);
+		add(linkInfo);
+		pos = linkInfo.bottom() + GAP;
 
-		RedButton btnChals = new RedButton("Chals: " + chalCount, 7) {
+		RedButton btnCommands = new RedButton("STREAM COMMANDS & POINTS", 7) {
 			@Override
 			protected void onClick() {
-				ShatteredPixelDungeon.scene().addToFront(new WndChallenges(session.challenges, false));
+				ShatteredPixelDungeon.scene().addToFront(new WndStreamCommands());
 			}
 		};
-		btnChals.icon(Icons.get(chalCount > 0 ? Icons.CHALLENGE_COLOR : Icons.CHALLENGE_GREY));
-		btnChals.setRect(0, pos, WIDTH / 2f - 1, 16);
-		add(btnChals);
+		btnCommands.textColor(0x55FF55);
+		btnCommands.setRect(0, pos, WIDTH, 18);
+		add(btnCommands);
+		pos = btnCommands.bottom() + GAP;
 
-		RedButton btnPacts = new RedButton("Pacts: " + pactCount, 7) {
-			@Override
-			protected void onClick() {
-				ShatteredPixelDungeon.scene().addToFront(new WndPacts(session.modifiers, false));
-			}
-		};
-		btnPacts.icon(Icons.get(Icons.PACTS));
-		btnPacts.setRect(WIDTH / 2f + 1, pos, WIDTH / 2f - 1, 16);
-		add(btnPacts);
-		pos = btnPacts.bottom() + GAP;
+		if (session.active) {
+			int chalCount = Challenges.activeChallenges(session.challenges);
+			int pactCount = Modifiers.activeModifiers(Modifiers.sanitize(session.modifiers));
 
-		btnName = new RedButton("Name: " + username, 7) {
-			@Override
-			protected void onClick() {
-				ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
-						"Chatter Name",
-						"3-16 alphanumeric characters (shown above your ghost):",
-						username,
-						16,
-						false,
-						"Set",
-						"Cancel") {
-					@Override
-					public void onSelect(boolean positive, String text) {
-						if (positive && text != null && !text.trim().isEmpty()) {
-							username = PlayAlongProtocol.sanitizeUsername(text, "01");
-							SPDSettings.playAlongUsername(username);
-							btnName.text("Name: " + username);
-						}
-					}
-				});
-			}
-		};
-		btnName.setRect(0, pos, WIDTH, 16);
-		add(btnName);
-		pos = btnName.bottom() + GAP;
-
-		RenderedTextBlock pickCls = PixelScene.renderTextBlock("Pick Hero Class:", 6);
-		pickCls.hardlight(TITLE_COLOR);
-		pickCls.setPos(0, pos);
-		add(pickCls);
-		pos = pickCls.bottom() + 2;
-
-		HeroClass[] classes = HeroClass.values();
-		float clsW = (WIDTH - (classes.length - 1)) / (float) classes.length;
-		for (int i = 0; i < classes.length; i++) {
-			final HeroClass hc = classes[i];
-			final int idx = i;
-			RedButton btnCls = new RedButton("", 6) {
+			RedButton btnChals = new RedButton("Chals: " + chalCount, 7) {
 				@Override
 				protected void onClick() {
-					selectedClass = hc;
-					refreshClassHighlight();
+					ShatteredPixelDungeon.scene().addToFront(new WndChallenges(session.challenges, false));
 				}
 			};
-			btnCls.icon(Icons.get(hc));
-			btnCls.setRect(i * (clsW + 1), pos, clsW, 20);
-			add(btnCls);
-			classButtons.add(btnCls);
-		}
-		refreshClassHighlight();
-		pos += 20 + GAP + 1;
+			btnChals.icon(Icons.get(chalCount > 0 ? Icons.CHALLENGE_COLOR : Icons.CHALLENGE_GREY));
+			btnChals.setRect(0, pos, WIDTH / 2f - 1, 16);
+			add(btnChals);
 
-		StyledButton btnDropIn = new RedButton("DROP INTO RUN", 8) {
-			@Override
-			protected void onClick() {
-				hide();
-				PlayAlongService.startClientRun(session, selectedClass, username);
+			RedButton btnPacts = new RedButton("Pacts: " + pactCount, 7) {
+				@Override
+				protected void onClick() {
+					ShatteredPixelDungeon.scene().addToFront(new WndPacts(session.modifiers, false));
+				}
+			};
+			btnPacts.icon(Icons.get(Icons.PACTS));
+			btnPacts.setRect(WIDTH / 2f + 1, pos, WIDTH / 2f - 1, 16);
+			add(btnPacts);
+			pos = btnPacts.bottom() + GAP;
+
+			btnName = new RedButton("Name: " + username, 7) {
+				@Override
+				protected void onClick() {
+					ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
+							"Chatter Name",
+							"3-16 alphanumeric characters (shown above your ghost):",
+							username,
+							16,
+							false,
+							"Set",
+							"Cancel") {
+						@Override
+						public void onSelect(boolean positive, String text) {
+							if (positive && text != null && !text.trim().isEmpty()) {
+								username = PlayAlongProtocol.sanitizeUsername(text, "01");
+								SPDSettings.playAlongUsername(username);
+								btnName.text("Name: " + username);
+							}
+						}
+					});
+				}
+			};
+			btnName.setRect(0, pos, WIDTH, 16);
+			add(btnName);
+			pos = btnName.bottom() + GAP;
+
+			RenderedTextBlock pickCls = PixelScene.renderTextBlock("Pick Hero Class:", 6);
+			pickCls.hardlight(TITLE_COLOR);
+			pickCls.setPos(0, pos);
+			add(pickCls);
+			pos = pickCls.bottom() + 2;
+
+			HeroClass[] classes = HeroClass.values();
+			float clsW = (WIDTH - (classes.length - 1)) / (float) classes.length;
+			for (int i = 0; i < classes.length; i++) {
+				final HeroClass hc = classes[i];
+				RedButton btnCls = new RedButton("", 6) {
+					@Override
+					protected void onClick() {
+						selectedClass = hc;
+						refreshClassHighlight();
+					}
+				};
+				btnCls.icon(Icons.get(hc));
+				btnCls.setRect(i * (clsW + 1), pos, clsW, 20);
+				add(btnCls);
+				classButtons.add(btnCls);
 			}
-		};
-		btnDropIn.icon(Icons.get(Icons.ENTER));
-		btnDropIn.textColor(TITLE_COLOR);
-		btnDropIn.setRect(0, pos, WIDTH, 20);
-		add(btnDropIn);
-		pos = btnDropIn.bottom() + GAP;
+			refreshClassHighlight();
+			pos += 20 + GAP + 1;
+
+			StyledButton btnDropIn = new RedButton("DROP INTO RUN", 8) {
+				@Override
+				protected void onClick() {
+					hide();
+					PlayAlongService.startClientRun(session, selectedClass, username);
+				}
+			};
+			btnDropIn.icon(Icons.get(Icons.ENTER));
+			btnDropIn.textColor(TITLE_COLOR);
+			btnDropIn.setRect(0, pos, WIDTH, 20);
+			add(btnDropIn);
+			pos = btnDropIn.bottom() + GAP;
+		}
 
 		RedButton btnYt = new RedButton("Open YouTube Channel", 7) {
 			@Override
@@ -182,6 +215,26 @@ public class WndPlayAlongJoin extends Window {
 		add(btnYt);
 
 		resize(WIDTH, (int) btnYt.bottom() + 1);
+
+		PlayAlongService.requestStreamEconomy(eco -> Game.runOnRenderThread(() -> {
+			if (parent == null || eco == null) return;
+			linkInfo.text(formatLinkLine(eco));
+			if (eco.linked && eco.linkedUsername != null && !eco.linkedUsername.trim().isEmpty()) {
+				username = PlayAlongProtocol.sanitizeUsername(eco.linkedUsername, "01");
+				if (btnName != null) {
+					btnName.text("Name: " + username + " (Linked)");
+				}
+				linkInfo.hardlight(0x88FF88);
+			} else {
+				linkInfo.hardlight(0xFFCC44);
+			}
+		}));
+	}
+
+	private static String formatLinkLine(StreamEconomyState eco) {
+		if (eco == null) return "Checking stream account link...";
+		if (!eco.linked) return "Stream account: Not linked (!link)";
+		return "Linked: @" + eco.linkedUsername + " (" + eco.totalPts + " pts)";
 	}
 
 	private void refreshClassHighlight() {

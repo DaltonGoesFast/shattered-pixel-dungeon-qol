@@ -33,6 +33,7 @@ public class Mod_Changes {
 
 	public static void addAllChanges( ArrayList<ChangeInfo> changeInfos ){
 		addOverview(changeInfos);
+		add_v4_0_2_QoL_15(changeInfos);
 		add_v4_0_2_QoL_14(changeInfos);
 		add_v4_0_2_QoL_13(changeInfos);
 		add_v4_0_2_QoL_12(changeInfos);
@@ -43,6 +44,25 @@ public class Mod_Changes {
 		add_v4_0_0_QoL_6(changeInfos);
 		add_v4_0_0_QoL_5(changeInfos);
 		add_v4_0_0(changeInfos);
+	}
+
+	private static void add_v4_0_2_QoL_15( ArrayList<ChangeInfo> changeInfos ) {
+		ChangeInfo changes = new ChangeInfo("4.0.2-QoL-15", true, "");
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes = new ChangeInfo(Messages.get(ChangesScene.class, "new"), false, null);
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.ENTER), "Stream Command Deck & !link",
+				"**-** Link your game client once with **!link <code>** in Twitch or YouTube chat to spend stream points in-game\n" +
+				"**-** Open the **Stream Command Deck** (**Help**, **Chaos**, **Comm.**, **Roster**) anytime Dalton's stream server is online — from the title screen, Play Along runs, Spirit Cam, or your own solo runs\n" +
+				"**-** Live depth-scaled monster & champion (2x) costs, free promos, and Spending On/Off sync"));
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.GOLD), "Play Along milestone rewards",
+				"**-** Linked players earn stream chat points for slaying bosses (**Goo**, **Tengu**, **DM-300**, **Dwarf King**, **Yog-Dzewa**) during hosted Play Along runs\n" +
+				"**-** Claiming the **Amulet of Yendor** in a hosted Play Along run awards bonus donor points"));
 	}
 
 	private static void add_v4_0_2_QoL_14( ArrayList<ChangeInfo> changeInfos ) {

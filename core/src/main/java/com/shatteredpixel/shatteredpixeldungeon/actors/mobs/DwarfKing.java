@@ -550,6 +550,7 @@ public class DwarfKing extends Mob {
 
 		GameScene.bossSlain();
 		StreamingEvents.bossSlainDepthPending = Dungeon.depth;
+		com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onBossSlain(Dungeon.depth);
 		super.die( cause );
 
 		Heap h = Dungeon.level.heaps.get(CityBossLevel.throne);

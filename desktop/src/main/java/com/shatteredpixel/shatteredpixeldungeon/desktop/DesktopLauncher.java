@@ -225,7 +225,7 @@ public class DesktopLauncher {
 		if (SPDSettings.streamingEnabled()) {
 			StreamingBootstrapper.start(SPDSettings.streamingPort());
 		}
-		if (SPDSettings.playAlongHostEnabled()) {
+		if (SPDSettings.playAlongHostEnabled() || SPDSettings.streamingEnabled()) {
 			com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.ensureHostServerStarted();
 		}
 		if (SPDSettings.trainingExportEnabled()) {
