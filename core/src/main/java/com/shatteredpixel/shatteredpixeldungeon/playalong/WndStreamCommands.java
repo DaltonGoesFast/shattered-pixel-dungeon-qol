@@ -37,6 +37,7 @@ import com.shatteredpixel.shatteredpixeldungeon.windows.WndTabbed;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndTextInput;
 import com.watabou.noosa.ColorBlock;
 import com.watabou.noosa.Game;
+import com.watabou.noosa.Gizmo;
 import com.watabou.noosa.ui.Component;
 
 import java.util.ArrayList;
@@ -105,9 +106,9 @@ public class WndStreamCommands extends WndTabbed {
 	private boolean championMode = false;
 	private float refreshAccum = 0f;
 
-	private Component headerGroup;
+	private ClearableGroup headerGroup;
 	private ScrollPane pane;
-	private Component content;
+	private ClearableGroup content;
 	private final List<LabeledTab> tabButtons = new ArrayList<>();
 
 	public WndStreamCommands() {
@@ -123,7 +124,7 @@ public class WndStreamCommands extends WndTabbed {
 		this.winHeight = Math.min(206, maxH);
 		resize(WIDTH, winHeight);
 
-		content = new Component();
+		content = new ClearableGroup();
 		pane = new ScrollPane(content) {
 			@Override
 			public void onClick(float x, float y) {
@@ -132,7 +133,7 @@ public class WndStreamCommands extends WndTabbed {
 		};
 		add(pane);
 
-		headerGroup = new Component();
+		headerGroup = new ClearableGroup();
 		add(headerGroup);
 
 		String[] labels = {"Help", "Chaos", "Comm.", "Roster"};
@@ -170,8 +171,31 @@ public class WndStreamCommands extends WndTabbed {
 		}
 	}
 
+	private static final class ClearableGroup extends Component {
+		boolean isAliveGroup() {
+			return exists && members != null;
+		}
+
+		void destroyAndClear() {
+			if (members == null) return;
+			ArrayList<Gizmo> old = new ArrayList<>(members);
+			clear();
+			for (Gizmo g : old) {
+				if (g != null) {
+					g.destroy();
+				}
+			}
+		}
+	}
+
+	private boolean isWindowDestroyed() {
+		return !exists
+				|| headerGroup == null || !headerGroup.isAliveGroup()
+				|| content == null || !content.isAliveGroup();
+	}
+
 	private void refreshEconomy(boolean showSpinStatus) {
-		if (fetchingEconomy) return;
+		if (isWindowDestroyed() || fetchingEconomy) return;
 		fetchingEconomy = true;
 		if (showSpinStatus) {
 			statusText = "Refreshing...";
@@ -180,7 +204,7 @@ public class WndStreamCommands extends WndTabbed {
 		}
 		PlayAlongService.requestStreamEconomy(state -> Game.runOnRenderThread(() -> {
 			fetchingEconomy = false;
-			if (parent == null) return;
+			if (parent == null || isWindowDestroyed()) return;
 			if (state != null) {
 				eco = state;
 				if (state.linked && pendingLinkCode != null) {
@@ -201,7 +225,7 @@ public class WndStreamCommands extends WndTabbed {
 	}
 
 	private void requestLinkCode() {
-		if (requestInFlight) return;
+		if (isWindowDestroyed() || requestInFlight) return;
 		requestInFlight = true;
 		statusText = "Generating link code...";
 		statusColor = 0xCCCCCC;
@@ -209,7 +233,7 @@ public class WndStreamCommands extends WndTabbed {
 
 		PlayAlongService.requestStreamLinkCode(resp -> Game.runOnRenderThread(() -> {
 			requestInFlight = false;
-			if (parent == null) return;
+			if (parent == null || isWindowDestroyed()) return;
 			if (resp == null) {
 				statusText = "Could not reach server for link code.";
 				statusColor = 0xFF5555;
@@ -231,7 +255,7 @@ public class WndStreamCommands extends WndTabbed {
 	}
 
 	private void sendCommand(final String rawCommand) {
-		if (requestInFlight || rawCommand == null || rawCommand.trim().isEmpty()) return;
+		if (isWindowDestroyed() || requestInFlight || rawCommand == null || rawCommand.trim().isEmpty()) return;
 		requestInFlight = true;
 		statusText = "Sending " + rawCommand + "...";
 		statusColor = 0xCCCCCC;
@@ -239,7 +263,7 @@ public class WndStreamCommands extends WndTabbed {
 
 		PlayAlongService.sendStreamCommand(rawCommand, resp -> Game.runOnRenderThread(() -> {
 			requestInFlight = false;
-			if (parent == null) return;
+			if (parent == null || isWindowDestroyed()) return;
 			if (resp == null) {
 				statusText = "Timed out waiting for stream server.";
 				statusColor = 0xFF5555;
@@ -257,6 +281,7 @@ public class WndStreamCommands extends WndTabbed {
 	}
 
 	private void rebuildAllPreservingScroll() {
+		if (isWindowDestroyed()) return;
 		float sy = (pane != null && pane.content() != null && pane.content().camera != null)
 				? pane.content().camera.scroll.y : 0f;
 		buildHeader();
@@ -267,7 +292,8 @@ public class WndStreamCommands extends WndTabbed {
 	}
 
 	private void buildHeader() {
-		headerGroup.clear();
+		if (isWindowDestroyed()) return;
+		headerGroup.destroyAndClear();
 		float py = 1f;
 
 		RenderedTextBlock title = PixelScene.renderTextBlock("Stream Command Deck", 9);
@@ -389,7 +415,8 @@ public class WndStreamCommands extends WndTabbed {
 	}
 
 	private void rebuildTabPage(boolean resetScroll) {
-		content.clear();
+		if (isWindowDestroyed()) return;
+		content.destroyAndClear();
 		float cy = 0f;
 
 		if (currentTab == TAB_HELP) {
