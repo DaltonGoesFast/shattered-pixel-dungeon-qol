@@ -33,6 +33,7 @@ public class Mod_Changes {
 
 	public static void addAllChanges( ArrayList<ChangeInfo> changeInfos ){
 		addOverview(changeInfos);
+		add_v4_0_2_QoL_16(changeInfos);
 		add_v4_0_2_QoL_15(changeInfos);
 		add_v4_0_2_QoL_14(changeInfos);
 		add_v4_0_2_QoL_13(changeInfos);
@@ -44,6 +45,22 @@ public class Mod_Changes {
 		add_v4_0_0_QoL_6(changeInfos);
 		add_v4_0_0_QoL_5(changeInfos);
 		add_v4_0_0(changeInfos);
+	}
+
+	private static void add_v4_0_2_QoL_16( ArrayList<ChangeInfo> changeInfos ) {
+		ChangeInfo changes = new ChangeInfo("4.0.2-QoL-16", true, "");
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes = new ChangeInfo(Messages.get(ChangesScene.class, "changes"), false, null);
+		changes.hardlight(CharSprite.WARNING);
+		changeInfos.add(changes);
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.CHALLENGE_COLOR), "Stream Command Deck UI & Monster Spawner",
+				"**-** Monster spawning now has a dedicated **Spawn** landing tab with a 4-column in-game monster sprite grid\n" +
+				"**-** Two-button **Normal (!spawn)** vs **Champion (2x)** mode switcher with fiery champion tinting\n" +
+				"**-** Hold (or right-click) any monster tile to inspect its full sprite, command cost, and bestiary description\n" +
+				"**-** Upgraded the **Comm.** Bestiary **!summon** list to a 4-column sprite grid and added in-game item icons to **Chaos** and **Help** commands"));
 	}
 
 	private static void add_v4_0_2_QoL_15( ArrayList<ChangeInfo> changeInfos ) {

@@ -113,7 +113,7 @@ public class PlayAlongHudIndicator extends StyledButton {
 		super.onClick();
 		int tab = (PlayAlongService.isHosting() || PlayAlongService.isSpectating())
 				? WndStreamCommands.TAB_ROSTER
-				: WndStreamCommands.TAB_HELP;
+				: WndStreamCommands.TAB_SPAWN;
 		GameScene.show(new WndStreamCommands(tab));
 	}
 }
