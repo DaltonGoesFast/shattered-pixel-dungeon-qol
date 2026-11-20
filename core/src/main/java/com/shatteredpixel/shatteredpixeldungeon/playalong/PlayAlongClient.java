@@ -56,6 +56,7 @@ public class PlayAlongClient {
 		void onPlayerWonNotice(WireMessage msg);
 		void onMilestoneRewardNotice(WireMessage msg);
 		void onStreamMessage(WireMessage msg);
+		void onChatCommand(WireMessage msg);
 		void onConnectionLost(boolean permanentlyFailed);
 	}
 
@@ -303,6 +304,9 @@ public class PlayAlongClient {
 							case "stream_link_resp":
 							case "stream_cmd_resp":
 								listener.onStreamMessage(msg);
+								break;
+							case "chat_command":
+								listener.onChatCommand(msg);
 								break;
 						}
 					} catch (Exception ignored) {

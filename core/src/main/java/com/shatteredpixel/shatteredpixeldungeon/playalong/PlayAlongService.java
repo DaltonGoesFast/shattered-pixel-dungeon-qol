@@ -29,9 +29,11 @@ import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroClass;
+import com.shatteredpixel.shatteredpixeldungeon.desktop.StreamingCommandHandler;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
+import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.ChatCommandPayload;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.GhostState;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.SessionInfo;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.StreamEconomyState;
@@ -51,6 +53,7 @@ import com.watabou.utils.DeviceCompat;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -126,6 +129,7 @@ public final class PlayAlongService {
 
 	private static volatile StreamEconomyState cachedEconomy = null;
 	private static final ConcurrentHashMap<String, PlayAlongClient.WireMessageCallback> pendingStreamRequests = new ConcurrentHashMap<>();
+	private static final CopyOnWriteArrayList<ChatCommandPayload> pendingChatCommands = new CopyOnWriteArrayList<>();
 
 	public interface EconomyCallback {
 		void onResult(StreamEconomyState state);
@@ -515,6 +519,44 @@ public final class PlayAlongService {
 			}
 
 			@Override
+			public void onChatCommand(WireMessage msg) {
+				if (msg == null || msg.chatCommand == null) return;
+				final ChatCommandPayload p = msg.chatCommand;
+				final boolean isConfig = "spawn_scale_config".equals(p.command);
+				if (!isConfig) {
+					if (role != Role.CLIENT) return;
+					String sender = normalizeChatUsername(p.username);
+					if (!sender.isEmpty()) {
+						if (sender.equals(normalizeChatUsername(clientUsername))
+								|| sender.equals(normalizeChatUsername(SPDSettings.playAlongUsername()))) {
+							return;
+						}
+						StreamEconomyState eco = cachedEconomy;
+						if (eco != null && eco.linked
+								&& sender.equals(normalizeChatUsername(eco.linkedUsername))) {
+							return;
+						}
+					}
+				}
+				Game.runOnRenderThread(() -> {
+					if (isConfig) {
+						StreamingCommandHandler.executeMirroredChatCommand(p);
+						return;
+					}
+					if (role != Role.CLIENT) return;
+					if (Dungeon.hero == null || Dungeon.level == null || !(Game.scene() instanceof GameScene)) {
+						if (pendingChatCommands.size() < 32) {
+							pendingChatCommands.add(p);
+						}
+						return;
+					}
+					if (Dungeon.hero.isAlive()) {
+						StreamingCommandHandler.executeMirroredChatCommand(p);
+					}
+				});
+			}
+
+			@Override
 			public void onConnectionLost(boolean permanentlyFailed) {
 				if (permanentlyFailed) {
 					Game.runOnRenderThread(() -> GLog.w("Disconnected from Dalton's Play Along lobby."));
@@ -556,6 +598,15 @@ public final class PlayAlongService {
 			hostServer.updateHostVitals(Dungeon.hero.HP, Dungeon.hero.HT);
 		} else if ((role == Role.CLIENT || role == Role.SPECTATOR) && client != null) {
 			sendClientState("IDLE", Dungeon.hero.pos);
+			if (role == Role.CLIENT && Dungeon.level != null && Dungeon.hero.isAlive()
+					&& (Game.scene() instanceof GameScene) && !pendingChatCommands.isEmpty()) {
+				List<ChatCommandPayload> drained = new ArrayList<>(pendingChatCommands);
+				pendingChatCommands.clear();
+				for (ChatCommandPayload p : drained) {
+					if (!Dungeon.hero.isAlive()) break;
+					StreamingCommandHandler.executeMirroredChatCommand(p);
+				}
+			}
 		}
 	}
 
@@ -636,6 +687,25 @@ public final class PlayAlongService {
 			msg.clientToken = SPDSettings.streamClientToken();
 			client.send(msg);
 		}
+	}
+
+	public static void broadcastHostChatCommand(ChatCommandPayload payload) {
+		if (payload == null) return;
+		if (!"spawn_scale_config".equals(payload.command) && !SPDSettings.playAlongSharedChat()) {
+			return;
+		}
+		if (role == Role.HOST && hostServer != null) {
+			hostServer.broadcastChatCommand(payload);
+		}
+	}
+
+	private static String normalizeChatUsername(String raw) {
+		if (raw == null) return "";
+		String s = raw.trim();
+		while (s.startsWith("@")) {
+			s = s.substring(1).trim();
+		}
+		return s.toLowerCase(Locale.ROOT);
 	}
 
 	public static void onAmuletObtained() {
@@ -907,6 +977,7 @@ public final class PlayAlongService {
 		hostGhost = null;
 		tombstones.clear();
 		depthCounts.clear();
+		pendingChatCommands.clear();
 		aliveCount = 0;
 	}
 

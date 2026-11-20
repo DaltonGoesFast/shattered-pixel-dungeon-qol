@@ -145,6 +145,20 @@ public final class PlayAlongProtocol {
 		public long timestampMs = 0L;
 	}
 
+	public static class ChatCommandPayload {
+		public String command;
+		public String username;
+		public String monster;
+		public int amount;
+		public String slot;
+		public int tier = -1;
+		public long rngSeed;
+		public String rolledClass;
+		public String secondaryClass;
+		public boolean positiveOnly;
+		public String bundleJson;
+	}
+
 	public static class WireMessage {
 		public String type;
 		public int protocolVersion = PROTOCOL_VERSION;
@@ -184,6 +198,7 @@ public final class PlayAlongProtocol {
 		public int pointsAwarded;
 		public String rewardKind;
 		public StreamEconomyState economy;
+		public ChatCommandPayload chatCommand;
 	}
 
 	/**

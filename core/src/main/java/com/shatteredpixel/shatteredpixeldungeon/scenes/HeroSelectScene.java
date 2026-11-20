@@ -960,6 +960,22 @@ public class HeroSelectScene extends PixelScene {
 				playAlongButton.icon(Icons.get(SPDSettings.playAlongHostEnabled() ? Icons.CHALLENGE_COLOR : Icons.CHALLENGE_GREY));
 				buttons.add(playAlongButton);
 				add(playAlongButton);
+
+				StyledButton sharedChatButton = new StyledButton(Chrome.Type.BLANK,
+						"Play Along Chat Cmds: " + (SPDSettings.playAlongSharedChat() ? "ON" : "OFF"), 6) {
+					@Override
+					protected void onClick() {
+						boolean next = !SPDSettings.playAlongSharedChat();
+						SPDSettings.playAlongSharedChat(next);
+						text("Play Along Chat Cmds: " + (next ? "ON" : "OFF"));
+						icon(Icons.get(next ? Icons.CHALLENGE_COLOR : Icons.CHALLENGE_GREY));
+						layout();
+					}
+				};
+				sharedChatButton.leftJustify = true;
+				sharedChatButton.icon(Icons.get(SPDSettings.playAlongSharedChat() ? Icons.CHALLENGE_COLOR : Icons.CHALLENGE_GREY));
+				buttons.add(sharedChatButton);
+				add(sharedChatButton);
 			}
 
 			for (int i = 1; i < buttons.size(); i++){

@@ -849,6 +849,7 @@ public class WndSettings extends WndTabbed {
 		ColorBlock sepPlayAlong;
 		RedButton btnPlayAlongServer;
 		CheckBox chkPlayAlongHost;
+		CheckBox chkPlayAlongSharedChat;
 
 		@Override
 		protected void createChildren() {
@@ -992,6 +993,16 @@ public class WndSettings extends WndTabbed {
 				};
 				chkPlayAlongHost.checked(SPDSettings.playAlongHostEnabled());
 				add(chkPlayAlongHost);
+
+				chkPlayAlongSharedChat = new CheckBox("Mirror Chat Cmds to Play Along") {
+					@Override
+					protected void onClick() {
+						super.onClick();
+						SPDSettings.playAlongSharedChat(checked());
+					}
+				};
+				chkPlayAlongSharedChat.checked(SPDSettings.playAlongSharedChat());
+				add(chkPlayAlongSharedChat);
 			}
 		}
 
@@ -1040,6 +1051,11 @@ public class WndSettings extends WndTabbed {
 			if (chkPlayAlongHost != null){
 				chkPlayAlongHost.setRect(0, pos + GAP, width, BTN_HEIGHT);
 				pos = chkPlayAlongHost.bottom();
+			}
+
+			if (chkPlayAlongSharedChat != null){
+				chkPlayAlongSharedChat.setRect(0, pos + GAP, width, BTN_HEIGHT);
+				pos = chkPlayAlongSharedChat.bottom();
 			}
 
 			height = pos;

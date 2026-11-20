@@ -16,8 +16,11 @@ package com.shatteredpixel.shatteredpixeldungeon.desktop;
 import com.badlogic.gdx.Gdx;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol;
+import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GameStateSnapshot;
 import com.watabou.noosa.Game;
+import com.watabou.utils.Random;
 
 import org.java_websocket.server.WebSocketServer;
 
@@ -113,6 +116,23 @@ public class StreamingServer extends WebSocketServer {
 		}
 	}
 
+	private static void broadcastChatMirror(String cmd, String username, String monster,
+	                                        int amount, String slot, int tier, long rngSeed) {
+		PlayAlongProtocol.ChatCommandPayload p = new PlayAlongProtocol.ChatCommandPayload();
+		p.command = cmd;
+		p.username = username;
+		p.monster = monster;
+		p.amount = amount;
+		p.slot = slot;
+		p.tier = tier;
+		p.rngSeed = rngSeed;
+		p.rolledClass = StreamingCommandHandler.lastRolledClass;
+		p.secondaryClass = StreamingCommandHandler.lastSecondaryClass;
+		p.positiveOnly = StreamingCommandHandler.lastPositiveOnly;
+		p.bundleJson = StreamingCommandHandler.lastBundleJson;
+		PlayAlongService.broadcastHostChatCommand(p);
+	}
+
 	@Override
 	public void onOpen(org.java_websocket.WebSocket conn, org.java_websocket.handshake.ClientHandshake handshake) {
 		// Send a fresh snapshot from the game thread so new clients get current run, not stale lastPayload
@@ -167,6 +187,12 @@ public class StreamingServer extends WebSocketServer {
 						err = (t.getMessage() != null) ? t.getMessage() : "Unknown error";
 					}
 					boolean ok = (err == null);
+					if (ok) {
+						PlayAlongProtocol.ChatCommandPayload p = new PlayAlongProtocol.ChatCommandPayload();
+						p.command = "spawn_scale_config";
+						p.bundleJson = obj.toString();
+						PlayAlongService.broadcastHostChatCommand(p);
+					}
 					JsonObject resp = new JsonObject();
 					resp.addProperty("type", "spawn_scale_config_result");
 					if (requestId != null && !requestId.isEmpty()) {
@@ -181,13 +207,21 @@ public class StreamingServer extends WebSocketServer {
 				if (monster == null || monster.isEmpty()) return;
 				String monsterFinal = monster.trim().toLowerCase();
 				Gdx.app.postRunnable(() -> {
+					StreamingCommandHandler.clearLastRoll();
+					long rngSeed = Random.Long();
 					String err = null;
+					Random.pushGenerator(rngSeed);
 					try {
 						err = StreamingCommandHandler.handleSpawn(monsterFinal, usernameFinal);
 					} catch (Throwable t) {
 						err = (t.getMessage() != null) ? t.getMessage() : "Unknown error";
+					} finally {
+						Random.popGenerator();
 					}
 					boolean ok = (err == null);
+					if (ok) {
+						broadcastChatMirror("spawn", usernameFinal, monsterFinal, 0, null, -1, rngSeed);
+					}
 					if (requestId != null && !requestId.isEmpty()) {
 						JsonObject resp = new JsonObject();
 						resp.addProperty("type", "spawn_result");
@@ -204,13 +238,21 @@ public class StreamingServer extends WebSocketServer {
 				if (monster == null || monster.isEmpty()) return;
 				String monsterFinal = monster.trim().toLowerCase();
 				Gdx.app.postRunnable(() -> {
+					StreamingCommandHandler.clearLastRoll();
+					long rngSeed = Random.Long();
 					String err = null;
+					Random.pushGenerator(rngSeed);
 					try {
 						err = StreamingCommandHandler.handleSpawnChampion(monsterFinal, usernameFinal);
 					} catch (Throwable t) {
 						err = (t.getMessage() != null) ? t.getMessage() : "Unknown error";
+					} finally {
+						Random.popGenerator();
 					}
 					boolean ok = (err == null);
+					if (ok) {
+						broadcastChatMirror("champion", usernameFinal, monsterFinal, 0, null, -1, rngSeed);
+					}
 					if (requestId != null && !requestId.isEmpty()) {
 						JsonObject resp = new JsonObject();
 						resp.addProperty("type", "champion_result");
@@ -226,17 +268,25 @@ public class StreamingServer extends WebSocketServer {
 				int amount = obj.has("amount") ? obj.get("amount").getAsInt() : 5;
 				final int amountFinal = amount;
 				Gdx.app.postRunnable(() -> {
+					StreamingCommandHandler.clearLastRoll();
+					long rngSeed = Random.Long();
 					String err = null;
 					if (amountFinal < 1 || amountFinal > 100) {
 						err = "Amount must be 1-100";
 					} else {
+						Random.pushGenerator(rngSeed);
 						try {
 							err = StreamingCommandHandler.handleDropGold(amountFinal, usernameFinal);
 						} catch (Throwable t) {
 							err = (t.getMessage() != null) ? t.getMessage() : "Unknown error";
+						} finally {
+							Random.popGenerator();
 						}
 					}
 					boolean ok = (err == null);
+					if (ok) {
+						broadcastChatMirror("gold", usernameFinal, null, amountFinal, null, -1, rngSeed);
+					}
 					if (requestId != null && !requestId.isEmpty()) {
 						JsonObject resp = new JsonObject();
 						resp.addProperty("type", "gold_result");
@@ -249,8 +299,19 @@ public class StreamingServer extends WebSocketServer {
 				});
 			} else if ("gas".equals(cmd)) {
 				Gdx.app.postRunnable(() -> {
-					String result = StreamingCommandHandler.handleSpawnGas(usernameFinal);
+					StreamingCommandHandler.clearLastRoll();
+					long rngSeed = Random.Long();
+					String result;
+					Random.pushGenerator(rngSeed);
+					try {
+						result = StreamingCommandHandler.handleSpawnGas(usernameFinal);
+					} finally {
+						Random.popGenerator();
+					}
 					boolean ok = (result != null && !result.startsWith("ERR:"));
+					if (ok) {
+						broadcastChatMirror("gas", usernameFinal, null, 0, null, -1, rngSeed);
+					}
 					String gasName = ok ? result : null;
 					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
 					if (requestId != null && !requestId.isEmpty()) {
@@ -275,10 +336,29 @@ public class StreamingServer extends WebSocketServer {
 				}
 				final int classKitDurationFinal = classKitDuration;
 				Gdx.app.postRunnable(() -> {
-					StreamingCommandHandler.CurseStreamResult result = slotFinal.isEmpty()
-							? StreamingCommandHandler.curseEquippedRandom(usernameFinal, classKitDurationFinal)
-							: StreamingCommandHandler.curseEquipped(slotFinal, usernameFinal, classKitDurationFinal);
+					StreamingCommandHandler.clearLastRoll();
+					long rngSeed = Random.Long();
+					boolean wasRandom = slotFinal.isEmpty();
+					StreamingCommandHandler.CurseStreamResult result;
+					Random.pushGenerator(rngSeed);
+					try {
+						result = wasRandom
+								? StreamingCommandHandler.curseEquippedRandom(usernameFinal, classKitDurationFinal)
+								: StreamingCommandHandler.curseEquipped(slotFinal, usernameFinal, classKitDurationFinal);
+					} finally {
+						Random.popGenerator();
+					}
 					boolean ok = (result.errorMessage == null);
+					if (ok) {
+						PlayAlongProtocol.ChatCommandPayload p = new PlayAlongProtocol.ChatCommandPayload();
+						p.command = "curse";
+						p.username = usernameFinal;
+						p.amount = classKitDurationFinal;
+						p.slot = !wasRandom ? slotFinal : StreamingCommandHandler.lastCurseSlot;
+						p.rolledClass = wasRandom ? "random" : null;
+						p.rngSeed = rngSeed;
+						PlayAlongService.broadcastHostChatCommand(p);
+					}
 					String itemName = ok ? result.itemName : null;
 					String err = result.errorMessage;
 					if (requestId != null && !requestId.isEmpty()) {
@@ -298,8 +378,19 @@ public class StreamingServer extends WebSocketServer {
 				});
 			} else if ("scroll".equals(cmd)) {
 				Gdx.app.postRunnable(() -> {
-					String result = StreamingCommandHandler.handleRandomScroll(usernameFinal);
+					StreamingCommandHandler.clearLastRoll();
+					long rngSeed = Random.Long();
+					String result;
+					Random.pushGenerator(rngSeed);
+					try {
+						result = StreamingCommandHandler.handleRandomScroll(usernameFinal);
+					} finally {
+						Random.popGenerator();
+					}
 					boolean ok = (result != null && !result.startsWith("ERR:"));
+					if (ok) {
+						broadcastChatMirror("scroll", usernameFinal, null, 0, null, -1, rngSeed);
+					}
 					String scrollName = ok ? result : null;
 					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
 					if (requestId != null && !requestId.isEmpty()) {
@@ -323,24 +414,45 @@ public class StreamingServer extends WebSocketServer {
 				}
 				final int tierFinal = tier;
 				Gdx.app.postRunnable(() -> {
-					StreamingCommandHandler.handleCursedWand(usernameFinal, tierFinal, (ok, effectName, rarity, err) -> {
-						if (requestId != null && !requestId.isEmpty()) {
-							JsonObject resp = new JsonObject();
-							resp.addProperty("type", "wand_result");
-							resp.addProperty("request_id", requestId);
-							resp.addProperty("success", ok);
-							if (effectName != null) resp.addProperty("effect_name", effectName);
-							resp.addProperty("rarity", rarity);
-							if (err != null) resp.addProperty("error", err);
-							addChatter(resp, usernameFinal);
-							broadcast(resp.toString());
-						}
-					});
+					StreamingCommandHandler.clearLastRoll();
+					long rngSeed = Random.Long();
+					Random.pushGenerator(rngSeed);
+					try {
+						StreamingCommandHandler.handleCursedWand(usernameFinal, tierFinal, null, null, rngSeed, (ok, effectName, rarity, err) -> {
+							if (ok) {
+								broadcastChatMirror("wand", usernameFinal, null, 0, null, tierFinal, rngSeed);
+							}
+							if (requestId != null && !requestId.isEmpty()) {
+								JsonObject resp = new JsonObject();
+								resp.addProperty("type", "wand_result");
+								resp.addProperty("request_id", requestId);
+								resp.addProperty("success", ok);
+								if (effectName != null) resp.addProperty("effect_name", effectName);
+								resp.addProperty("rarity", rarity);
+								if (err != null) resp.addProperty("error", err);
+								addChatter(resp, usernameFinal);
+								broadcast(resp.toString());
+							}
+						});
+					} finally {
+						Random.popGenerator();
+					}
 				});
 			} else if ("buff".equals(cmd)) {
 				Gdx.app.postRunnable(() -> {
-					String result = StreamingCommandHandler.handleChatBuff(usernameFinal);
+					StreamingCommandHandler.clearLastRoll();
+					long rngSeed = Random.Long();
+					String result;
+					Random.pushGenerator(rngSeed);
+					try {
+						result = StreamingCommandHandler.handleChatBuff(usernameFinal);
+					} finally {
+						Random.popGenerator();
+					}
 					boolean ok = (result != null && !result.startsWith("ERR:"));
+					if (ok) {
+						broadcastChatMirror("buff", usernameFinal, null, 0, null, -1, rngSeed);
+					}
 					String buffName = ok ? result : null;
 					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
 					if (requestId != null && !requestId.isEmpty()) {
@@ -356,8 +468,19 @@ public class StreamingServer extends WebSocketServer {
 				});
 			} else if ("debuff".equals(cmd)) {
 				Gdx.app.postRunnable(() -> {
-					String result = StreamingCommandHandler.handleChatDebuff(usernameFinal);
+					StreamingCommandHandler.clearLastRoll();
+					long rngSeed = Random.Long();
+					String result;
+					Random.pushGenerator(rngSeed);
+					try {
+						result = StreamingCommandHandler.handleChatDebuff(usernameFinal);
+					} finally {
+						Random.popGenerator();
+					}
 					boolean ok = (result != null && !result.startsWith("ERR:"));
+					if (ok) {
+						broadcastChatMirror("debuff", usernameFinal, null, 0, null, -1, rngSeed);
+					}
 					String debuffName = ok ? result : null;
 					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
 					if (requestId != null && !requestId.isEmpty()) {
@@ -373,8 +496,19 @@ public class StreamingServer extends WebSocketServer {
 				});
 			} else if ("trap".equals(cmd)) {
 				Gdx.app.postRunnable(() -> {
-					String result = StreamingCommandHandler.handleSpawnTrap(usernameFinal);
+					StreamingCommandHandler.clearLastRoll();
+					long rngSeed = Random.Long();
+					String result;
+					Random.pushGenerator(rngSeed);
+					try {
+						result = StreamingCommandHandler.handleSpawnTrap(usernameFinal);
+					} finally {
+						Random.popGenerator();
+					}
 					boolean ok = (result != null && !result.startsWith("ERR:"));
+					if (ok) {
+						broadcastChatMirror("trap", usernameFinal, null, 0, null, -1, rngSeed);
+					}
 					String trapName = ok ? result : null;
 					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
 					if (requestId != null && !requestId.isEmpty()) {
@@ -390,8 +524,19 @@ public class StreamingServer extends WebSocketServer {
 				});
 			} else if ("plant".equals(cmd)) {
 				Gdx.app.postRunnable(() -> {
-					String result = StreamingCommandHandler.handlePlantRandom(usernameFinal);
+					StreamingCommandHandler.clearLastRoll();
+					long rngSeed = Random.Long();
+					String result;
+					Random.pushGenerator(rngSeed);
+					try {
+						result = StreamingCommandHandler.handlePlantRandom(usernameFinal);
+					} finally {
+						Random.popGenerator();
+					}
 					boolean ok = (result != null && !result.startsWith("ERR:"));
+					if (ok) {
+						broadcastChatMirror("plant", usernameFinal, null, 0, null, -1, rngSeed);
+					}
 					String plantName = ok ? result : null;
 					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
 					if (requestId != null && !requestId.isEmpty()) {
@@ -407,8 +552,19 @@ public class StreamingServer extends WebSocketServer {
 				});
 			} else if ("bomb".equals(cmd)) {
 				Gdx.app.postRunnable(() -> {
-					String result = StreamingCommandHandler.handleSpawnBomb(usernameFinal);
+					StreamingCommandHandler.clearLastRoll();
+					long rngSeed = Random.Long();
+					String result;
+					Random.pushGenerator(rngSeed);
+					try {
+						result = StreamingCommandHandler.handleSpawnBomb(usernameFinal);
+					} finally {
+						Random.popGenerator();
+					}
 					boolean ok = (result != null && !result.startsWith("ERR:"));
+					if (ok) {
+						broadcastChatMirror("bomb", usernameFinal, null, 0, null, -1, rngSeed);
+					}
 					String bombName = ok ? result : null;
 					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
 					if (requestId != null && !requestId.isEmpty()) {
@@ -424,8 +580,19 @@ public class StreamingServer extends WebSocketServer {
 				});
 			} else if ("transmute".equals(cmd)) {
 				Gdx.app.postRunnable(() -> {
-					StreamingCommandHandler.TransmuteStreamResult tr = StreamingCommandHandler.transmuteForStream(usernameFinal);
+					StreamingCommandHandler.clearLastRoll();
+					long rngSeed = Random.Long();
+					StreamingCommandHandler.TransmuteStreamResult tr;
+					Random.pushGenerator(rngSeed);
+					try {
+						tr = StreamingCommandHandler.transmuteForStream(usernameFinal);
+					} finally {
+						Random.popGenerator();
+					}
 					boolean ok = (tr.errorMessage == null);
+					if (ok) {
+						broadcastChatMirror("transmute", usernameFinal, null, 0, null, -1, rngSeed);
+					}
 					String err = tr.errorMessage;
 					if (requestId != null && !requestId.isEmpty()) {
 						JsonObject resp = new JsonObject();
@@ -441,8 +608,19 @@ public class StreamingServer extends WebSocketServer {
 				});
 			} else if ("summon_bee".equals(cmd)) {
 				Gdx.app.postRunnable(() -> {
-					String result = StreamingCommandHandler.handleSummonBee(usernameFinal);
+					StreamingCommandHandler.clearLastRoll();
+					long rngSeed = Random.Long();
+					String result;
+					Random.pushGenerator(rngSeed);
+					try {
+						result = StreamingCommandHandler.handleSummonBee(usernameFinal);
+					} finally {
+						Random.popGenerator();
+					}
 					boolean ok = (result != null && !result.startsWith("ERR:"));
+					if (ok) {
+						broadcastChatMirror("summon_bee", usernameFinal, null, 0, null, -1, rngSeed);
+					}
 					String allyName = ok ? result : null;
 					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
 					if (requestId != null && !requestId.isEmpty()) {
@@ -458,8 +636,19 @@ public class StreamingServer extends WebSocketServer {
 				});
 			} else if ("ward".equals(cmd)) {
 				Gdx.app.postRunnable(() -> {
-					String result = StreamingCommandHandler.handleSpawnWard(usernameFinal);
+					StreamingCommandHandler.clearLastRoll();
+					long rngSeed = Random.Long();
+					String result;
+					Random.pushGenerator(rngSeed);
+					try {
+						result = StreamingCommandHandler.handleSpawnWard(usernameFinal);
+					} finally {
+						Random.popGenerator();
+					}
 					boolean ok = (result != null && !result.startsWith("ERR:"));
+					if (ok) {
+						broadcastChatMirror("ward", usernameFinal, null, 0, null, -1, rngSeed);
+					}
 					String wardName = ok ? result : null;
 					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
 					if (requestId != null && !requestId.isEmpty()) {
@@ -475,8 +664,19 @@ public class StreamingServer extends WebSocketServer {
 				});
 			} else if ("heal".equals(cmd)) {
 				Gdx.app.postRunnable(() -> {
-					String result = StreamingCommandHandler.handleChatHeal(usernameFinal);
+					StreamingCommandHandler.clearLastRoll();
+					long rngSeed = Random.Long();
+					String result;
+					Random.pushGenerator(rngSeed);
+					try {
+						result = StreamingCommandHandler.handleChatHeal(usernameFinal);
+					} finally {
+						Random.popGenerator();
+					}
 					boolean ok = (result != null && !result.startsWith("ERR:"));
+					if (ok) {
+						broadcastChatMirror("heal", usernameFinal, null, 0, null, -1, rngSeed);
+					}
 					String buffName = ok ? result : null;
 					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
 					if (requestId != null && !requestId.isEmpty()) {
@@ -492,8 +692,19 @@ public class StreamingServer extends WebSocketServer {
 				});
 			} else if ("cleanse".equals(cmd)) {
 				Gdx.app.postRunnable(() -> {
-					String result = StreamingCommandHandler.handleChatCleanse(usernameFinal);
+					StreamingCommandHandler.clearLastRoll();
+					long rngSeed = Random.Long();
+					String result;
+					Random.pushGenerator(rngSeed);
+					try {
+						result = StreamingCommandHandler.handleChatCleanse(usernameFinal);
+					} finally {
+						Random.popGenerator();
+					}
 					boolean ok = (result != null && !result.startsWith("ERR:"));
+					if (ok) {
+						broadcastChatMirror("cleanse", usernameFinal, null, 0, null, -1, rngSeed);
+					}
 					String buffName = ok ? result : null;
 					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
 					if (requestId != null && !requestId.isEmpty()) {
@@ -509,8 +720,19 @@ public class StreamingServer extends WebSocketServer {
 				});
 			} else if ("dew".equals(cmd)) {
 				Gdx.app.postRunnable(() -> {
-					String result = StreamingCommandHandler.handleChatDew(usernameFinal);
+					StreamingCommandHandler.clearLastRoll();
+					long rngSeed = Random.Long();
+					String result;
+					Random.pushGenerator(rngSeed);
+					try {
+						result = StreamingCommandHandler.handleChatDew(usernameFinal);
+					} finally {
+						Random.popGenerator();
+					}
 					boolean ok = (result != null && !result.startsWith("ERR:"));
+					if (ok) {
+						broadcastChatMirror("dew", usernameFinal, null, 0, null, -1, rngSeed);
+					}
 					String itemName = ok ? result : null;
 					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
 					if (requestId != null && !requestId.isEmpty()) {
@@ -526,8 +748,19 @@ public class StreamingServer extends WebSocketServer {
 				});
 			} else if ("corrupt_ally".equals(cmd)) {
 				Gdx.app.postRunnable(() -> {
-					String result = StreamingCommandHandler.handleChatCorruptAlly(usernameFinal);
+					StreamingCommandHandler.clearLastRoll();
+					long rngSeed = Random.Long();
+					String result;
+					Random.pushGenerator(rngSeed);
+					try {
+						result = StreamingCommandHandler.handleChatCorruptAlly(usernameFinal);
+					} finally {
+						Random.popGenerator();
+					}
 					boolean ok = (result != null && !result.startsWith("ERR:"));
+					if (ok) {
+						broadcastChatMirror("corrupt_ally", usernameFinal, null, 0, null, -1, rngSeed);
+					}
 					String mobName = ok ? result : null;
 					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
 					if (requestId != null && !requestId.isEmpty()) {
@@ -543,8 +776,19 @@ public class StreamingServer extends WebSocketServer {
 				});
 			} else if ("hex".equals(cmd)) {
 				Gdx.app.postRunnable(() -> {
-					String result = StreamingCommandHandler.handleChatHex(usernameFinal);
+					StreamingCommandHandler.clearLastRoll();
+					long rngSeed = Random.Long();
+					String result;
+					Random.pushGenerator(rngSeed);
+					try {
+						result = StreamingCommandHandler.handleChatHex(usernameFinal);
+					} finally {
+						Random.popGenerator();
+					}
 					boolean ok = (result != null && !result.startsWith("ERR:"));
+					if (ok) {
+						broadcastChatMirror("hex", usernameFinal, null, 0, null, -1, rngSeed);
+					}
 					String debuffName = ok ? result : null;
 					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
 					if (requestId != null && !requestId.isEmpty()) {
@@ -560,8 +804,19 @@ public class StreamingServer extends WebSocketServer {
 				});
 			} else if ("degrade".equals(cmd)) {
 				Gdx.app.postRunnable(() -> {
-					String result = StreamingCommandHandler.handleChatDegrade(usernameFinal);
+					StreamingCommandHandler.clearLastRoll();
+					long rngSeed = Random.Long();
+					String result;
+					Random.pushGenerator(rngSeed);
+					try {
+						result = StreamingCommandHandler.handleChatDegrade(usernameFinal);
+					} finally {
+						Random.popGenerator();
+					}
 					boolean ok = (result != null && !result.startsWith("ERR:"));
+					if (ok) {
+						broadcastChatMirror("degrade", usernameFinal, null, 0, null, -1, rngSeed);
+					}
 					String debuffName = ok ? result : null;
 					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
 					if (requestId != null && !requestId.isEmpty()) {
@@ -577,8 +832,19 @@ public class StreamingServer extends WebSocketServer {
 				});
 			} else if ("sabotage".equals(cmd)) {
 				Gdx.app.postRunnable(() -> {
-					String result = StreamingCommandHandler.handleChatSabotage(usernameFinal);
+					StreamingCommandHandler.clearLastRoll();
+					long rngSeed = Random.Long();
+					String result;
+					Random.pushGenerator(rngSeed);
+					try {
+						result = StreamingCommandHandler.handleChatSabotage(usernameFinal);
+					} finally {
+						Random.popGenerator();
+					}
 					boolean ok = (result != null && !result.startsWith("ERR:"));
+					if (ok) {
+						broadcastChatMirror("sabotage", usernameFinal, null, 0, null, -1, rngSeed);
+					}
 					String buffName = ok ? result : null;
 					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
 					if (requestId != null && !requestId.isEmpty()) {
@@ -594,8 +860,19 @@ public class StreamingServer extends WebSocketServer {
 				});
 			} else if ("ring_of_wealth".equals(cmd)) {
 				Gdx.app.postRunnable(() -> {
-					String result = StreamingCommandHandler.handleRingOfWealthDrop(usernameFinal);
+					StreamingCommandHandler.clearLastRoll();
+					long rngSeed = Random.Long();
+					String result;
+					Random.pushGenerator(rngSeed);
+					try {
+						result = StreamingCommandHandler.handleRingOfWealthDrop(usernameFinal);
+					} finally {
+						Random.popGenerator();
+					}
 					boolean ok = (result != null && !result.startsWith("ERR:"));
+					if (ok) {
+						broadcastChatMirror("ring_of_wealth", usernameFinal, null, 0, null, -1, rngSeed);
+					}
 					String detail = ok ? result : null;
 					String err = (result != null && result.startsWith("ERR:")) ? result.substring(4) : null;
 					if (requestId != null && !requestId.isEmpty()) {

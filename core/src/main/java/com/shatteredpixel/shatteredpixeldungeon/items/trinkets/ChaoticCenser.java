@@ -90,24 +90,43 @@ public class ChaoticCenser extends Trinket {
 
 	/** Spawn random gas for chat command. Uses level 3 distribution (40/40/20). Returns gas name on success, null on failure. */
 	public static String spawnGasForChat() {
+		return spawnGasForChat(null, null);
+	}
+
+	/** Spawn random (or forced) gas for chat command. Records chosen gas class in {@code outGasClass[0]} if non-null. */
+	public static String spawnGasForChat(Class<? extends Blob> forcedGasClass, Class<? extends Blob>[] outGasClass) {
 		int level = 3; // level +3 = best distribution
-		Class<? extends Blob> gasToSpawn;
-		float gasQuantity;
-		switch (Random.chances(GAS_CAT_CHANCES[level])) {
-			case 0: default:
-				do {
-					gasToSpawn = Random.element(COMMON_GASSES.keySet());
-				} while (!Regeneration.regenOn() && gasToSpawn == Regrowth.class);
-				gasQuantity = COMMON_GASSES.get(gasToSpawn);
-				break;
-			case 1:
-				gasToSpawn = Random.element(UNCOMMON_GASSES.keySet());
-				gasQuantity = UNCOMMON_GASSES.get(gasToSpawn);
-				break;
-			case 2:
-				gasToSpawn = Random.element(RARE_GASSES.keySet());
-				gasQuantity = RARE_GASSES.get(gasToSpawn);
-				break;
+		Class<? extends Blob> gasToSpawn = null;
+		float gasQuantity = 0f;
+		if (forcedGasClass != null) {
+			if (COMMON_GASSES.containsKey(forcedGasClass)) {
+				gasToSpawn = forcedGasClass;
+				gasQuantity = COMMON_GASSES.get(forcedGasClass);
+			} else if (UNCOMMON_GASSES.containsKey(forcedGasClass)) {
+				gasToSpawn = forcedGasClass;
+				gasQuantity = UNCOMMON_GASSES.get(forcedGasClass);
+			} else if (RARE_GASSES.containsKey(forcedGasClass)) {
+				gasToSpawn = forcedGasClass;
+				gasQuantity = RARE_GASSES.get(forcedGasClass);
+			}
+		}
+		if (gasToSpawn == null) {
+			switch (Random.chances(GAS_CAT_CHANCES[level])) {
+				case 0: default:
+					do {
+						gasToSpawn = Random.element(COMMON_GASSES.keySet());
+					} while (!Regeneration.regenOn() && gasToSpawn == Regrowth.class);
+					gasQuantity = COMMON_GASSES.get(gasToSpawn);
+					break;
+				case 1:
+					gasToSpawn = Random.element(UNCOMMON_GASSES.keySet());
+					gasQuantity = UNCOMMON_GASSES.get(gasToSpawn);
+					break;
+				case 2:
+					gasToSpawn = Random.element(RARE_GASSES.keySet());
+					gasQuantity = RARE_GASSES.get(gasToSpawn);
+					break;
+			}
 		}
 
 		HashMap<Integer, Float> candidateCells = new HashMap<>();
@@ -163,6 +182,9 @@ public class ChaoticCenser extends Trinket {
 		MagicMissile.boltFromChar(Dungeon.hero.sprite.parent, MISSILE_VFX.get(gasToSpawn), Dungeon.hero.sprite, targetCell, null);
 		Sample.INSTANCE.play(Assets.Sounds.GAS);
 
+		if (outGasClass != null && outGasClass.length > 0) {
+			outGasClass[0] = gasToSpawn;
+		}
 		return Messages.get(gasToSpawn, "name");
 	}
 

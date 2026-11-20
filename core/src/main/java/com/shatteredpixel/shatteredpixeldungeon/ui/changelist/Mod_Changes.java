@@ -33,6 +33,7 @@ public class Mod_Changes {
 
 	public static void addAllChanges( ArrayList<ChangeInfo> changeInfos ){
 		addOverview(changeInfos);
+		add_v4_0_2_QoL_17(changeInfos);
 		add_v4_0_2_QoL_16(changeInfos);
 		add_v4_0_2_QoL_15(changeInfos);
 		add_v4_0_2_QoL_14(changeInfos);
@@ -45,6 +46,22 @@ public class Mod_Changes {
 		add_v4_0_0_QoL_6(changeInfos);
 		add_v4_0_0_QoL_5(changeInfos);
 		add_v4_0_0(changeInfos);
+	}
+
+	private static void add_v4_0_2_QoL_17( ArrayList<ChangeInfo> changeInfos ) {
+		ChangeInfo changes = new ChangeInfo("4.0.2-QoL-17", true, "");
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes = new ChangeInfo(Messages.get(ChangesScene.class, "new"), false, null);
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.CHALLENGE_COLOR), "Shared Chat Commands in Play Along",
+				"**-** All Shatter the Streamer chat commands (**!spawn**, **!champion**, **!bomb**, **!trap**, **!plant**, **!gas**, **!buff**, **!debuff**, **!scroll**, **!wand**, **!curse**, **!row**, **!corruptally**, **!heal**, **!gold**, **!dew**, **!bee**, **!ward**, **!cleanse**, **!sabotage**, **!transmute**, **!hex**, **!degrade**) can now mirror from the host to all active Play Along racers on Desktop and Android\n" +
+				"**-** **Shared RNG & Local Depth Scaling:** Everyone gets the exact same rolled subtype, Champion title, trap, bomb, scroll, cursed wand effect, Ring of Wealth loot, and corrupted ally — with monsters automatically stat-scaled to each player's current floor depth\n" +
+				"**-** **Self-Exclusion & Floor Queueing:** Commands you trigger yourself skip your own hero (so you can't self-farm or self-sabotage), and commands arriving during floor transitions queue until the floor finishes loading\n" +
+				"**-** **Host Toggle:** Hosts can toggle chat command mirroring on/off live from the **Roster** tab, **Hero Select**, or **Settings → Data** (defaults to ON)"));
 	}
 
 	private static void add_v4_0_2_QoL_16( ArrayList<ChangeInfo> changeInfos ) {

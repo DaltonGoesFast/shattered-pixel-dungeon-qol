@@ -53,6 +53,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -193,6 +194,46 @@ public class PlayAlongServer extends WebSocketServer {
 		msg.sessionId = session.sessionId;
 		msg.activePlayers = countAliveClients();
 		sendToSessionClients(PlayAlongProtocol.GSON.toJson(msg));
+	}
+
+	private static String normalizeChatUsername(String raw) {
+		if (raw == null) return "";
+		String s = raw.trim();
+		while (s.startsWith("@")) {
+			s = s.substring(1).trim();
+		}
+		return s.toLowerCase(Locale.ROOT);
+	}
+
+	public void broadcastChatCommand(PlayAlongProtocol.ChatCommandPayload payload) {
+		SessionInfo session = activeSession;
+		if (session == null || !session.active || payload == null) return;
+
+		WireMessage msg = new WireMessage();
+		msg.type = "chat_command";
+		msg.sessionId = session.sessionId;
+		msg.chatCommand = payload;
+		String json = PlayAlongProtocol.GSON.toJson(msg);
+
+		boolean isConfig = "spawn_scale_config".equals(payload.command);
+		String senderNorm = normalizeChatUsername(payload.username);
+		String senderSanitized = senderNorm.isEmpty()
+				? ""
+				: PlayAlongProtocol.sanitizeUsername(senderNorm, "01").toLowerCase(Locale.ROOT);
+
+		for (Map.Entry<WebSocket, ClientRecord> entry : connToClient.entrySet()) {
+			WebSocket conn = entry.getKey();
+			ClientRecord rec = entry.getValue();
+			if (rec == null || (!isConfig && !rec.alive)) continue;
+			if (!isConfig && !senderNorm.isEmpty()) {
+				String recNorm = normalizeChatUsername(rec.username);
+				if (recNorm.equals(senderNorm)
+						|| (!senderSanitized.isEmpty() && recNorm.equals(senderSanitized))) {
+					continue;
+				}
+			}
+			safeSend(conn, json);
+		}
 	}
 
 	public synchronized WipeEvent triggerHostWipe(int hostDepth, String hostCause) {

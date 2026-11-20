@@ -25,6 +25,7 @@ import com.badlogic.gdx.Gdx;
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Chrome;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Acidic;
@@ -847,6 +848,23 @@ public class WndStreamCommands extends WndTabbed {
 	}
 
 	private float buildRosterTab(float cy) {
+		if (com.watabou.utils.DeviceCompat.isDesktop()
+				&& (PlayAlongService.isHosting() || SPDSettings.playAlongHostEnabled())) {
+			final boolean sharedOn = SPDSettings.playAlongSharedChat();
+			RedButton btnSharedChat = new RedButton("Mirror Chat Cmds to Racers: " + (sharedOn ? "ON" : "OFF"), 6) {
+				@Override
+				protected void onClick() {
+					SPDSettings.playAlongSharedChat(!SPDSettings.playAlongSharedChat());
+					rebuildAllPreservingScroll();
+				}
+			};
+			btnSharedChat.enableScrollPassthrough();
+			btnSharedChat.setRect(0, cy, WIDTH, 16);
+			btnSharedChat.textColor(sharedOn ? 0x55FF55 : 0xCCCCCC);
+			content.add(btnSharedChat);
+			cy = btnSharedChat.bottom() + 4;
+		}
+
 		if (PlayAlongService.isSpectating() && PlayAlongService.isHostAliveForSpectate()
 				&& Dungeon.level != null
 				&& (Dungeon.depth != PlayAlongService.getHostDepth()

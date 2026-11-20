@@ -21,6 +21,8 @@
 
 package com.shatteredpixel.shatteredpixeldungeon.desktop;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
@@ -30,6 +32,7 @@ import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
+import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Albino;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Bat;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Bee;
@@ -174,19 +177,25 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.traps.WarpingTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.WeakeningTrap;
 import com.shatteredpixel.shatteredpixeldungeon.levels.traps.WornDartTrap;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
+import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.utils.DebugItemResolver;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
 import com.shatteredpixel.shatteredpixeldungeon.utils.PlayerDebugActions;
 import com.watabou.noosa.Game;
 import com.watabou.utils.BArray;
+import com.watabou.utils.Bundlable;
+import com.watabou.utils.Bundle;
 import com.watabou.utils.Callback;
 import com.watabou.utils.PathFinder;
 import com.watabou.noosa.audio.Sample;
 import com.watabou.utils.Random;
 import com.watabou.utils.Reflection;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 
@@ -198,6 +207,33 @@ public final class StreamingCommandHandler {
 
 	private static final float SPAWN_DELAY = 0f;  // 0 = spawn immediately (was 2f)
 	private static final int SPAWN_RADIUS = 4;  // tiles away from hero (1–4)
+
+	public static volatile String lastRolledClass = null;
+	public static volatile String lastSecondaryClass = null;
+	public static volatile boolean lastPositiveOnly = false;
+	public static volatile String lastBundleJson = null;
+	public static volatile String lastCurseSlot = null;
+
+	public static void clearLastRoll() {
+		lastRolledClass = null;
+		lastSecondaryClass = null;
+		lastPositiveOnly = false;
+		lastBundleJson = null;
+		lastCurseSlot = null;
+	}
+
+	@SuppressWarnings("unchecked")
+	private static <T> Class<? extends T> resolveClass(String className, Class<T> expectedSuper) {
+		if (className == null || className.isEmpty()) return null;
+		try {
+			Class<?> cls = Reflection.forName(className);
+			if (cls != null && expectedSuper.isAssignableFrom(cls)) {
+				return (Class<? extends T>) cls;
+			}
+		} catch (Throwable ignored) {
+		}
+		return null;
+	}
 
 	/** Earliest depth each monster appears — see {@link PactRoster#nativeDepthForChatName}. */
 	private static Integer nativeDepthForChat(String monsterName) {
@@ -303,6 +339,10 @@ public final class StreamingCommandHandler {
 
 	/** Called from main thread via Gdx.app.postRunnable. Returns null on success, error message on failure. */
 	public static String handleSpawn(String monsterName, String username) {
+		return handleSpawn(monsterName, username, null);
+	}
+
+	public static String handleSpawn(String monsterName, String username, String forcedMobClassName) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "Not in an active run (title/menu)";
 		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
@@ -310,11 +350,14 @@ public final class StreamingCommandHandler {
 		if (!Dungeon.hero.isAlive())
 			return "Hero is dead";
 
-		Class<? extends Mob> mobClass = "elemental".equals(monsterName)
-				? Elemental.random()
-				: "shaman".equals(monsterName)
-				? Shaman.random()
-				: mobClassForName(monsterName);
+		Class<? extends Mob> mobClass = resolveClass(forcedMobClassName, Mob.class);
+		if (mobClass == null) {
+			mobClass = "elemental".equals(monsterName)
+					? Elemental.random()
+					: "shaman".equals(monsterName)
+					? Shaman.random()
+					: mobClassForName(monsterName);
+		}
 		if (mobClass == null)
 			return "Unknown monster";
 
@@ -356,6 +399,7 @@ public final class StreamingCommandHandler {
 		ScrollOfTeleportation.appear(mob, cell);
 		Dungeon.level.occupyCell(mob);
 
+		lastRolledClass = mobClass.getName();
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		GLog.p(Messages.get(StreamingCommandHandler.class, "chat_spawned"), chatter, monsterName);
 		return null;
@@ -369,6 +413,11 @@ public final class StreamingCommandHandler {
 
 	/** Spawn a champion version of the given monster. Same placement/scaling as handleSpawn; cost is 2× base (handled by overlay). */
 	public static String handleSpawnChampion(String monsterName, String username) {
+		return handleSpawnChampion(monsterName, username, null, null);
+	}
+
+	public static String handleSpawnChampion(String monsterName, String username,
+	                                         String forcedMobClassName, String forcedChampClassName) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "Not in an active run (title/menu)";
 		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
@@ -376,11 +425,14 @@ public final class StreamingCommandHandler {
 		if (!Dungeon.hero.isAlive())
 			return "Hero is dead";
 
-		Class<? extends Mob> mobClass = "elemental".equals(monsterName)
-				? Elemental.random()
-				: "shaman".equals(monsterName)
-				? Shaman.random()
-				: mobClassForName(monsterName);
+		Class<? extends Mob> mobClass = resolveClass(forcedMobClassName, Mob.class);
+		if (mobClass == null) {
+			mobClass = "elemental".equals(monsterName)
+					? Elemental.random()
+					: "shaman".equals(monsterName)
+					? Shaman.random()
+					: mobClassForName(monsterName);
+		}
 		if (mobClass == null)
 			return "Unknown monster";
 
@@ -388,8 +440,13 @@ public final class StreamingCommandHandler {
 		if (mob == null)
 			return "Failed to create monster";
 
+		Class<? extends ChampionEnemy> champClass = resolveClass(forcedChampClassName, ChampionEnemy.class);
+		if (champClass == null) {
+			champClass = Random.element(CHAMPION_TYPES);
+		}
+
 		Buff.affect(mob, ChatSpawned.class);
-		Buff.affect(mob, Random.element(CHAMPION_TYPES));
+		Buff.affect(mob, champClass);
 
 		Integer nativeDepth = nativeDepthForChat(monsterName);
 		applyChatSpawnParalysis(mob, nativeDepth);
@@ -423,6 +480,8 @@ public final class StreamingCommandHandler {
 		ScrollOfTeleportation.appear(mob, cell);
 		Dungeon.level.occupyCell(mob);
 
+		lastRolledClass = mobClass.getName();
+		lastSecondaryClass = champClass.getName();
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		GLog.p(Messages.get(StreamingCommandHandler.class, "chat_champion_spawned"), chatter, monsterName);
 		return null;
@@ -480,6 +539,10 @@ public final class StreamingCommandHandler {
 	 * Returns comma-separated item titles on success, or ERR:... on failure.
 	 */
 	public static String handleRingOfWealthDrop(String username) {
+		return handleRingOfWealthDrop(username, null);
+	}
+
+	public static String handleRingOfWealthDrop(String username, String forcedBundleJson) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
 		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
@@ -507,32 +570,58 @@ public final class StreamingCommandHandler {
 
 		int cell = Random.element(candidates);
 
-		ArrayList<Class<? extends Mob>> rotation = MobSpawner.getMobRotation(Dungeon.depth);
-		if (rotation == null || rotation.isEmpty())
-			return "ERR:No mob rotation for this depth";
-
-		Class<? extends Mob> mobClass = Random.element(rotation);
-		Mob sample = Reflection.newInstance(mobClass);
-		if (sample == null)
-			return "ERR:Failed to sample mob";
-
-		int rolls = 1;
-		if (Char.hasProp(sample, Char.Property.BOSS)) rolls = 15;
-		else if (Char.hasProp(sample, Char.Property.MINIBOSS)) rolls = 5;
-
-		int wealthLvl = wealthRingLevelForDepth(Dungeon.depth);
-		ArrayList<Item> bonus = RingOfWealth.tryForBonusDrop(Dungeon.hero, rolls, wealthLvl);
-
 		ArrayList<Item> toDrop = new ArrayList<>();
-		if (bonus != null) {
-			toDrop.addAll(bonus);
+		boolean usedForced = false;
+		if (forcedBundleJson != null && !forcedBundleJson.isEmpty()) {
+			try {
+				Bundle bundle = Bundle.read(new ByteArrayInputStream(forcedBundleJson.getBytes(StandardCharsets.UTF_8)));
+				Collection<Bundlable> items = bundle.getCollection("items");
+				if (items != null) {
+					for (Bundlable b : items) {
+						if (b instanceof Item) {
+							toDrop.add((Item) b);
+						}
+					}
+				}
+				usedForced = !toDrop.isEmpty();
+			} catch (Exception ignored) {
+			}
 		}
-		if (toDrop.isEmpty()) {
-			Item i;
-			do {
-				i = RingOfWealth.genConsumableDrop(wealthLvl - 1);
-			} while (Challenges.isItemBlocked(i));
-			toDrop.add(i);
+
+		if (!usedForced) {
+			ArrayList<Class<? extends Mob>> rotation = MobSpawner.getMobRotation(Dungeon.depth);
+			if (rotation == null || rotation.isEmpty())
+				return "ERR:No mob rotation for this depth";
+
+			Class<? extends Mob> mobClass = Random.element(rotation);
+			Mob sample = Reflection.newInstance(mobClass);
+			if (sample == null)
+				return "ERR:Failed to sample mob";
+
+			int rolls = 1;
+			if (Char.hasProp(sample, Char.Property.BOSS)) rolls = 15;
+			else if (Char.hasProp(sample, Char.Property.MINIBOSS)) rolls = 5;
+
+			int wealthLvl = wealthRingLevelForDepth(Dungeon.depth);
+			ArrayList<Item> bonus = RingOfWealth.tryForBonusDrop(Dungeon.hero, rolls, wealthLvl);
+
+			if (bonus != null) {
+				toDrop.addAll(bonus);
+			}
+			if (toDrop.isEmpty()) {
+				Item i;
+				do {
+					i = RingOfWealth.genConsumableDrop(wealthLvl - 1);
+				} while (Challenges.isItemBlocked(i));
+				toDrop.add(i);
+			}
+
+			try {
+				Bundle outBundle = new Bundle();
+				outBundle.put("items", toDrop);
+				lastBundleJson = outBundle.toString();
+			} catch (Exception ignored) {
+			}
 		}
 
 		StringBuilder titles = new StringBuilder();
@@ -577,6 +666,10 @@ public final class StreamingCommandHandler {
 
 	/** Spawn a random (non-blacklisted) trap near the hero, same placement logic as gold. Returns trap name on success, error message on failure. */
 	public static String handleSpawnTrap(String username) {
+		return handleSpawnTrap(username, null);
+	}
+
+	public static String handleSpawnTrap(String username, String forcedTrapClassName) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
 		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
@@ -611,13 +704,17 @@ public final class StreamingCommandHandler {
 			return "ERR:No space to place trap (hero surrounded or no valid tiles)";
 
 		int cell = Random.element(candidates);
-		Class<? extends Trap> trapClass = Random.element(allowed);
+		Class<? extends Trap> trapClass = resolveClass(forcedTrapClassName, Trap.class);
+		if (trapClass == null || TRAP_BLACKLIST.contains(trapClass)) {
+			trapClass = Random.element(allowed);
+		}
 		Trap trap = Reflection.newInstance(trapClass);
 		trap.reveal();
 
 		Level.set(cell, Terrain.TRAP);
 		Dungeon.level.setTrap(trap, cell);
 
+		lastRolledClass = trapClass.getName();
 		String trapName = trap.name();
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		GLog.w(Messages.get(StreamingCommandHandler.class, "chat_trap"), chatter, trapName);
@@ -626,6 +723,10 @@ public final class StreamingCommandHandler {
 
 	/** Plant a random seed near the hero. Only works when Barren Land is OFF. Returns plant/seed name on success, ERR:... on failure. */
 	public static String handlePlantRandom(String username) {
+		return handlePlantRandom(username, null);
+	}
+
+	public static String handlePlantRandom(String username, String forcedSeedClassName) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
 		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
@@ -660,12 +761,17 @@ public final class StreamingCommandHandler {
 			return "ERR:No space to plant (need nearby ground tiles)";
 
 		int cell = Random.element(candidates);
-		Plant.Seed seed = (Plant.Seed) Generator.randomUsingDefaults(Generator.Category.SEED);
+		Class<? extends Plant.Seed> seedClass = resolveClass(forcedSeedClassName, Plant.Seed.class);
+		Plant.Seed seed = (seedClass != null) ? Reflection.newInstance(seedClass) : null;
+		if (seed == null) {
+			seed = (Plant.Seed) Generator.randomUsingDefaults(Generator.Category.SEED);
+		}
 		if (seed == null)
 			return "ERR:Failed to choose a seed";
 
 		Dungeon.level.plant(seed, cell);
 
+		lastRolledClass = seed.getClass().getName();
 		String seedName = seed.name();
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		GLog.p(Messages.get(StreamingCommandHandler.class, "chat_plant"), chatter, seedName);
@@ -684,6 +790,10 @@ public final class StreamingCommandHandler {
 
 	/** Spawn a weighted random lit bomb near the hero. Returns bomb name on success, ERR:... on failure. */
 	public static String handleSpawnBomb(String username) {
+		return handleSpawnBomb(username, null);
+	}
+
+	public static String handleSpawnBomb(String username, String forcedBombClassName) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
 		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
@@ -711,8 +821,11 @@ public final class StreamingCommandHandler {
 			return "ERR:No space to drop bomb (hero surrounded or no valid tiles)";
 
 		int cell = Random.element(candidates);
-		int idx = Random.chances(CHAT_BOMB_WEIGHTS);
-		Class<? extends Bomb> bombClass = CHAT_BOMB_CLASSES[idx];
+		Class<? extends Bomb> bombClass = resolveClass(forcedBombClassName, Bomb.class);
+		if (bombClass == null) {
+			int idx = Random.chances(CHAT_BOMB_WEIGHTS);
+			bombClass = CHAT_BOMB_CLASSES[idx];
+		}
 		Bomb bomb = Reflection.newInstance(bombClass);
 		if (bomb == null)
 			return "ERR:Failed to create bomb";
@@ -721,6 +834,7 @@ public final class StreamingCommandHandler {
 		bomb.startFuseAfterDrop(cell);
 		Dungeon.level.drop(bomb, cell).sprite.drop();
 
+		lastRolledClass = bombClass.getName();
 		String bombName = bomb.name();
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		GLog.w(Messages.get(StreamingCommandHandler.class, "chat_bomb"), chatter, bombName);
@@ -950,6 +1064,7 @@ public final class StreamingCommandHandler {
 		out.itemName = itemName;
 		out.temporary = temporary;
 		out.durationTurns = temporary ? duration : 0;
+		lastCurseSlot = slotName;
 		return out;
 	}
 
@@ -974,6 +1089,11 @@ public final class StreamingCommandHandler {
 
 	/** Spawn random gas (Chaotic Censer at level +3). Returns gas name on success, error message on failure. */
 	public static String handleSpawnGas(String username) {
+		return handleSpawnGas(username, null);
+	}
+
+	@SuppressWarnings("unchecked")
+	public static String handleSpawnGas(String username, String forcedGasClassName) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
 		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
@@ -981,10 +1101,15 @@ public final class StreamingCommandHandler {
 		if (!Dungeon.hero.isAlive())
 			return "ERR:Hero is dead";
 
-		String gasName = ChaoticCenser.spawnGasForChat();
+		Class<? extends Blob> forcedGas = resolveClass(forcedGasClassName, Blob.class);
+		Class<? extends Blob>[] outGas = new Class[1];
+		String gasName = ChaoticCenser.spawnGasForChat(forcedGas, outGas);
 		if (gasName == null)
 			return "ERR:No valid cell to spawn gas (need visible tiles 2-6 from hero)";
 
+		if (outGas[0] != null) {
+			lastRolledClass = outGas[0].getName();
+		}
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		GLog.w(Messages.get(StreamingCommandHandler.class, "chat_gas"), chatter, Messages.titleCase(gasName));
 		return gasName;
@@ -1007,6 +1132,11 @@ public final class StreamingCommandHandler {
 	/** Trigger a cursed wand effect (excluding AbortRetryFail, Explosion, FireBall, ForestFire). Async.
 	 * @param tier -1 for random, 0=common, 1=uncommon, 2=rare, 3=very_rare */
 	public static void handleCursedWand(String username, int tier, CursedWandResultCallback callback) {
+		handleCursedWand(username, tier, null, null, 0L, callback);
+	}
+
+	public static void handleCursedWand(String username, int tier, String forcedEffectClassName,
+	                                    Boolean forcedPositiveOnly, long rngSeed, CursedWandResultCallback callback) {
 		if (Dungeon.hero == null || Dungeon.level == null) {
 			callback.onResult(false, null, 0, "Not in an active run (title/menu)");
 			return;
@@ -1039,23 +1169,48 @@ public final class StreamingCommandHandler {
 		Wand wand = new WandOfMagicMissile();
 		wand.level(Dungeon.scalingDepth() / 5);
 		Ballistica bolt = new Ballistica(Dungeon.hero.pos, targetCell, Ballistica.MAGIC_BOLT);
-		boolean positiveOnly = Random.Float() < com.shatteredpixel.shatteredpixeldungeon.items.trinkets.WondrousResin.positiveCurseEffectChance();
+		boolean positiveOnly = (forcedPositiveOnly != null)
+				? forcedPositiveOnly
+				: (Random.Float() < com.shatteredpixel.shatteredpixeldungeon.items.trinkets.WondrousResin.positiveCurseEffectChance());
 
 		int[] outRarity = new int[1];
-		CursedWand.CursedEffect effect = CursedWand.randomValidEffectExcluding(
-				wand, Dungeon.hero, bolt, positiveOnly, WAND_EXCLUDED, outRarity, tier);
+		CursedWand.CursedEffect effect = null;
+		Class<? extends CursedWand.CursedEffect> forcedEffectCls = resolveClass(forcedEffectClassName, CursedWand.CursedEffect.class);
+		if (forcedEffectCls != null && !WAND_EXCLUDED.contains(forcedEffectCls)) {
+			CursedWand.CursedEffect candidate = Reflection.newInstance(forcedEffectCls);
+			if (candidate != null && candidate.valid(wand, Dungeon.hero, bolt, positiveOnly)) {
+				effect = candidate;
+				outRarity[0] = Math.max(0, tier);
+			}
+		}
+		if (effect == null) {
+			effect = CursedWand.randomValidEffectExcluding(
+					wand, Dungeon.hero, bolt, positiveOnly, WAND_EXCLUDED, outRarity, tier);
+		}
 
-		String effectName = effect.getClass().getSimpleName();
-		int rarity = outRarity[0];
+		final CursedWand.CursedEffect chosenEffect = effect;
+		final String effectName = chosenEffect.getClass().getSimpleName();
+		final String effectClassName = chosenEffect.getClass().getName();
+		final boolean posOnlyFinal = positiveOnly;
+		final int rarity = outRarity[0];
 
-		effect.FX(wand, Dungeon.hero, bolt, new Callback() {
+		chosenEffect.FX(wand, Dungeon.hero, bolt, new Callback() {
 			@Override
 			public void call() {
-				effect.effect(wand, Dungeon.hero, bolt, positiveOnly);
+				if (rngSeed != 0L) Random.pushGenerator(rngSeed);
+				try {
+					chosenEffect.effect(wand, Dungeon.hero, bolt, posOnlyFinal);
+				} finally {
+					if (rngSeed != 0L) Random.popGenerator();
+				}
 				String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 				GLog.w(Messages.get(StreamingCommandHandler.class, "chat_wand"), chatter, effectName);
 				Dungeon.hero.spend(-1f);
 				Talent.onArtifactUsed(Dungeon.hero);
+				lastRolledClass = effectClassName;
+				lastSecondaryClass = null;
+				lastPositiveOnly = posOnlyFinal;
+				lastBundleJson = null;
 				callback.onResult(true, effectName, rarity, null);
 			}
 		});
@@ -1063,6 +1218,10 @@ public final class StreamingCommandHandler {
 
 	/** Use a random scroll like +10 Unstable Spellbook. Returns scroll name on success, error message on failure. */
 	public static String handleRandomScroll(String username) {
+		return handleRandomScroll(username, null);
+	}
+
+	public static String handleRandomScroll(String username, String forcedScrollClassName) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
 		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
@@ -1074,17 +1233,20 @@ public final class StreamingCommandHandler {
 		if (Dungeon.hero.buff(com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Blindness.class) != null)
 			return "ERR:Blinded";
 
-		Scroll scroll;
-		do {
-			scroll = (Scroll) Generator.randomUsingDefaults(Generator.Category.SCROLL);
-		} while (scroll == null
-				|| ((scroll instanceof ScrollOfIdentify || scroll instanceof ScrollOfRemoveCurse
-						|| scroll instanceof ScrollOfMagicMapping) && Random.Int(2) == 0)
-				|| (scroll instanceof ScrollOfTransmutation));
+		Class<? extends Scroll> forcedScrollCls = resolveClass(forcedScrollClassName, Scroll.class);
+		Scroll scroll = (forcedScrollCls != null) ? Reflection.newInstance(forcedScrollCls) : null;
+		if (scroll == null) {
+			do {
+				scroll = (Scroll) Generator.randomUsingDefaults(Generator.Category.SCROLL);
+			} while (scroll == null
+					|| ((scroll instanceof ScrollOfIdentify || scroll instanceof ScrollOfRemoveCurse
+							|| scroll instanceof ScrollOfMagicMapping) && Random.Int(2) == 0)
+					|| (scroll instanceof ScrollOfTransmutation));
 
-		// 50% chance for exotic version (like +10 spellbook empowered option)
-		if (ExoticScroll.regToExo.containsKey(scroll.getClass()) && Random.Int(2) == 0) {
-			scroll = (Scroll) Reflection.newInstance(ExoticScroll.regToExo.get(scroll.getClass()));
+			// 50% chance for exotic version (like +10 spellbook empowered option)
+			if (ExoticScroll.regToExo.containsKey(scroll.getClass()) && Random.Int(2) == 0) {
+				scroll = (Scroll) Reflection.newInstance(ExoticScroll.regToExo.get(scroll.getClass()));
+			}
 		}
 
 		scroll.anonymize();
@@ -1098,6 +1260,7 @@ public final class StreamingCommandHandler {
 		Dungeon.hero.spend(-1f);  // Chat scroll: no turn cost
 		Talent.onArtifactUsed(Dungeon.hero);
 
+		lastRolledClass = scroll.getClass().getName();
 		String scrollName = scroll.trueName();
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		GLog.p(Messages.get(StreamingCommandHandler.class, "chat_scroll"), chatter, scrollName);
@@ -1118,6 +1281,10 @@ public final class StreamingCommandHandler {
 
 	/** Apply a random buff to the hero. Returns buff name on success, ERR:... on failure. */
 	public static String handleChatBuff(String username) {
+		return handleChatBuff(username, null);
+	}
+
+	public static String handleChatBuff(String username, String forcedBuffClassName) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
 		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
@@ -1125,7 +1292,10 @@ public final class StreamingCommandHandler {
 		if (!Dungeon.hero.isAlive())
 			return "ERR:Hero is dead";
 
-		Class<? extends Buff> buffClass = Random.element(CHAT_BUFFS);
+		Class<? extends Buff> buffClass = resolveClass(forcedBuffClassName, Buff.class);
+		if (buffClass == null || !java.util.Arrays.asList(CHAT_BUFFS).contains(buffClass)) {
+			buffClass = Random.element(CHAT_BUFFS);
+		}
 		String buffName = Messages.titleCase(buffClass.getSimpleName());
 
 		if (buffClass == Healing.class) {
@@ -1151,6 +1321,7 @@ public final class StreamingCommandHandler {
 			Buff.affect(Dungeon.hero, MindVision.class, MindVision.DURATION);
 		}
 
+		lastRolledClass = buffClass.getName();
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		GLog.p(Messages.get(StreamingCommandHandler.class, "chat_buff"), chatter, buffName);
 		return buffName;
@@ -1158,6 +1329,10 @@ public final class StreamingCommandHandler {
 
 	/** Apply a random debuff to the hero. Returns debuff name on success, ERR:... on failure. */
 	public static String handleChatDebuff(String username) {
+		return handleChatDebuff(username, null);
+	}
+
+	public static String handleChatDebuff(String username, String forcedDebuffClassName) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
 		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
@@ -1165,14 +1340,18 @@ public final class StreamingCommandHandler {
 		if (!Dungeon.hero.isAlive())
 			return "ERR:Hero is dead";
 
-		Class<? extends Buff> debuffClass;
-		ArrayList<Class<? extends Buff>> pool = new ArrayList<>(java.util.Arrays.asList(CHAT_DEBUFFS));
-		do {
-			if (pool.isEmpty())
-				return "ERR:No debuff could be applied (e.g. Roots fails when flying)";
-			debuffClass = Random.element(pool);
-			pool.remove(debuffClass);
-		} while (debuffClass == Roots.class && Dungeon.hero.flying);
+		Class<? extends Buff> debuffClass = resolveClass(forcedDebuffClassName, Buff.class);
+		if (debuffClass == null
+				|| !java.util.Arrays.asList(CHAT_DEBUFFS).contains(debuffClass)
+				|| (debuffClass == Roots.class && Dungeon.hero.flying)) {
+			ArrayList<Class<? extends Buff>> pool = new ArrayList<>(java.util.Arrays.asList(CHAT_DEBUFFS));
+			do {
+				if (pool.isEmpty())
+					return "ERR:No debuff could be applied (e.g. Roots fails when flying)";
+				debuffClass = Random.element(pool);
+				pool.remove(debuffClass);
+			} while (debuffClass == Roots.class && Dungeon.hero.flying);
+		}
 
 		String debuffName = Messages.titleCase(debuffClass.getSimpleName());
 
@@ -1192,6 +1371,7 @@ public final class StreamingCommandHandler {
 			Buff.affect(Dungeon.hero, Vulnerable.class, Vulnerable.DURATION);
 		}
 
+		lastRolledClass = debuffClass.getName();
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		GLog.n(Messages.get(StreamingCommandHandler.class, "chat_debuff"), chatter, debuffName);
 		return debuffName;
@@ -1241,6 +1421,10 @@ public final class StreamingCommandHandler {
 
 	/** Chat command: remove one random negative buff. Returns buff name on success, ERR:... on failure. */
 	public static String handleChatCleanse(String username) {
+		return handleChatCleanse(username, null);
+	}
+
+	public static String handleChatCleanse(String username, String preferredBuffClassName) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
 		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
@@ -1249,13 +1433,21 @@ public final class StreamingCommandHandler {
 			return "ERR:Hero is dead";
 
 		ArrayList<Buff> negatives = new ArrayList<>();
+		Buff preferred = null;
 		for (Buff b : Dungeon.hero.buffs()) {
-			if (b.type == Buff.buffType.NEGATIVE) negatives.add(b);
+			if (b.type == Buff.buffType.NEGATIVE) {
+				negatives.add(b);
+				if (preferred == null && preferredBuffClassName != null
+						&& b.getClass().getName().equals(preferredBuffClassName)) {
+					preferred = b;
+				}
+			}
 		}
 		if (negatives.isEmpty())
 			return "ERR:No debuff to remove";
 
-		Buff toRemove = Random.element(negatives);
+		Buff toRemove = (preferred != null) ? preferred : Random.element(negatives);
+		lastRolledClass = toRemove.getClass().getName();
 		String buffName = Messages.titleCase(toRemove.getClass().getSimpleName());
 		toRemove.detach();
 
@@ -1301,6 +1493,10 @@ public final class StreamingCommandHandler {
 
 	/** Chat command: summon a corrupted (allied) enemy from the current biome. Boss floors allowed. Returns mob name on success, ERR:... on failure. */
 	public static String handleChatCorruptAlly(String username) {
+		return handleChatCorruptAlly(username, null);
+	}
+
+	public static String handleChatCorruptAlly(String username, String forcedMobClassName) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
 		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
@@ -1308,22 +1504,28 @@ public final class StreamingCommandHandler {
 		if (!Dungeon.hero.isAlive())
 			return "ERR:Hero is dead";
 
-		ArrayList<Class<? extends Mob>> rotation = MobSpawner.getMobRotation(Dungeon.depth);
-		ArrayList<Class<? extends Mob>> corruptible = new ArrayList<>();
-		for (Class<? extends Mob> cl : rotation) {
-			Mob test = Reflection.newInstance(cl);
-			if (test != null && !test.isImmune(Corruption.class))
-				corruptible.add(cl);
-		}
-		if (corruptible.isEmpty())
-			return "ERR:No corruptible mob in this biome";
+		Class<? extends Mob> mobClass = resolveClass(forcedMobClassName, Mob.class);
+		if (mobClass == null) {
+			ArrayList<Class<? extends Mob>> rotation = MobSpawner.getMobRotation(Dungeon.depth);
+			ArrayList<Class<? extends Mob>> corruptible = new ArrayList<>();
+			for (Class<? extends Mob> cl : rotation) {
+				Mob test = Reflection.newInstance(cl);
+				if (test != null && !test.isImmune(Corruption.class))
+					corruptible.add(cl);
+			}
+			if (corruptible.isEmpty())
+				return "ERR:No corruptible mob in this biome";
 
-		Class<? extends Mob> mobClass = Random.element(corruptible);
+			mobClass = Random.element(corruptible);
+		}
 		Mob mob = Reflection.newInstance(mobClass);
 		if (mob == null)
 			return "ERR:Failed to create mob";
 
 		Buff.affect(mob, ChatSpawned.class);
+
+		Integer nativeDepth = PactRoster.nativeDepth(mobClass);
+		applyChatSpawnStatScaling(mob, mobClass, nativeDepth);
 
 		int heroPos = Dungeon.hero.pos;
 		boolean[] spawnPassable = new boolean[Dungeon.level.length()];
@@ -1356,6 +1558,7 @@ public final class StreamingCommandHandler {
 		Corruption.corruptionHeal(mob);
 		Buff.affect(mob, Corruption.class);
 
+		lastRolledClass = mobClass.getName();
 		String mobName = mob.name();
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		GLog.p(Messages.get(StreamingCommandHandler.class, "chat_corrupt_ally"), chatter, mobName);
@@ -1404,6 +1607,10 @@ public final class StreamingCommandHandler {
 
 	/** Chat command: remove one random positive buff. Returns buff name on success, ERR:... on failure. */
 	public static String handleChatSabotage(String username) {
+		return handleChatSabotage(username, null);
+	}
+
+	public static String handleChatSabotage(String username, String preferredBuffClassName) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
 		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
@@ -1412,23 +1619,134 @@ public final class StreamingCommandHandler {
 			return "ERR:Hero is dead";
 
 		ArrayList<Buff> positives = new ArrayList<>();
+		Buff preferred = null;
 		for (Buff b : Dungeon.hero.buffs()) {
 			if (b.type == Buff.buffType.POSITIVE
 					&& b.icon() != BuffIndicator.NONE
 					&& !isSabotageProtected(b)) {
 				positives.add(b);
+				if (preferred == null && preferredBuffClassName != null
+						&& b.getClass().getName().equals(preferredBuffClassName)) {
+					preferred = b;
+				}
 			}
 		}
 		if (positives.isEmpty())
 			return "ERR:No visible buff to remove";
 
-		Buff toRemove = Random.element(positives);
+		Buff toRemove = (preferred != null) ? preferred : Random.element(positives);
+		lastRolledClass = toRemove.getClass().getName();
 		String buffName = Messages.titleCase(toRemove.getClass().getSimpleName());
 		toRemove.detach();
 
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		GLog.n(Messages.get(StreamingCommandHandler.class, "chat_sabotage"), chatter, buffName);
 		return buffName;
+	}
+
+	/**
+	 * Executes a chat command mirrored from the Play Along host, using shared RNG and forced roll outcomes.
+	 */
+	public static void executeMirroredChatCommand(PlayAlongProtocol.ChatCommandPayload p) {
+		if (p == null || p.command == null) return;
+		if ("spawn_scale_config".equals(p.command)) {
+			if (p.bundleJson != null && !p.bundleJson.isEmpty()) {
+				try {
+					JsonObject obj = JsonParser.parseString(p.bundleJson).getAsJsonObject();
+					handleSpawnScaleConfig(obj);
+				} catch (Throwable ignored) {
+				}
+			}
+			return;
+		}
+		if (Dungeon.hero == null || Dungeon.level == null) return;
+		if (!(ShatteredPixelDungeon.scene() instanceof GameScene)) return;
+		if (!Dungeon.hero.isAlive()) return;
+
+		if (p.rngSeed != 0L) Random.pushGenerator(p.rngSeed);
+		try {
+			switch (p.command) {
+				case "spawn":
+					handleSpawn(p.monster, p.username, p.rolledClass);
+					break;
+				case "champion":
+					handleSpawnChampion(p.monster, p.username, p.rolledClass, p.secondaryClass);
+					break;
+				case "gold":
+					handleDropGold(p.amount, p.username);
+					break;
+				case "gas":
+					handleSpawnGas(p.username, p.rolledClass);
+					break;
+				case "curse":
+					if (p.slot != null && !p.slot.isEmpty()) {
+						CurseStreamResult r = curseEquipped(p.slot, p.username, p.amount);
+						if (r.errorMessage != null && "random".equals(p.rolledClass)) {
+							curseEquippedRandom(p.username, p.amount);
+						}
+					} else {
+						curseEquippedRandom(p.username, p.amount);
+					}
+					break;
+				case "scroll":
+					handleRandomScroll(p.username, p.rolledClass);
+					break;
+				case "wand":
+					handleCursedWand(p.username, p.tier, p.rolledClass, p.positiveOnly, p.rngSeed,
+							(ok, effectName, rarity, err) -> {});
+					break;
+				case "buff":
+					handleChatBuff(p.username, p.rolledClass);
+					break;
+				case "debuff":
+					handleChatDebuff(p.username, p.rolledClass);
+					break;
+				case "trap":
+					handleSpawnTrap(p.username, p.rolledClass);
+					break;
+				case "plant":
+					handlePlantRandom(p.username, p.rolledClass);
+					break;
+				case "bomb":
+					handleSpawnBomb(p.username, p.rolledClass);
+					break;
+				case "transmute":
+					transmuteForStream(p.username);
+					break;
+				case "summon_bee":
+					handleSummonBee(p.username);
+					break;
+				case "ward":
+					handleSpawnWard(p.username);
+					break;
+				case "heal":
+					handleChatHeal(p.username);
+					break;
+				case "cleanse":
+					handleChatCleanse(p.username, p.rolledClass);
+					break;
+				case "dew":
+					handleChatDew(p.username);
+					break;
+				case "corrupt_ally":
+					handleChatCorruptAlly(p.username, p.rolledClass);
+					break;
+				case "hex":
+					handleChatHex(p.username);
+					break;
+				case "degrade":
+					handleChatDegrade(p.username);
+					break;
+				case "sabotage":
+					handleChatSabotage(p.username, p.rolledClass);
+					break;
+				case "ring_of_wealth":
+					handleRingOfWealthDrop(p.username, p.bundleJson);
+					break;
+			}
+		} finally {
+			if (p.rngSeed != 0L) Random.popGenerator();
+		}
 	}
 
 	/** Dispatch streamer-only WebSocket commands ({@code streamer_*}). */

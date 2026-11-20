@@ -755,6 +755,7 @@ public class SPDSettings extends GameSettings {
 	public static final String KEY_PLAY_ALONG_ADDRESS = "play_along_address";
 	public static final String KEY_PLAY_ALONG_PORT = "play_along_port";
 	public static final String KEY_PLAY_ALONG_HOST_ENABLED = "play_along_host_enabled";
+	public static final String KEY_PLAY_ALONG_SHARED_CHAT = "play_along_shared_chat";
 	public static final String KEY_PLAY_ALONG_USERNAME = "play_along_username";
 	public static final String KEY_STREAM_CLIENT_TOKEN = "stream_client_token";
 
@@ -794,6 +795,14 @@ public class SPDSettings extends GameSettings {
 
 	public static boolean playAlongHostEnabled() {
 		return getBoolean( KEY_PLAY_ALONG_HOST_ENABLED, false );
+	}
+
+	public static void playAlongSharedChat( boolean value ) {
+		put( KEY_PLAY_ALONG_SHARED_CHAT, value );
+	}
+
+	public static boolean playAlongSharedChat() {
+		return getBoolean( KEY_PLAY_ALONG_SHARED_CHAT, true );
 	}
 
 	public static void playAlongUsername( String value ) {
