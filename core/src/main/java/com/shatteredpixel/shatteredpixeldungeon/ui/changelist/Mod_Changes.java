@@ -33,6 +33,7 @@ public class Mod_Changes {
 
 	public static void addAllChanges( ArrayList<ChangeInfo> changeInfos ){
 		addOverview(changeInfos);
+		add_v4_0_2_QoL_18(changeInfos);
 		add_v4_0_2_QoL_17(changeInfos);
 		add_v4_0_2_QoL_16(changeInfos);
 		add_v4_0_2_QoL_15(changeInfos);
@@ -46,6 +47,22 @@ public class Mod_Changes {
 		add_v4_0_0_QoL_6(changeInfos);
 		add_v4_0_0_QoL_5(changeInfos);
 		add_v4_0_0(changeInfos);
+	}
+
+	private static void add_v4_0_2_QoL_18( ArrayList<ChangeInfo> changeInfos ) {
+		ChangeInfo changes = new ChangeInfo("4.0.2-QoL-18", true, "");
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes = new ChangeInfo(Messages.get(ChangesScene.class, "changes"), false, null);
+		changes.hardlight(CharSprite.WARNING);
+		changeInfos.add(changes);
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.CHALLENGE_COLOR), "Stream Deck & Play Along Polish",
+				"**-** **Accurate Live Run Status:** The title screen live indicator and Join dialog now accurately reflect live in-dungeon status and floor transitions\n" +
+				"**-** **Ring of Wealth Command Fix:** Resolved command key matching so **!row** / **!ring_of_wealth** costs and disabled states sync properly in the Command Deck\n" +
+				"**-** **Dynamic Cost Indicators:** Unloaded economy costs show dynamic placeholders (`...` / `?`) and stay disabled until synced\n" +
+				"**-** **Bestiary EXP Multiplier & Reset:** Configurable summon EXP multipliers and one-click Bestiary progress reset in the points dashboard"));
 	}
 
 	private static void add_v4_0_2_QoL_17( ArrayList<ChangeInfo> changeInfos ) {

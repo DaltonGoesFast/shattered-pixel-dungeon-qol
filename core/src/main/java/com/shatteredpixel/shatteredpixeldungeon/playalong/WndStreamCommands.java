@@ -988,15 +988,22 @@ public class WndStreamCommands extends WndTabbed {
 			float bx = col * (colW + GAP);
 			float by = cy + row * (BTN_H + GAP);
 
-			int cost = 0;
+			Integer cObj = null;
 			if (eco != null) {
-				Integer cObj = eco.costs.get(cmdId);
-				cost = cObj != null ? cObj : 0;
+				cObj = eco.costs.get(cmdId);
+				if (cObj == null && "ring_of_wealth".equals(cmdId)) {
+					cObj = eco.costs.get("row");
+				}
 			}
 			boolean isFree = eco != null && eco.freeKeys.contains(cfgKey);
-			if (isFree) cost = 0;
+			boolean costKnown = isFree || cObj != null;
+			int cost = isFree ? 0 : (cObj != null ? cObj : 0);
 
-			String costTxt = isFree ? "FREE!" : ("gold".equals(cmdId) ? (cost + "p/1g") : (cost + "p"));
+			String costTxt = isFree
+					? "FREE!"
+					: (!costKnown
+					? (eco == null ? "..." : "?")
+					: ("gold".equals(cmdId) ? (cost + "p/1g") : (cost + "p")));
 			final int costFinal = cost;
 			int fontSize = title.length() > 10 ? 5 : 6;
 			RedButton btn = new RedButton(title + "\n" + costTxt, fontSize) {
@@ -1030,13 +1037,15 @@ public class WndStreamCommands extends WndTabbed {
 			btn.setRect(bx, by, colW, BTN_H);
 			if (isFree) btn.textColor(0x55FF55);
 
-			boolean cmdBlocked = eco != null && eco.disabledCommands.contains(cmdId);
+			boolean cmdBlocked = eco != null && (eco.disabledCommands.contains(cmdId)
+					|| ("ring_of_wealth".equals(cmdId) && eco.disabledCommands.contains("row")));
 			boolean canUse = !requestInFlight
 					&& eco != null
 					&& eco.linked
 					&& !eco.spendDisabled
 					&& eco.inDungeon
 					&& !cmdBlocked
+					&& costKnown
 					&& costFinal <= eco.totalPts;
 			btn.enable(canUse);
 			content.add(btn);

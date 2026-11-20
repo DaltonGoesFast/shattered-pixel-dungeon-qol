@@ -4356,6 +4356,21 @@ def bestiary_config_api():
         return jsonify({'error': str(e)}), 500, resp_headers
 
 
+@app.route('/api/bestiary/reset', methods=['POST', 'OPTIONS'])
+def bestiary_reset_api():
+    """Reset Bestiary session progress (bar XP, level, sprint, heat, summon counts)."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    resp_headers = {'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0'}
+    try:
+        from summon_bestiary import reset_bestiary_state
+        reset_bestiary_state()
+        return jsonify({'ok': True, 'message': 'Bestiary reset.'}), 200, resp_headers
+    except Exception as e:
+        print(f"bestiary reset error: {e}")
+        return jsonify({'ok': False, 'error': str(e)}), 500, resp_headers
+
+
 @app.route('/api/obs-ui-actions', methods=['GET', 'POST', 'OPTIONS'])
 def obs_ui_actions_api():
     """Get or save obs_ui_actions.json (If/Then OBS hide + transform). Hot-reloads."""
@@ -4777,7 +4792,7 @@ def _build_playalong_client_state(token: str = "", depth_override: int | None = 
         ("buff", "cost_per_buff"),
         ("bee", "cost_per_ally_bee"),
         ("ward", "cost_per_ward"),
-        ("row", "cost_per_ring_of_wealth"),
+        ("ring_of_wealth", "cost_per_ring_of_wealth"),
         ("dew", "cost_per_dew"),
         ("gold", "cost_per_gold"),
         ("bomb", "cost_per_bomb"),
@@ -4796,6 +4811,7 @@ def _build_playalong_client_state(token: str = "", depth_override: int | None = 
     for cmd_id, cfg_key in cmd_spec:
         base = effective_cost(cfg_key, int(cfg.get(cfg_key, 0)))
         costs[cmd_id] = apply_death_cost_inflation(cmd_id, base)
+    costs["row"] = costs["ring_of_wealth"]
 
     curse_base = effective_cost("cost_per_curse", int(cfg.get("cost_per_curse", 200)))
     curse_scaled = curse_cost_for_equipped_curses(curse_base, cursed_cnt)
@@ -4819,7 +4835,10 @@ def _build_playalong_client_state(token: str = "", depth_override: int | None = 
         champion_costs[m] = apply_death_cost_inflation("champion", c_base)
 
     allowed_roles = cfg.get("command_allowed_roles") or {}
-    disabled_commands = sorted([str(k) for k, v in allowed_roles.items() if v == "disabled"])
+    disabled_set = {str(k) for k, v in allowed_roles.items() if v == "disabled"}
+    if "row" in disabled_set or "ring_of_wealth" in disabled_set:
+        disabled_set.update(("row", "ring_of_wealth"))
+    disabled_commands = sorted(disabled_set)
 
     best = get_state_payload()
     bestiary_summary = {

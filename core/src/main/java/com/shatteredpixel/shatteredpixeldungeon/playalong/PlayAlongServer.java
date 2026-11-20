@@ -33,6 +33,7 @@ import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.Tomb
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.WipeEvent;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.WireMessage;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
+import com.shatteredpixel.shatteredpixeldungeon.scenes.InterlevelScene;
 import com.watabou.noosa.Game;
 
 import org.java_websocket.WebSocket;
@@ -658,16 +659,16 @@ public class PlayAlongServer extends WebSocketServer {
 	private SessionInfo snapshotSessionInfo() {
 		SessionInfo src = activeSession;
 		SessionInfo copy = new SessionInfo();
-		copy.serverOnline = true;
 		boolean heroInDungeon = false;
 		try {
 			heroInDungeon = Dungeon.hero != null
 					&& Dungeon.level != null
 					&& Dungeon.hero.isAlive()
-					&& (Game.scene() instanceof GameScene);
+					&& (Game.scene() instanceof GameScene || Game.scene() instanceof InterlevelScene);
 		} catch (Throwable ignored) {
 		}
 		copy.inDungeon = heroInDungeon;
+		copy.serverOnline = (src != null && src.active) || heroInDungeon;
 		if (src == null || !src.active) {
 			copy.active = false;
 			copy.version = Game.version != null ? Game.version : "";

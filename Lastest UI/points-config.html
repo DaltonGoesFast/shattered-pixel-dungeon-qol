@@ -899,7 +899,7 @@
       <span class="free-countdown" style="display:none;"></span>
       <button type="button" class="cancel-free-btn" style="display:none;">Cancel</button>
     </div>
-    <div class="row" data-cost-key="cost_per_ring_of_wealth" data-cmd="row">
+    <div class="row" data-cost-key="cost_per_ring_of_wealth" data-cmd="ring_of_wealth">
       <label for="cost_per_ring_of_wealth">Ring of Wealth (!row):</label>
       <input type="number" id="cost_per_ring_of_wealth" min="1" value="100">
       <button type="button" class="free-btn">Free</button>
@@ -1337,6 +1337,9 @@
     <div class="row"><span style="color:var(--spd-muted-on-surface);font-size:0.85rem;">Heat:</span> <span id="bestiaryGlanceHeat">—</span></div>
     <div class="row" style="margin-top:0.35rem;"><span style="color:var(--spd-muted-on-surface);font-size:0.85rem;">Hall:</span></div>
     <div id="bestiaryGlanceHall" class="session-user-lists">—</div>
+    <div class="row" style="margin-top:0.5rem;gap:8px;">
+      <button type="button" id="bestiaryResetBtn" style="background:var(--spd-danger);" title="Reset Bestiary progress back to level 1 (clears bar XP, sprint, heat, and summon totals)">Reset Bestiary</button>
+    </div>
     <hr style="border:none;border-top:1px solid var(--spd-border);margin:0.75rem 0;">
     <p class="sub" style="margin-bottom: 0.5rem;">Config (<code>bestiary_config.json</code>)</p>
     <div class="ss-toolbar">
@@ -1348,6 +1351,7 @@
       <button type="button" id="bestiaryPresetApply" style="background:var(--spd-btn-secondary);" title="Load the selected preset into the form. Then click Save bestiary config to push.">Apply</button>
       <button type="button" id="bestiaryPresetDelete" style="background:var(--spd-danger);" title="Delete the selected bestiary preset from this browser.">Delete</button>
     </div>
+    <div class="row"><label for="bestiary_summon_exp_mult" title="Global multiplier for Bestiary XP gained from !summon (1.0 = normal, 2.0 = double XP, 0.5 = half XP)">Summon EXP mult:</label><input type="number" id="bestiary_summon_exp_mult" min="0" max="100" step="0.05" value="1" style="width:80px;"></div>
     <div class="row"><label for="bestiary_heat_window_sec" title="Rolling heat window">Heat window (sec):</label><input type="number" id="bestiary_heat_window_sec" min="60" value="900"></div>
     <div class="row"><label for="bestiary_sprint_donor_reward" title="Donor points to sprint winner when a zone clears">Sprint donor reward:</label><input type="number" id="bestiary_sprint_donor_reward" min="0" value="100"></div>
     <div class="row"><label for="bestiary_sprint_donor_reward_per_level" title="Extra donor pts × zone level">Reward per level:</label><input type="number" id="bestiary_sprint_donor_reward_per_level" min="0" value="100"></div>
@@ -1660,6 +1664,7 @@
       _bestiaryCfgCache = cfg;
       const setN = (id, v, d) => { const e = document.getElementById(id); if (e) e.value = v ?? d; };
       const setC = (id, v) => { const e = document.getElementById(id); if (e) e.checked = !!v; };
+      setN('bestiary_summon_exp_mult', cfg.summon_exp_multiplier ?? cfg.summon_exp_mult ?? cfg.summon_exp_gain, 1);
       setN('bestiary_heat_window_sec', cfg.heat_window_sec, 900);
       setN('bestiary_sprint_donor_reward', cfg.sprint_donor_reward, 100);
       setN('bestiary_sprint_donor_reward_per_level', cfg.sprint_donor_reward_per_level, 100);
@@ -1722,8 +1727,10 @@
         if (!Number.isFinite(n)) return d;
         return Math.max(0, Math.min(1, n / 100));
       };
+      const summonExpMult = parseFloat(document.getElementById('bestiary_summon_exp_mult')?.value);
       return {
         ...base,
+        summon_exp_multiplier: Number.isFinite(summonExpMult) ? Math.max(0, summonExpMult) : 1,
         heat_window_sec: Math.max(60, parseInt(document.getElementById('bestiary_heat_window_sec')?.value, 10) || 900),
         sprint_donor_reward: Math.max(0, parseInt(document.getElementById('bestiary_sprint_donor_reward')?.value, 10) || 0),
         sprint_donor_reward_per_level: Math.max(0, parseInt(document.getElementById('bestiary_sprint_donor_reward_per_level')?.value, 10) || 0),
@@ -1760,6 +1767,7 @@
 
     const BESTIARY_PRESETS_STORAGE = 'spd_bestiary_presets';
     const BESTIARY_PRESET_DEFAULT = {
+      summon_exp_multiplier: 1,
       heat_window_sec: 900,
       sprint_donor_reward: 100,
       sprint_donor_reward_per_level: 100,
@@ -1785,6 +1793,7 @@
       ],
     };
     const BESTIARY_PRESET_FAST = {
+      summon_exp_multiplier: 1,
       heat_window_sec: 900,
       sprint_donor_reward: 100,
       sprint_donor_reward_per_level: 100,
@@ -1810,6 +1819,7 @@
       ],
     };
     const BESTIARY_PRESET_SLOW = {
+      summon_exp_multiplier: 1,
       heat_window_sec: 1200,
       sprint_donor_reward: 100,
       sprint_donor_reward_per_level: 100,
@@ -3801,6 +3811,19 @@
       saveBestiaryPresets(getBestiaryPresets().filter(p => String(p.id) !== id));
       refreshBestiaryPresetsSelect();
       showMsg('Bestiary preset deleted', true);
+    });
+    document.getElementById('bestiaryResetBtn')?.addEventListener('click', () => {
+      if (!confirm('Reset Bestiary? This clears Bestiary level back to 1, co-op bar XP, sprint, rolling heat, and summon totals.')) return;
+      fetch('/api/bestiary/reset', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+          if (d.error || d.ok === false) throw new Error(d.error || d.message || 'reset failed');
+          showMsg('Bestiary reset', true);
+          logActivity('Bestiary reset');
+          fetch('/api/bestiary').then(r => r.json()).then(updateBestiaryGlance).catch(() => {});
+          refreshLiveStatus();
+        })
+        .catch(e => showMsg('Failed: ' + e.message, false));
     });
     document.getElementById('spawnScaleClassic')?.addEventListener('click', () => { applySpawnScaleToForm(SPAWN_SCALE_CLASSIC); setCostsDirty(true); showMsg('Classic scaling loaded (Save to push)', true); });
     document.getElementById('spawnScaleDefault')?.addEventListener('click', () => { applySpawnScaleToForm(SPAWN_SCALE_DEFAULT); setCostsDirty(true); showMsg('Default scaling loaded (Save to push)', true); });

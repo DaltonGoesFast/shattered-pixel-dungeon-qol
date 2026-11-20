@@ -85,6 +85,7 @@ def _default_shatter_event() -> dict:
 
 def _default_config() -> dict:
     return {
+        "summon_exp_multiplier": 1.0,
         "heat_window_sec": 900,
         "sprint_donor_reward": 100,
         "sprint_donor_reward_per_level": 100,
@@ -140,6 +141,15 @@ def load_config(force: bool = False) -> dict:
                     cfg["levels"] = raw["levels"]
         except (json.JSONDecodeError, OSError):
             pass
+    raw_mult = cfg.get("summon_exp_multiplier")
+    if raw_mult is None:
+        raw_mult = cfg.get("summon_exp_mult")
+    if raw_mult is None:
+        raw_mult = cfg.get("summon_exp_gain", 1.0)
+    try:
+        cfg["summon_exp_multiplier"] = max(0.0, float(raw_mult))
+    except (TypeError, ValueError):
+        cfg["summon_exp_multiplier"] = 1.0
     _config_cache = cfg
     _config_mtime = mtime
     return cfg
@@ -188,6 +198,15 @@ def normalize_config(raw: dict) -> dict:
     except (TypeError, ValueError):
         cfg["per_user_bar_cap_fraction"] = 0.0
     cfg["repeat_mob_diminishing"] = bool(cfg.get("repeat_mob_diminishing", False))
+    raw_mult = cfg.get("summon_exp_multiplier")
+    if raw_mult is None:
+        raw_mult = cfg.get("summon_exp_mult")
+    if raw_mult is None:
+        raw_mult = cfg.get("summon_exp_gain", 1.0)
+    try:
+        cfg["summon_exp_multiplier"] = max(0.0, float(raw_mult))
+    except (TypeError, ValueError):
+        cfg["summon_exp_multiplier"] = 1.0
     cfg["shatter_event"] = _normalize_shatter_event(cfg.get("shatter_event"))
     sf = cfg.get("soft_floor") if isinstance(cfg.get("soft_floor"), dict) else {}
     sf["enabled"] = bool(sf.get("enabled", True))
@@ -575,16 +594,31 @@ def _max_level(cfg: Optional[dict] = None) -> int:
     return max(levels) if levels else 1
 
 
-def monster_xp(monster: str) -> int:
-    """XP from cost_per_monster: max(2, cost // 5)."""
+def monster_xp(monster: str, cfg: Optional[dict] = None) -> int:
+    """XP from cost_per_monster: max(2, cost // 5), scaled by summon_exp_multiplier."""
     monster = (monster or "").strip().lower()
     try:
         from points_command import get_config
-        cfg = get_config()
-        cost = int(cfg.get("cost_per_monster", {}).get(monster, cfg.get("default_monster_cost", 100)))
+        cost_cfg = get_config()
+        cost = int(cost_cfg.get("cost_per_monster", {}).get(monster, cost_cfg.get("default_monster_cost", 100)))
     except Exception:
         cost = 100
-    return max(2, cost // 5)
+    base_xp = max(2, cost // 5)
+    cfg = cfg or load_config()
+    raw_mult = cfg.get("summon_exp_multiplier")
+    if raw_mult is None:
+        raw_mult = cfg.get("summon_exp_mult")
+    if raw_mult is None:
+        raw_mult = cfg.get("summon_exp_gain", 1.0)
+    try:
+        mult = float(raw_mult)
+    except (TypeError, ValueError):
+        mult = 1.0
+    if mult != 1.0:
+        if mult <= 0.0:
+            return 0
+        return max(1, int(round(base_xp * mult)))
+    return base_xp
 
 
 def _empty_state() -> dict:
@@ -1407,7 +1441,7 @@ def apply_summon(username: str, monster: str) -> dict[str, Any]:
     monster = (monster or "").strip().lower()
     display = (username or "").strip() or "Anonymous"
     key = display.lower()
-    xp = monster_xp(monster)
+    xp = monster_xp(monster, cfg)
     window = int(cfg.get("heat_window_sec", 900))
     diminish = bool(cfg.get("repeat_mob_diminishing", False))
 
@@ -1592,6 +1626,7 @@ def get_state_payload() -> dict[str, Any]:
             "last_crown_reason": str(state.get("last_crown_reason") or ""),
             "last_crown_donor": int(state.get("last_crown_donor", 0) or 0),
             "session_summon_counts": dict(state.get("session_summon_counts") or {}),
+            "summon_exp_multiplier": float(cfg.get("summon_exp_multiplier", 1.0) or 1.0),
             "heat_window_sec": window,
             "sprint_donor_reward": int(cfg.get("sprint_donor_reward", 100)),
             "sprint_donor_reward_per_level": int(

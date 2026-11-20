@@ -205,7 +205,7 @@ public final class PlayAlongService {
 
 	public static boolean isStreamServerLive() {
 		SessionInfo info = liveSessionInfo;
-		return info != null && (info.active || info.serverOnline);
+		return info != null && (info.active || info.inDungeon);
 	}
 
 	public static boolean isPlayAlongRunLive() {
@@ -335,7 +335,7 @@ public final class PlayAlongService {
 		lastPollTimeMs = now;
 		PlayAlongClient.pingStatus(effectiveAddress(), info -> {
 			statusPolling = false;
-			if (info != null && (info.active || info.serverOnline)) {
+			if (info != null && (info.active || info.inDungeon)) {
 				liveSessionInfo = info;
 				if (role == Role.NONE && info.inDungeon) {
 					hostDepth = info.hostDepth;

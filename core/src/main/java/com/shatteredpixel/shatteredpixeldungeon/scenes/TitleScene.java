@@ -523,7 +523,7 @@ public class TitleScene extends PixelScene {
 
 			PlayAlongService.pollLiveStatus(false);
 			PlayAlongProtocol.SessionInfo live = PlayAlongService.getLiveSession();
-			boolean isLive = live != null && (live.active || live.serverOnline);
+			boolean isLive = live != null && (live.active || live.inDungeon);
 
 			if (isLive != liveShown) {
 				liveShown = isLive;
@@ -548,7 +548,7 @@ public class TitleScene extends PixelScene {
 		@Override
 		protected void onClick() {
 			PlayAlongProtocol.SessionInfo live = PlayAlongService.getLiveSession();
-			if (live != null && (live.active || live.serverOnline)) {
+			if (live != null && (live.active || live.inDungeon)) {
 				ShatteredPixelDungeon.scene().addToFront(new WndPlayAlongJoin(live));
 			} else {
 				ShatteredPixelDungeon.platform.openURI("https://www.youtube.com/@DaltonGoesFast");

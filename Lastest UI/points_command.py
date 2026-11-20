@@ -697,8 +697,11 @@ def apply_death_cost_inflation(command_id: str, cost: int) -> int:
 def check_command_access(command_id, role):
     """Return (True, None) if allowed, else (False, error_msg). Only \"disabled\" in command_allowed_roles blocks a command."""
     allowed = get_config().get("command_allowed_roles") or {}
-    val = allowed.get(command_id, "both")
-    if val == "disabled":
+    if allowed.get(command_id, "both") == "disabled":
+        return False, "This command is currently disabled."
+    if command_id == "ring_of_wealth" and allowed.get("row") == "disabled":
+        return False, "This command is currently disabled."
+    if command_id == "row" and allowed.get("ring_of_wealth") == "disabled":
         return False, "This command is currently disabled."
     return True, None
 
