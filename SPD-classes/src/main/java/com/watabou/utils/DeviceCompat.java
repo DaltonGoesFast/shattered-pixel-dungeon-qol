@@ -52,11 +52,15 @@ public class DeviceCompat {
 	}
 	
 	public static boolean isDebug(){
-		return Game.version.contains("INDEV");
+		return Game.version != null && Game.version.contains("INDEV");
 	}
 	
 	public static void log( String tag, String message ){
-		Gdx.app.log( tag, message );
+		if (Gdx.app != null) {
+			Gdx.app.log( tag, message );
+		} else {
+			System.out.println( "[" + tag + "] " + message );
+		}
 	}
 
 	//some devices (macOS mainly) report virtual pixels to Shattered, but sometimes we want real pixel precision

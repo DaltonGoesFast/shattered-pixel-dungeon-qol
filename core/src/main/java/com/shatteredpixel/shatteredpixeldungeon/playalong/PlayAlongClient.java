@@ -72,15 +72,21 @@ public class PlayAlongClient {
 	private volatile String lastUserId;
 	private volatile String lastUsername;
 	private volatile String lastClientToken;
+	private volatile String lastJoinCode;
 	private volatile String lastHeroClass;
 	private volatile String lastModVersion;
 	private volatile String lastSessionId;
 	private volatile int lastDepth = 1;
 	private volatile int lastBranch = 0;
 	private volatile int lastPos = 0;
+	private volatile String lastAction = "IDLE";
 
 	public PlayAlongClient(ClientListener listener) {
 		this.listener = listener;
+	}
+
+	public void setSpectating(boolean spectating) {
+		this.lastAction = spectating ? "DEAD" : "IDLE";
 	}
 
 	public static void pingStatus(final String address, final StatusCallback callback) {
@@ -108,7 +114,9 @@ public class PlayAlongClient {
 								ref.set(msg.session);
 								latch.countDown();
 							}
-						} catch (Exception ignored) {
+						} catch (Exception e) {
+							System.err.println("[PlayAlongClient] Status ping parse failed: "
+									+ e.getClass().getSimpleName() + ": " + e.getMessage());
 						}
 					}
 
@@ -127,12 +135,16 @@ public class PlayAlongClient {
 					latch.await(PING_TIMEOUT_MS, TimeUnit.MILLISECONDS);
 					result = ref.get();
 				}
-			} catch (Exception ignored) {
+			} catch (Exception e) {
+				System.err.println("[PlayAlongClient] Status ping failed (" + address + "): "
+						+ e.getClass().getSimpleName() + ": " + e.getMessage());
 			} finally {
 				if (pingSocket != null) {
 					try {
 						pingSocket.close();
-					} catch (Exception ignored) {
+					} catch (Exception e) {
+						System.err.println("[PlayAlongClient] Failed to parse message: "
+								+ e.getClass().getSimpleName() + ": " + e.getMessage());
 					}
 				}
 			}
@@ -175,7 +187,9 @@ public class PlayAlongClient {
 									latch.countDown();
 								}
 							}
-						} catch (Exception ignored) {
+						} catch (Exception e) {
+							System.err.println("[PlayAlongClient] Control response parse failed: "
+									+ e.getClass().getSimpleName() + ": " + e.getMessage());
 						}
 					}
 
@@ -194,12 +208,16 @@ public class PlayAlongClient {
 					latch.await(timeoutMs, TimeUnit.MILLISECONDS);
 					result = ref.get();
 				}
-			} catch (Exception ignored) {
+			} catch (Exception e) {
+				System.err.println("[PlayAlongClient] Control request failed (" + address + "): "
+						+ e.getClass().getSimpleName() + ": " + e.getMessage());
 			} finally {
 				if (ws != null) {
 					try {
 						ws.close();
-					} catch (Exception ignored) {
+					} catch (Exception e) {
+						System.err.println("[PlayAlongClient] Failed to parse message: "
+								+ e.getClass().getSimpleName() + ": " + e.getMessage());
 					}
 				}
 			}
@@ -214,6 +232,12 @@ public class PlayAlongClient {
 	public synchronized void connect(String address, String userId, String username,
 	                                 String clientToken, String heroClass, String modVersion, String sessionId,
 	                                 int depth, int branch, int pos, boolean isRejoin) {
+		connect(address, userId, username, clientToken, "", heroClass, modVersion, sessionId, depth, branch, pos, isRejoin);
+	}
+
+	public synchronized void connect(String address, String userId, String username,
+	                                 String clientToken, String joinCode, String heroClass, String modVersion, String sessionId,
+	                                 int depth, int branch, int pos, boolean isRejoin) {
 		closeInternal();
 		this.intentionalClose = false;
 		this.disconnectedSinceMs = 0L;
@@ -221,12 +245,14 @@ public class PlayAlongClient {
 		this.lastUserId = userId;
 		this.lastUsername = username;
 		this.lastClientToken = clientToken;
+		this.lastJoinCode = joinCode != null ? joinCode.trim() : "";
 		this.lastHeroClass = heroClass;
 		this.lastModVersion = modVersion;
 		this.lastSessionId = sessionId;
 		this.lastDepth = depth;
 		this.lastBranch = branch;
 		this.lastPos = pos;
+		this.lastAction = "IDLE";
 
 		openSocket(isRejoin);
 	}
@@ -249,20 +275,22 @@ public class PlayAlongClient {
 				@Override
 				public void onOpen(ServerHandshake handshakedata) {
 					opened.set(true);
-					disconnectedSinceMs = 0L;
 					reconnecting = false;
 
 					WireMessage join = new WireMessage();
 					join.type = isRejoin ? "rejoin" : "join";
+					join.protocolVersion = PlayAlongProtocol.PROTOCOL_VERSION;
 					join.sessionId = lastSessionId;
 					join.userId = lastUserId;
 					join.username = lastUsername;
 					join.clientToken = lastClientToken;
+					join.joinCode = lastJoinCode;
 					join.heroClass = lastHeroClass;
 					join.modVersion = lastModVersion;
 					join.depth = lastDepth;
 					join.branch = lastBranch;
 					join.pos = lastPos;
+					join.action = lastAction;
 					send(PlayAlongProtocol.GSON.toJson(join));
 				}
 
@@ -274,6 +302,7 @@ public class PlayAlongClient {
 						if (msg == null || msg.type == null || listener == null) return;
 						switch (msg.type) {
 							case "join_ack":
+								disconnectedSinceMs = 0L;
 								listener.onJoinAck(msg);
 								break;
 							case "join_error":
@@ -309,7 +338,9 @@ public class PlayAlongClient {
 								listener.onChatCommand(msg);
 								break;
 						}
-					} catch (Exception ignored) {
+					} catch (Exception e) {
+						System.err.println("[PlayAlongClient] Failed to parse message: "
+								+ e.getClass().getSimpleName() + ": " + e.getMessage());
 					}
 				}
 
@@ -352,7 +383,7 @@ public class PlayAlongClient {
 			reconnecting = false;
 			if (intentionalClose) return;
 			long elapsed = System.currentTimeMillis() - disconnectedSinceMs;
-			if (elapsed > PlayAlongProtocol.RECONNECT_GRACE_MS) {
+			if (elapsed > PlayAlongProtocol.CLIENT_RECONNECT_GRACE_MS) {
 				intentionalClose = true;
 				if (listener != null) listener.onConnectionLost(true);
 				return;
@@ -365,11 +396,23 @@ public class PlayAlongClient {
 	}
 
 	public void send(WireMessage msg) {
+		if (msg != null && "player_state".equals(msg.type)) {
+			if (msg.depth > 0) this.lastDepth = msg.depth;
+			this.lastBranch = msg.branch;
+			this.lastPos = msg.pos;
+			if (msg.action != null && !msg.action.isEmpty()) {
+				this.lastAction = msg.action;
+			}
+		} else if (msg != null && "player_died".equals(msg.type)) {
+			this.lastAction = "DEAD";
+		}
 		WebSocketClient ws = socket;
 		if (ws != null && ws.isOpen()) {
 			try {
 				ws.send(PlayAlongProtocol.GSON.toJson(msg));
-			} catch (Exception ignored) {
+			} catch (Exception e) {
+				System.err.println("[PlayAlongClient] WebSocket send failed: "
+						+ e.getClass().getSimpleName() + ": " + e.getMessage());
 			}
 		}
 	}

@@ -152,7 +152,8 @@ public class TextureCache {
 				return null;
 				
 			} else if (src instanceof String) {
-				
+
+				if (Gdx.files == null) return null;
 				return new Pixmap(Gdx.files.internal((String)src));
 				
 			} else if (src instanceof Pixmap) {

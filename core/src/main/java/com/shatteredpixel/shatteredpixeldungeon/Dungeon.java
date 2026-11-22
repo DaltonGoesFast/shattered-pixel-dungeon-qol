@@ -216,6 +216,7 @@ public class Dungeon {
 	public static String customSeedText = "";
 	public static long seed;
 	public static long lastPlayed;
+	public static String playAlongSessionId = "";
 
 	//we initialize the seed separately so that things like interlevelscene can access it early
 	public static void initSeed(){
@@ -330,6 +331,7 @@ public class Dungeon {
 		Rebirth.reset();
 		if (!looping) Rebirth.deliverIfNeeded();
 
+		playAlongSessionId = "";
 		if (com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.isClientJoining()) {
 			com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.clearClientJoinPending();
 		} else {
@@ -684,6 +686,7 @@ public class Dungeon {
 	private static final String CHAPTERS	= "chapters";
 	private static final String QUESTS		= "quests";
 	private static final String BADGES		= "badges";
+	private static final String PLAY_ALONG_SESSION_ID = "play_along_session_id";
 	
 	public static void saveGame( int save ) {
 		try {
@@ -700,6 +703,9 @@ public class Dungeon {
 			bundle.put( LAST_PLAYED, lastPlayed = Game.realTime);
 			bundle.put( CHALLENGES, challenges );
 			bundle.put( MODIFIERS, modifiers );
+			if (playAlongSessionId != null && !playAlongSessionId.isEmpty()) {
+				bundle.put( PLAY_ALONG_SESSION_ID, playAlongSessionId );
+			}
 			FirstDescent.store( bundle );
 			Command.store( bundle );
 			Rebirth.store( bundle );
@@ -776,6 +782,9 @@ public class Dungeon {
 	}
 	
 	public static void saveAll() throws IOException {
+		if (com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.isSpectating()) {
+			return;
+		}
 		if (hero != null && (hero.isAlive() || WndResurrect.instance != null)) {
 			
 			Actor.fixTime();
@@ -804,6 +813,7 @@ public class Dungeon {
 		daily = bundle.getBoolean( DAILY );
 		dailyReplay = bundle.getBoolean( DAILY_REPLAY );
 		debugRun = bundle.getBoolean( DEBUG_RUN );
+		playAlongSessionId = bundle.contains( PLAY_ALONG_SESSION_ID ) ? bundle.getString( PLAY_ALONG_SESSION_ID ) : "";
 
 		Actor.clear();
 		Actor.restoreNextID( bundle );
@@ -948,6 +958,7 @@ public class Dungeon {
 		info.daily = bundle.getBoolean( DAILY );
 		info.dailyReplay = bundle.getBoolean( DAILY_REPLAY );
 		info.debugRun = bundle.getBoolean( DEBUG_RUN );
+		info.playAlongSessionId = bundle.contains( PLAY_ALONG_SESSION_ID ) ? bundle.getString( PLAY_ALONG_SESSION_ID ) : "";
 		info.feeling = bundle.contains( FEELING ) ? bundle.getEnum( FEELING, Level.Feeling.class ) : Level.Feeling.NONE;
 		info.lastPlayed = bundle.getLong( LAST_PLAYED );
 

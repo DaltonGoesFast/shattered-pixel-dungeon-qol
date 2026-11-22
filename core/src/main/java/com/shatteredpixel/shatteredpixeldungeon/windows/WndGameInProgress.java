@@ -171,6 +171,7 @@ public class WndGameInProgress extends Window {
 					@Override
 					protected void onSelect( int index ) {
 						if (index == 0) {
+							com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onHostSaveDeleted(info.playAlongSessionId);
 							Dungeon.deleteGame(slot, true);
 							ShatteredPixelDungeon.switchNoFade(StartScene.class);
 						}

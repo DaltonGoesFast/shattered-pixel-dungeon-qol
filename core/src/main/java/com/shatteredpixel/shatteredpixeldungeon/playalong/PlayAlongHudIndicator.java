@@ -30,7 +30,7 @@ import com.watabou.noosa.Game;
 import com.watabou.utils.ColorMath;
 
 /**
- * Compact clickable HUD badge displaying Dalton's live depth/HP danger & active Play Along racer count.
+ * Compact clickable HUD badge displaying the host's live depth/HP danger & active Play Along racer count.
  */
 public class PlayAlongHudIndicator extends StyledButton {
 
@@ -83,7 +83,7 @@ public class PlayAlongHudIndicator extends StyledButton {
 			setSize(reqW, 14);
 		}
 
-		// Pulse red warning when Dalton is critical (<30% HP) for client racers
+		// Pulse red warning when the host is critical (<30% HP) for client racers
 		GhostState hg = findHostGhost();
 		if (PlayAlongService.isActive() && !PlayAlongService.isHosting() && hg != null && hg.hpPct > 0f && hg.hpPct < 0.30f) {
 			float pulse = 0.5f + 0.5f * (float) Math.sin(Game.timeTotal * 8f);

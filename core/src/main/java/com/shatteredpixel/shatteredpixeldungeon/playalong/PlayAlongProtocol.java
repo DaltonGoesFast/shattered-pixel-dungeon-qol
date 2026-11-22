@@ -25,6 +25,7 @@ import com.google.gson.Gson;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 
 import java.net.URI;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -41,13 +42,17 @@ public final class PlayAlongProtocol {
 	public static final int PROTOCOL_VERSION = 1;
 	public static final int MAX_PACKET_LENGTH = 4096;
 	public static final long RECONNECT_GRACE_MS = 30_000L;
+	public static final long CLIENT_RECONNECT_GRACE_MS = 120_000L;
 
 	public static final Gson GSON = new Gson();
 
 	private static final Pattern USERNAME_PATTERN = Pattern.compile("^[a-zA-Z0-9_ ]{3,16}$");
+	private static final Pattern CLIENT_TOKEN_PATTERN = Pattern.compile("^[a-zA-Z0-9_-]{8,64}$");
+	private static final String JOIN_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+	private static final SecureRandom JOIN_CODE_RNG = new SecureRandom();
 
 	private static final List<String> RESERVED_HOST_NAMES = Arrays.asList(
-			"dalton", "daltongoesfast", "host", "streamer"
+			"host", "streamer"
 	);
 
 	// Mirrors Lastest UI/hero_name_blocklist.txt for client/cross-platform stream safety.
@@ -66,6 +71,8 @@ public final class PlayAlongProtocol {
 		public boolean inDungeon = false;
 		public String sessionId = "";
 		public String version = "";
+		public String hostUsername = "Host";
+		public boolean joinCodeRequired = false;
 		public long seed;
 		public String customSeedText = "";
 		public int challenges;
@@ -76,6 +83,13 @@ public final class PlayAlongProtocol {
 		public int hostHp = 20;
 		public int hostHt = 20;
 		public int activePlayers = 0;
+
+		public String displayHostName() {
+			if (hostUsername != null && !hostUsername.trim().isEmpty()) {
+				return hostUsername.trim();
+			}
+			return "Host";
+		}
 	}
 
 	public static class StreamEconomyState {
@@ -187,6 +201,7 @@ public final class PlayAlongProtocol {
 		public Map<Integer, Integer> depthCounts = new LinkedHashMap<>();
 
 		// Stream command deck, account linking & milestone rewards
+		public String joinCode;
 		public String clientToken;
 		public String rawCommand;
 		public String requestId;
@@ -201,11 +216,31 @@ public final class PlayAlongProtocol {
 		public ChatCommandPayload chatCommand;
 	}
 
+	public static String generateJoinCode() {
+		StringBuilder sb = new StringBuilder(4);
+		for (int i = 0; i < 4; i++) {
+			sb.append(JOIN_CODE_ALPHABET.charAt(JOIN_CODE_RNG.nextInt(JOIN_CODE_ALPHABET.length())));
+		}
+		return sb.toString();
+	}
+
+	public static boolean isValidClientToken(String token) {
+		return token != null && CLIENT_TOKEN_PATTERN.matcher(token.trim()).matches();
+	}
+
 	/**
 	 * Enforces regex {@code ^[a-zA-Z0-9_ ]{3,16}$}, blocks host impersonation,
 	 * and censors blocklisted substrings to {@code Adventurer_<suffix>}.
 	 */
 	public static String sanitizeUsername(String raw, String fallbackSuffix) {
+		return sanitizeUsername(raw, fallbackSuffix, SPDSettings.playAlongHostUsernameSafe());
+	}
+
+	/**
+	 * Enforces regex {@code ^[a-zA-Z0-9_ ]{3,16}$}, blocks impersonation of {@code activeHostUsername}
+	 * and generic host titles, and censors blocklisted substrings to {@code Adventurer_<suffix>}.
+	 */
+	public static String sanitizeUsername(String raw, String fallbackSuffix, String activeHostUsername) {
 		String suffix = (fallbackSuffix == null || fallbackSuffix.isEmpty()) ? "01" : fallbackSuffix;
 		if (suffix.length() > 4) suffix = suffix.substring(0, 4);
 		String fallback = "Adventurer_" + suffix;
@@ -219,6 +254,13 @@ public final class PlayAlongProtocol {
 		String collapsed = lower.replace(" ", "").replace("_", "");
 		for (String reserved : RESERVED_HOST_NAMES) {
 			if (collapsed.equals(reserved) || lower.equals(reserved)) {
+				return fallback;
+			}
+		}
+		if (activeHostUsername != null && !activeHostUsername.trim().isEmpty()) {
+			String hostLower = activeHostUsername.trim().toLowerCase(Locale.ROOT);
+			String hostCollapsed = hostLower.replace(" ", "").replace("_", "");
+			if (lower.equals(hostLower) || collapsed.equals(hostCollapsed)) {
 				return fallback;
 			}
 		}

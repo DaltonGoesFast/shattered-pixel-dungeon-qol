@@ -97,6 +97,9 @@ public class Messages {
 		formatters.clear();
 
 		bundles = new ArrayList<>();
+		if (Gdx.files == null) {
+			return;
+		}
 		for (String file : prop_files) {
 			if (bundleLocal.getLanguage().equals("id")){
 				//This is a really silly hack to fix some platforms using "id" for indonesian and some using "in" (Android 14- mostly).
@@ -147,6 +150,7 @@ public class Messages {
 	}
 
 	private static String getFromBundle(String key){
+		if (bundles == null) return null;
 		String result;
 		for (I18NBundle b : bundles){
 			result = b.get(key);

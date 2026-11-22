@@ -107,7 +107,7 @@ import java.util.Map;
 
 /**
  * Interactive Stream Command Deck + Play Along Roster window.
- * Works from Title Screen, solo runs, Play Along runs, and Spirit Cam whenever Dalton is live.
+ * Works from Title Screen, solo runs, Play Along runs, and Spirit Cam whenever the stream host is live.
  */
 public class WndStreamCommands extends WndTabbed {
 
@@ -448,7 +448,8 @@ public class WndStreamCommands extends WndTabbed {
 		py = Math.max(title.bottom(), btnRefresh.bottom()) + 2;
 
 		if (eco == null) {
-			RenderedTextBlock loading = PixelScene.renderTextBlock("Connecting to Dalton's stream...", 6);
+			RenderedTextBlock loading = PixelScene.renderTextBlock(
+					"Connecting to " + PlayAlongService.getHostDisplayName() + "'s stream...", 6);
 			loading.hardlight(0xCCCCCC);
 			loading.maxWidth(WIDTH);
 			loading.setPos(0, py);
@@ -526,7 +527,8 @@ public class WndStreamCommands extends WndTabbed {
 			headerGroup.add(banner);
 			py = banner.bottom() + 2;
 		} else if (eco != null && !eco.inDungeon) {
-			RenderedTextBlock banner = PixelScene.renderTextBlock("Dalton in menu (dungeon cmds paused)", 6);
+			RenderedTextBlock banner = PixelScene.renderTextBlock(
+					PlayAlongService.getHostDisplayName() + " in menu (dungeon cmds paused)", 6);
 			banner.hardlight(0xFFCC44);
 			banner.maxWidth(WIDTH);
 			banner.setPos(0, py);
@@ -862,14 +864,56 @@ public class WndStreamCommands extends WndTabbed {
 			btnSharedChat.setRect(0, cy, WIDTH, 16);
 			btnSharedChat.textColor(sharedOn ? 0x55FF55 : 0xCCCCCC);
 			content.add(btnSharedChat);
-			cy = btnSharedChat.bottom() + 4;
+			cy = btnSharedChat.bottom() + 3;
+
+			final PlayAlongServer hostSrv = PlayAlongService.getHostServer();
+			if (hostSrv != null) {
+				final boolean authOn = hostSrv.isJoinCodeRequired();
+				RedButton btnAuthToggle = new RedButton("Join Code Auth: " + (authOn ? "ON" : "OFF"), 6) {
+					@Override
+					protected void onClick() {
+						boolean next = !hostSrv.isJoinCodeRequired();
+						hostSrv.setRequireJoinCode(next);
+						SPDSettings.playAlongRequireJoinCode(next);
+						rebuildAllPreservingScroll();
+					}
+				};
+				btnAuthToggle.enableScrollPassthrough();
+				btnAuthToggle.setRect(0, cy, authOn ? (WIDTH / 2f - 1) : WIDTH, 16);
+				btnAuthToggle.textColor(authOn ? 0x55FF55 : 0xFFCC44);
+				content.add(btnAuthToggle);
+
+				if (authOn) {
+					RedButton btnRotate = new RedButton("Code: " + hostSrv.getLobbyJoinCode() + " ↻", 6) {
+						@Override
+						protected void onClick() {
+							hostSrv.rotateLobbyJoinCode();
+							rebuildAllPreservingScroll();
+						}
+					};
+					btnRotate.enableScrollPassthrough();
+					btnRotate.setRect(WIDTH / 2f + 1, cy, WIDTH / 2f - 1, 16);
+					btnRotate.textColor(TITLE_COLOR);
+					content.add(btnRotate);
+				}
+				cy = btnAuthToggle.bottom() + 3;
+
+				RenderedTextBlock metricsTxt = PixelScene.renderTextBlock(
+						hostSrv.getMetrics().formatSummaryLine(), 5);
+				metricsTxt.hardlight(0xAAAAAA);
+				metricsTxt.maxWidth(WIDTH - 4);
+				metricsTxt.setPos(2, cy);
+				content.add(metricsTxt);
+				cy = metricsTxt.bottom() + 3;
+			}
 		}
 
 		if (PlayAlongService.isSpectating() && PlayAlongService.isHostAliveForSpectate()
 				&& Dungeon.level != null
 				&& (Dungeon.depth != PlayAlongService.getHostDepth()
 				|| Dungeon.branch != PlayAlongService.getHostBranch())) {
-			RedButton btnFollow = new RedButton("Follow Dalton (Depth " + PlayAlongService.getHostDepth() + ")", 7) {
+			RedButton btnFollow = new RedButton(
+					"Follow " + PlayAlongService.getHostDisplayName() + " (Depth " + PlayAlongService.getHostDepth() + ")", 7) {
 				@Override
 				protected void onClick() {
 					hide();
@@ -909,7 +953,7 @@ public class WndStreamCommands extends WndTabbed {
 				}
 			} else {
 				String soloTxt = (eco != null && eco.inDungeon)
-						? ("Dalton is in a solo stream run on Depth " + eco.hostDepth + ".")
+						? (PlayAlongService.getHostDisplayName() + " is in a solo stream run on Depth " + eco.hostDepth + ".")
 						: "No Play Along ghost race is currently active.";
 				RenderedTextBlock note = PixelScene.renderTextBlock(soloTxt, 6);
 				note.hardlight(0xCCCCCC);

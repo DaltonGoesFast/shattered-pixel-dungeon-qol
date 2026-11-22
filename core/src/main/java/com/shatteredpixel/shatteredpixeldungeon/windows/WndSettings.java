@@ -848,7 +848,10 @@ public class WndSettings extends WndTabbed {
 		CheckBox chkWifi;
 		ColorBlock sepPlayAlong;
 		RedButton btnPlayAlongServer;
+		RedButton btnPlayAlongHostName;
+		RedButton btnStreamOverlayUrl;
 		CheckBox chkPlayAlongHost;
+		CheckBox chkPlayAlongRequireCode;
 		CheckBox chkPlayAlongSharedChat;
 
 		@Override
@@ -959,7 +962,7 @@ public class WndSettings extends WndTabbed {
 				protected void onClick() {
 					ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
 							"Play Along Server",
-							"Enter Dalton's Playit.gg host:port (leave empty to reset to default):",
+							"Enter Play Along host:port (leave empty to reset to default):",
 							SPDSettings.playAlongAddress(),
 							64,
 							false,
@@ -981,18 +984,81 @@ public class WndSettings extends WndTabbed {
 			add(btnPlayAlongServer);
 
 			if (DeviceCompat.isDesktop()) {
+				btnPlayAlongHostName = new RedButton("Host Name: " + SPDSettings.playAlongHostUsername(), 8) {
+					@Override
+					protected void onClick() {
+						ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
+								"Play Along Host Name",
+								"Display name shown to joined racers (3-16 chars):",
+								SPDSettings.playAlongHostUsername(),
+								16,
+								false,
+								"Save",
+								"Reset Default") {
+							@Override
+							public void onSelect(boolean positive, String text) {
+								if (positive) {
+									SPDSettings.playAlongHostUsername(text);
+								} else {
+									SPDSettings.playAlongHostUsername(SPDSettings.DEFAULT_PLAY_ALONG_HOST_USERNAME);
+								}
+								btnPlayAlongHostName.text("Host Name: " + SPDSettings.playAlongHostUsername());
+							}
+						});
+					}
+				};
+				add(btnPlayAlongHostName);
+
+				btnStreamOverlayUrl = new RedButton("Overlay API: " + SPDSettings.streamOverlayUrl(), 8) {
+					@Override
+					protected void onClick() {
+						ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
+								"Stream Overlay API URL",
+								"Base URL for stream-control HTTP bridge (leave empty to reset):",
+								SPDSettings.streamOverlayUrl(),
+								96,
+								false,
+								"Save",
+								"Reset Default") {
+							@Override
+							public void onSelect(boolean positive, String text) {
+								if (positive) {
+									SPDSettings.streamOverlayUrl(text);
+								} else {
+									SPDSettings.streamOverlayUrl(SPDSettings.DEFAULT_STREAM_OVERLAY_URL);
+								}
+								btnStreamOverlayUrl.text("Overlay API: " + SPDSettings.streamOverlayUrl());
+							}
+						});
+					}
+				};
+				add(btnStreamOverlayUrl);
+
 				chkPlayAlongHost = new CheckBox("Host Play Along Lobby") {
 					@Override
 					protected void onClick() {
 						super.onClick();
 						SPDSettings.playAlongHostEnabled(checked());
-						if (checked()) {
-							com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.ensureHostServerStarted();
-						}
+						com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onHostSettingChanged(checked());
 					}
 				};
 				chkPlayAlongHost.checked(SPDSettings.playAlongHostEnabled());
 				add(chkPlayAlongHost);
+
+				chkPlayAlongRequireCode = new CheckBox("Require Lobby Join Code") {
+					@Override
+					protected void onClick() {
+						super.onClick();
+						SPDSettings.playAlongRequireJoinCode(checked());
+						com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongServer srv =
+								com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.getHostServer();
+						if (srv != null) {
+							srv.setRequireJoinCode(checked());
+						}
+					}
+				};
+				chkPlayAlongRequireCode.checked(SPDSettings.playAlongRequireJoinCode());
+				add(chkPlayAlongRequireCode);
 
 				chkPlayAlongSharedChat = new CheckBox("Mirror Chat Cmds to Play Along") {
 					@Override
@@ -1048,9 +1114,24 @@ public class WndSettings extends WndTabbed {
 			btnPlayAlongServer.setRect(0, pos + GAP, width, BTN_HEIGHT);
 			pos = btnPlayAlongServer.bottom();
 
+			if (btnPlayAlongHostName != null){
+				btnPlayAlongHostName.setRect(0, pos + GAP, width, BTN_HEIGHT);
+				pos = btnPlayAlongHostName.bottom();
+			}
+
+			if (btnStreamOverlayUrl != null){
+				btnStreamOverlayUrl.setRect(0, pos + GAP, width, BTN_HEIGHT);
+				pos = btnStreamOverlayUrl.bottom();
+			}
+
 			if (chkPlayAlongHost != null){
 				chkPlayAlongHost.setRect(0, pos + GAP, width, BTN_HEIGHT);
 				pos = chkPlayAlongHost.bottom();
+			}
+
+			if (chkPlayAlongRequireCode != null){
+				chkPlayAlongRequireCode.setRect(0, pos + GAP, width, BTN_HEIGHT);
+				pos = chkPlayAlongRequireCode.bottom();
 			}
 
 			if (chkPlayAlongSharedChat != null){

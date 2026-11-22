@@ -220,11 +220,11 @@ public class Game implements ApplicationListener {
 	}
 	
 	public static Scene scene() {
-		return instance.scene;
+		return instance == null ? null : instance.scene;
 	}
 
 	public static boolean switchingScene() {
-		return instance.requestedReset;
+		return instance != null && instance.requestedReset;
 	}
 	
 	protected void step() {
@@ -304,6 +304,11 @@ public class Game implements ApplicationListener {
 	}
 	
 	public static void runOnRenderThread(Callback c){
+		if (c == null) return;
+		if (Gdx.app == null) {
+			c.call();
+			return;
+		}
 		Gdx.app.postRunnable(new Runnable() {
 			@Override
 			public void run() {

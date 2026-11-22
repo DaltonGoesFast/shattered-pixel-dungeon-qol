@@ -47,8 +47,8 @@ public class SmartTexture extends Texture {
 	public SmartTexture( Pixmap bitmap, int filtering, int wrapping, boolean premultiplied ) {
 
 		this.bitmap = bitmap;
-		width = bitmap.getWidth();
-		height = bitmap.getHeight();
+		width = bitmap != null ? bitmap.getWidth() : 256;
+		height = bitmap != null ? bitmap.getHeight() : 256;
 		this.fModeMin = this.fModeMax = filtering;
 		this.wModeH = this.wModeV = wrapping;
 		this.premultiplied = premultiplied;

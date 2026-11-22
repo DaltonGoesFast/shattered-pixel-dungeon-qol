@@ -8,4 +8,7 @@ dependencies {
     implementation project(':services')
     api 'org.java-websocket:Java-WebSocket:1.5.4'
     api 'com.google.code.gson:gson:2.10.1'
+
+    testImplementation 'junit:junit:4.13.2'
+    testRuntimeOnly "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop"
 }

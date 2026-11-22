@@ -949,10 +949,10 @@ public class HeroSelectScene extends PixelScene {
 						text("Play Along Lobby: " + (next ? "ON" : "OFF"));
 						if (next) {
 							icon(Icons.get(Icons.CHALLENGE_COLOR));
-							com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.ensureHostServerStarted();
 						} else {
 							icon(Icons.get(Icons.CHALLENGE_GREY));
 						}
+						com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onHostSettingChanged(next);
 						layout();
 					}
 				};
