@@ -333,6 +333,8 @@ public class Dungeon {
 
 		playAlongSessionId = "";
 		if (com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.isClientJoining()) {
+			// Re-stamp after clear so client archives stay keyed to the host session.
+			com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.applyClientRulesToDungeon();
 			com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.clearClientJoinPending();
 		} else {
 			com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onHostRunStarted();

@@ -140,69 +140,93 @@ public class WndPlayAlongJoin extends Window {
 			add(btnPacts);
 			pos = btnPacts.bottom() + GAP;
 
-			btnName = new RedButton("Name: " + username, 7) {
-				@Override
-				protected void onClick() {
-					ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
-							"Chatter Name",
-							"3-16 alphanumeric characters (shown above your ghost):",
-							username,
-							16,
-							false,
-							"Set",
-							"Cancel") {
-						@Override
-						public void onSelect(boolean positive, String text) {
-							if (positive && text != null && !text.trim().isEmpty()) {
-								username = PlayAlongProtocol.sanitizeUsername(text, "01");
-								SPDSettings.playAlongUsername(username);
-								btnName.text("Name: " + username);
-							}
-						}
-					});
-				}
-			};
-			btnName.setRect(0, pos, WIDTH, 16);
-			add(btnName);
-			pos = btnName.bottom() + GAP;
+			boolean canResume = PlayAlongArchives.hasArchive(session.sessionId);
+			if (canResume) {
+				RenderedTextBlock resumeInfo = PixelScene.renderTextBlock(
+						"You have a saved race for this run.", 6);
+				resumeInfo.hardlight(0x88FF88);
+				resumeInfo.maxWidth(WIDTH);
+				resumeInfo.setPos(0, pos);
+				add(resumeInfo);
+				pos = resumeInfo.bottom() + GAP;
 
-			RenderedTextBlock pickCls = PixelScene.renderTextBlock("Pick Hero Class:", 6);
-			pickCls.hardlight(TITLE_COLOR);
-			pickCls.setPos(0, pos);
-			add(pickCls);
-			pos = pickCls.bottom() + 2;
-
-			HeroClass[] classes = HeroClass.values();
-			float clsW = (WIDTH - (classes.length - 1)) / (float) classes.length;
-			for (int i = 0; i < classes.length; i++) {
-				final HeroClass hc = classes[i];
-				RedButton btnCls = new RedButton("", 6) {
+				StyledButton btnResume = new RedButton("RESUME YOUR RACE", 8) {
 					@Override
 					protected void onClick() {
-						selectedClass = hc;
-						refreshClassHighlight();
+						hide();
+						PlayAlongService.continueClientRun(session);
 					}
 				};
-				btnCls.icon(Icons.get(hc));
-				btnCls.setRect(i * (clsW + 1), pos, clsW, 20);
-				add(btnCls);
-				classButtons.add(btnCls);
-			}
-			refreshClassHighlight();
-			pos += 20 + GAP + 1;
+				btnResume.icon(Icons.get(Icons.ENTER));
+				btnResume.textColor(TITLE_COLOR);
+				btnResume.setRect(0, pos, WIDTH, 20);
+				add(btnResume);
+				pos = btnResume.bottom() + GAP;
+			} else {
+				btnName = new RedButton("Name: " + username, 7) {
+					@Override
+					protected void onClick() {
+						ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
+								"Chatter Name",
+								"3-16 alphanumeric characters (shown above your ghost):",
+								username,
+								16,
+								false,
+								"Set",
+								"Cancel") {
+							@Override
+							public void onSelect(boolean positive, String text) {
+								if (positive && text != null && !text.trim().isEmpty()) {
+									username = PlayAlongProtocol.sanitizeUsername(text, "01");
+									SPDSettings.playAlongUsername(username);
+									btnName.text("Name: " + username);
+								}
+							}
+						});
+					}
+				};
+				btnName.setRect(0, pos, WIDTH, 16);
+				add(btnName);
+				pos = btnName.bottom() + GAP;
 
-			StyledButton btnDropIn = new RedButton("DROP INTO RUN", 8) {
-				@Override
-				protected void onClick() {
-					hide();
-					PlayAlongService.startClientRun(session, selectedClass, username);
+				RenderedTextBlock pickCls = PixelScene.renderTextBlock("Pick Hero Class:", 6);
+				pickCls.hardlight(TITLE_COLOR);
+				pickCls.setPos(0, pos);
+				add(pickCls);
+				pos = pickCls.bottom() + 2;
+
+				HeroClass[] classes = HeroClass.values();
+				float clsW = (WIDTH - (classes.length - 1)) / (float) classes.length;
+				for (int i = 0; i < classes.length; i++) {
+					final HeroClass hc = classes[i];
+					RedButton btnCls = new RedButton("", 6) {
+						@Override
+						protected void onClick() {
+							selectedClass = hc;
+							refreshClassHighlight();
+						}
+					};
+					btnCls.icon(Icons.get(hc));
+					btnCls.setRect(i * (clsW + 1), pos, clsW, 20);
+					add(btnCls);
+					classButtons.add(btnCls);
 				}
-			};
-			btnDropIn.icon(Icons.get(Icons.ENTER));
-			btnDropIn.textColor(TITLE_COLOR);
-			btnDropIn.setRect(0, pos, WIDTH, 20);
-			add(btnDropIn);
-			pos = btnDropIn.bottom() + GAP;
+				refreshClassHighlight();
+				pos += 20 + GAP + 1;
+
+				StyledButton btnDropIn = new RedButton("DROP INTO RUN", 8) {
+					@Override
+					protected void onClick() {
+						hide();
+						PlayAlongService.startClientRun(session, selectedClass, username);
+					}
+				};
+				btnDropIn.icon(Icons.get(Icons.ENTER));
+				btnDropIn.textColor(TITLE_COLOR);
+				btnDropIn.setRect(0, pos, WIDTH, 20);
+				add(btnDropIn);
+				pos = btnDropIn.bottom() + GAP;
+			}
 		}
 
 		RedButton btnYt = new RedButton("Open YouTube Channel", 7) {

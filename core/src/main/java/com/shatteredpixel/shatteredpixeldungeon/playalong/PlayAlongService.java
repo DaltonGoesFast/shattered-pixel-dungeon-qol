@@ -42,6 +42,7 @@ import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.Wipe
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.WireMessage;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.InterlevelScene;
+import com.shatteredpixel.shatteredpixeldungeon.scenes.TitleScene;
 import com.shatteredpixel.shatteredpixeldungeon.ui.ActionIndicator;
 import com.shatteredpixel.shatteredpixeldungeon.utils.DungeonSeed;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
@@ -134,6 +135,9 @@ public final class PlayAlongService {
 	private static volatile StreamEconomyState cachedEconomy = null;
 	private static final ConcurrentHashMap<String, PlayAlongClient.WireMessageCallback> pendingStreamRequests = new ConcurrentHashMap<>();
 	private static final CopyOnWriteArrayList<ChatCommandPayload> pendingChatCommands = new CopyOnWriteArrayList<>();
+	private static volatile boolean sessionMigrationPromptOpen = false;
+	private static volatile boolean sessionMigrationHandled = false;
+	private static volatile SessionInfo pendingTitleJoinSession = null;
 
 	public interface EconomyCallback {
 		void onResult(StreamEconomyState state);
@@ -528,6 +532,7 @@ public final class PlayAlongService {
 	public static void startClientRun(SessionInfo session, HeroClass heroClass, String rawUsername) {
 		if (session == null || !session.active) return;
 
+		parkCurrentClientProgress();
 		disconnect();
 		resetRuntimeCollections();
 
@@ -544,27 +549,199 @@ public final class PlayAlongService {
 		localVictorySent = false;
 		localDeathSent = false;
 		clientHasJoinedOnce = false;
+		sessionMigrationHandled = true;
 		discardPendingKillExp();
 		runStartMs = System.currentTimeMillis();
 		hostDepth = session.hostDepth;
 		hostPos = session.hostPos;
 
+		int slot = PlayAlongArchives.allocateForNewRun(session.sessionId);
 		GamesInProgress.selectedClass = heroClass;
 		GamesInProgress.randomizedClass = false;
 		GamesInProgress.pendingHeroName = safeName;
-		GamesInProgress.curSlot = GamesInProgress.PLAY_ALONG_SLOT;
-		Dungeon.deleteGame(GamesInProgress.PLAY_ALONG_SLOT, true);
+		GamesInProgress.curSlot = slot;
+		Dungeon.deleteGame(slot, true);
+		PlayAlongArchives.remember(session.sessionId, slot);
 
 		Dungeon.hero = null;
 		Dungeon.daily = Dungeon.dailyReplay = false;
 		Dungeon.seed = session.seed;
 		Dungeon.customSeedText = (session.customSeedText != null) ? session.customSeedText : "";
+		Dungeon.playAlongSessionId = session.sessionId != null ? session.sessionId : "";
 		ActionIndicator.clearAction();
 
 		connectClient(session, heroClass.name(), safeName, false);
 
 		InterlevelScene.mode = InterlevelScene.Mode.DESCEND;
 		Game.switchScene(InterlevelScene.class);
+	}
+
+	/** Resume a parked Play Along save for the host's current sessionId. */
+	public static void continueClientRun(SessionInfo session) {
+		if (session == null || !session.active) return;
+		int slot = PlayAlongArchives.findSlot(session.sessionId);
+		if (slot <= 0 || !GamesInProgress.gameExists(slot)) {
+			GLog.w("No saved Play Along race for this run — pick a class to join.");
+			beginJoinAfterMigration(session);
+			return;
+		}
+
+		parkCurrentClientProgress();
+		if (client != null) {
+			client.close();
+			client = null;
+		}
+		resetRuntimeCollections();
+
+		GamesInProgress.Info info = GamesInProgress.check(slot);
+		String safeName = SPDSettings.playAlongUsername();
+		if (safeName == null || safeName.isEmpty()) {
+			safeName = "Chatter";
+		}
+		String heroClassName = (info != null && info.heroClass != null)
+				? info.heroClass.name() : HeroClass.WARRIOR.name();
+
+		role = Role.CLIENT;
+		activeClientSession = session;
+		clientJoinPending = false;
+		clientUsername = safeName;
+		wipeTriggeredOnClient = false;
+		localVictorySent = false;
+		localDeathSent = false;
+		clientHasJoinedOnce = false;
+		sessionMigrationHandled = true;
+		discardPendingKillExp();
+		runStartMs = System.currentTimeMillis();
+		hostDepth = session.hostDepth;
+		hostPos = session.hostPos;
+
+		GamesInProgress.curSlot = slot;
+		PlayAlongArchives.touch(session.sessionId);
+		ActionIndicator.clearAction();
+
+		int depth = info != null ? Math.max(1, info.depth) : 1;
+		connectClientAt(session, heroClassName, safeName, true, depth, 0, 0);
+
+		GLog.p("Resuming your Play Along race on Dalton's save!");
+		InterlevelScene.mode = InterlevelScene.Mode.CONTINUE;
+		Game.switchScene(InterlevelScene.class);
+	}
+
+	public static void clearSessionMigrationPrompt() {
+		sessionMigrationPromptOpen = false;
+	}
+
+	/** Decline following the host: disconnect and return to title (progress stays archived). */
+	public static void declineSessionMigration() {
+		sessionMigrationHandled = true;
+		sessionMigrationPromptOpen = false;
+		pendingTitleJoinSession = null;
+		parkCurrentClientProgress();
+		disconnect();
+		Game.switchScene(TitleScene.class);
+		GLog.w("Left Play Along. Rejoin from the title screen when ready.");
+	}
+
+	/** Leave the stale race and open class select on the title screen. */
+	public static void beginJoinAfterMigration(SessionInfo session) {
+		sessionMigrationHandled = true;
+		sessionMigrationPromptOpen = false;
+		parkCurrentClientProgress();
+		if (client != null) {
+			client.close();
+			client = null;
+		}
+		role = Role.NONE;
+		clientJoinPending = false;
+		activeClientSession = null;
+		resetRuntimeCollections();
+		pendingTitleJoinSession = session;
+		liveSessionInfo = session;
+		Game.switchScene(TitleScene.class);
+	}
+
+	/** Called from TitleScene after a forced Join migration. */
+	public static void consumePendingTitleJoin() {
+		SessionInfo pending = pendingTitleJoinSession;
+		pendingTitleJoinSession = null;
+		if (pending == null || !pending.active) return;
+		if (Game.scene() != null) {
+			Game.scene().addToFront(new WndPlayAlongJoin(pending));
+		}
+	}
+
+	private static void parkCurrentClientProgress() {
+		if (role != Role.CLIENT && role != Role.SPECTATOR) return;
+		SessionInfo cur = activeClientSession;
+		if (cur == null || cur.sessionId == null || cur.sessionId.trim().isEmpty()) return;
+		int slot = GamesInProgress.curSlot;
+		if (!GamesInProgress.isPlayAlongSlot(slot)) return;
+		try {
+			if (Dungeon.hero != null && Dungeon.level != null
+					&& (Dungeon.hero.isAlive()
+					|| com.shatteredpixel.shatteredpixeldungeon.windows.WndResurrect.instance != null)) {
+				Dungeon.playAlongSessionId = cur.sessionId.trim();
+				Dungeon.saveAll();
+			}
+		} catch (Throwable ignored) {
+		}
+		PlayAlongArchives.remember(cur.sessionId.trim(), slot);
+	}
+
+	private static void handleHostSessionChanged(SessionInfo newSession) {
+		Game.runOnRenderThread(() -> {
+			if (sessionMigrationPromptOpen) return;
+
+			boolean inPlayAlong = role == Role.CLIENT || role == Role.SPECTATOR
+					|| (GamesInProgress.isPlayAlongSlot(GamesInProgress.curSlot)
+					&& Dungeon.hero != null
+					&& Game.scene() instanceof GameScene);
+			if (!inPlayAlong) return;
+
+			parkCurrentClientProgress();
+			if (client != null) {
+				client.close();
+				client = null;
+			}
+
+			sessionMigrationHandled = false;
+
+			if (newSession != null && newSession.active) {
+				promptSessionMigration(newSession);
+				return;
+			}
+
+			// Close reason / join_error fallback: discover the live session via status ping.
+			PlayAlongClient.pingStatus(effectiveAddress(), info -> Game.runOnRenderThread(() -> {
+				if (info != null && info.active) {
+					promptSessionMigration(info);
+				} else {
+					declineSessionMigration();
+				}
+			}));
+		});
+	}
+
+	private static void promptSessionMigration(SessionInfo session) {
+		if (session == null || !session.active) {
+			declineSessionMigration();
+			return;
+		}
+		if (sessionMigrationPromptOpen) return;
+		sessionMigrationPromptOpen = true;
+		liveSessionInfo = session;
+
+		String sid = session.sessionId != null ? session.sessionId.trim() : "";
+		boolean canResume = PlayAlongArchives.hasArchive(sid);
+		GLog.w(canResume
+				? "Dalton switched saves — Resume or Leave?"
+				: "Dalton started a new run — Join or Leave?");
+		if (Game.scene() != null) {
+			Game.scene().addToFront(new WndPlayAlongSessionSwitch(session, canResume));
+		} else {
+			sessionMigrationPromptOpen = false;
+			declineSessionMigration();
+		}
 	}
 
 	public static void clearClientJoinPending() {
@@ -578,9 +755,19 @@ public final class PlayAlongService {
 		Dungeon.customSeedText = (s.customSeedText != null) ? s.customSeedText : "";
 		Dungeon.challenges = s.challenges;
 		Dungeon.modifiers = s.modifiers;
+		Dungeon.playAlongSessionId = s.sessionId != null ? s.sessionId : "";
+		if (GamesInProgress.isPlayAlongSlot(GamesInProgress.curSlot) && s.sessionId != null) {
+			PlayAlongArchives.remember(s.sessionId, GamesInProgress.curSlot);
+		}
 	}
 
 	private static void connectClient(SessionInfo session, String heroClass, String username, boolean isRejoin) {
+		connectClientAt(session, heroClass, username, isRejoin,
+				Dungeon.depth, Dungeon.branch, Dungeon.hero != null ? Dungeon.hero.pos : 0);
+	}
+
+	private static void connectClientAt(SessionInfo session, String heroClass, String username,
+	                                    boolean isRejoin, int depth, int branch, int pos) {
 		client = new PlayAlongClient(new PlayAlongClient.ClientListener() {
 			@Override
 			public void onJoinAck(WireMessage msg) {
@@ -608,6 +795,10 @@ public final class PlayAlongService {
 			public void onJoinError(String error) {
 				final String err = error != null ? error : "Could not join Play Along run.";
 				Game.runOnRenderThread(() -> {
+					if (err.contains("different Play Along")) {
+						handleHostSessionChanged(null);
+						return;
+					}
 					GLog.n(err);
 					disconnect();
 				});
@@ -616,6 +807,11 @@ public final class PlayAlongService {
 			@Override
 			public void onWorldState(WireMessage msg) {
 				applyWorldStateSnapshot(msg.hostGhost, msg.ghosts, msg.tombstones, msg.activePlayers, msg.depthCounts);
+			}
+
+			@Override
+			public void onSessionChanged(SessionInfo session) {
+				handleHostSessionChanged(session);
 			}
 
 			@Override
@@ -735,8 +931,7 @@ public final class PlayAlongService {
 
 		String ver = Game.version != null ? Game.version : "";
 		client.connect(effectiveAddress(), localUserId, username, SPDSettings.streamClientToken(),
-				heroClass, ver, session.sessionId, Dungeon.depth, Dungeon.branch,
-				Dungeon.hero != null ? Dungeon.hero.pos : 0, isRejoin);
+				heroClass, ver, session.sessionId, depth, branch, pos, isRejoin);
 	}
 
 	// ---- In-Game Hooks ----

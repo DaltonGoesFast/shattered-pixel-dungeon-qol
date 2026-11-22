@@ -50,6 +50,7 @@ public class PlayAlongClient {
 		void onJoinAck(WireMessage msg);
 		void onJoinError(String error);
 		void onWorldState(WireMessage msg);
+		void onSessionChanged(SessionInfo session);
 		void onHostAnkhPopped(WireMessage msg);
 		void onHostDied(WireMessage msg);
 		void onPlayerDiedNotice(WireMessage msg);
@@ -292,6 +293,10 @@ public class PlayAlongClient {
 							case "world_state":
 								listener.onWorldState(msg);
 								break;
+							case "session_changed":
+								intentionalClose = true;
+								listener.onSessionChanged(msg.session != null ? msg.session : null);
+								break;
 							case "host_ankh_popped":
 								listener.onHostAnkhPopped(msg);
 								break;
@@ -326,9 +331,14 @@ public class PlayAlongClient {
 
 				@Override
 				public void onClose(int code, String reason, boolean remote) {
-					if (!intentionalClose) {
-						scheduleReconnect();
+					if (intentionalClose) return;
+					if (reason != null && reason.contains("New Play Along session")) {
+						intentionalClose = true;
+						// Message may have been missed; service will status-ping for the new session.
+						listener.onSessionChanged(null);
+						return;
 					}
+					scheduleReconnect();
 				}
 
 				@Override

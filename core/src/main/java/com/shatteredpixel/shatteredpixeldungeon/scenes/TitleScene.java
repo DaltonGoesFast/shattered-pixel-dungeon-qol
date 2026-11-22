@@ -184,6 +184,7 @@ public class TitleScene extends PixelScene {
 		btnSupport = new SupportButton(GREY_TR, "DaltonGoesFast");
 		add(btnSupport);
 		PlayAlongService.pollLiveStatus(true);
+		PlayAlongService.consumePendingTitleJoin();
 
 		btnRankings = new StyledButton(GREY_TR,Messages.get(this, "rankings")){
 			@Override

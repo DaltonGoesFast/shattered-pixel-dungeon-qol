@@ -168,6 +168,7 @@ public class PlayAlongServer extends WebSocketServer {
 	public synchronized void startSession(SessionInfo session, GhostState initialHost) {
 		if (this.activeSession != null && (session == null || this.activeSession.sessionId == null
 				|| !this.activeSession.sessionId.equals(session.sessionId))) {
+			broadcastSessionChanged(session);
 			closeAllSessionClients(1000, "New Play Along session started");
 		}
 		this.activeSession = session;
@@ -178,6 +179,16 @@ public class PlayAlongServer extends WebSocketServer {
 		this.connToClient.clear();
 		this.tombstones.clear();
 		this.dirty = true;
+	}
+
+	/** Tell connected racers the host moved to a different save / new run before sockets close. */
+	private void broadcastSessionChanged(SessionInfo newSession) {
+		if (newSession == null) return;
+		WireMessage msg = new WireMessage();
+		msg.type = "session_changed";
+		msg.sessionId = newSession.sessionId;
+		msg.session = newSession;
+		sendToSessionClients(PlayAlongProtocol.GSON.toJson(msg));
 	}
 
 	public synchronized WireMessage resumeSession(GhostState currentHost, int hp, int ht, String heroClass) {

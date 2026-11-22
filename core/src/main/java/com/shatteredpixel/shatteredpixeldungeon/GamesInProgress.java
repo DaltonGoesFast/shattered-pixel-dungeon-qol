@@ -40,6 +40,13 @@ public class GamesInProgress {
 	public static final int PAGE_COUNT = 2;
 	public static final int MAX_SLOTS = SLOTS_PER_PAGE * PAGE_COUNT;
 	public static final int PLAY_ALONG_SLOT = 99;
+	/** First of {@link #PLAY_ALONG_SLOT_COUNT} client archive slots (96–99). */
+	public static final int PLAY_ALONG_SLOT_FIRST = 96;
+	public static final int PLAY_ALONG_SLOT_COUNT = 4;
+
+	public static boolean isPlayAlongSlot( int slot ) {
+		return slot >= PLAY_ALONG_SLOT_FIRST && slot < PLAY_ALONG_SLOT_FIRST + PLAY_ALONG_SLOT_COUNT;
+	}
 	
 	//null means we have loaded info and it is empty, no entry means unknown.
 	private static HashMap<Integer, Info> slotStates = new HashMap<>();

@@ -757,6 +757,7 @@ public class SPDSettings extends GameSettings {
 	public static final String KEY_PLAY_ALONG_HOST_ENABLED = "play_along_host_enabled";
 	public static final String KEY_PLAY_ALONG_SHARED_CHAT = "play_along_shared_chat";
 	public static final String KEY_PLAY_ALONG_USERNAME = "play_along_username";
+	public static final String KEY_PLAY_ALONG_ARCHIVES = "play_along_archives";
 	public static final String KEY_STREAM_CLIENT_TOKEN = "stream_client_token";
 
 	public static synchronized String streamClientToken() {
@@ -812,5 +813,14 @@ public class SPDSettings extends GameSettings {
 	public static String playAlongUsername() {
 		String s = getString( KEY_PLAY_ALONG_USERNAME, "" );
 		return s == null ? "" : s.trim();
+	}
+
+	public static void playAlongArchivesJson( String value ) {
+		put( KEY_PLAY_ALONG_ARCHIVES, value == null ? "" : value );
+	}
+
+	public static String playAlongArchivesJson() {
+		String s = getString( KEY_PLAY_ALONG_ARCHIVES, "" );
+		return s == null ? "" : s;
 	}
 }
