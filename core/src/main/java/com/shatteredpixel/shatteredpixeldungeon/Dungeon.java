@@ -782,6 +782,9 @@ public class Dungeon {
 	}
 	
 	public static void saveAll() throws IOException {
+		if (com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.isSpectating()) {
+			return;
+		}
 		if (hero != null && (hero.isAlive() || WndResurrect.instance != null)) {
 			
 			Actor.fixTime();

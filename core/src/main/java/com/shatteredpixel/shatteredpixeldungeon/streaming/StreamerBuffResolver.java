@@ -2,7 +2,7 @@
  * Streamer debug: resolve buff/debuff names for apply and search.
  */
 
-package com.shatteredpixel.shatteredpixeldungeon.desktop;
+package com.shatteredpixel.shatteredpixeldungeon.streaming;
 
 import com.shatteredpixel.shatteredpixeldungeon.utils.DebugItemResolver;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Adrenaline;

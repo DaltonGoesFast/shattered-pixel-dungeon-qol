@@ -19,7 +19,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 
-package com.shatteredpixel.shatteredpixeldungeon.desktop;
+package com.shatteredpixel.shatteredpixeldungeon.streaming;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -207,6 +207,32 @@ public final class StreamingCommandHandler {
 
 	private static final float SPAWN_DELAY = 0f;  // 0 = spawn immediately (was 2f)
 	private static final int SPAWN_RADIUS = 4;  // tiles away from hero (1–4)
+	private static volatile boolean headlessFixtureMode = false;
+
+	public static void setHeadlessFixtureMode(boolean enabled) {
+		headlessFixtureMode = enabled;
+	}
+
+	private static boolean isInActiveGameScene() {
+		return headlessFixtureMode || (ShatteredPixelDungeon.scene() instanceof GameScene);
+	}
+
+	private static void placeMobAndAppear(Mob mob, int cell) {
+		mob.pos = cell;
+		GameScene.add(mob, SPAWN_DELAY);
+		if (mob.sprite != null) {
+			ScrollOfTeleportation.appear(mob, cell);
+		}
+		Dungeon.level.occupyCell(mob);
+	}
+
+	private static void dropItemWithSprite(Item item, int cell, boolean bypassChallengeItemBlock) {
+		com.shatteredpixel.shatteredpixeldungeon.items.Heap heap =
+				Dungeon.level.drop(item, cell, bypassChallengeItemBlock);
+		if (heap != null && heap.sprite != null) {
+			heap.sprite.drop();
+		}
+	}
 
 	public static volatile String lastRolledClass = null;
 	public static volatile String lastSecondaryClass = null;
@@ -345,18 +371,19 @@ public final class StreamingCommandHandler {
 	public static String handleSpawn(String monsterName, String username, String forcedMobClassName) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "Not in an active run (title/menu)";
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+		if (!isInActiveGameScene())
 			return "Not in an active run (title/menu)";
 		if (!Dungeon.hero.isAlive())
 			return "Hero is dead";
 
+		Class<? extends Mob> defaultMobClass = "elemental".equals(monsterName)
+				? Elemental.random()
+				: "shaman".equals(monsterName)
+				? Shaman.random()
+				: mobClassForName(monsterName);
 		Class<? extends Mob> mobClass = resolveClass(forcedMobClassName, Mob.class);
 		if (mobClass == null) {
-			mobClass = "elemental".equals(monsterName)
-					? Elemental.random()
-					: "shaman".equals(monsterName)
-					? Shaman.random()
-					: mobClassForName(monsterName);
+			mobClass = defaultMobClass;
 		}
 		if (mobClass == null)
 			return "Unknown monster";
@@ -394,10 +421,7 @@ public final class StreamingCommandHandler {
 		if (mob.state != mob.PASSIVE) {
 			mob.state = mob.WANDERING;
 		}
-		mob.pos = cell;
-		GameScene.add(mob, SPAWN_DELAY);
-		ScrollOfTeleportation.appear(mob, cell);
-		Dungeon.level.occupyCell(mob);
+		placeMobAndAppear(mob, cell);
 
 		lastRolledClass = mobClass.getName();
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
@@ -420,18 +444,19 @@ public final class StreamingCommandHandler {
 	                                         String forcedMobClassName, String forcedChampClassName) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "Not in an active run (title/menu)";
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+		if (!isInActiveGameScene())
 			return "Not in an active run (title/menu)";
 		if (!Dungeon.hero.isAlive())
 			return "Hero is dead";
 
+		Class<? extends Mob> defaultMobClass = "elemental".equals(monsterName)
+				? Elemental.random()
+				: "shaman".equals(monsterName)
+				? Shaman.random()
+				: mobClassForName(monsterName);
 		Class<? extends Mob> mobClass = resolveClass(forcedMobClassName, Mob.class);
 		if (mobClass == null) {
-			mobClass = "elemental".equals(monsterName)
-					? Elemental.random()
-					: "shaman".equals(monsterName)
-					? Shaman.random()
-					: mobClassForName(monsterName);
+			mobClass = defaultMobClass;
 		}
 		if (mobClass == null)
 			return "Unknown monster";
@@ -440,9 +465,10 @@ public final class StreamingCommandHandler {
 		if (mob == null)
 			return "Failed to create monster";
 
+		Class<? extends ChampionEnemy> defaultChampClass = Random.element(CHAMPION_TYPES);
 		Class<? extends ChampionEnemy> champClass = resolveClass(forcedChampClassName, ChampionEnemy.class);
 		if (champClass == null) {
-			champClass = Random.element(CHAMPION_TYPES);
+			champClass = defaultChampClass;
 		}
 
 		Buff.affect(mob, ChatSpawned.class);
@@ -475,10 +501,7 @@ public final class StreamingCommandHandler {
 		if (mob.state != mob.PASSIVE) {
 			mob.state = mob.WANDERING;
 		}
-		mob.pos = cell;
-		GameScene.add(mob, SPAWN_DELAY);
-		ScrollOfTeleportation.appear(mob, cell);
-		Dungeon.level.occupyCell(mob);
+		placeMobAndAppear(mob, cell);
 
 		lastRolledClass = mobClass.getName();
 		lastSecondaryClass = champClass.getName();
@@ -491,7 +514,7 @@ public final class StreamingCommandHandler {
 	public static String handleDropGold(int amount, String username) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "Not in an active run (title/menu)";
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+		if (!isInActiveGameScene())
 			return "Not in an active run (title/menu)";
 		if (!Dungeon.hero.isAlive())
 			return "Hero is dead";
@@ -517,7 +540,7 @@ public final class StreamingCommandHandler {
 			return "No space to drop gold (hero surrounded)";
 
 		int cell = Random.element(candidates);
-		Dungeon.level.drop(new Gold(amount), cell).sprite.drop();
+		dropItemWithSprite(new Gold(amount), cell, false);
 
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		GLog.h(Messages.get(StreamingCommandHandler.class, "chat_gold_dropped"), chatter, amount);
@@ -545,7 +568,7 @@ public final class StreamingCommandHandler {
 	public static String handleRingOfWealthDrop(String username, String forcedBundleJson) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+		if (!isInActiveGameScene())
 			return "ERR:Not in an active run (title/menu)";
 		if (!Dungeon.hero.isAlive())
 			return "ERR:Hero is dead";
@@ -626,11 +649,13 @@ public final class StreamingCommandHandler {
 
 		StringBuilder titles = new StringBuilder();
 		for (Item it : toDrop) {
-			Dungeon.level.drop(it, cell).sprite.drop();
+			dropItemWithSprite(it, cell, false);
 			if (titles.length() > 0) titles.append(", ");
 			titles.append(it.title());
 		}
-		RingOfWealth.showFlareForBonusDrop(Dungeon.hero.sprite);
+		if (Dungeon.hero.sprite != null) {
+			RingOfWealth.showFlareForBonusDrop(Dungeon.hero.sprite);
+		}
 
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		GLog.p(Messages.get(StreamingCommandHandler.class, "chat_ring_of_wealth"), chatter, titles.toString());
@@ -672,7 +697,7 @@ public final class StreamingCommandHandler {
 	public static String handleSpawnTrap(String username, String forcedTrapClassName) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+		if (!isInActiveGameScene())
 			return "ERR:Not in an active run (title/menu)";
 		if (!Dungeon.hero.isAlive())
 			return "ERR:Hero is dead";
@@ -729,7 +754,7 @@ public final class StreamingCommandHandler {
 	public static String handlePlantRandom(String username, String forcedSeedClassName) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+		if (!isInActiveGameScene())
 			return "ERR:Not in an active run (title/menu)";
 		if (!Dungeon.hero.isAlive())
 			return "ERR:Hero is dead";
@@ -796,7 +821,7 @@ public final class StreamingCommandHandler {
 	public static String handleSpawnBomb(String username, String forcedBombClassName) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+		if (!isInActiveGameScene())
 			return "ERR:Not in an active run (title/menu)";
 		if (!Dungeon.hero.isAlive())
 			return "ERR:Hero is dead";
@@ -832,7 +857,7 @@ public final class StreamingCommandHandler {
 
 		// Light fuse before drop so ItemSprite.link → view(heap) reads glowing() with fuse set (same order as Bomb.onThrow).
 		bomb.startFuseAfterDrop(cell);
-		Dungeon.level.drop(bomb, cell).sprite.drop();
+		dropItemWithSprite(bomb, cell, false);
 
 		lastRolledClass = bombClass.getName();
 		String bombName = bomb.name();
@@ -858,7 +883,7 @@ public final class StreamingCommandHandler {
 			out.errorMessage = "Not in an active run (title/menu)";
 			return out;
 		}
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene)) {
+		if (!isInActiveGameScene()) {
 			out.errorMessage = "Not in an active run (title/menu)";
 			return out;
 		}
@@ -892,7 +917,7 @@ public final class StreamingCommandHandler {
 	public static String handleSummonBee(String username) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+		if (!isInActiveGameScene())
 			return "ERR:Not in an active run (title/menu)";
 		if (!Dungeon.hero.isAlive())
 			return "ERR:Hero is dead";
@@ -918,7 +943,7 @@ public final class StreamingCommandHandler {
 	public static String handleSpawnWard(String username) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+		if (!isInActiveGameScene())
 			return "ERR:Not in an active run (title/menu)";
 		if (!Dungeon.hero.isAlive())
 			return "ERR:Hero is dead";
@@ -951,7 +976,9 @@ public final class StreamingCommandHandler {
 		if (existing instanceof WandOfWarding.Ward) {
 			WandOfWarding.Ward ward = (WandOfWarding.Ward) existing;
 			ward.upgrade(wandLevel);
-			ward.sprite.emitter().burst(com.shatteredpixel.shatteredpixeldungeon.effects.MagicMissile.WardParticle.UP, ward.tier);
+			if (ward.sprite != null) {
+				ward.sprite.emitter().burst(com.shatteredpixel.shatteredpixeldungeon.effects.MagicMissile.WardParticle.UP, ward.tier);
+			}
 			GLog.p(Messages.get(StreamingCommandHandler.class, "chat_ward_upgraded"), chatter);
 			return "Ward";
 		}
@@ -977,7 +1004,7 @@ public final class StreamingCommandHandler {
 			out.errorMessage = "Not in an active run (title/menu)";
 			return out;
 		}
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene)) {
+		if (!isInActiveGameScene()) {
 			out.errorMessage = "Not in an active run (title/menu)";
 			return out;
 		}
@@ -1096,7 +1123,7 @@ public final class StreamingCommandHandler {
 	public static String handleSpawnGas(String username, String forcedGasClassName) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+		if (!isInActiveGameScene())
 			return "ERR:Not in an active run (title/menu)";
 		if (!Dungeon.hero.isAlive())
 			return "ERR:Hero is dead";
@@ -1141,7 +1168,7 @@ public final class StreamingCommandHandler {
 			callback.onResult(false, null, 0, "Not in an active run (title/menu)");
 			return;
 		}
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene)) {
+		if (!isInActiveGameScene()) {
 			callback.onResult(false, null, 0, "Not in an active run (title/menu)");
 			return;
 		}
@@ -1224,7 +1251,7 @@ public final class StreamingCommandHandler {
 	public static String handleRandomScroll(String username, String forcedScrollClassName) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+		if (!isInActiveGameScene())
 			return "ERR:Not in an active run (title/menu)";
 		if (!Dungeon.hero.isAlive())
 			return "ERR:Hero is dead";
@@ -1287,7 +1314,7 @@ public final class StreamingCommandHandler {
 	public static String handleChatBuff(String username, String forcedBuffClassName) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+		if (!isInActiveGameScene())
 			return "ERR:Not in an active run (title/menu)";
 		if (!Dungeon.hero.isAlive())
 			return "ERR:Hero is dead";
@@ -1335,7 +1362,7 @@ public final class StreamingCommandHandler {
 	public static String handleChatDebuff(String username, String forcedDebuffClassName) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+		if (!isInActiveGameScene())
 			return "ERR:Not in an active run (title/menu)";
 		if (!Dungeon.hero.isAlive())
 			return "ERR:Hero is dead";
@@ -1381,7 +1408,7 @@ public final class StreamingCommandHandler {
 	public static String handleChatHeal(String username) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+		if (!isInActiveGameScene())
 			return "ERR:Not in an active run (title/menu)";
 		if (!Dungeon.hero.isAlive())
 			return "ERR:Hero is dead";
@@ -1403,7 +1430,7 @@ public final class StreamingCommandHandler {
 	public static String handleSetHeroName(String name) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+		if (!isInActiveGameScene())
 			return "ERR:Not in an active run (title/menu)";
 		if (!Dungeon.hero.isAlive())
 			return "ERR:Hero is dead";
@@ -1427,7 +1454,7 @@ public final class StreamingCommandHandler {
 	public static String handleChatCleanse(String username, String preferredBuffClassName) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+		if (!isInActiveGameScene())
 			return "ERR:Not in an active run (title/menu)";
 		if (!Dungeon.hero.isAlive())
 			return "ERR:Hero is dead";
@@ -1460,7 +1487,7 @@ public final class StreamingCommandHandler {
 	public static String handleChatDew(String username) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+		if (!isInActiveGameScene())
 			return "ERR:Not in an active run (title/menu)";
 		if (!Dungeon.hero.isAlive())
 			return "ERR:Hero is dead";
@@ -1484,7 +1511,7 @@ public final class StreamingCommandHandler {
 			return "ERR:No space to drop dewdrop (hero surrounded)";
 
 		int cell = Random.element(candidates);
-		Dungeon.level.drop(new Dewdrop(), cell, true).sprite.drop();
+		dropItemWithSprite(new Dewdrop(), cell, true);
 
 		String chatter = (username != null && !username.isEmpty()) ? username : "Chat";
 		GLog.h(Messages.get(StreamingCommandHandler.class, "chat_dew"), chatter);
@@ -1499,7 +1526,7 @@ public final class StreamingCommandHandler {
 	public static String handleChatCorruptAlly(String username, String forcedMobClassName) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+		if (!isInActiveGameScene())
 			return "ERR:Not in an active run (title/menu)";
 		if (!Dungeon.hero.isAlive())
 			return "ERR:Hero is dead";
@@ -1550,10 +1577,7 @@ public final class StreamingCommandHandler {
 		if (mob.state != mob.PASSIVE) {
 			mob.state = mob.WANDERING;
 		}
-		mob.pos = cell;
-		GameScene.add(mob, SPAWN_DELAY);
-		ScrollOfTeleportation.appear(mob, cell);
-		Dungeon.level.occupyCell(mob);
+		placeMobAndAppear(mob, cell);
 
 		Corruption.corruptionHeal(mob);
 		Buff.affect(mob, Corruption.class);
@@ -1569,7 +1593,7 @@ public final class StreamingCommandHandler {
 	public static String handleChatHex(String username) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+		if (!isInActiveGameScene())
 			return "ERR:Not in an active run (title/menu)";
 		if (!Dungeon.hero.isAlive())
 			return "ERR:Hero is dead";
@@ -1585,7 +1609,7 @@ public final class StreamingCommandHandler {
 	public static String handleChatDegrade(String username) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+		if (!isInActiveGameScene())
 			return "ERR:Not in an active run (title/menu)";
 		if (!Dungeon.hero.isAlive())
 			return "ERR:Hero is dead";
@@ -1613,7 +1637,7 @@ public final class StreamingCommandHandler {
 	public static String handleChatSabotage(String username, String preferredBuffClassName) {
 		if (Dungeon.hero == null || Dungeon.level == null)
 			return "ERR:Not in an active run (title/menu)";
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene))
+		if (!isInActiveGameScene())
 			return "ERR:Not in an active run (title/menu)";
 		if (!Dungeon.hero.isAlive())
 			return "ERR:Hero is dead";
@@ -1660,7 +1684,7 @@ public final class StreamingCommandHandler {
 			return;
 		}
 		if (Dungeon.hero == null || Dungeon.level == null) return;
-		if (!(ShatteredPixelDungeon.scene() instanceof GameScene)) return;
+		if (!isInActiveGameScene()) return;
 		if (!Dungeon.hero.isAlive()) return;
 
 		if (p.rngSeed != 0L) Random.pushGenerator(p.rngSeed);

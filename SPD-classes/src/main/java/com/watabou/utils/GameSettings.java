@@ -25,14 +25,21 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Preferences;
 import com.watabou.noosa.Game;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class GameSettings {
 	
 	public static final String DEFAULT_PREFS_FILE = "settings.xml";
 	
 	private static Preferences prefs;
+	private static final Map<String, Object> headlessPrefs = new HashMap<>();
 	
 	private static Preferences get() {
 		if (prefs == null) {
+			if (Gdx.app == null) {
+				return null;
+			}
 			prefs = Gdx.app.getPreferences( DEFAULT_PREFS_FILE );
 		}
 		return prefs;
@@ -44,7 +51,13 @@ public class GameSettings {
 	}
 	
 	public static boolean contains( String key ){
-		return get().contains( key );
+		Preferences p = get();
+		if (p == null) {
+			synchronized (headlessPrefs) {
+				return headlessPrefs.containsKey(key);
+			}
+		}
+		return p.contains( key );
 	}
 	
 	public static int getInt( String key, int defValue ) {
@@ -53,7 +66,16 @@ public class GameSettings {
 	
 	public static int getInt( String key, int defValue, int min, int max ) {
 		try {
-			int i = get().getInteger( key, defValue );
+			Preferences p = get();
+			int i;
+			if (p == null) {
+				synchronized (headlessPrefs) {
+					Object v = headlessPrefs.get(key);
+					i = (v instanceof Number) ? ((Number) v).intValue() : defValue;
+				}
+			} else {
+				i = p.getInteger( key, defValue );
+			}
 			if (i < min || i > max){
 				int val = (int)GameMath.gate(min, i, max);
 				put(key, val);
@@ -74,7 +96,16 @@ public class GameSettings {
 
 	public static long getLong( String key, long defValue, long min, long max ) {
 		try {
-			long i = get().getLong( key, defValue );
+			Preferences p = get();
+			long i;
+			if (p == null) {
+				synchronized (headlessPrefs) {
+					Object v = headlessPrefs.get(key);
+					i = (v instanceof Number) ? ((Number) v).longValue() : defValue;
+				}
+			} else {
+				i = p.getLong( key, defValue );
+			}
 			if (i < min || i > max){
 				long val = (long)GameMath.gate(min, i, max);
 				put(key, val);
@@ -91,7 +122,14 @@ public class GameSettings {
 	
 	public static boolean getBoolean( String key, boolean defValue ) {
 		try {
-			return get().getBoolean(key, defValue);
+			Preferences p = get();
+			if (p == null) {
+				synchronized (headlessPrefs) {
+					Object v = headlessPrefs.get(key);
+					return (v instanceof Boolean) ? (Boolean) v : defValue;
+				}
+			}
+			return p.getBoolean(key, defValue);
 		} catch (Exception e) {
 			Game.reportException(e);
 			return defValue;
@@ -104,7 +142,16 @@ public class GameSettings {
 	
 	public static String getString( String key, String defValue, int maxLength ) {
 		try {
-			String s = get().getString( key, defValue );
+			Preferences p = get();
+			String s;
+			if (p == null) {
+				synchronized (headlessPrefs) {
+					Object v = headlessPrefs.get(key);
+					s = (v instanceof String) ? (String) v : defValue;
+				}
+			} else {
+				s = p.getString( key, defValue );
+			}
 			if (s != null && s.length() > maxLength) {
 				put(key, defValue);
 				return defValue;
@@ -119,23 +166,51 @@ public class GameSettings {
 	}
 	
 	public static void put( String key, int value ) {
-		get().putInteger(key, value);
-		get().flush();
+		Preferences p = get();
+		if (p == null) {
+			synchronized (headlessPrefs) {
+				headlessPrefs.put(key, value);
+			}
+			return;
+		}
+		p.putInteger(key, value);
+		p.flush();
 	}
 
 	public static void put( String key, long value ) {
-		get().putLong(key, value);
-		get().flush();
+		Preferences p = get();
+		if (p == null) {
+			synchronized (headlessPrefs) {
+				headlessPrefs.put(key, value);
+			}
+			return;
+		}
+		p.putLong(key, value);
+		p.flush();
 	}
 	
 	public static void put( String key, boolean value ) {
-		get().putBoolean(key, value);
-		get().flush();
+		Preferences p = get();
+		if (p == null) {
+			synchronized (headlessPrefs) {
+				headlessPrefs.put(key, value);
+			}
+			return;
+		}
+		p.putBoolean(key, value);
+		p.flush();
 	}
 	
 	public static void put( String key, String value ) {
-		get().putString(key, value);
-		get().flush();
+		Preferences p = get();
+		if (p == null) {
+			synchronized (headlessPrefs) {
+				headlessPrefs.put(key, value);
+			}
+			return;
+		}
+		p.putString(key, value);
+		p.flush();
 	}
 	
 }

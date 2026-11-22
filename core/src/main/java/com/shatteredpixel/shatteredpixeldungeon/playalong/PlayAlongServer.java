@@ -21,14 +21,13 @@
 
 package com.shatteredpixel.shatteredpixeldungeon.playalong;
 
-import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.GhostState;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.SessionInfo;
-import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.StreamEconomyState;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.TombstoneState;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.WipeEvent;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.WireMessage;
@@ -40,15 +39,7 @@ import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
-import java.net.URL;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -59,13 +50,14 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Host-authoritative WebSocket server for Play Along Mode (listens on 0.0.0.0:port for Playit.gg).
+ * Host-authoritative WebSocket server for Play Along race synchronization
+ * (listens on 0.0.0.0:port for Playit.gg). Stream economy / {@code !link} /
+ * command requests are delegated to {@link StreamControlProxy}.
  */
 public class PlayAlongServer extends WebSocketServer {
 
@@ -74,12 +66,13 @@ public class PlayAlongServer extends WebSocketServer {
 		void onChatterDied(String username, int depth, String cause);
 		void onChatterWon(String username, long durationMs);
 		void onChatterBossSlain(String username, int depth, int awardedPts);
+		default void onHostWarning(String failureClass, String message) {}
 	}
 
-	private static final int MAX_CLIENTS = 100;
-	private static final int RATE_LIMIT_PER_SEC = 8;
+	public static final int MAX_CLIENTS = 100;
+	public static final int RATE_LIMIT_PER_SEC = 8;
+	private static final int RAW_SOCKET_OVERHEAD_CAP = 32;
 	private static final long BOOT_REJOIN_GRACE_MS = 90_000L;
-	private static final String OVERLAY_API_BASE = "http://127.0.0.1:5000";
 
 	private static class ClientRecord {
 		String userId;
@@ -96,6 +89,9 @@ public class PlayAlongServer extends WebSocketServer {
 	}
 
 	private final HostCallbacks callbacks;
+	private final PlayAlongHostMetrics metrics = new PlayAlongHostMetrics();
+	private final StreamControlProxy streamControlProxy;
+
 	private final ConcurrentHashMap<String, ClientRecord> clientsByUserId = new ConcurrentHashMap<>();
 	private final ConcurrentHashMap<WebSocket, ClientRecord> connToClient = new ConcurrentHashMap<>();
 	private final ConcurrentHashMap<WebSocket, long[]> anonRateLimits = new ConcurrentHashMap<>();
@@ -108,12 +104,45 @@ public class PlayAlongServer extends WebSocketServer {
 	private final long serverStartedAtMs = System.currentTimeMillis();
 	private volatile boolean sessionExplicitlyEnded = false;
 
+	private volatile int maxClients = MAX_CLIENTS;
+	private volatile long reconnectGraceMs = PlayAlongProtocol.RECONNECT_GRACE_MS;
+	private volatile boolean requireJoinCode;
+	private volatile String lobbyJoinCode;
+
 	private ScheduledExecutorService ticker;
-	private ExecutorService httpPool;
 
 	public PlayAlongServer(int port, HostCallbacks callbacks) {
 		super(new InetSocketAddress("0.0.0.0", port));
 		this.callbacks = callbacks;
+		this.requireJoinCode = SPDSettings.playAlongRequireJoinCode();
+		String savedCode = SPDSettings.playAlongJoinCode();
+		if (savedCode == null || savedCode.isEmpty()) {
+			savedCode = PlayAlongProtocol.generateJoinCode();
+			SPDSettings.playAlongJoinCode(savedCode);
+		}
+		this.lobbyJoinCode = savedCode;
+		this.streamControlProxy = new StreamControlProxy(
+				this::snapshotSessionInfo,
+				new StreamControlProxy.TransportCallbacks() {
+					@Override
+					public void safeSend(WebSocket conn, String json) {
+						PlayAlongServer.this.safeSend(conn, json);
+					}
+
+					@Override
+					public void onFailure(String failureClass, String sessionId, Throwable err) {
+						reportFailure(failureClass, sessionId, err);
+					}
+
+					@Override
+					public void onBossSlainReward(String username, int depth, int awardedPts) {
+						if (PlayAlongServer.this.callbacks != null) {
+							PlayAlongServer.this.callbacks.onChatterBossSlain(username, depth, awardedPts);
+						}
+					}
+				},
+				metrics
+		);
 		setReuseAddr(true);
 		setConnectionLostTimeout(30);
 	}
@@ -126,11 +155,7 @@ public class PlayAlongServer extends WebSocketServer {
 			return t;
 		});
 		ticker.scheduleAtFixedRate(this::tickBroadcast, 200, 200, TimeUnit.MILLISECONDS);
-		httpPool = Executors.newFixedThreadPool(4, r -> {
-			Thread t = new Thread(r, "PlayAlongHttpBridge");
-			t.setDaemon(true);
-			return t;
-		});
+		streamControlProxy.start();
 	}
 
 	public void stopServer() {
@@ -138,10 +163,7 @@ public class PlayAlongServer extends WebSocketServer {
 			ticker.shutdownNow();
 			ticker = null;
 		}
-		if (httpPool != null) {
-			httpPool.shutdownNow();
-			httpPool = null;
-		}
+		streamControlProxy.shutdown();
 		try {
 			stop(1000);
 		} catch (InterruptedException e) {
@@ -149,17 +171,88 @@ public class PlayAlongServer extends WebSocketServer {
 		}
 	}
 
+	public PlayAlongHostMetrics getMetrics() {
+		return metrics;
+	}
+
+	public StreamControlProxy getStreamControlProxy() {
+		return streamControlProxy;
+	}
+
 	public SessionInfo getActiveSession() {
 		return activeSession;
 	}
 
+	public int getMaxClients() {
+		return maxClients;
+	}
+
+	public void setMaxClients(int maxClients) {
+		this.maxClients = Math.max(1, maxClients);
+	}
+
+	public long getReconnectGraceMs() {
+		return reconnectGraceMs;
+	}
+
+	public void setReconnectGraceMs(long reconnectGraceMs) {
+		this.reconnectGraceMs = Math.max(50L, reconnectGraceMs);
+	}
+
+	public boolean isJoinCodeRequired() {
+		return requireJoinCode;
+	}
+
+	public void setRequireJoinCode(boolean requireJoinCode) {
+		this.requireJoinCode = requireJoinCode;
+		SessionInfo s = activeSession;
+		if (s != null) {
+			s.joinCodeRequired = requireJoinCode;
+		}
+	}
+
+	public String getLobbyJoinCode() {
+		return lobbyJoinCode;
+	}
+
+	public void setLobbyJoinCode(String code) {
+		if (code != null && !code.trim().isEmpty()) {
+			this.lobbyJoinCode = code.trim().toUpperCase(Locale.ROOT);
+		}
+	}
+
+	public String rotateLobbyJoinCode() {
+		String next = PlayAlongProtocol.generateJoinCode();
+		this.lobbyJoinCode = next;
+		SPDSettings.playAlongJoinCode(next);
+		return next;
+	}
+
+	private String currentSessionId() {
+		SessionInfo s = activeSession;
+		return (s != null && s.sessionId != null) ? s.sessionId : "";
+	}
+
+	private void reportFailure(String failureClass, String sessionId, Throwable err) {
+		String sid = (sessionId != null && !sessionId.isEmpty()) ? sessionId : "-";
+		String errType = err != null ? err.getClass().getSimpleName() : "UnknownError";
+		String errMsg = (err != null && err.getMessage() != null) ? err.getMessage() : "no details";
+		System.err.println("[PlayAlong] Failure [" + failureClass + "] sessionId=" + sid
+				+ " (" + errType + ": " + errMsg + ")");
+		if (metrics.markFailureClassReported(failureClass) && callbacks != null) {
+			callbacks.onHostWarning(failureClass, failureClass + ": " + errType + " (" + errMsg + ")");
+		}
+	}
+
 	private void closeAllSessionClients(int code, String reason) {
 		List<WebSocket> conns = new ArrayList<>(connToClient.keySet());
+		String sid = currentSessionId();
 		for (WebSocket conn : conns) {
 			if (conn != null && conn.isOpen()) {
 				try {
 					conn.close(code, reason);
-				} catch (Exception ignored) {
+				} catch (Exception e) {
+					reportFailure("ws_close_client", sid, e);
 				}
 			}
 		}
@@ -170,6 +263,12 @@ public class PlayAlongServer extends WebSocketServer {
 				|| !this.activeSession.sessionId.equals(session.sessionId))) {
 			closeAllSessionClients(1000, "New Play Along session started");
 		}
+		if (session != null) {
+			if (session.hostUsername == null || session.hostUsername.trim().isEmpty()) {
+				session.hostUsername = SPDSettings.playAlongHostUsernameSafe();
+			}
+			session.joinCodeRequired = requireJoinCode;
+		}
 		this.activeSession = session;
 		this.hostGhost = initialHost;
 		this.lastWipeEvent = null;
@@ -177,6 +276,9 @@ public class PlayAlongServer extends WebSocketServer {
 		this.clientsByUserId.clear();
 		this.connToClient.clear();
 		this.tombstones.clear();
+		this.metrics.resetSessionFailureClasses();
+		this.metrics.setActiveClients(0);
+		this.metrics.setAliveClients(0);
 		this.dirty = true;
 	}
 
@@ -192,6 +294,7 @@ public class PlayAlongServer extends WebSocketServer {
 		}
 		this.activeSession.hostHp = hp;
 		this.activeSession.hostHt = ht;
+		this.activeSession.joinCodeRequired = requireJoinCode;
 		if (heroClass != null && !heroClass.isEmpty()) {
 			this.activeSession.hostClass = heroClass;
 		}
@@ -208,6 +311,8 @@ public class PlayAlongServer extends WebSocketServer {
 		this.clientsByUserId.clear();
 		this.connToClient.clear();
 		this.tombstones.clear();
+		this.metrics.setActiveClients(0);
+		this.metrics.setAliveClients(0);
 		this.dirty = false;
 	}
 
@@ -265,7 +370,7 @@ public class PlayAlongServer extends WebSocketServer {
 		String senderNorm = normalizeChatUsername(payload.username);
 		String senderSanitized = senderNorm.isEmpty()
 				? ""
-				: PlayAlongProtocol.sanitizeUsername(senderNorm, "01").toLowerCase(Locale.ROOT);
+				: PlayAlongProtocol.sanitizeUsername(senderNorm, "01", session.hostUsername).toLowerCase(Locale.ROOT);
 
 		for (Map.Entry<WebSocket, ClientRecord> entry : connToClient.entrySet()) {
 			WebSocket conn = entry.getKey();
@@ -278,7 +383,9 @@ public class PlayAlongServer extends WebSocketServer {
 					continue;
 				}
 			}
-			safeSend(conn, json);
+			if (!safeSend(conn, json)) {
+				metrics.incrementMirrorDrops();
+			}
 		}
 	}
 
@@ -315,6 +422,8 @@ public class PlayAlongServer extends WebSocketServer {
 		}
 
 		this.lastWipeEvent = wipe;
+		metrics.recordWipeVictims(victims);
+		metrics.setAliveClients(0);
 		if (session != null) {
 			session.active = false;
 			session.activePlayers = 0;
@@ -340,10 +449,14 @@ public class PlayAlongServer extends WebSocketServer {
 		return count;
 	}
 
+	public int getKnownClientCount() {
+		return clientsByUserId.size();
+	}
+
 	@Override
 	public void onOpen(WebSocket conn, ClientHandshake handshake) {
-		if (getConnections().size() > MAX_CLIENTS) {
-			conn.close(1008, "Lobby full");
+		if (getConnections().size() > (maxClients + RAW_SOCKET_OVERHEAD_CAP)) {
+			conn.close(1008, "Server socket capacity exceeded");
 		}
 	}
 
@@ -356,10 +469,14 @@ public class PlayAlongServer extends WebSocketServer {
 			rec.disconnectedAtMs = System.currentTimeMillis();
 			dirty = true;
 		}
+		metrics.setActiveClients(connToClient.size());
 	}
 
 	@Override
 	public void onError(WebSocket conn, Exception ex) {
+		if (ex != null) {
+			reportFailure("ws_socket_error", currentSessionId(), ex);
+		}
 		if (conn != null) {
 			anonRateLimits.remove(conn);
 			ClientRecord rec = connToClient.remove(conn);
@@ -368,6 +485,7 @@ public class PlayAlongServer extends WebSocketServer {
 				rec.disconnectedAtMs = System.currentTimeMillis();
 			}
 		}
+		metrics.setActiveClients(connToClient.size());
 	}
 
 	@Override
@@ -380,10 +498,17 @@ public class PlayAlongServer extends WebSocketServer {
 			return;
 		}
 
+		JsonObject rawObj;
 		WireMessage msg;
 		try {
-			msg = PlayAlongProtocol.GSON.fromJson(message, WireMessage.class);
+			JsonElement el = JsonParser.parseString(message);
+			if (el == null || !el.isJsonObject()) {
+				return;
+			}
+			rawObj = el.getAsJsonObject();
+			msg = PlayAlongProtocol.GSON.fromJson(rawObj, WireMessage.class);
 		} catch (Exception e) {
+			reportFailure("ws_invalid_json", currentSessionId(), e);
 			return;
 		}
 		if (msg == null || msg.type == null) return;
@@ -394,7 +519,7 @@ public class PlayAlongServer extends WebSocketServer {
 				break;
 			case "join":
 			case "rejoin":
-				handleJoin(conn, msg, "rejoin".equals(msg.type));
+				handleJoin(conn, rawObj, msg, "rejoin".equals(msg.type));
 				break;
 			case "player_state":
 				handlePlayerState(conn, msg);
@@ -409,13 +534,13 @@ public class PlayAlongServer extends WebSocketServer {
 				handlePlayerBossSlain(conn, msg);
 				break;
 			case "stream_state_req":
-				handleStreamStateRequest(conn, msg);
+				streamControlProxy.handleStreamStateRequest(conn, msg);
 				break;
 			case "stream_link_req":
-				handleStreamLinkRequest(conn, msg);
+				streamControlProxy.handleStreamLinkRequest(conn, msg);
 				break;
 			case "stream_cmd_req":
-				handleStreamCommandRequest(conn, msg);
+				streamControlProxy.handleStreamCommandRequest(conn, msg);
 				break;
 			default:
 				// Strict host authority: ignore any unauthorized or host-only packet types from clients.
@@ -448,12 +573,21 @@ public class PlayAlongServer extends WebSocketServer {
 	private void handleStatusPing(WebSocket conn) {
 		WireMessage pong = new WireMessage();
 		pong.type = "status_pong";
-		SessionInfo snap = snapshotSessionInfo();
-		pong.session = snap;
-		conn.send(PlayAlongProtocol.GSON.toJson(pong));
+		pong.session = snapshotSessionInfo();
+		safeSend(conn, PlayAlongProtocol.GSON.toJson(pong));
 	}
 
-	private synchronized void handleJoin(WebSocket conn, WireMessage msg, boolean isRejoin) {
+	private synchronized void handleJoin(WebSocket conn, JsonObject rawObj, WireMessage msg, boolean isRejoin) {
+		if (!rawObj.has("protocolVersion") || !rawObj.get("protocolVersion").isJsonPrimitive()
+				|| msg.protocolVersion != PlayAlongProtocol.PROTOCOL_VERSION) {
+			metrics.incrementRejectedJoins();
+			String clientVer = rawObj.has("protocolVersion") ? String.valueOf(msg.protocolVersion) : "missing";
+			sendJoinError(conn, "Protocol version mismatch: server requires v"
+					+ PlayAlongProtocol.PROTOCOL_VERSION + " (client sent " + clientVer + "). Please update to play along.");
+			conn.close(1008, "Protocol version mismatch");
+			return;
+		}
+
 		WipeEvent wipe = lastWipeEvent;
 		if (isRejoin && wipe != null && msg.sessionId != null && msg.sessionId.equals(wipe.sessionId)) {
 			WireMessage deadMsg = new WireMessage();
@@ -463,33 +597,33 @@ public class PlayAlongServer extends WebSocketServer {
 			deadMsg.cause = wipe.hostCause;
 			deadMsg.victims = wipe.victims;
 			deadMsg.victimNames = wipe.victimNames;
-			conn.send(PlayAlongProtocol.GSON.toJson(deadMsg));
+			safeSend(conn, PlayAlongProtocol.GSON.toJson(deadMsg));
 			return;
 		}
 
 		SessionInfo session = activeSession;
+		String hostName = (session != null) ? session.displayHostName() : SPDSettings.playAlongHostUsernameSafe();
 		if (session == null || !session.active) {
 			if (isRejoin && session == null && !sessionExplicitlyEnded
 					&& (System.currentTimeMillis() - serverStartedAtMs) < BOOT_REJOIN_GRACE_MS) {
 				conn.close(1013, "Host is loading save");
 				return;
 			}
-			sendJoinError(conn, "Dalton is not currently hosting a Play Along run.");
+			metrics.incrementRejectedJoins();
+			sendJoinError(conn, hostName + " is not currently hosting a Play Along run.");
 			return;
 		}
 		if (isRejoin && msg.sessionId != null && !msg.sessionId.isEmpty()
 				&& session.sessionId != null && !session.sessionId.isEmpty()
 				&& !msg.sessionId.equals(session.sessionId)) {
-			sendJoinError(conn, "Dalton started a different Play Along run! Return to title to join.");
+			metrics.incrementRejectedJoins();
+			sendJoinError(conn, hostName + " started a different Play Along run! Return to title to join.");
 			return;
 		}
 		if (msg.modVersion != null && !msg.modVersion.isEmpty()
 				&& !session.version.isEmpty() && !msg.modVersion.equals(session.version)) {
-			sendJoinError(conn, "Version mismatch: Dalton is running " + session.version + ". Please update to play along.");
-			return;
-		}
-		if (clientsByUserId.size() >= MAX_CLIENTS && (msg.userId == null || !clientsByUserId.containsKey(msg.userId))) {
-			sendJoinError(conn, "Play Along lobby is full (" + MAX_CLIENTS + " players).");
+			metrics.incrementRejectedJoins();
+			sendJoinError(conn, "Version mismatch: " + hostName + " is running " + session.version + ". Please update to play along.");
 			return;
 		}
 
@@ -498,11 +632,36 @@ public class PlayAlongServer extends WebSocketServer {
 				: ("u_" + Integer.toHexString(conn.hashCode()));
 		if (userId.length() > 36) userId = userId.substring(0, 36);
 
-		String shortSuffix = Integer.toHexString(Math.abs(userId.hashCode()) % 0xFFF);
-		String safeName = PlayAlongProtocol.sanitizeUsername(msg.username, shortSuffix);
 		String cToken = msg.clientToken != null ? msg.clientToken.trim() : "";
+		ClientRecord existingRec = clientsByUserId.get(userId);
+
+		if (requireJoinCode) {
+			String suppliedCode = msg.joinCode != null ? msg.joinCode.trim() : "";
+			boolean codeMatches = !suppliedCode.isEmpty() && suppliedCode.equalsIgnoreCase(lobbyJoinCode);
+			boolean trustedReconnect = isRejoin && existingRec != null
+					&& !existingRec.clientToken.isEmpty() && existingRec.clientToken.equals(cToken);
+			if (!codeMatches && !trustedReconnect) {
+				metrics.incrementRejectedJoins();
+				sendJoinError(conn, "Invalid or missing lobby join code.");
+				conn.close(1008, "Invalid join code");
+				return;
+			}
+		}
+
+		purgeExpiredDisconnectedClients(System.currentTimeMillis());
+
+		if (!clientsByUserId.containsKey(userId) && clientsByUserId.size() >= maxClients) {
+			metrics.incrementRejectedJoins();
+			sendJoinError(conn, "Play Along lobby is full (" + maxClients + " players).");
+			conn.close(1008, "Lobby full");
+			return;
+		}
+
+		String shortSuffix = Integer.toHexString(Math.abs(userId.hashCode()) % 0xFFF);
+		String safeName = PlayAlongProtocol.sanitizeUsername(msg.username, shortSuffix, session.hostUsername);
 
 		ClientRecord rec = clientsByUserId.get(userId);
+		boolean isNewClient = (rec == null);
 		if (rec == null) {
 			boolean rejoinedAsDead = isRejoin && "DEAD".equalsIgnoreCase(msg.action);
 			rec = new ClientRecord();
@@ -525,7 +684,15 @@ public class PlayAlongServer extends WebSocketServer {
 			clientsByUserId.put(userId, rec);
 		} else {
 			if (rec.conn != null && rec.conn != conn) {
-				connToClient.remove(rec.conn);
+				WebSocket prevConn = rec.conn;
+				connToClient.remove(prevConn);
+				if (prevConn.isOpen()) {
+					try {
+						prevConn.close(1000, "Replaced by new connection");
+					} catch (Exception e) {
+						reportFailure("ws_replace_conn", session.sessionId, e);
+					}
+				}
 			}
 			rec.disconnectedAtMs = 0L;
 			if (!cToken.isEmpty()) {
@@ -549,20 +716,35 @@ public class PlayAlongServer extends WebSocketServer {
 		connToClient.put(conn, rec);
 		anonRateLimits.remove(conn);
 
+		if (isNewClient) {
+			metrics.incrementTotalJoins();
+		}
+		metrics.setActiveClients(connToClient.size());
+		metrics.setAliveClients(countAliveClients());
+
 		WireMessage ack = new WireMessage();
 		ack.type = "join_ack";
 		ack.userId = rec.userId;
 		ack.username = rec.username;
 		ack.session = snapshotSessionInfo();
-		conn.send(PlayAlongProtocol.GSON.toJson(ack));
+		safeSend(conn, PlayAlongProtocol.GSON.toJson(ack));
 
-		conn.send(PlayAlongProtocol.GSON.toJson(buildWorldStateMessage()));
+		safeSend(conn, PlayAlongProtocol.GSON.toJson(buildWorldStateMessage()));
 		dirty = true;
 
 		if (!rec.clientToken.isEmpty()) {
 			final ClientRecord recFinal = rec;
-			final String tokenFinal = rec.clientToken;
-			submitHttp(() -> syncLinkedUsernameForJoin(recFinal, tokenFinal, shortSuffix));
+			streamControlProxy.syncLinkedUsernameAsync(
+					rec.clientToken,
+					shortSuffix,
+					session.hostUsername,
+					verified -> {
+						recFinal.username = verified;
+						if (recFinal.ghost != null) {
+							recFinal.ghost.username = verified;
+						}
+						dirty = true;
+					});
 		}
 	}
 
@@ -570,7 +752,7 @@ public class PlayAlongServer extends WebSocketServer {
 		WireMessage msg = new WireMessage();
 		msg.type = "join_error";
 		msg.error = err;
-		conn.send(PlayAlongProtocol.GSON.toJson(msg));
+		safeSend(conn, PlayAlongProtocol.GSON.toJson(msg));
 	}
 
 	private void handlePlayerState(WebSocket conn, WireMessage msg) {
@@ -599,6 +781,7 @@ public class PlayAlongServer extends WebSocketServer {
 			rec.ghost.hpPct = 0f;
 			rec.ghost.lastUpdateMs = System.currentTimeMillis();
 		}
+		metrics.setAliveClients(countAliveClients());
 
 		TombstoneState tomb = new TombstoneState();
 		tomb.userId = rec.userId;
@@ -641,7 +824,8 @@ public class PlayAlongServer extends WebSocketServer {
 		if (session != null && session.active) {
 			String token = (msg.clientToken != null && !msg.clientToken.trim().isEmpty())
 					? msg.clientToken.trim() : rec.clientToken;
-			triggerMilestoneRewardAsync(conn, rec, session.sessionId, token, "victory", 0);
+			streamControlProxy.triggerMilestoneRewardAsync(
+					conn, rec.username, session.sessionId, token, "victory", 0);
 		}
 		dirty = true;
 	}
@@ -661,22 +845,31 @@ public class PlayAlongServer extends WebSocketServer {
 
 		String token = (msg.clientToken != null && !msg.clientToken.trim().isEmpty())
 				? msg.clientToken.trim() : rec.clientToken;
-		triggerMilestoneRewardAsync(conn, rec, session.sessionId, token, "boss_" + depth, depth);
+		streamControlProxy.triggerMilestoneRewardAsync(
+				conn, rec.username, session.sessionId, token, "boss_" + depth, depth);
+	}
+
+	private boolean purgeExpiredDisconnectedClients(long now) {
+		boolean removed = false;
+		Iterator<Map.Entry<String, ClientRecord>> it = clientsByUserId.entrySet().iterator();
+		while (it.hasNext()) {
+			ClientRecord rec = it.next().getValue();
+			if (rec.conn == null && rec.disconnectedAtMs > 0
+					&& (now - rec.disconnectedAtMs) > reconnectGraceMs) {
+				it.remove();
+				removed = true;
+			}
+		}
+		if (removed) {
+			metrics.setAliveClients(countAliveClients());
+		}
+		return removed;
 	}
 
 	private void tickBroadcast() {
 		try {
 			long now = System.currentTimeMillis();
-			boolean removed = false;
-			Iterator<Map.Entry<String, ClientRecord>> it = clientsByUserId.entrySet().iterator();
-			while (it.hasNext()) {
-				ClientRecord rec = it.next().getValue();
-				if (rec.conn == null && rec.disconnectedAtMs > 0
-						&& (now - rec.disconnectedAtMs) > PlayAlongProtocol.RECONNECT_GRACE_MS) {
-					it.remove();
-					removed = true;
-				}
-			}
+			boolean removed = purgeExpiredDisconnectedClients(now);
 
 			if (!dirty && !removed) return;
 			dirty = false;
@@ -686,6 +879,7 @@ public class PlayAlongServer extends WebSocketServer {
 
 			WireMessage world = buildWorldStateMessage();
 			session.activePlayers = world.activePlayers;
+			metrics.setAliveClients(world.activePlayers);
 
 			if (!connToClient.isEmpty()) {
 				sendToSessionClients(PlayAlongProtocol.GSON.toJson(world));
@@ -693,7 +887,8 @@ public class PlayAlongServer extends WebSocketServer {
 			if (callbacks != null) {
 				callbacks.onWorldStateUpdated(world.ghosts, world.tombstones, world.activePlayers);
 			}
-		} catch (Exception ignored) {
+		} catch (Exception e) {
+			reportFailure("ws_tick_broadcast", currentSessionId(), e);
 		}
 	}
 
@@ -720,7 +915,7 @@ public class PlayAlongServer extends WebSocketServer {
 		return world;
 	}
 
-	private SessionInfo snapshotSessionInfo() {
+	public SessionInfo snapshotSessionInfo() {
 		SessionInfo src = activeSession;
 		SessionInfo copy = new SessionInfo();
 		boolean heroInDungeon = false;
@@ -729,13 +924,16 @@ public class PlayAlongServer extends WebSocketServer {
 					&& Dungeon.level != null
 					&& Dungeon.hero.isAlive()
 					&& (Game.scene() instanceof GameScene || Game.scene() instanceof InterlevelScene);
-		} catch (Throwable ignored) {
+		} catch (Throwable t) {
+			reportFailure("snapshot_hero_state", src != null ? src.sessionId : "", t);
 		}
 		copy.inDungeon = heroInDungeon;
 		copy.serverOnline = (src != null && src.active) || heroInDungeon;
+		copy.joinCodeRequired = requireJoinCode;
 		if (src == null || !src.active) {
 			copy.active = false;
 			copy.version = Game.version != null ? Game.version : "";
+			copy.hostUsername = SPDSettings.playAlongHostUsernameSafe();
 			if (heroInDungeon && Dungeon.hero != null) {
 				copy.hostDepth = Dungeon.depth;
 				copy.hostPos = Dungeon.hero.pos;
@@ -750,6 +948,7 @@ public class PlayAlongServer extends WebSocketServer {
 		copy.active = src.active;
 		copy.sessionId = src.sessionId;
 		copy.version = src.version;
+		copy.hostUsername = src.displayHostName();
 		copy.seed = src.seed;
 		copy.customSeedText = src.customSeedText;
 		copy.challenges = src.challenges;
@@ -763,336 +962,36 @@ public class PlayAlongServer extends WebSocketServer {
 		return copy;
 	}
 
-	private void handleStreamStateRequest(final WebSocket conn, WireMessage msg) {
-		final String token = msg.clientToken != null ? msg.clientToken.trim() : "";
-		final String reqId = msg.requestId;
-		submitHttp(() -> {
-			SessionInfo snap = snapshotSessionInfo();
-			StreamEconomyState eco = fetchEconomyStateFromOverlay(token, snap);
-			WireMessage resp = new WireMessage();
-			resp.type = "stream_state_resp";
-			resp.requestId = reqId;
-			resp.economy = eco;
-			safeSend(conn, PlayAlongProtocol.GSON.toJson(resp));
-		});
-	}
-
-	private void handleStreamLinkRequest(final WebSocket conn, WireMessage msg) {
-		final String token = msg.clientToken != null ? msg.clientToken.trim() : "";
-		final String reqId = msg.requestId;
-		submitHttp(() -> {
-			SessionInfo snap = snapshotSessionInfo();
-			WireMessage resp = new WireMessage();
-			resp.type = "stream_link_resp";
-			resp.requestId = reqId;
-			try {
-				JsonObject body = new JsonObject();
-				body.addProperty("token", token);
-				JsonObject res = httpPostJson(OVERLAY_API_BASE + "/api/playalong/link-request", body);
-				if (res != null && res.has("ok") && res.get("ok").getAsBoolean()) {
-					resp.commandOk = true;
-					resp.linkCode = res.has("code") ? res.get("code").getAsString() : "";
-					resp.linkExpiresSec = res.has("expires_in") ? res.get("expires_in").getAsInt() : 300;
-				} else {
-					resp.commandOk = false;
-					resp.message = (res != null && res.has("error"))
-							? res.get("error").getAsString()
-							: "Overlay server unavailable.";
-				}
-			} catch (Exception e) {
-				resp.commandOk = false;
-				resp.message = "Overlay server unavailable (" + e.getMessage() + ")";
-			}
-			resp.economy = fetchEconomyStateFromOverlay(token, snap);
-			safeSend(conn, PlayAlongProtocol.GSON.toJson(resp));
-		});
-	}
-
-	private void handleStreamCommandRequest(final WebSocket conn, WireMessage msg) {
-		final String token = msg.clientToken != null ? msg.clientToken.trim() : "";
-		final String rawCmd = msg.rawCommand != null ? msg.rawCommand.trim() : "";
-		final String reqId = msg.requestId;
-		submitHttp(() -> {
-			SessionInfo snap = snapshotSessionInfo();
-			WireMessage resp = new WireMessage();
-			resp.type = "stream_cmd_resp";
-			resp.requestId = reqId;
-			try {
-				JsonObject body = new JsonObject();
-				body.addProperty("token", token);
-				body.addProperty("rawMessage", rawCmd);
-				JsonObject res = httpPostJson(OVERLAY_API_BASE + "/api/playalong/client-command", body);
-				if (res != null) {
-					resp.commandOk = res.has("ok") && res.get("ok").getAsBoolean();
-					if (res.has("message") && !res.get("message").isJsonNull()) {
-						resp.message = res.get("message").getAsString();
-					}
-					if (res.has("pts") && !res.get("pts").isJsonNull()) {
-						resp.pointsBalance = res.get("pts").getAsInt();
-					}
-					if (res.has("state") && res.get("state").isJsonObject()) {
-						resp.economy = parseEconomyState(res.getAsJsonObject("state"), snap);
-					}
-				} else {
-					resp.commandOk = false;
-					resp.message = "Overlay server offline.";
-				}
-			} catch (Exception e) {
-				resp.commandOk = false;
-				resp.message = "Overlay server offline.";
-			}
-			if (resp.economy == null) {
-				resp.economy = fetchEconomyStateFromOverlay(token, snap);
-			}
-			safeSend(conn, PlayAlongProtocol.GSON.toJson(resp));
-		});
-	}
-
-	private void triggerMilestoneRewardAsync(final WebSocket conn, final ClientRecord rec,
-	                                         final String sessionId, final String token,
-	                                         final String milestone, final int bossDepth) {
-		if (token == null || token.isEmpty()) return;
-		submitHttp(() -> {
-			try {
-				JsonObject body = new JsonObject();
-				body.addProperty("sessionId", sessionId != null ? sessionId : "");
-				body.addProperty("token", token);
-				body.addProperty("username", rec.username != null ? rec.username : "");
-				body.addProperty("milestone", milestone);
-				JsonObject res = httpPostJson(OVERLAY_API_BASE + "/api/playalong/milestone-reward", body);
-				if (res == null || !res.has("ok") || !res.get("ok").getAsBoolean()) return;
-
-				int awarded = res.has("awarded") ? res.get("awarded").getAsInt() : 0;
-				if (awarded <= 0) return;
-
-				String uname = res.has("username") ? res.get("username").getAsString() : rec.username;
-				String label = res.has("label") ? res.get("label").getAsString() : milestone;
-				String kind = res.has("kind") ? res.get("kind").getAsString() : "chat";
-				int bal = res.has("pts") ? res.get("pts").getAsInt() : 0;
-
-				WireMessage notice = new WireMessage();
-				notice.type = "milestone_reward_notice";
-				notice.username = uname;
-				notice.message = label;
-				notice.pointsAwarded = awarded;
-				notice.rewardKind = kind;
-				notice.pointsBalance = bal;
-				notice.depth = bossDepth;
-				safeSend(conn, PlayAlongProtocol.GSON.toJson(notice));
-
-				if (bossDepth > 0 && callbacks != null) {
-					callbacks.onChatterBossSlain(uname, bossDepth, awarded);
-				}
-			} catch (Exception ignored) {
-			}
-		});
-	}
-
-	private void syncLinkedUsernameForJoin(ClientRecord rec, String token, String shortSuffix) {
+	private boolean safeSend(WebSocket conn, String json) {
+		if (conn == null || !conn.isOpen() || json == null) {
+			return false;
+		}
 		try {
-			StreamEconomyState eco = fetchEconomyStateFromOverlay(token, snapshotSessionInfo());
-			if (eco != null && eco.linked && eco.linkedUsername != null && !eco.linkedUsername.trim().isEmpty()) {
-				String verified = PlayAlongProtocol.sanitizeUsername(eco.linkedUsername, shortSuffix);
-				rec.username = verified;
-				if (rec.ghost != null) {
-					rec.ghost.username = verified;
-				}
-				dirty = true;
-			}
-		} catch (Exception ignored) {
-		}
-	}
-
-	private StreamEconomyState fetchEconomyStateFromOverlay(String token, SessionInfo snap) {
-		try {
-			String enc = URLEncoder.encode(token != null ? token : "", "UTF-8");
-			String url = OVERLAY_API_BASE + "/api/playalong/client-state?token=" + enc
-					+ (snap.inDungeon ? ("&depth=" + snap.hostDepth) : "");
-			JsonObject json = httpGetJson(url);
-			if (json != null) {
-				return parseEconomyState(json, snap);
-			}
-		} catch (Exception ignored) {
-		}
-		StreamEconomyState fallback = new StreamEconomyState();
-		fallback.serverOnline = snap.serverOnline;
-		fallback.inDungeon = snap.inDungeon;
-		fallback.playAlongActive = snap.active;
-		fallback.hostDepth = snap.hostDepth;
-		fallback.hostHp = snap.hostHp;
-		fallback.hostHt = snap.hostHt;
-		return fallback;
-	}
-
-	private static StreamEconomyState parseEconomyState(JsonObject json, SessionInfo snap) {
-		StreamEconomyState eco = new StreamEconomyState();
-		eco.serverOnline = snap.serverOnline;
-		eco.inDungeon = snap.inDungeon;
-		eco.playAlongActive = snap.active;
-		eco.hostDepth = snap.hostDepth;
-		eco.hostHp = snap.hostHp;
-		eco.hostHt = snap.hostHt;
-
-		eco.spendDisabled = getBool(json, "spend_disabled", false);
-		eco.doublePointsActive = getBool(json, "double_points_active", false);
-		eco.doublePointsSecLeft = getInt(json, "double_points_sec_left", 0);
-		eco.deathCostMult = getFloat(json, "death_cost_mult", 1f);
-		eco.bankRatioManual = getFloat(json, "bank_ratio_manual", 0.10f);
-
-		if (json.has("costs") && json.get("costs").isJsonObject()) {
-			readIntMap(json.getAsJsonObject("costs"), eco.costs);
-		}
-		if (json.has("monster_costs") && json.get("monster_costs").isJsonObject()) {
-			readIntMap(json.getAsJsonObject("monster_costs"), eco.monsterCosts);
-		}
-		if (json.has("champion_costs") && json.get("champion_costs").isJsonObject()) {
-			readIntMap(json.getAsJsonObject("champion_costs"), eco.championCosts);
-		}
-		if (json.has("free_keys") && json.get("free_keys").isJsonArray()) {
-			readStringList(json.getAsJsonArray("free_keys"), eco.freeKeys);
-		}
-		if (json.has("disabled_commands") && json.get("disabled_commands").isJsonArray()) {
-			readStringList(json.getAsJsonArray("disabled_commands"), eco.disabledCommands);
-		}
-		if (json.has("bestiary") && json.get("bestiary").isJsonObject()) {
-			JsonObject b = json.getAsJsonObject("bestiary");
-			eco.bestiaryLevel = getInt(b, "level", 1);
-			eco.bestiaryZone = getStr(b, "zone", "Sewers");
-			eco.bestiaryXp = getInt(b, "bar_xp", 0);
-			eco.bestiaryThreshold = getInt(b, "bar_threshold", 1000);
-			if (b.has("unlocked_monsters") && b.get("unlocked_monsters").isJsonArray()) {
-				readStringList(b.getAsJsonArray("unlocked_monsters"), eco.bestiaryUnlocked);
-			}
-		}
-		if (json.has("user") && json.get("user").isJsonObject()) {
-			JsonObject u = json.getAsJsonObject("user");
-			eco.linked = getBool(u, "linked", false);
-			eco.linkedUsername = getStr(u, "username", "");
-			eco.linkedPlatform = getStr(u, "platform", "");
-			eco.chatPts = getInt(u, "chat_pts", 0);
-			eco.donorPts = getInt(u, "donor_pts", 0);
-			eco.totalPts = getInt(u, "total_pts", 0);
-			eco.chatCap = getInt(u, "chat_cap", 300);
-			eco.fardUsed = getBool(u, "fard_used", false);
-			eco.summonCooldownSec = getInt(u, "summon_cooldown_sec", 0);
-		}
-		return eco;
-	}
-
-	private static void readIntMap(JsonObject obj, Map<String, Integer> out) {
-		for (Map.Entry<String, JsonElement> e : obj.entrySet()) {
-			try {
-				out.put(e.getKey(), e.getValue().getAsInt());
-			} catch (Exception ignored) {
-			}
-		}
-	}
-
-	private static void readStringList(JsonArray arr, List<String> out) {
-		for (JsonElement el : arr) {
-			if (el != null && !el.isJsonNull()) {
-				out.add(el.getAsString());
-			}
-		}
-	}
-
-	private static boolean getBool(JsonObject o, String k, boolean def) {
-		return o.has(k) && !o.get(k).isJsonNull() ? o.get(k).getAsBoolean() : def;
-	}
-
-	private static int getInt(JsonObject o, String k, int def) {
-		return o.has(k) && !o.get(k).isJsonNull() ? o.get(k).getAsInt() : def;
-	}
-
-	private static float getFloat(JsonObject o, String k, float def) {
-		return o.has(k) && !o.get(k).isJsonNull() ? o.get(k).getAsFloat() : def;
-	}
-
-	private static String getStr(JsonObject o, String k, String def) {
-		return o.has(k) && !o.get(k).isJsonNull() ? o.get(k).getAsString() : def;
-	}
-
-	private void submitHttp(Runnable task) {
-		ExecutorService pool = httpPool;
-		if (pool != null && !pool.isShutdown()) {
-			try {
-				pool.submit(task);
-			} catch (Exception ignored) {
-			}
-		}
-	}
-
-	private static JsonObject httpGetJson(String urlStr) throws Exception {
-		HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
-		conn.setRequestMethod("GET");
-		conn.setConnectTimeout(1500);
-		conn.setReadTimeout(2500);
-		return readJsonResponse(conn);
-	}
-
-	private static JsonObject httpPostJson(String urlStr, JsonObject payload) throws Exception {
-		HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
-		conn.setRequestMethod("POST");
-		conn.setDoOutput(true);
-		conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-		conn.setConnectTimeout(1500);
-		conn.setReadTimeout(12000);
-		byte[] bytes = payload.toString().getBytes(StandardCharsets.UTF_8);
-		try (OutputStream os = conn.getOutputStream()) {
-			os.write(bytes);
-		}
-		return readJsonResponse(conn);
-	}
-
-	private static JsonObject readJsonResponse(HttpURLConnection conn) throws Exception {
-		int code = conn.getResponseCode();
-		InputStream is = (code >= 200 && code < 400) ? conn.getInputStream() : conn.getErrorStream();
-		if (is == null) return null;
-		StringBuilder sb = new StringBuilder();
-		try (BufferedReader br = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
-			String line;
-			while ((line = br.readLine()) != null) {
-				sb.append(line);
-			}
-		} finally {
-			conn.disconnect();
-		}
-		String raw = sb.toString().trim();
-		if (raw.isEmpty()) return null;
-		JsonElement el = JsonParser.parseString(raw);
-		return el != null && el.isJsonObject() ? el.getAsJsonObject() : null;
-	}
-
-	private static void safeSend(WebSocket conn, String json) {
-		if (conn != null && conn.isOpen() && json != null) {
-			try {
-				conn.send(json);
-			} catch (Exception ignored) {
-			}
+			conn.send(json);
+			return true;
+		} catch (Exception e) {
+			metrics.incrementWsSendFailures();
+			reportFailure("ws_send", currentSessionId(), e);
+			return false;
 		}
 	}
 
 	private void sendToSessionClients(String json) {
 		for (WebSocket conn : connToClient.keySet()) {
-			if (conn != null && conn.isOpen()) {
-				try {
-					conn.send(json);
-				} catch (Exception ignored) {
-				}
-			}
+			safeSend(conn, json);
 		}
 	}
 
 	private static String safeHeroClass(String raw) {
 		if (raw == null) return "WARRIOR";
-		switch (raw.toUpperCase()) {
+		switch (raw.toUpperCase(Locale.ROOT)) {
 			case "WARRIOR":
 			case "MAGE":
 			case "ROGUE":
 			case "HUNTRESS":
 			case "DUELIST":
 			case "CLERIC":
-				return raw.toUpperCase();
+				return raw.toUpperCase(Locale.ROOT);
 			default:
 				return "WARRIOR";
 		}
@@ -1100,13 +999,13 @@ public class PlayAlongServer extends WebSocketServer {
 
 	private static String safeAction(String raw) {
 		if (raw == null) return "IDLE";
-		switch (raw.toUpperCase()) {
+		switch (raw.toUpperCase(Locale.ROOT)) {
 			case "IDLE":
 			case "MOVE":
 			case "ATTACK":
 			case "OPERATE":
 			case "DEAD":
-				return raw.toUpperCase();
+				return raw.toUpperCase(Locale.ROOT);
 			default:
 				return "IDLE";
 		}

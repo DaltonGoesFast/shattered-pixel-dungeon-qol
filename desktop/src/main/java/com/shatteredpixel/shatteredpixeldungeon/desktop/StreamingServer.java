@@ -18,6 +18,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService;
+import com.shatteredpixel.shatteredpixeldungeon.streaming.StreamingCommandHandler;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GameStateSnapshot;
 import com.watabou.noosa.Game;
 import com.watabou.utils.Random;

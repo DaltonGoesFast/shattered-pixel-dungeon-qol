@@ -44,7 +44,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Drop-in lobby & Stream Command hub opened when clicking the glowing red DaltonGoesFast [LIVE] button.
+ * Drop-in lobby & Stream Command hub opened when clicking the glowing live status button.
  */
 public class WndPlayAlongJoin extends Window {
 
@@ -53,7 +53,9 @@ public class WndPlayAlongJoin extends Window {
 
 	private HeroClass selectedClass = HeroClass.WARRIOR;
 	private String username;
+	private String joinCode;
 	private RedButton btnName;
+	private RedButton btnJoinCode;
 	private RenderedTextBlock linkInfo;
 	private final List<RedButton> classButtons = new ArrayList<>();
 
@@ -64,8 +66,10 @@ public class WndPlayAlongJoin extends Window {
 		if (this.username.isEmpty()) {
 			this.username = "Chatter";
 		}
+		this.joinCode = SPDSettings.playAlongJoinCode();
 
-		String titleTxt = session.active ? "Play Along [LIVE]" : "DaltonGoesFast [LIVE]";
+		final String hostName = session.displayHostName();
+		String titleTxt = session.active ? "Play Along [LIVE]" : (hostName + " [LIVE]");
 		RenderedTextBlock title = PixelScene.renderTextBlock(titleTxt, 10);
 		title.hardlight(0xFF4444);
 		title.setPos((WIDTH - title.width()) / 2f, 2);
@@ -79,16 +83,16 @@ public class WndPlayAlongJoin extends Window {
 			String seedDisplay = (session.customSeedText != null && !session.customSeedText.isEmpty())
 					? session.customSeedText
 					: DungeonSeed.convertToCode(session.seed);
-			statusTxt = "Dalton: Depth " + session.hostDepth
+			statusTxt = hostName + ": Depth " + session.hostDepth
 					+ " (" + session.hostHp + "/" + session.hostHt + " HP)\n"
 					+ "Racers: " + session.activePlayers + " • Seed: " + seedDisplay + "\n"
-					+ "Goal: Get the Amulet before Dalton dies!";
+					+ "Goal: Get the Amulet before " + hostName + " dies!";
 		} else if (session.inDungeon) {
-			statusTxt = "Dalton: Depth " + session.hostDepth
+			statusTxt = hostName + ": Depth " + session.hostDepth
 					+ " (" + session.hostHp + "/" + session.hostHt + " HP)\n"
 					+ "Solo Stream Run — Stream commands are LIVE!";
 		} else {
-			statusTxt = "Dalton is in the menu / between runs.\n"
+			statusTxt = hostName + " is in the menu / between runs.\n"
 					+ "Account linking & community commands are ready!";
 		}
 		RenderedTextBlock info = PixelScene.renderTextBlock(statusTxt, 6);
@@ -154,7 +158,7 @@ public class WndPlayAlongJoin extends Window {
 						@Override
 						public void onSelect(boolean positive, String text) {
 							if (positive && text != null && !text.trim().isEmpty()) {
-								username = PlayAlongProtocol.sanitizeUsername(text, "01");
+								username = PlayAlongProtocol.sanitizeUsername(text, "01", session.hostUsername);
 								SPDSettings.playAlongUsername(username);
 								btnName.text("Name: " + username);
 							}
@@ -165,6 +169,19 @@ public class WndPlayAlongJoin extends Window {
 			btnName.setRect(0, pos, WIDTH, 16);
 			add(btnName);
 			pos = btnName.bottom() + GAP;
+
+			if (session.joinCodeRequired) {
+				String codeDisplay = joinCode.isEmpty() ? "(Required)" : joinCode;
+				btnJoinCode = new RedButton("Join Code: " + codeDisplay, 7) {
+					@Override
+					protected void onClick() {
+						promptJoinCode(session, false);
+					}
+				};
+				btnJoinCode.setRect(0, pos, WIDTH, 16);
+				add(btnJoinCode);
+				pos = btnJoinCode.bottom() + GAP;
+			}
 
 			RenderedTextBlock pickCls = PixelScene.renderTextBlock("Pick Hero Class:", 6);
 			pickCls.hardlight(TITLE_COLOR);
@@ -194,8 +211,12 @@ public class WndPlayAlongJoin extends Window {
 			StyledButton btnDropIn = new RedButton("DROP INTO RUN", 8) {
 				@Override
 				protected void onClick() {
+					if (session.joinCodeRequired && joinCode.isEmpty()) {
+						promptJoinCode(session, true);
+						return;
+					}
 					hide();
-					PlayAlongService.startClientRun(session, selectedClass, username);
+					PlayAlongService.startClientRun(session, selectedClass, username, joinCode);
 				}
 			};
 			btnDropIn.icon(Icons.get(Icons.ENTER));
@@ -220,7 +241,7 @@ public class WndPlayAlongJoin extends Window {
 			if (parent == null || eco == null) return;
 			linkInfo.text(formatLinkLine(eco));
 			if (eco.linked && eco.linkedUsername != null && !eco.linkedUsername.trim().isEmpty()) {
-				username = PlayAlongProtocol.sanitizeUsername(eco.linkedUsername, "01");
+				username = PlayAlongProtocol.sanitizeUsername(eco.linkedUsername, "01", session.hostUsername);
 				if (btnName != null) {
 					btnName.text("Name: " + username + " (Linked)");
 				}
@@ -229,6 +250,32 @@ public class WndPlayAlongJoin extends Window {
 				linkInfo.hardlight(0xFFCC44);
 			}
 		}));
+	}
+
+	private void promptJoinCode(final SessionInfo session, final boolean joinAfter) {
+		ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
+				"Lobby Join Code",
+				"Enter the host's Play Along join code:",
+				joinCode,
+				12,
+				false,
+				"Confirm",
+				"Cancel") {
+			@Override
+			public void onSelect(boolean positive, String text) {
+				if (positive && text != null && !text.trim().isEmpty()) {
+					joinCode = text.trim().toUpperCase(java.util.Locale.ROOT);
+					SPDSettings.playAlongJoinCode(joinCode);
+					if (btnJoinCode != null) {
+						btnJoinCode.text("Join Code: " + joinCode);
+					}
+					if (joinAfter) {
+						WndPlayAlongJoin.this.hide();
+						PlayAlongService.startClientRun(session, selectedClass, username, joinCode);
+					}
+				}
+			}
+		});
 	}
 
 	private static String formatLinkLine(StreamEconomyState eco) {

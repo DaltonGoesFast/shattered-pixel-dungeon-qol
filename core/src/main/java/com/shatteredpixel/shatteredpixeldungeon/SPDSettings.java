@@ -751,12 +751,18 @@ public class SPDSettings extends GameSettings {
 	//Play Along Mode
 	public static final String DEFAULT_PLAY_ALONG_ADDRESS = "spdqol.playit.plus:47974";
 	public static final int DEFAULT_PLAY_ALONG_PORT = 5005;
+	public static final String DEFAULT_STREAM_OVERLAY_URL = "http://127.0.0.1:5000";
+	public static final String DEFAULT_PLAY_ALONG_HOST_USERNAME = "Host";
 
 	public static final String KEY_PLAY_ALONG_ADDRESS = "play_along_address";
 	public static final String KEY_PLAY_ALONG_PORT = "play_along_port";
 	public static final String KEY_PLAY_ALONG_HOST_ENABLED = "play_along_host_enabled";
 	public static final String KEY_PLAY_ALONG_SHARED_CHAT = "play_along_shared_chat";
 	public static final String KEY_PLAY_ALONG_USERNAME = "play_along_username";
+	public static final String KEY_PLAY_ALONG_HOST_USERNAME = "play_along_host_username";
+	public static final String KEY_PLAY_ALONG_REQUIRE_JOIN_CODE = "play_along_require_join_code";
+	public static final String KEY_PLAY_ALONG_JOIN_CODE = "play_along_join_code";
+	public static final String KEY_STREAM_OVERLAY_URL = "stream_overlay_url";
 	public static final String KEY_STREAM_CLIENT_TOKEN = "stream_client_token";
 
 	public static synchronized String streamClientToken() {
@@ -766,6 +772,28 @@ public class SPDSettings extends GameSettings {
 			put( KEY_STREAM_CLIENT_TOKEN, tok );
 		}
 		return tok.trim();
+	}
+
+	public static void streamOverlayUrl( String value ) {
+		String normalized = normalizeOverlayUrl(value);
+		put( KEY_STREAM_OVERLAY_URL, normalized );
+	}
+
+	public static String streamOverlayUrl() {
+		String s = getString( KEY_STREAM_OVERLAY_URL, DEFAULT_STREAM_OVERLAY_URL );
+		return normalizeOverlayUrl(s);
+	}
+
+	public static String normalizeOverlayUrl( String value ) {
+		String s = value == null ? "" : value.trim();
+		if (s.isEmpty()) return DEFAULT_STREAM_OVERLAY_URL;
+		if (!s.startsWith("http://") && !s.startsWith("https://")) {
+			s = "http://" + s;
+		}
+		while (s.endsWith("/")) {
+			s = s.substring(0, s.length() - 1);
+		}
+		return s.isEmpty() ? DEFAULT_STREAM_OVERLAY_URL : s;
 	}
 
 	public static void playAlongAddress( String value ) {
@@ -812,5 +840,40 @@ public class SPDSettings extends GameSettings {
 	public static String playAlongUsername() {
 		String s = getString( KEY_PLAY_ALONG_USERNAME, "" );
 		return s == null ? "" : s.trim();
+	}
+
+	public static void playAlongHostUsername( String value ) {
+		String trimmed = value == null ? "" : value.trim();
+		put( KEY_PLAY_ALONG_HOST_USERNAME, trimmed.isEmpty() ? DEFAULT_PLAY_ALONG_HOST_USERNAME : trimmed );
+	}
+
+	public static String playAlongHostUsername() {
+		String s = getString( KEY_PLAY_ALONG_HOST_USERNAME, DEFAULT_PLAY_ALONG_HOST_USERNAME );
+		if (s == null || s.trim().isEmpty()) {
+			return DEFAULT_PLAY_ALONG_HOST_USERNAME;
+		}
+		return s.trim();
+	}
+
+	public static String playAlongHostUsernameSafe() {
+		return playAlongHostUsername();
+	}
+
+	public static void playAlongRequireJoinCode( boolean value ) {
+		put( KEY_PLAY_ALONG_REQUIRE_JOIN_CODE, value );
+	}
+
+	public static boolean playAlongRequireJoinCode() {
+		return getBoolean( KEY_PLAY_ALONG_REQUIRE_JOIN_CODE, true );
+	}
+
+	public static void playAlongJoinCode( String value ) {
+		String cleaned = value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
+		put( KEY_PLAY_ALONG_JOIN_CODE, cleaned );
+	}
+
+	public static String playAlongJoinCode() {
+		String s = getString( KEY_PLAY_ALONG_JOIN_CODE, "" );
+		return s == null ? "" : s.trim().toUpperCase(Locale.ROOT);
 	}
 }

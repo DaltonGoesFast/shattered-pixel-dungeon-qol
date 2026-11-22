@@ -72,6 +72,7 @@ public class PlayAlongClient {
 	private volatile String lastUserId;
 	private volatile String lastUsername;
 	private volatile String lastClientToken;
+	private volatile String lastJoinCode;
 	private volatile String lastHeroClass;
 	private volatile String lastModVersion;
 	private volatile String lastSessionId;
@@ -113,7 +114,9 @@ public class PlayAlongClient {
 								ref.set(msg.session);
 								latch.countDown();
 							}
-						} catch (Exception ignored) {
+						} catch (Exception e) {
+							System.err.println("[PlayAlongClient] Status ping parse failed: "
+									+ e.getClass().getSimpleName() + ": " + e.getMessage());
 						}
 					}
 
@@ -132,12 +135,16 @@ public class PlayAlongClient {
 					latch.await(PING_TIMEOUT_MS, TimeUnit.MILLISECONDS);
 					result = ref.get();
 				}
-			} catch (Exception ignored) {
+			} catch (Exception e) {
+				System.err.println("[PlayAlongClient] Status ping failed (" + address + "): "
+						+ e.getClass().getSimpleName() + ": " + e.getMessage());
 			} finally {
 				if (pingSocket != null) {
 					try {
 						pingSocket.close();
-					} catch (Exception ignored) {
+					} catch (Exception e) {
+						System.err.println("[PlayAlongClient] Failed to parse message: "
+								+ e.getClass().getSimpleName() + ": " + e.getMessage());
 					}
 				}
 			}
@@ -180,7 +187,9 @@ public class PlayAlongClient {
 									latch.countDown();
 								}
 							}
-						} catch (Exception ignored) {
+						} catch (Exception e) {
+							System.err.println("[PlayAlongClient] Control response parse failed: "
+									+ e.getClass().getSimpleName() + ": " + e.getMessage());
 						}
 					}
 
@@ -199,12 +208,16 @@ public class PlayAlongClient {
 					latch.await(timeoutMs, TimeUnit.MILLISECONDS);
 					result = ref.get();
 				}
-			} catch (Exception ignored) {
+			} catch (Exception e) {
+				System.err.println("[PlayAlongClient] Control request failed (" + address + "): "
+						+ e.getClass().getSimpleName() + ": " + e.getMessage());
 			} finally {
 				if (ws != null) {
 					try {
 						ws.close();
-					} catch (Exception ignored) {
+					} catch (Exception e) {
+						System.err.println("[PlayAlongClient] Failed to parse message: "
+								+ e.getClass().getSimpleName() + ": " + e.getMessage());
 					}
 				}
 			}
@@ -219,6 +232,12 @@ public class PlayAlongClient {
 	public synchronized void connect(String address, String userId, String username,
 	                                 String clientToken, String heroClass, String modVersion, String sessionId,
 	                                 int depth, int branch, int pos, boolean isRejoin) {
+		connect(address, userId, username, clientToken, "", heroClass, modVersion, sessionId, depth, branch, pos, isRejoin);
+	}
+
+	public synchronized void connect(String address, String userId, String username,
+	                                 String clientToken, String joinCode, String heroClass, String modVersion, String sessionId,
+	                                 int depth, int branch, int pos, boolean isRejoin) {
 		closeInternal();
 		this.intentionalClose = false;
 		this.disconnectedSinceMs = 0L;
@@ -226,6 +245,7 @@ public class PlayAlongClient {
 		this.lastUserId = userId;
 		this.lastUsername = username;
 		this.lastClientToken = clientToken;
+		this.lastJoinCode = joinCode != null ? joinCode.trim() : "";
 		this.lastHeroClass = heroClass;
 		this.lastModVersion = modVersion;
 		this.lastSessionId = sessionId;
@@ -259,10 +279,12 @@ public class PlayAlongClient {
 
 					WireMessage join = new WireMessage();
 					join.type = isRejoin ? "rejoin" : "join";
+					join.protocolVersion = PlayAlongProtocol.PROTOCOL_VERSION;
 					join.sessionId = lastSessionId;
 					join.userId = lastUserId;
 					join.username = lastUsername;
 					join.clientToken = lastClientToken;
+					join.joinCode = lastJoinCode;
 					join.heroClass = lastHeroClass;
 					join.modVersion = lastModVersion;
 					join.depth = lastDepth;
@@ -316,7 +338,9 @@ public class PlayAlongClient {
 								listener.onChatCommand(msg);
 								break;
 						}
-					} catch (Exception ignored) {
+					} catch (Exception e) {
+						System.err.println("[PlayAlongClient] Failed to parse message: "
+								+ e.getClass().getSimpleName() + ": " + e.getMessage());
 					}
 				}
 
@@ -386,7 +410,9 @@ public class PlayAlongClient {
 		if (ws != null && ws.isOpen()) {
 			try {
 				ws.send(PlayAlongProtocol.GSON.toJson(msg));
-			} catch (Exception ignored) {
+			} catch (Exception e) {
+				System.err.println("[PlayAlongClient] WebSocket send failed: "
+						+ e.getClass().getSimpleName() + ": " + e.getMessage());
 			}
 		}
 	}

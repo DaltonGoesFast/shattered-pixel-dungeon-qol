@@ -359,13 +359,15 @@ public class GameScene extends PixelScene {
 		mobs.add( hero );
 		if (PlayAlongService.isSpectating()) {
 			hero.visible = false;
+		} else {
+			Rebirth.claimStrayCurrency();
+			FirstDescent.applyIfPending();
+			Rebirth.announceGift();
 		}
-
-		Rebirth.claimStrayCurrency();
-		FirstDescent.applyIfPending();
-		Rebirth.announceGift();
 		hero.updateArmor();
-		Legacy.resumeIfPending();
+		if (!PlayAlongService.isSpectating()) {
+			Legacy.resumeIfPending();
+		}
 		
 		for (Mob mob : Dungeon.level.mobs) {
 			addMobSprite( mob );

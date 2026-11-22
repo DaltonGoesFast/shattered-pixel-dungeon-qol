@@ -730,13 +730,14 @@ public class InterlevelScene extends PixelScene {
 	}
 	
 	private void returnTo() throws IOException {
+		if (com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.isSpectating()) {
+			com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.spectatorReturnTo(
+					returnDepth, returnBranch, returnPos);
+			return;
+		}
+
 		Mob.holdAllies( Dungeon.level );
 		Dungeon.saveAll();
-		if (com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.isSpectating() && Dungeon.level != null) {
-			try {
-				Dungeon.saveLevel( GamesInProgress.curSlot );
-			} catch (Exception ignored) {}
-		}
 
 		if (debugGenerateSkipped) {
 			try {
