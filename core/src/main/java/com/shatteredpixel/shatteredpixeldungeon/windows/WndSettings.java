@@ -986,9 +986,7 @@ public class WndSettings extends WndTabbed {
 					protected void onClick() {
 						super.onClick();
 						SPDSettings.playAlongHostEnabled(checked());
-						if (checked()) {
-							com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.ensureHostServerStarted();
-						}
+						com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onHostSettingChanged(checked());
 					}
 				};
 				chkPlayAlongHost.checked(SPDSettings.playAlongHostEnabled());

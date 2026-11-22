@@ -176,6 +176,7 @@ public class GamesInProgress {
 		info.daily = Dungeon.daily;
 		info.dailyReplay = Dungeon.dailyReplay;
 		info.debugRun = Dungeon.debugRun;
+		info.playAlongSessionId = Dungeon.playAlongSessionId != null ? Dungeon.playAlongSessionId : "";
 		info.feeling = Dungeon.level != null ? Dungeon.level.feeling : Level.Feeling.NONE;
 		
 		info.level = Dungeon.hero.lvl;
@@ -217,6 +218,7 @@ public class GamesInProgress {
 		public boolean daily;
 		public boolean dailyReplay;
 		public boolean debugRun;
+		public String playAlongSessionId = "";
 		public Level.Feeling feeling = Level.Feeling.NONE;
 		public long lastPlayed;
 

@@ -127,7 +127,7 @@ public class WndGame extends Window {
 				}
 				// End training run + close steps.jsonl while process stays at title.
 				TrainingExport.onSessionEnd();
-				com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.disconnect();
+				com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onQuitToTitle();
 				Game.switchScene(TitleScene.class);
 			}
 		});

@@ -78,6 +78,7 @@ public class PlayAlongServer extends WebSocketServer {
 
 	private static final int MAX_CLIENTS = 100;
 	private static final int RATE_LIMIT_PER_SEC = 8;
+	private static final long BOOT_REJOIN_GRACE_MS = 90_000L;
 	private static final String OVERLAY_API_BASE = "http://127.0.0.1:5000";
 
 	private static class ClientRecord {
@@ -104,6 +105,8 @@ public class PlayAlongServer extends WebSocketServer {
 	private volatile GhostState hostGhost;
 	private volatile WipeEvent lastWipeEvent;
 	private volatile boolean dirty = false;
+	private final long serverStartedAtMs = System.currentTimeMillis();
+	private volatile boolean sessionExplicitlyEnded = false;
 
 	private ScheduledExecutorService ticker;
 	private ExecutorService httpPool;
@@ -146,20 +149,62 @@ public class PlayAlongServer extends WebSocketServer {
 		}
 	}
 
+	public SessionInfo getActiveSession() {
+		return activeSession;
+	}
+
+	private void closeAllSessionClients(int code, String reason) {
+		List<WebSocket> conns = new ArrayList<>(connToClient.keySet());
+		for (WebSocket conn : conns) {
+			if (conn != null && conn.isOpen()) {
+				try {
+					conn.close(code, reason);
+				} catch (Exception ignored) {
+				}
+			}
+		}
+	}
+
 	public synchronized void startSession(SessionInfo session, GhostState initialHost) {
+		if (this.activeSession != null && (session == null || this.activeSession.sessionId == null
+				|| !this.activeSession.sessionId.equals(session.sessionId))) {
+			closeAllSessionClients(1000, "New Play Along session started");
+		}
 		this.activeSession = session;
 		this.hostGhost = initialHost;
 		this.lastWipeEvent = null;
+		this.sessionExplicitlyEnded = false;
 		this.clientsByUserId.clear();
 		this.connToClient.clear();
 		this.tombstones.clear();
 		this.dirty = true;
 	}
 
+	public synchronized WireMessage resumeSession(GhostState currentHost, int hp, int ht, String heroClass) {
+		if (this.activeSession == null || !this.activeSession.active) {
+			return null;
+		}
+		this.sessionExplicitlyEnded = false;
+		this.hostGhost = currentHost;
+		if (currentHost != null) {
+			this.activeSession.hostDepth = currentHost.depth;
+			this.activeSession.hostPos = currentHost.pos;
+		}
+		this.activeSession.hostHp = hp;
+		this.activeSession.hostHt = ht;
+		if (heroClass != null && !heroClass.isEmpty()) {
+			this.activeSession.hostClass = heroClass;
+		}
+		this.dirty = true;
+		return buildWorldStateMessage();
+	}
+
 	public synchronized void endSession() {
+		this.sessionExplicitlyEnded = true;
 		if (this.activeSession != null) {
 			this.activeSession.active = false;
 		}
+		closeAllSessionClients(1000, "Play Along session ended");
 		this.clientsByUserId.clear();
 		this.connToClient.clear();
 		this.tombstones.clear();
@@ -424,7 +469,18 @@ public class PlayAlongServer extends WebSocketServer {
 
 		SessionInfo session = activeSession;
 		if (session == null || !session.active) {
+			if (isRejoin && session == null && !sessionExplicitlyEnded
+					&& (System.currentTimeMillis() - serverStartedAtMs) < BOOT_REJOIN_GRACE_MS) {
+				conn.close(1013, "Host is loading save");
+				return;
+			}
 			sendJoinError(conn, "Dalton is not currently hosting a Play Along run.");
+			return;
+		}
+		if (isRejoin && msg.sessionId != null && !msg.sessionId.isEmpty()
+				&& session.sessionId != null && !session.sessionId.isEmpty()
+				&& !msg.sessionId.equals(session.sessionId)) {
+			sendJoinError(conn, "Dalton started a different Play Along run! Return to title to join.");
 			return;
 		}
 		if (msg.modVersion != null && !msg.modVersion.isEmpty()
@@ -448,10 +504,12 @@ public class PlayAlongServer extends WebSocketServer {
 
 		ClientRecord rec = clientsByUserId.get(userId);
 		if (rec == null) {
+			boolean rejoinedAsDead = isRejoin && "DEAD".equalsIgnoreCase(msg.action);
 			rec = new ClientRecord();
 			rec.userId = userId;
 			rec.username = safeName;
 			rec.clientToken = cToken;
+			rec.alive = !rejoinedAsDead;
 			rec.ghost = new GhostState();
 			rec.ghost.userId = userId;
 			rec.ghost.username = safeName;
@@ -460,7 +518,8 @@ public class PlayAlongServer extends WebSocketServer {
 			rec.ghost.depth = Math.max(1, msg.depth);
 			rec.ghost.branch = msg.branch;
 			rec.ghost.pos = msg.pos;
-			rec.ghost.hpPct = 1f;
+			rec.ghost.hpPct = rejoinedAsDead ? 0f : 1f;
+			rec.ghost.action = rejoinedAsDead ? "DEAD" : "IDLE";
 			rec.ghost.isHost = false;
 			rec.ghost.lastUpdateMs = System.currentTimeMillis();
 			clientsByUserId.put(userId, rec);
@@ -479,6 +538,11 @@ public class PlayAlongServer extends WebSocketServer {
 				rec.alive = true;
 				rec.won = false;
 				rec.claimedBossDepths.clear();
+			} else if (rec.ghost != null && rec.alive) {
+				if (msg.depth > 0) rec.ghost.depth = Math.max(1, Math.min(50, msg.depth));
+				rec.ghost.branch = Math.max(0, Math.min(10, msg.branch));
+				rec.ghost.pos = Math.max(0, msg.pos);
+				rec.ghost.lastUpdateMs = System.currentTimeMillis();
 			}
 		}
 		rec.conn = conn;

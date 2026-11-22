@@ -785,6 +785,7 @@ public class InterlevelScene extends PixelScene {
 			Level level = Dungeon.loadLevel( GamesInProgress.curSlot );
 			Dungeon.switchLevel( level, Dungeon.hero.pos );
 		}
+		com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onHostRunLoaded();
 	}
 	
 	private void resurrect() {

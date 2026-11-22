@@ -126,6 +126,8 @@ public final class PlayAlongService {
 	private static volatile HostWipeDoom pendingWipeOnScene = null;
 	private static volatile boolean localVictorySent = false;
 	private static volatile boolean localDeathSent = false;
+	private static volatile String pendingHostNotice = null;
+	private static volatile boolean clientHasJoinedOnce = false;
 
 	private static volatile StreamEconomyState cachedEconomy = null;
 	private static final ConcurrentHashMap<String, PlayAlongClient.WireMessageCallback> pendingStreamRequests = new ConcurrentHashMap<>();
@@ -350,36 +352,175 @@ public final class PlayAlongService {
 	// ---- Starting & Joining Runs ----
 
 	public static void onHostRunStarted() {
-		if (!DeviceCompat.isDesktop() || !SPDSettings.playAlongHostEnabled() || isClientJoining()) {
+		startOrResumeHostSession(false, false, false);
+	}
+
+	public static void onHostRunLoaded() {
+		startOrResumeHostSession(true, true, true);
+	}
+
+	public static void onQuitToTitle() {
+		if (role == Role.HOST && hostServer != null) {
+			boolean runStillAlive = Dungeon.hero != null
+					&& (Dungeon.hero.isAlive() || com.shatteredpixel.shatteredpixeldungeon.windows.WndResurrect.instance != null);
+			if (runStillAlive) {
+				role = Role.NONE;
+				pendingHostNotice = null;
+				System.out.println("[PlayAlong] Host saved & quit to title — keeping Play Along session alive.");
+				return;
+			}
+		}
+		disconnect();
+	}
+
+	public static void onHostSettingChanged(boolean enabled) {
+		if (!DeviceCompat.isDesktop()) return;
+		if (enabled) {
+			ensureHostServerStarted();
+			if (role == Role.NONE && !isClientJoining()
+					&& Game.scene() instanceof GameScene
+					&& Dungeon.hero != null && Dungeon.hero.isAlive()) {
+				startOrResumeHostSession(true, true, false);
+				String notice = pendingHostNotice;
+				pendingHostNotice = null;
+				if (notice != null) {
+					GLog.p(notice);
+				}
+			}
+		} else {
+			endHostSessionIfRunning();
+		}
+	}
+
+	public static void onHostSaveDeleted(String deletedSessionId) {
+		if (!DeviceCompat.isDesktop() || hostServer == null
+				|| deletedSessionId == null || deletedSessionId.trim().isEmpty()) {
 			return;
 		}
+		SessionInfo existing = hostServer.getActiveSession();
+		if (existing != null && existing.active && deletedSessionId.trim().equals(existing.sessionId)) {
+			endHostSessionIfRunning();
+		}
+	}
+
+	private static void startOrResumeHostSession(boolean allowResumeExisting, boolean isLoadedSave,
+	                                             boolean persistIdIfNew) {
+		if (!DeviceCompat.isDesktop() || isClientJoining()
+				|| role == Role.CLIENT || role == Role.SPECTATOR) {
+			return;
+		}
+		if (!SPDSettings.playAlongHostEnabled()) {
+			endHostSessionIfRunning();
+			if (!isLoadedSave) {
+				Dungeon.playAlongSessionId = "";
+			}
+			return;
+		}
+		if (Dungeon.hero == null) return;
+
 		ensureHostServerStarted();
 		if (hostServer == null) return;
+
+		String savedSid = Dungeon.playAlongSessionId != null ? Dungeon.playAlongSessionId.trim() : "";
+
+		if (allowResumeExisting && !savedSid.isEmpty()) {
+			SessionInfo existing = hostServer.getActiveSession();
+			if (existing != null && existing.active && savedSid.equals(existing.sessionId)) {
+				role = Role.HOST;
+				lastWipeCount = -1;
+				lastWipeSummary = "";
+
+				GhostState hg = buildLocalGhostState("IDLE", Dungeon.hero.pos, true);
+				hostGhost = hg;
+				hostDepth = Dungeon.depth;
+				hostBranch = Dungeon.branch;
+				hostPos = Dungeon.hero.pos;
+
+				WireMessage world = hostServer.resumeSession(
+						hg,
+						Dungeon.hero.HP,
+						Dungeon.hero.HT,
+						Dungeon.hero.heroClass != null ? Dungeon.hero.heroClass.name() : "WARRIOR");
+				if (world != null) {
+					applyWorldStateSnapshot(hg, world.ghosts, world.tombstones, world.activePlayers, world.depthCounts);
+					pendingHostNotice = world.activePlayers > 0
+							? ("Play Along resumed (" + world.activePlayers
+							+ (world.activePlayers == 1 ? " racer" : " racers") + " still connected)!")
+							: "Play Along lobby resumed!";
+					System.out.println("[PlayAlong] Resumed Play Along session " + savedSid
+							+ " (activePlayers=" + world.activePlayers + ")");
+					return;
+				}
+			}
+		}
 
 		resetRuntimeCollections();
 		role = Role.HOST;
 		lastWipeCount = -1;
 		lastWipeSummary = "";
 
+		boolean stampedNewId = false;
+		String sessionId;
+		if (isLoadedSave && !savedSid.isEmpty()) {
+			sessionId = savedSid;
+		} else {
+			sessionId = UUID.randomUUID().toString();
+			Dungeon.playAlongSessionId = sessionId;
+			stampedNewId = isLoadedSave;
+		}
+
 		SessionInfo info = new SessionInfo();
 		info.active = true;
-		info.sessionId = UUID.randomUUID().toString();
+		info.sessionId = sessionId;
 		info.version = Game.version != null ? Game.version : "";
 		info.seed = Dungeon.seed;
 		info.customSeedText = Dungeon.customSeedText != null ? Dungeon.customSeedText : "";
 		info.challenges = Dungeon.challenges;
 		info.modifiers = Dungeon.modifiers;
-		info.hostClass = Dungeon.hero != null ? Dungeon.hero.heroClass.name() : "WARRIOR";
+		info.hostClass = Dungeon.hero.heroClass != null ? Dungeon.hero.heroClass.name() : "WARRIOR";
 		info.hostDepth = Dungeon.depth;
-		info.hostPos = Dungeon.hero != null ? Dungeon.hero.pos : 0;
-		info.hostHp = Dungeon.hero != null ? Dungeon.hero.HP : 20;
-		info.hostHt = Dungeon.hero != null ? Dungeon.hero.HT : 20;
+		info.hostPos = Dungeon.hero.pos;
+		info.hostHp = Dungeon.hero.HP;
+		info.hostHt = Dungeon.hero.HT;
 
-		GhostState hg = buildLocalGhostState("IDLE", Dungeon.hero != null ? Dungeon.hero.pos : 0, true);
+		GhostState hg = buildLocalGhostState("IDLE", Dungeon.hero.pos, true);
 		hostGhost = hg;
 		hostDepth = Dungeon.depth;
 		hostBranch = Dungeon.branch;
+		hostPos = Dungeon.hero.pos;
 		hostServer.startSession(info, hg);
+
+		if (persistIdIfNew && stampedNewId
+				&& GamesInProgress.curSlot > 0 && GamesInProgress.curSlot != GamesInProgress.PLAY_ALONG_SLOT) {
+			try {
+				Dungeon.saveGame(GamesInProgress.curSlot);
+			} catch (Throwable ignored) {
+			}
+		}
+
+		if (isLoadedSave) {
+			pendingHostNotice = !savedSid.isEmpty()
+					? "Play Along lobby restored for this save (racers can reconnect)!"
+					: "Play Along lobby is now LIVE for this run!";
+			System.out.println("[PlayAlong] " + (!savedSid.isEmpty() ? "Restored" : "Started")
+					+ " Play Along session " + sessionId + " on save load.");
+		}
+	}
+
+	private static void endHostSessionIfRunning() {
+		if (hostServer != null) {
+			SessionInfo existing = hostServer.getActiveSession();
+			if (existing != null && existing.active) {
+				hostServer.endSession();
+			}
+		}
+		if (role == Role.HOST) {
+			role = Role.NONE;
+		}
+		pendingHostNotice = null;
+		lastWipeCount = -1;
+		lastWipeSummary = "";
+		resetRuntimeCollections();
 	}
 
 	public static void startClientRun(SessionInfo session, HeroClass heroClass, String rawUsername) {
@@ -400,6 +541,7 @@ public final class PlayAlongService {
 		wipeTriggeredOnClient = false;
 		localVictorySent = false;
 		localDeathSent = false;
+		clientHasJoinedOnce = false;
 		runStartMs = System.currentTimeMillis();
 		hostDepth = session.hostDepth;
 		hostPos = session.hostPos;
@@ -445,7 +587,18 @@ public final class PlayAlongService {
 				if (msg.session != null) {
 					activeClientSession = msg.session;
 				}
-				Game.runOnRenderThread(() -> GLog.p("Joined Dalton's Play Along run as %s!", clientUsername));
+				final boolean wasReconnect = clientHasJoinedOnce;
+				clientHasJoinedOnce = true;
+				Game.runOnRenderThread(() -> {
+					if (wasReconnect) {
+						GLog.p("Reconnected to Dalton's Play Along run as %s!", clientUsername);
+						if (Dungeon.hero != null && Dungeon.level != null && (role == Role.CLIENT || role == Role.SPECTATOR)) {
+							sendClientState(role == Role.SPECTATOR ? "DEAD" : "IDLE", Dungeon.hero.pos);
+						}
+					} else {
+						GLog.p("Joined Dalton's Play Along run as %s!", clientUsername);
+					}
+				});
 			}
 
 			@Override
@@ -589,6 +742,11 @@ public final class PlayAlongService {
 		}
 
 		if (role == Role.HOST && hostServer != null) {
+			String notice = pendingHostNotice;
+			pendingHostNotice = null;
+			if (notice != null) {
+				GLog.p(notice);
+			}
 			GhostState hg = buildLocalGhostState("IDLE", Dungeon.hero.pos, true);
 			hostGhost = hg;
 			hostDepth = Dungeon.depth;
@@ -852,6 +1010,9 @@ public final class PlayAlongService {
 	public static void enterSpiritCam() {
 		if (role != Role.CLIENT || !isHostAliveForSpectate()) return;
 		role = Role.SPECTATOR;
+		if (client != null) {
+			client.setSpectating(true);
+		}
 		magicMapCurrentFloor();
 		if (Dungeon.depth != hostDepth || Dungeon.branch != hostBranch) {
 			followHostFloor();
@@ -889,9 +1050,11 @@ public final class PlayAlongService {
 		}
 		role = Role.NONE;
 		clientJoinPending = false;
+		clientHasJoinedOnce = false;
 		activeClientSession = null;
 		wipeTriggeredOnClient = false;
 		pendingWipeOnScene = null;
+		pendingHostNotice = null;
 		lastWipeCount = -1;
 		lastWipeSummary = "";
 		resetRuntimeCollections();

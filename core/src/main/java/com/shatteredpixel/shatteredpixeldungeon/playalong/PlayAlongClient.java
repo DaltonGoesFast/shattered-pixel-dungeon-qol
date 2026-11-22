@@ -78,9 +78,14 @@ public class PlayAlongClient {
 	private volatile int lastDepth = 1;
 	private volatile int lastBranch = 0;
 	private volatile int lastPos = 0;
+	private volatile String lastAction = "IDLE";
 
 	public PlayAlongClient(ClientListener listener) {
 		this.listener = listener;
+	}
+
+	public void setSpectating(boolean spectating) {
+		this.lastAction = spectating ? "DEAD" : "IDLE";
 	}
 
 	public static void pingStatus(final String address, final StatusCallback callback) {
@@ -227,6 +232,7 @@ public class PlayAlongClient {
 		this.lastDepth = depth;
 		this.lastBranch = branch;
 		this.lastPos = pos;
+		this.lastAction = "IDLE";
 
 		openSocket(isRejoin);
 	}
@@ -249,7 +255,6 @@ public class PlayAlongClient {
 				@Override
 				public void onOpen(ServerHandshake handshakedata) {
 					opened.set(true);
-					disconnectedSinceMs = 0L;
 					reconnecting = false;
 
 					WireMessage join = new WireMessage();
@@ -263,6 +268,7 @@ public class PlayAlongClient {
 					join.depth = lastDepth;
 					join.branch = lastBranch;
 					join.pos = lastPos;
+					join.action = lastAction;
 					send(PlayAlongProtocol.GSON.toJson(join));
 				}
 
@@ -274,6 +280,7 @@ public class PlayAlongClient {
 						if (msg == null || msg.type == null || listener == null) return;
 						switch (msg.type) {
 							case "join_ack":
+								disconnectedSinceMs = 0L;
 								listener.onJoinAck(msg);
 								break;
 							case "join_error":
@@ -352,7 +359,7 @@ public class PlayAlongClient {
 			reconnecting = false;
 			if (intentionalClose) return;
 			long elapsed = System.currentTimeMillis() - disconnectedSinceMs;
-			if (elapsed > PlayAlongProtocol.RECONNECT_GRACE_MS) {
+			if (elapsed > PlayAlongProtocol.CLIENT_RECONNECT_GRACE_MS) {
 				intentionalClose = true;
 				if (listener != null) listener.onConnectionLost(true);
 				return;
@@ -365,6 +372,16 @@ public class PlayAlongClient {
 	}
 
 	public void send(WireMessage msg) {
+		if (msg != null && "player_state".equals(msg.type)) {
+			if (msg.depth > 0) this.lastDepth = msg.depth;
+			this.lastBranch = msg.branch;
+			this.lastPos = msg.pos;
+			if (msg.action != null && !msg.action.isEmpty()) {
+				this.lastAction = msg.action;
+			}
+		} else if (msg != null && "player_died".equals(msg.type)) {
+			this.lastAction = "DEAD";
+		}
 		WebSocketClient ws = socket;
 		if (ws != null && ws.isOpen()) {
 			try {

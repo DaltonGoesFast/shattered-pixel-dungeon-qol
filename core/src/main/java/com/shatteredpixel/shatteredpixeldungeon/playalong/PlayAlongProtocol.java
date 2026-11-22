@@ -41,6 +41,7 @@ public final class PlayAlongProtocol {
 	public static final int PROTOCOL_VERSION = 1;
 	public static final int MAX_PACKET_LENGTH = 4096;
 	public static final long RECONNECT_GRACE_MS = 30_000L;
+	public static final long CLIENT_RECONNECT_GRACE_MS = 120_000L;
 
 	public static final Gson GSON = new Gson();
 
