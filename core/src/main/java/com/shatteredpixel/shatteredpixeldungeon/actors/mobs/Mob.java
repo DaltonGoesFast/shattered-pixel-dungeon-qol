@@ -1109,6 +1109,7 @@ public abstract class Mob extends Char {
 
 				if (exp > 0) {
 					Dungeon.hero.sprite.showStatusWithIcon(CharSprite.POSITIVE, Integer.toString(exp), FloatingText.EXPERIENCE);
+					com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onKillExp(exp);
 				}
 				Dungeon.hero.earnExp(exp, getClass());
 				//in the vault level we manually progress ring IDing. 5 enemies defeated to an ID

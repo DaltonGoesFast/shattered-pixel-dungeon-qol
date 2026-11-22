@@ -33,6 +33,7 @@ public class Mod_Changes {
 
 	public static void addAllChanges( ArrayList<ChangeInfo> changeInfos ){
 		addOverview(changeInfos);
+		add_v4_0_2_QoL_19(changeInfos);
 		add_v4_0_2_QoL_18(changeInfos);
 		add_v4_0_2_QoL_17(changeInfos);
 		add_v4_0_2_QoL_16(changeInfos);
@@ -47,6 +48,29 @@ public class Mod_Changes {
 		add_v4_0_0_QoL_6(changeInfos);
 		add_v4_0_0_QoL_5(changeInfos);
 		add_v4_0_0(changeInfos);
+	}
+
+	private static void add_v4_0_2_QoL_19( ArrayList<ChangeInfo> changeInfos ) {
+		ChangeInfo changes = new ChangeInfo("4.0.2-QoL-19", true, "");
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes = new ChangeInfo(Messages.get(ChangesScene.class, "new"), false, null);
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.CHALLENGE_COLOR), "Play Along Kill EXP Donor Rewards",
+				"**-** Linked Play Along racers earn **donor points** from kill EXP (configurable pts-per-EXP in the points dashboard)\n" +
+				"**-** EXP banks per floor and cashes out when you **change depth** (including ascend) or **win** — pending floor EXP is lost on death or disconnect\n" +
+				"**-** Kill rewards use their own toggle (independent of milestone boss/victory rewards)"));
+
+		changes = new ChangeInfo(Messages.get(ChangesScene.class, "changes"), false, null);
+		changes.hardlight(CharSprite.WARNING);
+		changeInfos.add(changes);
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.CHALLENGE_COLOR), "Play Along Session Persistence",
+				"**-** Play Along sessions persist across saves and reloads with improved reconnection handling\n" +
+				"**-** Bestiary progression thresholds tuned"));
 	}
 
 	private static void add_v4_0_2_QoL_18( ArrayList<ChangeInfo> changeInfos ) {

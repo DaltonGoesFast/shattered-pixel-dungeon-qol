@@ -55,6 +55,7 @@ public class PlayAlongClient {
 		void onPlayerDiedNotice(WireMessage msg);
 		void onPlayerWonNotice(WireMessage msg);
 		void onMilestoneRewardNotice(WireMessage msg);
+		void onKillExpRewardNotice(WireMessage msg);
 		void onStreamMessage(WireMessage msg);
 		void onChatCommand(WireMessage msg);
 		void onConnectionLost(boolean permanentlyFailed);
@@ -306,6 +307,9 @@ public class PlayAlongClient {
 								break;
 							case "milestone_reward_notice":
 								listener.onMilestoneRewardNotice(msg);
+								break;
+							case "kill_exp_reward_notice":
+								listener.onKillExpRewardNotice(msg);
 								break;
 							case "stream_state_resp":
 							case "stream_link_resp":

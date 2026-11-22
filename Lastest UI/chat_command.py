@@ -1426,3 +1426,64 @@ def award_play_along_milestone(
         "kind": kind,
         "pts": new_total,
     }
+
+
+def award_play_along_kill_exp(
+    session_id: str,
+    token: str,
+    fallback_username: str,
+    exp: int,
+    depth: int = 0,
+) -> dict:
+    """Grant donor points for a Play Along client's cashed-out kill EXP batch.
+
+    Independent of milestone play_along_rewards.enabled; gated only by kill_rewards_enabled.
+    """
+    cfg = get_config()
+    rewards = sanitize_play_along_rewards(cfg.get("play_along_rewards"))
+    if not rewards.get("kill_rewards_enabled", True):
+        return {"ok": False, "reason": "disabled"}
+
+    try:
+        exp_i = max(0, int(exp))
+    except (TypeError, ValueError):
+        exp_i = 0
+    rate = float(rewards.get("kill_donor_per_exp", 1) or 0)
+    amount = int(exp_i * rate)  # floor via int truncation for non-negative
+    if amount <= 0:
+        return {"ok": False, "reason": "zero_reward", "exp": exp_i}
+
+    linked = get_linked_client(token)
+    if not linked or not linked.get("username"):
+        return {
+            "ok": False,
+            "reason": "unlinked",
+            "message": "Link your stream account (!link) to earn Play Along stream points!",
+        }
+
+    username = str(linked["username"]).strip()
+    user_low = username.lower()
+
+    ok, _donor_tot, added = grant_flat_donor_points(username, amount)
+    if not ok:
+        return {"ok": False, "reason": "points_busy"}
+
+    new_total = _donor_tot
+    try:
+        with points_lock():
+            pts_data = read_points()
+            pts, _, donation_pts, _ = _get_user_data(pts_data, user_low)
+            new_total = effective_total(pts, donation_pts)
+    except TimeoutError:
+        new_total = _donor_tot
+
+    return {
+        "ok": True,
+        "username": username,
+        "awarded": added,
+        "kind": "donor",
+        "pts": new_total,
+        "exp": exp_i,
+        "depth": max(0, int(depth) if depth is not None else 0),
+        "label": "Kill EXP",
+    }

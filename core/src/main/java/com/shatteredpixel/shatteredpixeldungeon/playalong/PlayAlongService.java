@@ -128,6 +128,8 @@ public final class PlayAlongService {
 	private static volatile boolean localDeathSent = false;
 	private static volatile String pendingHostNotice = null;
 	private static volatile boolean clientHasJoinedOnce = false;
+	private static volatile int pendingKillExp = 0;
+	private static volatile int lastKillExpDepth = -1;
 
 	private static volatile StreamEconomyState cachedEconomy = null;
 	private static final ConcurrentHashMap<String, PlayAlongClient.WireMessageCallback> pendingStreamRequests = new ConcurrentHashMap<>();
@@ -542,6 +544,7 @@ public final class PlayAlongService {
 		localVictorySent = false;
 		localDeathSent = false;
 		clientHasJoinedOnce = false;
+		discardPendingKillExp();
 		runStartMs = System.currentTimeMillis();
 		hostDepth = session.hostDepth;
 		hostPos = session.hostPos;
@@ -658,6 +661,19 @@ public final class PlayAlongService {
 			}
 
 			@Override
+			public void onKillExpRewardNotice(WireMessage msg) {
+				if (msg == null || msg.pointsAwarded <= 0) return;
+				Game.runOnRenderThread(() -> {
+					Sample.INSTANCE.play(Assets.Sounds.LEVELUP);
+					GLog.p("✨ Kill EXP Reward: +%d Donor pts (D%d, %d EXP)! Balance: %d pts",
+							msg.pointsAwarded,
+							msg.depth,
+							msg.killExp,
+							msg.pointsBalance);
+				});
+			}
+
+			@Override
 			public void onStreamMessage(WireMessage msg) {
 				if (msg == null) return;
 				if (msg.economy != null) {
@@ -755,6 +771,9 @@ public final class PlayAlongService {
 			hostServer.updateHostState(hg);
 			hostServer.updateHostVitals(Dungeon.hero.HP, Dungeon.hero.HT);
 		} else if ((role == Role.CLIENT || role == Role.SPECTATOR) && client != null) {
+			if (role == Role.CLIENT) {
+				maybeFlushKillExpOnDepthChange();
+			}
 			sendClientState("IDLE", Dungeon.hero.pos);
 			if (role == Role.CLIENT && Dungeon.level != null && Dungeon.hero.isAlive()
 					&& (Game.scene() instanceof GameScene) && !pendingChatCommands.isEmpty()) {
@@ -825,16 +844,55 @@ public final class PlayAlongService {
 			fields.put("depth", wipe.hostDepth);
 			fields.put("victim_names", wipe.victimNames);
 			StreamingEvents.notifyTyped("playalong_wipe", fields);
-		} else if (role == Role.CLIENT && client != null && !(cause instanceof HostWipeDoom) && !localDeathSent) {
-			localDeathSent = true;
-			WireMessage msg = new WireMessage();
-			msg.type = "player_died";
-			msg.depth = Dungeon.depth;
-			msg.branch = Dungeon.branch;
-			msg.pos = Dungeon.hero != null ? Dungeon.hero.pos : 0;
-			msg.cause = cause != null ? cause.getClass().getSimpleName() : "Perished";
-			client.send(msg);
+		} else if (role == Role.CLIENT) {
+			discardPendingKillExp();
+			if (client != null && !(cause instanceof HostWipeDoom) && !localDeathSent) {
+				localDeathSent = true;
+				WireMessage msg = new WireMessage();
+				msg.type = "player_died";
+				msg.depth = Dungeon.depth;
+				msg.branch = Dungeon.branch;
+				msg.pos = Dungeon.hero != null ? Dungeon.hero.pos : 0;
+				msg.cause = cause != null ? cause.getClass().getSimpleName() : "Perished";
+				client.send(msg);
+			}
 		}
+	}
+
+	public static void onKillExp(int exp) {
+		if (role != Role.CLIENT || exp <= 0) return;
+		if (lastKillExpDepth < 0) {
+			lastKillExpDepth = Dungeon.depth;
+		}
+		pendingKillExp += exp;
+	}
+
+	private static void maybeFlushKillExpOnDepthChange() {
+		int cur = Dungeon.depth;
+		if (lastKillExpDepth < 0) {
+			lastKillExpDepth = cur;
+			return;
+		}
+		if (cur == lastKillExpDepth) return;
+		flushPendingKillExp(lastKillExpDepth);
+		lastKillExpDepth = cur;
+	}
+
+	private static void flushPendingKillExp(int cashedDepth) {
+		int exp = pendingKillExp;
+		pendingKillExp = 0;
+		if (exp <= 0 || role != Role.CLIENT || client == null) return;
+		WireMessage msg = new WireMessage();
+		msg.type = "player_kill_exp_batch";
+		msg.killExp = exp;
+		msg.depth = cashedDepth;
+		msg.clientToken = SPDSettings.streamClientToken();
+		client.send(msg);
+	}
+
+	private static void discardPendingKillExp() {
+		pendingKillExp = 0;
+		lastKillExpDepth = -1;
 	}
 
 	public static void onBossSlain(int depth) {
@@ -869,6 +927,8 @@ public final class PlayAlongService {
 	public static void onAmuletObtained() {
 		if (role == Role.CLIENT && client != null && !localVictorySent) {
 			localVictorySent = true;
+			int cashedDepth = lastKillExpDepth > 0 ? lastKillExpDepth : Dungeon.depth;
+			flushPendingKillExp(cashedDepth);
 			WireMessage msg = new WireMessage();
 			msg.type = "player_won";
 			msg.durationMs = Math.max(0L, System.currentTimeMillis() - runStartMs);
@@ -1041,6 +1101,7 @@ public final class PlayAlongService {
 	}
 
 	public static void disconnect() {
+		discardPendingKillExp();
 		if (role == Role.HOST && hostServer != null) {
 			hostServer.endSession();
 		}
@@ -1142,6 +1203,8 @@ public final class PlayAlongService {
 		depthCounts.clear();
 		pendingChatCommands.clear();
 		aliveCount = 0;
+		pendingKillExp = 0;
+		lastKillExpDepth = -1;
 	}
 
 	private static void sendClientState(String action, int pos) {

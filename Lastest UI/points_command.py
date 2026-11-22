@@ -303,6 +303,8 @@ DEFAULT_PLAY_ALONG_REWARDS = {
     "boss_king_pts": 80,
     "boss_yog_pts": 100,
     "victory_donor_pts": 150,
+    "kill_rewards_enabled": True,
+    "kill_donor_per_exp": 1,
 }
 
 
@@ -314,6 +316,11 @@ def sanitize_play_along_rewards(raw) -> dict:
             return max(0, min(10000, int(src.get(key, default))))
         except (TypeError, ValueError):
             return default
+    def _rate_val(key, default):
+        try:
+            return max(0.0, min(100.0, float(src.get(key, default))))
+        except (TypeError, ValueError):
+            return float(default)
     return {
         "enabled": bool(src.get("enabled", DEFAULT_PLAY_ALONG_REWARDS["enabled"])),
         "boss_ignore_chat_cap": bool(src.get("boss_ignore_chat_cap", DEFAULT_PLAY_ALONG_REWARDS["boss_ignore_chat_cap"])),
@@ -323,6 +330,8 @@ def sanitize_play_along_rewards(raw) -> dict:
         "boss_king_pts": _int_val("boss_king_pts", DEFAULT_PLAY_ALONG_REWARDS["boss_king_pts"]),
         "boss_yog_pts": _int_val("boss_yog_pts", DEFAULT_PLAY_ALONG_REWARDS["boss_yog_pts"]),
         "victory_donor_pts": _int_val("victory_donor_pts", DEFAULT_PLAY_ALONG_REWARDS["victory_donor_pts"]),
+        "kill_rewards_enabled": bool(src.get("kill_rewards_enabled", DEFAULT_PLAY_ALONG_REWARDS["kill_rewards_enabled"])),
+        "kill_donor_per_exp": _rate_val("kill_donor_per_exp", DEFAULT_PLAY_ALONG_REWARDS["kill_donor_per_exp"]),
     }
 
 

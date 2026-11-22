@@ -198,6 +198,7 @@ public final class PlayAlongProtocol {
 		public int pointsBalance;
 		public int pointsAwarded;
 		public String rewardKind;
+		public int killExp;
 		public StreamEconomyState economy;
 		public ChatCommandPayload chatCommand;
 	}

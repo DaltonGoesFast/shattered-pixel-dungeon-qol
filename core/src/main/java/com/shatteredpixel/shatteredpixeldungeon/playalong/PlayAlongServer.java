@@ -408,6 +408,9 @@ public class PlayAlongServer extends WebSocketServer {
 			case "player_boss_slain":
 				handlePlayerBossSlain(conn, msg);
 				break;
+			case "player_kill_exp_batch":
+				handlePlayerKillExpBatch(conn, msg);
+				break;
 			case "stream_state_req":
 				handleStreamStateRequest(conn, msg);
 				break;
@@ -662,6 +665,55 @@ public class PlayAlongServer extends WebSocketServer {
 		String token = (msg.clientToken != null && !msg.clientToken.trim().isEmpty())
 				? msg.clientToken.trim() : rec.clientToken;
 		triggerMilestoneRewardAsync(conn, rec, session.sessionId, token, "boss_" + depth, depth);
+	}
+
+	private void handlePlayerKillExpBatch(WebSocket conn, WireMessage msg) {
+		ClientRecord rec = connToClient.get(conn);
+		SessionInfo session = activeSession;
+		if (rec == null || session == null || !session.active) return;
+
+		int exp = msg.killExp;
+		if (exp <= 0) return;
+
+		String token = (msg.clientToken != null && !msg.clientToken.trim().isEmpty())
+				? msg.clientToken.trim() : rec.clientToken;
+		if (token == null || token.isEmpty()) return;
+
+		final int depth = Math.max(0, msg.depth);
+		final int expFinal = exp;
+		final String sessionId = session.sessionId;
+		final String uname = rec.username != null ? rec.username : "";
+		submitHttp(() -> {
+			try {
+				JsonObject body = new JsonObject();
+				body.addProperty("sessionId", sessionId != null ? sessionId : "");
+				body.addProperty("token", token);
+				body.addProperty("username", uname);
+				body.addProperty("exp", expFinal);
+				body.addProperty("depth", depth);
+				JsonObject res = httpPostJson(OVERLAY_API_BASE + "/api/playalong/kill-exp-reward", body);
+				if (res == null || !res.has("ok") || !res.get("ok").getAsBoolean()) return;
+
+				int awarded = res.has("awarded") ? res.get("awarded").getAsInt() : 0;
+				if (awarded <= 0) return;
+
+				String awardUname = res.has("username") ? res.get("username").getAsString() : uname;
+				int bal = res.has("pts") ? res.get("pts").getAsInt() : 0;
+				int reportedExp = res.has("exp") ? res.get("exp").getAsInt() : expFinal;
+
+				WireMessage notice = new WireMessage();
+				notice.type = "kill_exp_reward_notice";
+				notice.username = awardUname;
+				notice.message = "Kill EXP";
+				notice.pointsAwarded = awarded;
+				notice.rewardKind = "donor";
+				notice.pointsBalance = bal;
+				notice.depth = depth;
+				notice.killExp = reportedExp;
+				safeSend(conn, PlayAlongProtocol.GSON.toJson(notice));
+			} catch (Exception ignored) {
+			}
+		});
 	}
 
 	private void tickBroadcast() {

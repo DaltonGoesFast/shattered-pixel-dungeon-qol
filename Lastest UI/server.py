@@ -5032,6 +5032,36 @@ def playalong_milestone_reward_api():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@app.route('/api/playalong/kill-exp-reward', methods=['POST', 'OPTIONS'])
+def playalong_kill_exp_reward_api():
+    """Award donor points for a linked Play Along client's cashed-out kill EXP batch."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        from chat_command import award_play_along_kill_exp
+        body = request.get_json(force=True, silent=True) or {}
+        session_id = str(body.get("sessionId") or "")
+        token = str(body.get("token") or "")
+        username = str(body.get("username") or "")
+        try:
+            exp = int(body.get("exp") or 0)
+        except (TypeError, ValueError):
+            exp = 0
+        try:
+            depth = int(body.get("depth") or 0)
+        except (TypeError, ValueError):
+            depth = 0
+        res = award_play_along_kill_exp(session_id, token, username, exp, depth)
+        if res.get("ok"):
+            print(
+                f"PlayAlong [KILL-EXP] {res.get('username')}: "
+                f"+{res.get('awarded')} donor pts (exp={res.get('exp')} depth={res.get('depth')})"
+            )
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @app.route('/api/playalong/linked-clients', methods=['GET', 'OPTIONS'])
 def playalong_linked_clients_api():
     """List linked installed game clients for the points-config admin panel."""
