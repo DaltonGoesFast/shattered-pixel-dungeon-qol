@@ -122,6 +122,7 @@ public class GameStateSnapshot {
 		out.put("talents", buildTalents(hero));
 		out.put("quests", buildQuests());
 		out.put("feeling", formatFeeling(Dungeon.level.feeling));
+		out.put("play_along_racers", buildPlayAlongRacers());
 		return out;
 	}
 
@@ -330,6 +331,26 @@ public class GameStateSnapshot {
 		return uiIconRect(Icons.get(type));
 	}
 
+	private static List<Map<String, Object>> buildPlayAlongRacers() {
+		List<Map<String, Object>> rows = new ArrayList<>();
+		try {
+			for (com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.GhostState g
+					: com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.getAllRosterGhosts()) {
+				if (g == null) continue;
+				Map<String, Object> row = new LinkedHashMap<>();
+				row.put("username", g.username);
+				row.put("hero_class", g.heroClass);
+				row.put("depth", g.depth);
+				row.put("hp_pct", g.hpPct);
+				row.put("host", g.isHost);
+				row.put("catchup", g.catchup);
+				rows.add(row);
+			}
+		} catch (Throwable ignored) {
+		}
+		return rows;
+	}
+
 	private static Map<String, Object> buildStats() {
 		Map<String, Object> s = new LinkedHashMap<>();
 		s.put("depth", Dungeon.depth);
@@ -341,6 +362,8 @@ public class GameStateSnapshot {
 		s.put("food_eaten", Statistics.foodEaten);
 		s.put("potions_cooked", Statistics.itemsCrafted);
 		s.put("ankhs_used", Statistics.ankhsUsed);
+		s.put("play_along_last_boss", com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.lastBossId());
+		s.put("play_along_catchup", com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.isCatchupHero());
 		return s;
 	}
 

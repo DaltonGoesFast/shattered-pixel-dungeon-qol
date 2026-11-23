@@ -102,5 +102,48 @@
     "xp_caves": 8,
     "xp_city": 11,
     "xp_halls": 12
+  },
+  "play_along_catchup": {
+    "enabled": true,
+    "exp_rewards_after_first_floor": true,
+    "once_per_session": true,
+    "allow_artifacts": false,
+    "goo": {
+      "spawn_floor": 6,
+      "level": 6,
+      "str": 11,
+      "sou": 2,
+      "weapon_tier": 2,
+      "armor_tier": 2,
+      "bonus_items": ""
+    },
+    "tengu": {
+      "spawn_floor": 11,
+      "level": 11,
+      "str": 12,
+      "sou": 4,
+      "weapon_tier": 3,
+      "armor_tier": 3,
+      "bonus_items": ""
+    },
+    "dm300": {
+      "spawn_floor": 16,
+      "level": 16,
+      "str": 13,
+      "sou": 6,
+      "weapon_tier": 4,
+      "armor_tier": 4,
+      "bonus_items": ""
+    },
+    "king": {
+      "spawn_floor": 21,
+      "level": 21,
+      "str": 14,
+      "sou": 8,
+      "weapon_tier": 4,
+      "armor_tier": 4,
+      "bonus_items": ""
+    },
+    "all_regions_bonus_items": ""
   }
 }

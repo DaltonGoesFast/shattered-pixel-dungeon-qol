@@ -335,6 +335,52 @@ def sanitize_play_along_rewards(raw) -> dict:
     }
 
 
+DEFAULT_PLAY_ALONG_CATCHUP_ROWS = {
+    "goo": {"spawn_floor": 6, "level": 6, "str": 11, "sou": 2, "weapon_tier": 2, "armor_tier": 2, "bonus_items": ""},
+    "tengu": {"spawn_floor": 11, "level": 11, "str": 12, "sou": 4, "weapon_tier": 3, "armor_tier": 3, "bonus_items": ""},
+    "dm300": {"spawn_floor": 16, "level": 16, "str": 13, "sou": 6, "weapon_tier": 4, "armor_tier": 4, "bonus_items": ""},
+    "king": {"spawn_floor": 21, "level": 21, "str": 14, "sou": 8, "weapon_tier": 4, "armor_tier": 4, "bonus_items": ""},
+}
+
+
+def _catchup_int(src, key, default, lo, hi):
+    try:
+        value = int(src.get(key, default))
+    except (TypeError, ValueError):
+        return default
+    if value < lo or value > hi:
+        return default
+    return value
+
+
+def sanitize_play_along_catchup(raw) -> dict:
+    """Normalize play_along_catchup. Broken values fall back to the built-in row."""
+    src = raw if isinstance(raw, dict) else {}
+    out = {
+        "enabled": bool(src.get("enabled", True)) if isinstance(src, dict) else True,
+        "exp_rewards_after_first_floor": bool(src.get("exp_rewards_after_first_floor", True)) if isinstance(src, dict) else True,
+        "once_per_session": bool(src.get("once_per_session", True)) if isinstance(src, dict) else True,
+        "allow_artifacts": bool(src.get("allow_artifacts", False)) if isinstance(src, dict) else False,
+        "all_regions_bonus_items": "",
+    }
+    if isinstance(src, dict):
+        bonus = src.get("all_regions_bonus_items", "")
+        out["all_regions_bonus_items"] = str(bonus or "")[:240]
+    for boss, fallback in DEFAULT_PLAY_ALONG_CATCHUP_ROWS.items():
+        row_src = src.get(boss) if isinstance(src, dict) and isinstance(src.get(boss), dict) else {}
+        row_bonus = str(row_src.get("bonus_items", "") or "")[:240]
+        out[boss] = {
+            "spawn_floor": _catchup_int(row_src, "spawn_floor", fallback["spawn_floor"], 2, 24),
+            "level": _catchup_int(row_src, "level", fallback["level"], 1, 30),
+            "str": _catchup_int(row_src, "str", fallback["str"], 10, 20),
+            "sou": _catchup_int(row_src, "sou", fallback["sou"], 0, 20),
+            "weapon_tier": _catchup_int(row_src, "weapon_tier", fallback["weapon_tier"], 1, 5),
+            "armor_tier": _catchup_int(row_src, "armor_tier", fallback["armor_tier"], 1, 5),
+            "bonus_items": row_bonus,
+        }
+    return out
+
+
 def load_config():
     """Load costs from points_config.json. Falls back to defaults if missing/invalid."""
     defaults = {
@@ -383,6 +429,7 @@ def load_config():
         "reset_debounce_hours": 4,
         "death_cost_inflation_enabled": True,
         "play_along_rewards": dict(DEFAULT_PLAY_ALONG_REWARDS),
+        "play_along_catchup": sanitize_play_along_catchup(None),
     }
     if not os.path.exists(CONFIG_FILE):
         return defaults
@@ -446,6 +493,7 @@ def load_config():
                 defaults["death_cost_inflation_enabled"],
             )),
             "play_along_rewards": sanitize_play_along_rewards(cfg.get("play_along_rewards")),
+            "play_along_catchup": sanitize_play_along_catchup(cfg.get("play_along_catchup")),
         }
     except Exception:
         return defaults

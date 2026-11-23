@@ -936,7 +936,8 @@ public class WndStreamCommands extends WndTabbed {
 				String cls = g.heroClass != null
 						? g.heroClass.substring(0, 1) + g.heroClass.substring(1).toLowerCase(Locale.ROOT)
 						: "";
-				String line = roleTag + g.username + " — D" + g.depth + " (" + cls + " " + hpPct + "%)";
+				String line = roleTag + g.username + " — D" + g.depth + " (" + cls + " " + hpPct + "%)"
+						+ (g.catchup ? " · catch-up" : "");
 				RenderedTextBlock row = PixelScene.renderTextBlock(line, 6);
 				row.maxWidth(WIDTH - 8);
 				if (g.isHost) row.hardlight(TITLE_COLOR);

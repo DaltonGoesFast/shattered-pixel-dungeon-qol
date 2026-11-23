@@ -326,6 +326,7 @@ public class PlayAlongServer extends WebSocketServer {
 		}
 
 		this.lastWipeEvent = wipe;
+		PlayAlongCatchup.onHostWipe();
 		if (session != null) {
 			session.active = false;
 			session.activePlayers = 0;
@@ -599,6 +600,7 @@ public class PlayAlongServer extends WebSocketServer {
 		rec.ghost.facingLeft = msg.facingLeft;
 		rec.ghost.hpPct = Math.max(0f, Math.min(1f, msg.hpPct));
 		rec.ghost.action = safeAction(msg.action);
+		rec.ghost.catchup = msg.catchup;
 		rec.ghost.lastUpdateMs = System.currentTimeMillis();
 		dirty = true;
 	}
@@ -823,6 +825,7 @@ public class PlayAlongServer extends WebSocketServer {
 		copy.hostHp = src.hostHp;
 		copy.hostHt = src.hostHt;
 		copy.activePlayers = countAliveClients();
+		PlayAlongCatchup.fillSession(copy);
 		return copy;
 	}
 

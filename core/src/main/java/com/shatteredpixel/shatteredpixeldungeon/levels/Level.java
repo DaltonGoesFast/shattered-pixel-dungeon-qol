@@ -619,6 +619,10 @@ public abstract class Level implements Bundlable {
 
 	//returns true if we immediately transition, false otherwise
 	public boolean activateTransition(Hero hero, LevelTransition transition){
+		if (com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.blockAscent(transition)) {
+			com.shatteredpixel.shatteredpixeldungeon.utils.GLog.w("The way back is sealed.");
+			return false;
+		}
 		if (locked){
 			return false;
 		}

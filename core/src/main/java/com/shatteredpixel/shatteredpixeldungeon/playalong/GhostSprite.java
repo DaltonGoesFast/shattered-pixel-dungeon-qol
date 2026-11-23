@@ -97,7 +97,7 @@ public class GhostSprite extends Group implements Tweener.Listener, MovieClip.Li
 			body.play(animIdle);
 		}
 
-		String prefix = isHost ? "* " : "";
+		String prefix = isHost ? "* " : (state.catchup ? "^ " : "");
 		String rawName = state.username != null ? state.username : "";
 		String safeAscii = rawName.replaceAll("[^\\x20-\\x7E]", "?");
 		String label = prefix + safeAscii;
@@ -107,6 +107,8 @@ public class GhostSprite extends Group implements Tweener.Listener, MovieClip.Li
 		}
 		if (isHost) {
 			nameTag.hardlight(0xFFD740);
+		} else if (state.catchup) {
+			nameTag.hardlight(0xFFCC66);
 		} else {
 			nameTag.hardlight(0x88DDFF);
 		}
