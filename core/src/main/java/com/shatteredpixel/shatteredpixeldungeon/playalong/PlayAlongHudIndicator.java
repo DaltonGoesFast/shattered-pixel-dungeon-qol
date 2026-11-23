@@ -65,7 +65,12 @@ public class PlayAlongHudIndicator extends StyledButton {
 
 		String next;
 		if (PlayAlongService.isHosting()) {
-			next = "LIVE: " + alive;
+			String code = PlayAlongService.relayRoomCode();
+			if (code != null && !PlayAlongService.relayRoomIsPublic()) {
+				next = code + ": " + alive;
+			} else {
+				next = "LIVE: " + alive;
+			}
 		} else if (PlayAlongService.isSpectating()) {
 			next = "CAM D" + hDepth + " (" + alive + ")";
 		} else if (PlayAlongService.isClient()) {

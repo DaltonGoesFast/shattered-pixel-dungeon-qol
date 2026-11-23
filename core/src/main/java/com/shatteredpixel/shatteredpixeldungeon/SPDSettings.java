@@ -837,4 +837,84 @@ public class SPDSettings extends GameSettings {
 	public static float playAlongGhostOpacityScale() {
 		return playAlongGhostOpacity() / 10f;
 	}
+
+	/**
+	 * Public Play Along relay. Cloudflare terminates TLS; players use this base
+	 * on port 443. Override in settings only to point at a local relay
+	 * ({@code ws://localhost:8765}).
+	 */
+	public static final String DEFAULT_PLAY_ALONG_RELAY_URL = "wss://playalong.playpd.net";
+
+	/** Reserved room claimed by Dalton's host token. Viewers join this with no code. */
+	public static final String PLAY_ALONG_RELAY_ROOM = "dalton";
+
+	public static final String KEY_PLAY_ALONG_RELAY_URL = "play_along_relay_url";
+	public static final String KEY_PLAY_ALONG_RELAY_HOST = "play_along_relay_host";
+	public static final String KEY_PLAY_ALONG_RELAY_TOKEN = "play_along_relay_token";
+	public static final String KEY_PLAY_ALONG_LAST_ROOM = "play_along_last_room";
+
+	public static void playAlongRelayUrl( String value ) {
+		String trimmed = value == null ? "" : value.trim();
+		while (trimmed.endsWith("/")) {
+			trimmed = trimmed.substring(0, trimmed.length() - 1);
+		}
+		if (trimmed.isEmpty() || DEFAULT_PLAY_ALONG_RELAY_URL.equals(trimmed)) {
+			put( KEY_PLAY_ALONG_RELAY_URL, "" );
+		} else {
+			put( KEY_PLAY_ALONG_RELAY_URL, trimmed );
+		}
+	}
+
+	public static String playAlongRelayUrl() {
+		String s = getString( KEY_PLAY_ALONG_RELAY_URL, "" );
+		if (s == null || s.trim().isEmpty()) return DEFAULT_PLAY_ALONG_RELAY_URL;
+		return s.trim();
+	}
+
+	public static boolean playAlongRelayUrlIsWebSocket( String value ) {
+		if (value == null) return false;
+		String trimmed = value.trim();
+		return trimmed.startsWith("ws://") || trimmed.startsWith("wss://");
+	}
+
+	/** When on, the desktop host also dials the relay. Direct host:port stays available. */
+	public static void playAlongRelayHost( boolean value ) {
+		put( KEY_PLAY_ALONG_RELAY_HOST, value );
+	}
+
+	public static boolean playAlongRelayHost() {
+		return getBoolean( KEY_PLAY_ALONG_RELAY_HOST, true );
+	}
+
+	public static void playAlongRelayToken( String value ) {
+		put( KEY_PLAY_ALONG_RELAY_TOKEN, value == null ? "" : value.trim() );
+	}
+
+	/**
+	 * Secret that claims {@link #PLAY_ALONG_RELAY_ROOM}. Empty means a private
+	 * room code. Settings win; otherwise {@code PLAYALONG_HOST_TOKEN} or
+	 * {@code PLAYALONG_DALTON_TOKEN} from the environment.
+	 */
+	public static String playAlongRelayToken() {
+		String s = getString( KEY_PLAY_ALONG_RELAY_TOKEN, "" );
+		if (s != null && !s.trim().isEmpty()) return s.trim();
+		String env = System.getenv("PLAYALONG_HOST_TOKEN");
+		if (env == null || env.trim().isEmpty()) {
+			env = System.getenv("PLAYALONG_DALTON_TOKEN");
+		}
+		return env == null ? "" : env.trim();
+	}
+
+	public static boolean playAlongRelayTokenConfigured() {
+		return !playAlongRelayToken().isEmpty();
+	}
+
+	public static void playAlongLastRoom( String value ) {
+		put( KEY_PLAY_ALONG_LAST_ROOM, value == null ? "" : value.trim() );
+	}
+
+	public static String playAlongLastRoom() {
+		String s = getString( KEY_PLAY_ALONG_LAST_ROOM, "" );
+		return s == null ? "" : s.trim();
+	}
 }

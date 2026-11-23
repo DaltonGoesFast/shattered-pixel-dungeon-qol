@@ -634,6 +634,15 @@ public class HeroSelectScene extends PixelScene {
 		}
 	}
 
+	private static String playAlongLobbyLabel(boolean on) {
+		String label = "Play Along Lobby: " + (on ? "ON" : "OFF");
+		String code = com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.relayRoomCode();
+		if (on && code != null && !code.isEmpty()) {
+			label += " [" + code + "]";
+		}
+		return label;
+	}
+
 	private class GameOptions extends Component {
 
 		private NinePatch bg;
@@ -941,12 +950,25 @@ public class HeroSelectScene extends PixelScene {
 
 			if (com.watabou.utils.DeviceCompat.isDesktop()) {
 				StyledButton playAlongButton = new StyledButton(Chrome.Type.BLANK,
-						"Play Along Lobby: " + (SPDSettings.playAlongHostEnabled() ? "ON" : "OFF"), 6) {
+						playAlongLobbyLabel(SPDSettings.playAlongHostEnabled()), 6) {
+					private String shownCode = "";
+
+					@Override
+					public void update() {
+						super.update();
+						String code = com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.relayRoomCode();
+						String nextCode = code == null ? "" : code;
+						if (!nextCode.equals(shownCode)) {
+							shownCode = nextCode;
+							text(playAlongLobbyLabel(SPDSettings.playAlongHostEnabled()));
+						}
+					}
+
 					@Override
 					protected void onClick() {
 						boolean next = !SPDSettings.playAlongHostEnabled();
 						SPDSettings.playAlongHostEnabled(next);
-						text("Play Along Lobby: " + (next ? "ON" : "OFF"));
+						text(playAlongLobbyLabel(next));
 						if (next) {
 							icon(Icons.get(Icons.CHALLENGE_COLOR));
 						} else {

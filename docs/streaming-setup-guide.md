@@ -207,12 +207,25 @@ The game sends immediate `ui_layout` events with popup bounds; the server expand
 | Godot companion | Polls `/api/summon-march` if used |
 | Points backup | CSV export from `/points-config` before wipes |
 | After stream | Keep server up for debounced R10 **or** force session end before next stream |
+| Play Along relay | Relay on the Ubuntu host. Tunnel `playalong.playpd.net` to `http://localhost:8765`. Title-screen Play Along joins Dalton with no room code. |
 
 Optional: `.\phase3_rapid_test.ps1 -Scenario Default` (Streamer.bot HTTP on `7474`).
 
 ---
 
-## 7. Troubleshooting
+## 7. Play Along without port forwarding
+
+Play Along stays host-authoritative. The desktop game can dial **out** to a small relay instead of publishing a port through Playit.
+
+* **Dalton's stream:** viewers keep the title-screen button. One tap checks `wss://playalong.playpd.net/join/dalton` and drops in. No room code. If that room is down, the same button falls back to the direct host:port address (Playit or a forwarded port).
+* **Anyone else hosting:** the relay assigns a short room code. Players use **Join with room code** (settings, or the title button when Dalton is not live).
+* The reserved name `dalton` is claimed with a host token (`PLAYALONG_DALTON_TOKEN` on the relay, the same value in the game's **Dalton room token** setting). Other people cannot take that room.
+
+Run and install notes, the systemd unit, and the cloudflared ingress (`playalong.playpd.net` → `http://localhost:8765`) are in [relay/README.md](../relay/README.md).
+
+Local test: start the relay on `127.0.0.1:8765`, set the in-game relay URL to `ws://localhost:8765`, and put a matching token in both places. `python3 relay/test_playalong_relay.py` checks a host and two players without the game.
+
+## 8. Troubleshooting
 
 - **"No game data available"** — Game not running, or save directory wrong. Check `save_directory` in `config.json`.
 - **"Game not connected"** on spawn — Game must be running with streaming enabled; port in game Settings must match `GAME_WS_URL` in `server.py` (default 5001).
@@ -221,3 +234,4 @@ Optional: `.\phase3_rapid_test.ps1 -Scenario Default` (Streamer.bot HTTP on `747
 - **Fard / kesha: sound works, no OBS flash** — Streamer.bot was not connected to OBS; connect and retry.
 - **Session end did nothing** — `POST /api/session/end` returns `debounce` until the timer fires; keep `server.py` running or use `force: true` (see [economy-v11-apply.md](economy-v11-apply.md)).
 - **Chat commands fire but spawns do not appear** — Game **Streaming** must be on; overlay relays to `ws://127.0.0.1:5001`. R1 does not require a separate Streamer.bot game WebSocket.
+- **Play Along won't connect** — The title button tries `wss://playalong.playpd.net/join/dalton` first. If the game says the network may be blocking it, that network is dropping the WebSocket (the old `ws://` Playit port is what many filters block). Direct host:port is the fallback when the relay room is down. Other hosts' rooms use **Join with room code**.

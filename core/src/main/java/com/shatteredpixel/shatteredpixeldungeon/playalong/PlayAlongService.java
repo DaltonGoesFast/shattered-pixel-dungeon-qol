@@ -44,6 +44,7 @@ import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.InterlevelScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.TitleScene;
 import com.shatteredpixel.shatteredpixeldungeon.ui.ActionIndicator;
+import com.shatteredpixel.shatteredpixeldungeon.windows.WndTextInput;
 import com.shatteredpixel.shatteredpixeldungeon.utils.DungeonSeed;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
 import com.shatteredpixel.shatteredpixeldungeon.utils.StreamingEvents;
@@ -104,7 +105,16 @@ public final class PlayAlongService {
 	private static volatile long lastPollTimeMs = 0L;
 
 	private static PlayAlongServer hostServer = null;
+	private static volatile PlayAlongRelayHost relayHost = null;
 	private static PlayAlongClient client = null;
+
+	/** Address the current viewer session should use (relay room or direct host:port). */
+	private static volatile String clientServerAddress = null;
+	/** Address the latest title-screen live check actually reached. */
+	private static volatile String discoveredAddress = null;
+	private static volatile String lastAnnouncedRoom = null;
+	private static volatile boolean relayDownAnnounced = false;
+	private static volatile boolean connectHintShown = false;
 
 	private static volatile SessionInfo activeClientSession = null;
 	private static volatile boolean clientJoinPending = false;
@@ -226,10 +236,66 @@ public final class PlayAlongService {
 	}
 
 	private static String effectiveAddress() {
-		if (DeviceCompat.isDesktop() && hostServer != null) {
+		// The machine that is hosting talks to its own server for stream commands.
+		if (DeviceCompat.isDesktop() && hostServer != null
+				&& role != Role.CLIENT && role != Role.SPECTATOR && !clientJoinPending) {
 			return "127.0.0.1:" + SPDSettings.playAlongPort();
 		}
-		return SPDSettings.playAlongAddress();
+		if (clientServerAddress != null && !clientServerAddress.isEmpty()
+				&& (role == Role.CLIENT || role == Role.SPECTATOR || clientJoinPending)) {
+			return clientServerAddress;
+		}
+		if (discoveredAddress != null && !discoveredAddress.isEmpty()) {
+			return discoveredAddress;
+		}
+		// Public drop-in. Direct host:port is only used when a live check fell back to it.
+		return PlayAlongProtocol.daltonJoinAddress();
+	}
+
+	/** Address captured for the join window that is about to open. */
+	public static String peekJoinAddress() {
+		if (clientServerAddress != null && !clientServerAddress.isEmpty()) return clientServerAddress;
+		if (discoveredAddress != null && !discoveredAddress.isEmpty()) return discoveredAddress;
+		return PlayAlongProtocol.daltonJoinAddress();
+	}
+
+	public static void useJoinAddress(String address) {
+		if (address != null && !address.isEmpty()) {
+			clientServerAddress = address;
+		}
+	}
+
+	/** Title-screen drop-in. Uses whichever server the live check reached. */
+	public static void armDiscoveredJoin() {
+		if (discoveredAddress != null && !discoveredAddress.isEmpty()) {
+			clientServerAddress = discoveredAddress;
+		} else {
+			clientServerAddress = PlayAlongProtocol.daltonJoinAddress();
+		}
+	}
+
+	public static String relayRoomCode() {
+		PlayAlongRelayHost host = relayHost;
+		return host == null ? null : host.roomCode();
+	}
+
+	public static boolean relayRoomIsPublic() {
+		return PlayAlongProtocol.isReservedRoom(relayRoomCode());
+	}
+
+	public static String hostConnectionSummary() {
+		String direct = SPDSettings.playAlongAddress();
+		if (!DeviceCompat.isDesktop() || !SPDSettings.playAlongRelayHost()) {
+			return Messages.get(PlayAlongService.class, "roster_off", direct);
+		}
+		String code = relayRoomCode();
+		if (code == null || code.isEmpty()) {
+			return Messages.get(PlayAlongService.class, "roster_wait", direct);
+		}
+		if (relayRoomIsPublic()) {
+			return Messages.get(PlayAlongService.class, "roster_public", code, direct);
+		}
+		return Messages.get(PlayAlongService.class, "roster_code", code, direct);
 	}
 
 	public static List<GhostState> getGhostsForFloor(int depth, int branch) {
@@ -285,7 +351,10 @@ public final class PlayAlongService {
 
 	public static synchronized void ensureHostServerStarted() {
 		if (!DeviceCompat.isDesktop()) return;
-		if (hostServer != null) return;
+		if (hostServer != null) {
+			if (SPDSettings.playAlongRelayHost()) startRelay();
+			return;
+		}
 		int port = SPDSettings.playAlongPort();
 		PlayAlongServer srv = new PlayAlongServer(port, new PlayAlongServer.HostCallbacks() {
 			@Override
@@ -324,14 +393,99 @@ public final class PlayAlongService {
 		} catch (Exception e) {
 			System.err.println("[PlayAlong] Failed to start host server on port " + port + ": " + e.getMessage());
 		}
+		if (hostServer != null && SPDSettings.playAlongRelayHost()) {
+			startRelay();
+		}
 	}
 
 	public static synchronized void stopHostServer() {
 		if (hostServer != null) {
 			hostServer.endSession();
+		}
+		stopRelay();
+		if (hostServer != null) {
 			hostServer.stopServer();
 			hostServer = null;
 		}
+	}
+
+	public static synchronized void onRelaySettingChanged(boolean enabled) {
+		if (!DeviceCompat.isDesktop()) return;
+		if (enabled) {
+			ensureHostServerStarted();
+		} else {
+			stopRelay();
+		}
+	}
+
+	/** Relay URL or Dalton room token changed. Re-dial so the new values apply. */
+	public static synchronized void onRelayEndpointChanged() {
+		if (!DeviceCompat.isDesktop()) return;
+		boolean restart = SPDSettings.playAlongRelayHost() && hostServer != null;
+		stopRelay();
+		if (restart) startRelay();
+	}
+
+	private static void startRelay() {
+		if (relayHost != null || hostServer == null || !SPDSettings.playAlongRelayHost()) return;
+		final PlayAlongServer server = hostServer;
+		PlayAlongRelayHost host = new PlayAlongRelayHost(server, new PlayAlongRelayHost.Listener() {
+			@Override
+			public void onRoomReady(String code) {
+				relayDownAnnounced = false;
+				Game.runOnRenderThread(() -> announceRoom(code));
+			}
+
+			@Override
+			public void onRelayDown() {
+				Game.runOnRenderThread(() -> announceRelayDown());
+			}
+
+			@Override
+			public void onRelayDenied() {
+				Game.runOnRenderThread(() -> {
+					lastAnnouncedRoom = null;
+					GLog.w(Messages.get(PlayAlongService.class, "relay_denied"));
+					System.out.println("[PlayAlong] Reserved room token was rejected.");
+				});
+			}
+		});
+		relayHost = host;
+		String token = SPDSettings.playAlongRelayToken();
+		System.out.println("[PlayAlong] Dialing relay "
+				+ (token.isEmpty()
+				? PlayAlongProtocol.relayHostAddress(null)
+				: PlayAlongProtocol.relayHostAddress(SPDSettings.PLAY_ALONG_RELAY_ROOM))
+				+ (token.isEmpty() ? " (private room code)" : " (public room)"));
+		host.start();
+	}
+
+	private static void stopRelay() {
+		PlayAlongRelayHost host = relayHost;
+		relayHost = null;
+		lastAnnouncedRoom = null;
+		if (host != null) host.stop();
+	}
+
+	private static void announceRoom(String code) {
+		if (code == null || code.isEmpty() || code.equals(lastAnnouncedRoom)) return;
+		lastAnnouncedRoom = code;
+		if (PlayAlongProtocol.isReservedRoom(code)) {
+			GLog.p(Messages.get(PlayAlongService.class, "room_ready_public", code));
+			System.out.println("[PlayAlong] Public relay room '" + code + "' is live.");
+		} else {
+			GLog.p(Messages.get(PlayAlongService.class, "room_ready", code));
+			System.out.println("[PlayAlong] Relay room code " + code
+					+ ". Set the Dalton room token to claim the public room.");
+		}
+	}
+
+	private static void announceRelayDown() {
+		lastAnnouncedRoom = null;
+		if (relayDownAnnounced) return;
+		relayDownAnnounced = true;
+		GLog.w(Messages.get(PlayAlongService.class, "relay_down"));
+		System.out.println("[PlayAlong] Relay unavailable. Direct host:port still works.");
 	}
 
 	// ---- Title Screen Live Status Polling ----
@@ -341,18 +495,49 @@ public final class PlayAlongService {
 		if (!force && (statusPolling || (now - lastPollTimeMs < 6000L))) return;
 		statusPolling = true;
 		lastPollTimeMs = now;
-		PlayAlongClient.pingStatus(effectiveAddress(), info -> {
-			statusPolling = false;
+		// The host's own title button watches the local server. Everyone else
+		// tries the public relay room first, then the direct host:port fallback.
+		if (DeviceCompat.isDesktop() && hostServer != null) {
+			PlayAlongClient.pingStatus("127.0.0.1:" + SPDSettings.playAlongPort(), info -> {
+				statusPolling = false;
+				applyPolledSession(info, null, false);
+			});
+			return;
+		}
+		final String relay = PlayAlongProtocol.daltonJoinAddress();
+		PlayAlongClient.pingStatus(relay, info -> {
 			if (info != null && (info.active || info.inDungeon)) {
-				liveSessionInfo = info;
-				if (role == Role.NONE && info.inDungeon) {
-					hostDepth = info.hostDepth;
-					hostPos = info.hostPos;
-				}
-			} else {
-				liveSessionInfo = null;
+				statusPolling = false;
+				applyPolledSession(info, relay, true);
+				return;
 			}
+			PlayAlongClient.pingStatus(SPDSettings.playAlongAddress(), direct -> {
+				statusPolling = false;
+				if (direct != null && (direct.active || direct.inDungeon)) {
+					applyPolledSession(direct, SPDSettings.playAlongAddress(), true);
+				} else {
+					applyPolledSession(null, null, true);
+				}
+			});
 		});
+	}
+
+	private static void applyPolledSession(SessionInfo info, String address, boolean updateDiscovery) {
+		if (info != null && (info.active || info.inDungeon)) {
+			liveSessionInfo = info;
+			if (updateDiscovery && address != null) {
+				discoveredAddress = address;
+			}
+			if (role == Role.NONE && info.inDungeon) {
+				hostDepth = info.hostDepth;
+				hostPos = info.hostPos;
+			}
+		} else {
+			liveSessionInfo = null;
+			if (updateDiscovery && role == Role.NONE) {
+				discoveredAddress = null;
+			}
+		}
 	}
 
 	// ---- Starting & Joining Runs ----
@@ -532,8 +717,13 @@ public final class PlayAlongService {
 	public static void startClientRun(SessionInfo session, HeroClass heroClass, String rawUsername) {
 		if (session == null || !session.active) return;
 
+		String joinAddr = clientServerAddress;
+		if (joinAddr == null || joinAddr.isEmpty()) joinAddr = discoveredAddress;
+		if (joinAddr == null || joinAddr.isEmpty()) joinAddr = PlayAlongProtocol.daltonJoinAddress();
+
 		parkCurrentClientProgress();
 		disconnect();
+		clientServerAddress = joinAddr;
 		resetRuntimeCollections();
 
 		String shortId = Integer.toHexString(Math.abs(localUserId.hashCode()) % 0xFFF);
@@ -614,6 +804,11 @@ public final class PlayAlongService {
 		runStartMs = System.currentTimeMillis();
 		hostDepth = session.hostDepth;
 		hostPos = session.hostPos;
+		if (clientServerAddress == null || clientServerAddress.isEmpty()) {
+			clientServerAddress = discoveredAddress != null && !discoveredAddress.isEmpty()
+					? discoveredAddress
+					: PlayAlongProtocol.daltonJoinAddress();
+		}
 
 		GamesInProgress.curSlot = slot;
 		PlayAlongArchives.touch(session.sessionId);
@@ -768,6 +963,12 @@ public final class PlayAlongService {
 
 	private static void connectClientAt(SessionInfo session, String heroClass, String username,
 	                                    boolean isRejoin, int depth, int branch, int pos) {
+		connectHintShown = false;
+		if (clientServerAddress == null || clientServerAddress.isEmpty()) {
+			clientServerAddress = discoveredAddress != null && !discoveredAddress.isEmpty()
+					? discoveredAddress
+					: PlayAlongProtocol.daltonJoinAddress();
+		}
 		client = new PlayAlongClient(new PlayAlongClient.ClientListener() {
 			@Override
 			public void onJoinAck(WireMessage msg) {
@@ -924,7 +1125,10 @@ public final class PlayAlongService {
 			@Override
 			public void onConnectionLost(boolean permanentlyFailed) {
 				if (permanentlyFailed) {
-					Game.runOnRenderThread(() -> GLog.w("Disconnected from Dalton's Play Along lobby."));
+					Game.runOnRenderThread(() -> GLog.w(connectionFailureMessage(true)));
+				} else if (!connectHintShown && !clientHasJoinedOnce) {
+					connectHintShown = true;
+					Game.runOnRenderThread(() -> GLog.w(connectionFailureMessage(false)));
 				}
 			}
 		});
@@ -1295,6 +1499,62 @@ public final class PlayAlongService {
 		}
 	}
 
+	/** Other hosts' rooms. Dalton's public room uses the title-screen button instead. */
+	public static void promptRoomCodeJoin() {
+		if (Game.scene() == null) return;
+		final String initial = SPDSettings.playAlongLastRoom();
+		Game.scene().addToFront(new WndTextInput(
+				Messages.get(PlayAlongService.class, "code_title"),
+				Messages.get(PlayAlongService.class, "code_prompt"),
+				initial == null ? "" : initial,
+				16,
+				false,
+				Messages.get(PlayAlongService.class, "code_ok"),
+				Messages.get(PlayAlongService.class, "code_cancel")) {
+			@Override
+			public void onSelect(boolean positive, String text) {
+				if (!positive) return;
+				final String code = PlayAlongProtocol.normalizeRoomCode(text);
+				if (code.isEmpty()) {
+					GLog.w(Messages.get(PlayAlongService.class, "code_invalid"));
+					return;
+				}
+				SPDSettings.playAlongLastRoom(code);
+				final String url = PlayAlongProtocol.relayJoinAddress(code);
+				PlayAlongClient.pingStatus(url, info -> Game.runOnRenderThread(() -> {
+					if (info == null || (!info.active && !info.inDungeon)) {
+						GLog.w(Messages.get(PlayAlongService.class, "code_offline"));
+						return;
+					}
+					clientServerAddress = url;
+					discoveredAddress = url;
+					liveSessionInfo = info;
+					if (Game.scene() != null) {
+						Game.scene().addToFront(new WndPlayAlongJoin(info));
+					}
+				}));
+			}
+		});
+	}
+
+	private static String connectionFailureMessage(boolean permanent) {
+		String addr = clientServerAddress == null ? "" : clientServerAddress;
+		int mark = addr.indexOf("/join/");
+		boolean privateRoom = false;
+		if (mark >= 0) {
+			String room = addr.substring(mark + "/join/".length());
+			int cut = room.indexOf('?');
+			if (cut >= 0) room = room.substring(0, cut);
+			cut = room.indexOf('/');
+			if (cut >= 0) room = room.substring(0, cut);
+			privateRoom = !room.equalsIgnoreCase(SPDSettings.PLAY_ALONG_RELAY_ROOM);
+		}
+		if (privateRoom) {
+			return Messages.get(PlayAlongService.class, permanent ? "connect_lost_room" : "connect_blocked_room");
+		}
+		return Messages.get(PlayAlongService.class, permanent ? "connect_lost" : "connect_blocked");
+	}
+
 	public static void disconnect() {
 		discardPendingKillExp();
 		if (role == Role.HOST && hostServer != null) {
@@ -1307,6 +1567,8 @@ public final class PlayAlongService {
 		role = Role.NONE;
 		clientJoinPending = false;
 		clientHasJoinedOnce = false;
+		clientServerAddress = null;
+		connectHintShown = false;
 		activeClientSession = null;
 		wipeTriggeredOnClient = false;
 		pendingWipeOnScene = null;

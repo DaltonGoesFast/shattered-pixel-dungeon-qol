@@ -849,6 +849,17 @@ public class WndStreamCommands extends WndTabbed {
 
 	private float buildRosterTab(float cy) {
 		if (com.watabou.utils.DeviceCompat.isDesktop()
+				&& (PlayAlongService.isHosting() || SPDSettings.playAlongHostEnabled()
+				|| PlayAlongService.isLocalHostServerRunning())) {
+			RenderedTextBlock hostLine = PixelScene.renderTextBlock(PlayAlongService.hostConnectionSummary(), 6);
+			hostLine.hardlight(0xFFCC88);
+			hostLine.maxWidth(WIDTH - 4);
+			hostLine.setPos(2, cy);
+			content.add(hostLine);
+			cy = hostLine.bottom() + 4;
+		}
+
+		if (com.watabou.utils.DeviceCompat.isDesktop()
 				&& (PlayAlongService.isHosting() || SPDSettings.playAlongHostEnabled())) {
 			final boolean sharedOn = SPDSettings.playAlongSharedChat();
 			RedButton btnSharedChat = new RedButton("Mirror Chat Cmds to Racers: " + (sharedOn ? "ON" : "OFF"), 6) {

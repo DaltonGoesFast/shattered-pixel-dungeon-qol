@@ -25,6 +25,7 @@ import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Modifiers;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
+import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroClass;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.SessionInfo;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.StreamEconomyState;
@@ -56,9 +57,12 @@ public class WndPlayAlongJoin extends Window {
 	private RedButton btnName;
 	private RenderedTextBlock linkInfo;
 	private final List<RedButton> classButtons = new ArrayList<>();
+	/** Server this window should drop into, captured so a later room-code prompt cannot retarget it. */
+	private final String joinAddress;
 
 	public WndPlayAlongJoin(final SessionInfo session) {
 		super();
+		this.joinAddress = PlayAlongService.peekJoinAddress();
 
 		this.username = SPDSettings.playAlongUsername();
 		if (this.username.isEmpty()) {
@@ -154,6 +158,7 @@ public class WndPlayAlongJoin extends Window {
 					@Override
 					protected void onClick() {
 						hide();
+						PlayAlongService.useJoinAddress(joinAddress);
 						PlayAlongService.continueClientRun(session);
 					}
 				};
@@ -218,6 +223,7 @@ public class WndPlayAlongJoin extends Window {
 					@Override
 					protected void onClick() {
 						hide();
+						PlayAlongService.useJoinAddress(joinAddress);
 						PlayAlongService.startClientRun(session, selectedClass, username);
 					}
 				};
@@ -228,6 +234,16 @@ public class WndPlayAlongJoin extends Window {
 				pos = btnDropIn.bottom() + GAP;
 			}
 		}
+
+		RedButton btnRoom = new RedButton(Messages.get(this, "join_code"), 7) {
+			@Override
+			protected void onClick() {
+				PlayAlongService.promptRoomCodeJoin();
+			}
+		};
+		btnRoom.setRect(0, pos, WIDTH, 16);
+		add(btnRoom);
+		pos = btnRoom.bottom() + GAP;
 
 		RedButton btnYt = new RedButton("Open YouTube Channel", 7) {
 			@Override

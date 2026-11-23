@@ -549,12 +549,25 @@ public class TitleScene extends PixelScene {
 		@Override
 		protected void onClick() {
 			PlayAlongProtocol.SessionInfo live = PlayAlongService.getLiveSession();
-			if (live == null) {
-				live = new PlayAlongProtocol.SessionInfo();
-				live.active = false;
-				live.inDungeon = false;
+			if (live != null && (live.active || live.inDungeon)) {
+				PlayAlongService.armDiscoveredJoin();
+				ShatteredPixelDungeon.scene().addToFront(new WndPlayAlongJoin(live));
+			} else {
+				ShatteredPixelDungeon.scene().addToFront(new WndOptions(
+						Messages.get(TitleScene.class, "playalong_offline_title"),
+						Messages.get(TitleScene.class, "playalong_offline_body"),
+						Messages.get(TitleScene.class, "playalong_youtube"),
+						Messages.get(TitleScene.class, "playalong_room")) {
+					@Override
+					protected void onSelect(int index) {
+						if (index == 0) {
+							ShatteredPixelDungeon.platform.openURI("https://www.youtube.com/@DaltonGoesFast");
+						} else {
+							PlayAlongService.promptRoomCodeJoin();
+						}
+					}
+				});
 			}
-			ShatteredPixelDungeon.scene().addToFront(new WndPlayAlongJoin(live));
 		}
 
 		@Override
