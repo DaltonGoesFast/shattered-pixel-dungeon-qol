@@ -1602,7 +1602,9 @@ public final class PlayAlongService {
 				continue;
 			}
 			if (!acceptMirroredChat(p)) continue;
-			if (Dungeon.hero == null || !Dungeon.hero.isAlive()) continue;
+			// Hero null means the run is still loading. Keep the command until
+			// the scene exists. Drop it only once a dead hero is actually here.
+			if (Dungeon.hero != null && !Dungeon.hero.isAlive()) continue;
 			while (pendingChatCommands.size() >= MAX_PENDING_CHAT) {
 				pendingChatCommands.remove(0);
 			}
