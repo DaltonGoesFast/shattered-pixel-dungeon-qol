@@ -1,0 +1,23 @@
+[Unit]
+Description=Play Along room-code relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Create a dedicated user: sudo useradd --system --home /opt/playalong-relay --shell /usr/sbin/nologin playalong
+User=playalong
+Group=playalong
+WorkingDirectory=/opt/playalong-relay
+Environment=PLAYALONG_RELAY_HOST=127.0.0.1
+Environment=PLAYALONG_RELAY_PORT=8765
+Environment=PLAYALONG_RESERVED_ROOM=dalton
+# chmod 600 this file. It must define PLAYALONG_DALTON_TOKEN=<secret>.
+EnvironmentFile=-/etc/playalong-relay.env
+ExecStart=/opt/playalong-relay/venv/bin/python /opt/playalong-relay/playalong_relay.py
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

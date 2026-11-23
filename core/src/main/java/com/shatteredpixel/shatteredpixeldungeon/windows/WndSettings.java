@@ -849,7 +849,12 @@ public class WndSettings extends WndTabbed {
 		ColorBlock sepPlayAlong;
 		RedButton btnPlayAlongServer;
 		OptionSlider optPlayAlongGhostOpacity;
+		RedButton btnJoinRoomCode;
 		CheckBox chkPlayAlongHost;
+		CheckBox chkPlayAlongRelay;
+		RedButton btnPlayAlongRoom;
+		RedButton btnPlayAlongToken;
+		RedButton btnPlayAlongRelayUrl;
 		CheckBox chkPlayAlongSharedChat;
 
 		@Override
@@ -955,12 +960,12 @@ public class WndSettings extends WndTabbed {
 			sepPlayAlong = new ColorBlock(1, 1, 0xFF000000);
 			add(sepPlayAlong);
 
-			btnPlayAlongServer = new RedButton("Play Along: " + SPDSettings.playAlongAddress(), 8) {
+			btnPlayAlongServer = new RedButton(Messages.get(this, "playalong_direct", SPDSettings.playAlongAddress()), 8) {
 				@Override
 				protected void onClick() {
 					ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
-							"Play Along Server",
-							"Enter Dalton's Playit.gg host:port (leave empty to reset to default):",
+							Messages.get(DataTab.this, "playalong_direct_title"),
+							Messages.get(DataTab.this, "playalong_direct_prompt"),
 							SPDSettings.playAlongAddress(),
 							64,
 							false,
@@ -973,7 +978,7 @@ public class WndSettings extends WndTabbed {
 							} else {
 								SPDSettings.playAlongAddress(SPDSettings.DEFAULT_PLAY_ALONG_ADDRESS);
 							}
-							btnPlayAlongServer.text("Play Along: " + SPDSettings.playAlongAddress());
+							btnPlayAlongServer.text(Messages.get(DataTab.this, "playalong_direct", SPDSettings.playAlongAddress()));
 							com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.pollLiveStatus(true);
 						}
 					});
@@ -992,6 +997,14 @@ public class WndSettings extends WndTabbed {
 			optPlayAlongGhostOpacity.setSelectedValue(SPDSettings.playAlongGhostOpacity());
 			add(optPlayAlongGhostOpacity);
 
+			btnJoinRoomCode = new RedButton(Messages.get(this, "playalong_join_code"), 8) {
+				@Override
+				protected void onClick() {
+					com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.promptRoomCodeJoin();
+				}
+			};
+			add(btnJoinRoomCode);
+
 			if (DeviceCompat.isDesktop()) {
 				chkPlayAlongHost = new CheckBox("Host Play Along Lobby") {
 					@Override
@@ -1003,6 +1016,94 @@ public class WndSettings extends WndTabbed {
 				};
 				chkPlayAlongHost.checked(SPDSettings.playAlongHostEnabled());
 				add(chkPlayAlongHost);
+
+				chkPlayAlongRelay = new CheckBox(Messages.get(this, "playalong_relay")) {
+					@Override
+					protected void onClick() {
+						super.onClick();
+						SPDSettings.playAlongRelayHost(checked());
+						com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onRelaySettingChanged(checked());
+						if (btnPlayAlongRoom != null) {
+							btnPlayAlongRoom.text(playAlongRoomLabel());
+						}
+					}
+				};
+				chkPlayAlongRelay.checked(SPDSettings.playAlongRelayHost());
+				add(chkPlayAlongRelay);
+
+				btnPlayAlongRoom = new RedButton(playAlongRoomLabel(), 8) {
+					@Override
+					protected void onClick() {
+						String code = com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.relayRoomCode();
+						String body;
+						if (code == null || code.isEmpty()) {
+							body = Messages.get(DataTab.this, "playalong_room_body_wait");
+						} else {
+							String url = com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.relayJoinAddress(code);
+							if (com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.relayRoomIsPublic()) {
+								body = Messages.get(DataTab.this, "playalong_room_body_public", url);
+							} else {
+								body = Messages.get(DataTab.this, "playalong_room_body_code", code, url);
+							}
+						}
+						ShatteredPixelDungeon.scene().addToFront(new WndMessage(body));
+					}
+				};
+				add(btnPlayAlongRoom);
+
+				btnPlayAlongToken = new RedButton(playAlongTokenLabel(), 8) {
+					@Override
+					protected void onClick() {
+						ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
+								Messages.get(DataTab.this, "playalong_token_title"),
+								Messages.get(DataTab.this, "playalong_token_prompt"),
+								SPDSettings.playAlongRelayToken(),
+								80,
+								false,
+								"Save",
+								"Clear") {
+							@Override
+							public void onSelect(boolean positive, String text) {
+								if (positive) {
+									SPDSettings.playAlongRelayToken(text);
+								} else {
+									SPDSettings.playAlongRelayToken("");
+								}
+								btnPlayAlongToken.text(playAlongTokenLabel());
+								com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onRelayEndpointChanged();
+							}
+						});
+					}
+				};
+				add(btnPlayAlongToken);
+
+				btnPlayAlongRelayUrl = new RedButton(Messages.get(this, "playalong_relay_url", SPDSettings.playAlongRelayUrl()), 8) {
+					@Override
+					protected void onClick() {
+						ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
+								Messages.get(DataTab.this, "playalong_relay_url_title"),
+								Messages.get(DataTab.this, "playalong_relay_url_prompt"),
+								SPDSettings.playAlongRelayUrl(),
+								120,
+								false,
+								"Save",
+								"Reset Default") {
+							@Override
+							public void onSelect(boolean positive, String text) {
+								String next = positive ? (text == null ? "" : text.trim()) : "";
+								if (!next.isEmpty() && !SPDSettings.playAlongRelayUrlIsWebSocket(next)) {
+									ShatteredPixelDungeon.scene().addToFront(new WndMessage(
+											Messages.get(DataTab.this, "playalong_relay_url_bad")));
+									return;
+								}
+								SPDSettings.playAlongRelayUrl(next);
+								btnPlayAlongRelayUrl.text(Messages.get(DataTab.this, "playalong_relay_url", SPDSettings.playAlongRelayUrl()));
+								com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onRelayEndpointChanged();
+							}
+						});
+					}
+				};
+				add(btnPlayAlongRelayUrl);
 
 				chkPlayAlongSharedChat = new CheckBox("Mirror Chat Cmds to Play Along") {
 					@Override
@@ -1061,9 +1162,34 @@ public class WndSettings extends WndTabbed {
 			optPlayAlongGhostOpacity.setRect(0, pos + GAP, width, SLIDER_HEIGHT);
 			pos = optPlayAlongGhostOpacity.bottom();
 
+			if (btnJoinRoomCode != null) {
+				btnJoinRoomCode.setRect(0, pos + GAP, width, BTN_HEIGHT);
+				pos = btnJoinRoomCode.bottom();
+			}
+
 			if (chkPlayAlongHost != null){
 				chkPlayAlongHost.setRect(0, pos + GAP, width, BTN_HEIGHT);
 				pos = chkPlayAlongHost.bottom();
+			}
+
+			if (chkPlayAlongRelay != null) {
+				chkPlayAlongRelay.setRect(0, pos + GAP, width, BTN_HEIGHT);
+				pos = chkPlayAlongRelay.bottom();
+			}
+
+			if (btnPlayAlongRoom != null) {
+				btnPlayAlongRoom.setRect(0, pos + GAP, width, BTN_HEIGHT);
+				pos = btnPlayAlongRoom.bottom();
+			}
+
+			if (btnPlayAlongToken != null) {
+				btnPlayAlongToken.setRect(0, pos + GAP, width, BTN_HEIGHT);
+				pos = btnPlayAlongToken.bottom();
+			}
+
+			if (btnPlayAlongRelayUrl != null) {
+				btnPlayAlongRelayUrl.setRect(0, pos + GAP, width, BTN_HEIGHT);
+				pos = btnPlayAlongRelayUrl.bottom();
 			}
 
 			if (chkPlayAlongSharedChat != null){
@@ -1073,6 +1199,27 @@ public class WndSettings extends WndTabbed {
 
 			height = pos;
 
+		}
+
+		private String playAlongRoomLabel() {
+			if (!SPDSettings.playAlongRelayHost()) {
+				return Messages.get(this, "playalong_room_off");
+			}
+			String code = com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.relayRoomCode();
+			if (code == null || code.isEmpty()) {
+				return Messages.get(this, "playalong_room_wait");
+			}
+			if (com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.relayRoomIsPublic()) {
+				return Messages.get(this, "playalong_room_public", code);
+			}
+			return Messages.get(this, "playalong_room", code);
+		}
+
+		private String playAlongTokenLabel() {
+			String state = SPDSettings.playAlongRelayTokenConfigured()
+					? Messages.get(this, "playalong_token_set")
+					: Messages.get(this, "playalong_token_unset");
+			return Messages.get(this, "playalong_token", state);
 		}
 	}
 

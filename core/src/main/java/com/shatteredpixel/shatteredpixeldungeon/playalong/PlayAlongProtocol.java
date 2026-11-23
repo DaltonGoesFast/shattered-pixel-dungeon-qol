@@ -233,6 +233,9 @@ public final class PlayAlongProtocol {
 		return trimmed;
 	}
 
+	/** Room-code alphabet shared with relay/playalong_relay.py. No 0/O/1/I. */
+	public static final String RELAY_ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
 	public static URI buildWebSocketUri(String address) {
 		String addr = (address == null || address.trim().isEmpty())
 				? SPDSettings.DEFAULT_PLAY_ALONG_ADDRESS
@@ -244,5 +247,49 @@ public final class PlayAlongProtocol {
 			addr = addr + ":" + SPDSettings.DEFAULT_PLAY_ALONG_PORT;
 		}
 		return URI.create("ws://" + addr);
+	}
+
+	/** {@code dalton} or a 4–5 character room code. Empty when the text is not a code. */
+	public static String normalizeRoomCode(String raw) {
+		if (raw == null) return "";
+		String s = raw.trim().replace(" ", "").replace("-", "");
+		if (s.equalsIgnoreCase(SPDSettings.PLAY_ALONG_RELAY_ROOM)) {
+			return SPDSettings.PLAY_ALONG_RELAY_ROOM;
+		}
+		s = s.toUpperCase(Locale.ROOT);
+		if (s.length() < 4 || s.length() > 5) return "";
+		for (int i = 0; i < s.length(); i++) {
+			if (RELAY_ROOM_ALPHABET.indexOf(s.charAt(i)) < 0) return "";
+		}
+		return s;
+	}
+
+	public static boolean isReservedRoom(String room) {
+		return room != null && room.equalsIgnoreCase(SPDSettings.PLAY_ALONG_RELAY_ROOM);
+	}
+
+	public static String relayBase() {
+		String base = SPDSettings.playAlongRelayUrl();
+		while (base.endsWith("/")) {
+			base = base.substring(0, base.length() - 1);
+		}
+		return base;
+	}
+
+	/** Public drop-in URL. Viewers of Dalton's stream use this with no room code. */
+	public static String daltonJoinAddress() {
+		return relayJoinAddress(SPDSettings.PLAY_ALONG_RELAY_ROOM);
+	}
+
+	public static String relayJoinAddress(String room) {
+		return relayBase() + "/join/" + room;
+	}
+
+	/** {@code null} asks the relay for a random room code. */
+	public static String relayHostAddress(String reservedRoomOrNull) {
+		if (reservedRoomOrNull == null || reservedRoomOrNull.isEmpty()) {
+			return relayBase() + "/host";
+		}
+		return relayBase() + "/host/" + reservedRoomOrNull;
 	}
 }
