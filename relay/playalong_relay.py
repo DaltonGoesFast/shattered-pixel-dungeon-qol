@@ -75,8 +75,9 @@ class RelayConfig:
     reserved_room: str = "dalton"
     reserved_token: str = ""
     max_players: int = 80
-    # Host → relay frames (world-state envelopes). Player frames use the tighter cap.
-    max_message_bytes: int = 128 * 1024
+    # Host → relay frames. World-state includes every tombstone from the run,
+    # so this stays well above the player cap. Player sockets override it.
+    max_message_bytes: int = 8 * 1024 * 1024
     # PlayAlongProtocol.MAX_PACKET_LENGTH. Enforced on /join before forward.
     max_player_message_bytes: int = 4096
     # Per player socket. Surplus frames are not forwarded; a sustained flood closes.
@@ -336,6 +337,13 @@ class Relay:
                     return code
         raise RuntimeError("room code space exhausted")
 
+    async def holding_for_reclaim(self, code: str) -> bool:
+        async with self.rooms_lock:
+            current = self.rooms.get(code)
+            if current is not None and not current.closed:
+                return True
+            return bool(self._secret_locked(code))
+
     def _secret_locked(self, code: str) -> str:
         room = self.rooms.get(code)
         if room is not None and room.host_secret:
@@ -417,7 +425,10 @@ class Relay:
                 player = Player(cid, ws)
                 room.players[cid] = player
         if room_gone:
-            if waiting:
+            # A join can observe the old Room after close_room has already
+            # parked its secret. That is a retry, not a dead room.
+            if waiting or await self.holding_for_reclaim(code):
+                log.info("player wait room=%s reason=host reconnecting", code)
                 await _safe_close(ws, 1013, "host reconnecting")
             else:
                 await self.reject_player(
@@ -625,7 +636,7 @@ def config_from_env(argv: Optional[list] = None) -> RelayConfig:
     parser.add_argument(
         "--max-message-bytes",
         type=int,
-        default=int(os.environ.get("PLAYALONG_MAX_MESSAGE_BYTES", str(128 * 1024))),
+        default=int(os.environ.get("PLAYALONG_MAX_MESSAGE_BYTES", str(8 * 1024 * 1024))),
         help="Max incoming frame on the host link (world-state envelopes)",
     )
     parser.add_argument(

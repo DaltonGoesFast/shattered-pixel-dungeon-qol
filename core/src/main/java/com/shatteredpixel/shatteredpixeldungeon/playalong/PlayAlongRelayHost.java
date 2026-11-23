@@ -185,12 +185,16 @@ public final class PlayAlongRelayHost {
 				dropVirtuals();
 				if (!running) return;
 				String why = reason == null ? "" : reason.toLowerCase(Locale.ROOT);
-				if (why.contains("reserved room disabled") || (reserved && why.contains("unauthorized"))) {
+				// 4001 is unauthorized and 1011 is reserved-room-disabled. The
+				// close code still arrives when a proxy drops the reason text.
+				boolean authRejected = code == 4001 || why.contains("unauthorized");
+				boolean reservedDisabled = code == 1011 || why.contains("reserved room disabled");
+				if (reserved && (authRejected || reservedDisabled)) {
 					running = false;
 					if (listener != null) listener.onRelayDenied();
 					return;
 				}
-				if (why.contains("unauthorized")) {
+				if (authRejected) {
 					// Grace for this private code has ended. Open a new one.
 					roomCode = "";
 					hostSecret = "";
