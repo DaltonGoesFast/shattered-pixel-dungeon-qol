@@ -25,7 +25,9 @@ Topology
 
 * Player -> ws://127.0.0.1:8765/join/<CODE>
     Unchanged Play Along JSON (``join``, ``status_ping``, ``player_state``, ...).
-    The relay does not interpret those messages.
+    The relay does not interpret those messages. Incoming player frames are
+    capped at 4096 bytes (the game's packet limit) and at a small per-socket
+    rate so one player cannot fill the shared host link.
 
 Host link multiplexing (host socket only)::
 
@@ -73,7 +75,13 @@ class RelayConfig:
     reserved_room: str = "dalton"
     reserved_token: str = ""
     max_players: int = 80
-    max_message_bytes: int = 512 * 1024
+    # Host → relay frames (world-state envelopes). Player frames use the tighter cap.
+    max_message_bytes: int = 128 * 1024
+    # PlayAlongProtocol.MAX_PACKET_LENGTH. Enforced on /join before forward.
+    max_player_message_bytes: int = 4096
+    # Per player socket. Surplus frames are not forwarded; a sustained flood closes.
+    player_msg_rate: int = 30
+    player_msg_burst: int = 60
     ping_interval: float = 20.0
     ping_timeout: float = 20.0
     rate_limit: int = 40
@@ -86,6 +94,8 @@ class Player:
         self.client_id = client_id
         self.ws = ws
         self.send_lock = asyncio.Lock()
+        self.window_start = time.monotonic()
+        self.window_count = 0
 
 
 class Room:
@@ -154,9 +164,13 @@ class Relay:
         self.limiter = RateLimiter(config.rate_limit, config.rate_window)
 
     def process_request(self, connection: ServerConnection, request):
-        path = request.path.split("?", 1)[0]
+        path = route_path(request.path)
         if path == "/health" or path == "/health/":
             return connection.respond(200, "ok\n")
+        # Apply this before data frames are parsed so an oversized player
+        # payload is rejected from its header instead of buffered.
+        if path.startswith("/join/"):
+            connection.protocol.max_size = self.config.max_player_message_bytes
         return None
 
     async def start(self):
@@ -351,6 +365,17 @@ class Relay:
                 if not isinstance(message, str):
                     await _safe_close(ws, 1003, "text only")
                     break
+                if len(message.encode("utf-8")) > self.config.max_player_message_bytes:
+                    log.info("player oversize room=%s id=%s", room.code, player.client_id)
+                    await _safe_close(ws, 1009, "message too large")
+                    break
+                decision = self.note_player_frame(player)
+                if decision == "drop":
+                    continue
+                if decision == "close":
+                    log.info("player rate limit room=%s id=%s", room.code, player.client_id)
+                    await _safe_close(ws, 1008, "rate limited")
+                    break
                 try:
                     await room.send(envelope("msg", player.client_id, message))
                 except ConnectionClosed:
@@ -360,6 +385,19 @@ class Relay:
             pass
         finally:
             await self.detach_player(room, player.client_id, notify_host=True)
+
+    def note_player_frame(self, player: Player) -> str:
+        """Return ok, drop, or close. Only ok frames are copied onto the host socket."""
+        now = time.monotonic()
+        if now - player.window_start >= 1.0:
+            player.window_start = now
+            player.window_count = 0
+        player.window_count += 1
+        if player.window_count > self.config.player_msg_burst:
+            return "close"
+        if player.window_count > self.config.player_msg_rate:
+            return "drop"
+        return "ok"
 
     def canonical_join(self, raw: str) -> Optional[str]:
         name = unquote(raw).strip()
@@ -506,7 +544,20 @@ def config_from_env(argv: Optional[list] = None) -> RelayConfig:
     parser.add_argument(
         "--max-message-bytes",
         type=int,
-        default=int(os.environ.get("PLAYALONG_MAX_MESSAGE_BYTES", str(512 * 1024))),
+        default=int(os.environ.get("PLAYALONG_MAX_MESSAGE_BYTES", str(128 * 1024))),
+        help="Max incoming frame on the host link (world-state envelopes)",
+    )
+    parser.add_argument(
+        "--max-player-bytes",
+        type=int,
+        default=int(os.environ.get("PLAYALONG_MAX_PLAYER_BYTES", "4096")),
+        help="Max incoming player frame (Play Along packet limit)",
+    )
+    parser.add_argument(
+        "--player-msg-rate",
+        type=int,
+        default=int(os.environ.get("PLAYALONG_PLAYER_MSG_RATE", "30")),
+        help="Player frames forwarded per second before extras are dropped",
     )
     parser.add_argument(
         "--ping-interval",
@@ -536,7 +587,10 @@ def config_from_env(argv: Optional[list] = None) -> RelayConfig:
         reserved_room=args.reserved_room.strip() or "dalton",
         reserved_token=args.token,
         max_players=max(1, args.max_players),
-        max_message_bytes=max(1024, args.max_message_bytes),
+        max_message_bytes=max(4096, args.max_message_bytes),
+        max_player_message_bytes=max(256, min(args.max_player_bytes, args.max_message_bytes)),
+        player_msg_rate=max(1, args.player_msg_rate),
+        player_msg_burst=max(max(1, args.player_msg_rate), max(1, args.player_msg_rate) * 2),
         ping_interval=args.ping_interval,
         ping_timeout=args.ping_timeout,
         rate_limit=max(1, args.rate_limit),

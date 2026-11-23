@@ -30,7 +30,7 @@ Reserved room:
 3. The token must match `PLAYALONG_DALTON_TOKEN` on the server. It is never logged.
 4. A good token replaces the previous holder (reconnect after a crash). A bad token is closed with `4001` and does not kick the live host.
 
-Other limits: per-room player cap (default 80), 512 KiB frames, WebSocket ping interval/timeout (default 20s/20s), and a per-IP connection rate limit (default 40 new sockets / 30s). Behind Cloudflare the client IP is `CF-Connecting-IP` or `X-Forwarded-For`. `GET /health` returns `ok`.
+Other limits: per-room player cap (default 80), player frames capped at 4096 bytes (the game packet limit) and 30 forwarded messages/second per socket (a flood is dropped, then the socket is closed), host-link frames capped at 128 KiB for world-state envelopes, WebSocket ping interval/timeout (default 20s/20s), and a per-IP connection rate limit (default 40 new sockets / 30s). Behind Cloudflare the client IP is `CF-Connecting-IP` or `X-Forwarded-For`. `GET /health` returns `ok`.
 
 ## Run locally
 

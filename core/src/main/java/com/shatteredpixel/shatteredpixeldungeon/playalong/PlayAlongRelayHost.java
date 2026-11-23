@@ -67,6 +67,13 @@ public final class PlayAlongRelayHost {
 		public String d;
 	}
 
+	/**
+	 * Largest relay→host frame we will JSON-parse. Player payloads are capped
+	 * at {@link PlayAlongProtocol#MAX_PACKET_LENGTH}; the envelope around one
+	 * of those is far smaller than this.
+	 */
+	private static final int MAX_RELAY_FRAME = 32 * 1024;
+
 	private final PlayAlongServer server;
 	private final Listener listener;
 	private final ConcurrentHashMap<String, VirtualClient> virtuals = new ConcurrentHashMap<>();
@@ -150,7 +157,7 @@ public final class PlayAlongRelayHost {
 			@Override
 			public void onMessage(String message) {
 				if (!running || socket != this || message == null) return;
-				if (message.length() > 1024 * 1024) return;
+				if (message.length() > MAX_RELAY_FRAME) return;
 				try {
 					Env env = PlayAlongProtocol.GSON.fromJson(message, Env.class);
 					handleEnvelope(env);
@@ -244,6 +251,10 @@ public final class PlayAlongRelayHost {
 		if (client == null) return;
 		if ("msg".equals(env.t)) {
 			if (env.d == null) return;
+			if (env.d.length() > PlayAlongProtocol.MAX_PACKET_LENGTH) {
+				client.close(1009, "Message too large");
+				return;
+			}
 			try {
 				server.onMessage(client, env.d);
 			} catch (Exception ignored) {

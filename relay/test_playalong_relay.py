@@ -219,10 +219,68 @@ async def test_rate_limit():
         await server.wait_closed()
 
 
+async def test_player_frame_limits():
+    config = RelayConfig(
+        host="127.0.0.1",
+        port=0,
+        reserved_token="t",
+        max_player_message_bytes=64,
+        player_msg_rate=2,
+        player_msg_burst=4,
+    )
+    _relay, server, port = await _start(config)
+    base = "ws://127.0.0.1:%d" % port
+    try:
+        host = await connect(base + "/host", open_timeout=2)
+        room = await _recv_json(host)
+        code = room["d"]
+
+        bulky = await connect(base + "/join/" + code, open_timeout=2)
+        opened = await _recv_json(host)
+        assert opened["t"] == "open"
+        try:
+            await bulky.send("x" * 200)
+        except ConnectionClosed:
+            pass
+        closed = await _expect_closed(bulky)
+        assert closed.rcvd is not None and closed.rcvd.code == 1009
+        # The player is dropped. The payload itself is not forwarded.
+        notice = await _recv_json(host)
+        assert notice["t"] == "close", notice
+
+        fast = await connect(base + "/join/" + code, open_timeout=2)
+        opened_fast = await _recv_json(host)
+        assert opened_fast["t"] == "open"
+        fast_id = opened_fast["c"]
+        for i in range(8):
+            await fast.send('{"type":"player_state","n":%d}' % i)
+        forwarded = 0
+        saw_close = False
+        deadline = asyncio.get_event_loop().time() + 2
+        while asyncio.get_event_loop().time() < deadline and not saw_close:
+            try:
+                env = await asyncio.wait_for(host.recv(), 0.4)
+            except asyncio.TimeoutError:
+                break
+            env = json.loads(env)
+            if env.get("t") == "msg" and env.get("c") == fast_id:
+                forwarded += 1
+            elif env.get("t") == "close" and env.get("c") == fast_id:
+                saw_close = True
+        assert forwarded == 2, forwarded
+        assert saw_close
+        await _expect_closed(fast)
+        await host.close()
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
 async def main():
     await test_host_and_two_players()
     await test_reserved_room()
     await test_rate_limit()
+    await test_player_frame_limits()
     print("playalong relay tests passed")
 
 
