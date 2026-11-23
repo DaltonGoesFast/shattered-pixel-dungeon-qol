@@ -91,10 +91,23 @@ public class KingsCrown extends Item {
 	
 	public void upgradeArmor(Hero hero, Armor armor, ArmorAbility ability) {
 
-		detach(hero.belongings.backpack);
+		if (hero == null) {
+			return;
+		}
+
+		// Detach only this crown, and only if the hero is holding it. Class-armor
+		// rechoice and Play Along both call this with a crown that may not be in the bag.
+		boolean held = hero.belongings != null
+				&& hero.belongings.backpack != null
+				&& hero.belongings.backpack.contains( this );
+		if (held) {
+			detach(hero.belongings.backpack);
+		}
 		Catalog.countUse( getClass() );
 
-		hero.sprite.emitter().burst( Speck.factory( Speck.CROWN), 12 );
+		if (hero.sprite != null) {
+			hero.sprite.emitter().burst( Speck.factory( Speck.CROWN), 12 );
+		}
 		hero.spend(Actor.TICK);
 		hero.busy();
 
@@ -110,7 +123,9 @@ public class KingsCrown extends Item {
 			if (hero.belongings.armor == armor) {
 
 				hero.belongings.armor = classArmor;
-				((HeroSprite) hero.sprite).updateArmor();
+				if (hero.sprite instanceof HeroSprite) {
+					((HeroSprite) hero.sprite).updateArmor();
+				}
 				classArmor.activate(hero);
 
 			} else {
@@ -128,7 +143,9 @@ public class KingsCrown extends Item {
 		TalentAutoPlan.tryApply( hero );
 		Chimera.grantSignature( hero, Chimera.classOf( ability ) );
 
-		hero.sprite.operate( hero.pos );
+		if (hero.sprite != null) {
+			hero.sprite.operate( hero.pos );
+		}
 		Sample.INSTANCE.play( Assets.Sounds.MASTERY );
 	}
 
