@@ -159,6 +159,29 @@ def load_spawn_scale_from_disk():
     return sanitize_spawn_scale(None)
 
 
+def push_catchup_to_game(catchup=None):
+    """Push play_along_catchup to the game over WebSocket. Returns True if sent."""
+    if catchup is None:
+        try:
+            from points_command import sanitize_play_along_catchup
+            if os.path.exists(POINTS_CONFIG_FILE):
+                with open(POINTS_CONFIG_FILE, encoding="utf-8") as f:
+                    data = json.load(f) or {}
+                catchup = sanitize_play_along_catchup(data.get("play_along_catchup"))
+            else:
+                catchup = sanitize_play_along_catchup(None)
+        except Exception:
+            return False
+    if not game_ws_app:
+        return False
+    try:
+        _send_to_game({"command": "play_along_catchup_config", "play_along_catchup": catchup})
+        return True
+    except Exception as e:
+        print(f"push_catchup_to_game: {e}")
+        return False
+
+
 def push_spawn_scale_to_game(spawn_scale=None):
     """Push spawn_scale knobs to the game over WebSocket. Returns True if sent."""
     if spawn_scale is None:
@@ -471,6 +494,7 @@ last_open_layout_key = None
 last_item_info_ignore_open_until = 0.0
 ITEM_INFO_IGNORE_OPEN_AFTER_CLOSE_SEC = 0.5
 game_ws_received_count = 0
+_catchup_name_cache = set()
 last_ignored_source_log_time = 0.0
 IGNORED_SOURCE_LOG_INTERVAL = 60.0
 
@@ -1064,7 +1088,7 @@ def _game_ws_on_message(ws, message):
     try:
         data = json.loads(message)
         # Handle spawn/gold result (game reports success/failure)
-        if data.get('type') in ('ping_result', 'spawn_result', 'champion_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result', 'trap_result', 'plant_result', 'bomb_result', 'transmute_result', 'summon_bee_result', 'ward_result', 'heal_result', 'cleanse_result', 'dew_result', 'corrupt_ally_result', 'hex_result', 'degrade_result', 'sabotage_result', 'ring_of_wealth_result', 'streamer_debug_result', 'set_hero_name_result'):
+        if data.get('type') in ('ping_result', 'spawn_result', 'champion_result', 'gold_result', 'curse_result', 'gas_result', 'scroll_result', 'wand_result', 'buff_result', 'debuff_result', 'trap_result', 'plant_result', 'bomb_result', 'transmute_result', 'summon_bee_result', 'ward_result', 'heal_result', 'cleanse_result', 'dew_result', 'corrupt_ally_result', 'hex_result', 'degrade_result', 'sabotage_result', 'ring_of_wealth_result', 'streamer_debug_result', 'set_hero_name_result', 'catchup_result', 'catchup_validate_result', 'catchup_catalog_result'):
             rid = data.get('request_id')
             ok = data.get('success', False)
             if rid:
@@ -1174,6 +1198,16 @@ def _game_ws_on_message(ws, message):
                             pending_spawns[rid]['name'] = data.get('name')
                         if data.get('type') == 'set_hero_name_result' and data.get('error'):
                             pending_spawns[rid]['error'] = data.get('error')
+                        if data.get('message'):
+                            pending_spawns[rid]['message'] = data.get('message')
+                        if 'unknown' in data:
+                            pending_spawns[rid]['unknown'] = data.get('unknown')
+                        if 'capped' in data:
+                            pending_spawns[rid]['capped'] = data.get('capped')
+                        if isinstance(data.get('names'), list):
+                            pending_spawns[rid]['names'] = data.get('names')
+                            global _catchup_name_cache
+                            _catchup_name_cache = {str(n).strip().lower() for n in data.get('names') if str(n).strip()}
                         pending_spawns[rid]['event'].set()
             _vprint(f"Game {data.get('type')}: request_id={rid} success={ok}")
             return
@@ -1744,8 +1778,9 @@ def game_ws_thread():
                 # Push latest spawn_scale so a restarted game picks up saved knobs
                 try:
                     push_spawn_scale_to_game()
+                    push_catchup_to_game()
                 except Exception as e:
-                    print(f"Game WS on_open spawn_scale push: {e}")
+                    print(f"Game WS on_open config push: {e}")
             def on_close(conn, code, reason):
                 global last_obs_crop_top, last_obs_mask_enabled, last_open_best_crop, last_open_layout_key
                 global last_item_info_ignore_open_until, game_ws_received_count, game_ws_app
@@ -1877,11 +1912,12 @@ def points_config_api():
                 data.setdefault("cooldown_bypass_users", ["DaltonGoesFast"])
                 data.setdefault("chat_cap_exempt_users", ["bob"])
                 data.setdefault("death_cost_inflation_enabled", True)
-                from points_command import sanitize_play_along_rewards
+                from points_command import sanitize_play_along_catchup, sanitize_play_along_rewards
                 data["play_along_rewards"] = sanitize_play_along_rewards(data.get("play_along_rewards"))
+                data["play_along_catchup"] = sanitize_play_along_catchup(data.get("play_along_catchup"))
                 data["spawn_scale"] = sanitize_spawn_scale(data.get("spawn_scale"))
             else:
-                from points_command import DEFAULT_PLAY_ALONG_REWARDS
+                from points_command import DEFAULT_PLAY_ALONG_REWARDS, sanitize_play_along_catchup
                 data = {
                     "cost_per_gold": 5,
                     "cost_per_curse": 200,
@@ -1928,6 +1964,7 @@ def points_config_api():
                     "curse_class_kit_duration_turns": 100,
                     "death_cost_inflation_enabled": True,
                     "play_along_rewards": dict(DEFAULT_PLAY_ALONG_REWARDS),
+                    "play_along_catchup": sanitize_play_along_catchup(None),
                     "spawn_scale": sanitize_spawn_scale(None),
                 }
             try:
@@ -1994,7 +2031,7 @@ def points_config_api():
             death_cost_enabled = bool(existing.get("death_cost_inflation_enabled", True))
 
         # Validate and sanitize
-        from points_command import sanitize_play_along_rewards
+        from points_command import sanitize_play_along_catchup, sanitize_play_along_rewards
         cfg = {
             "cost_per_gold": max(1, int(data.get("cost_per_gold", 5))),
             "cost_per_curse": max(1, int(data.get("cost_per_curse", 200))),
@@ -2037,6 +2074,9 @@ def points_config_api():
             "play_along_rewards": sanitize_play_along_rewards(
                 data["play_along_rewards"] if "play_along_rewards" in data else existing.get("play_along_rewards")
             ),
+            "play_along_catchup": sanitize_play_along_catchup(
+                data["play_along_catchup"] if "play_along_catchup" in data else existing.get("play_along_catchup")
+            ),
             "spawn_scale": sanitize_spawn_scale(
                 data["spawn_scale"] if "spawn_scale" in data else existing.get("spawn_scale")
             ),
@@ -2049,12 +2089,13 @@ def points_config_api():
         with open(POINTS_CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2)
         pushed = push_spawn_scale_to_game(cfg["spawn_scale"])
+        catchup_pushed = push_catchup_to_game(cfg["play_along_catchup"])
         try:
             from points_command import refresh_death_cost_display_file
             refresh_death_cost_display_file()
         except Exception:
             pass
-        return jsonify({"ok": True, "spawn_scale_pushed": pushed})
+        return jsonify({"ok": True, "spawn_scale_pushed": pushed, "catchup_pushed": catchup_pushed})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -3681,6 +3722,110 @@ def _forward_streamer_debug(ws_cmd, default_err='Command failed', extra_payload=
     except Exception as e:
         print(f"streamer debug exception: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 400
+
+
+def _catchup_local_names():
+    names = set(_catchup_name_cache)
+    names.update({"sou", "scrollofupgrade", "scrollsofupgrade"})
+    try:
+        from streamer_item_index import load_index, normalize_key
+        for display, key, hint in load_index():
+            names.add(normalize_key(hint))
+            names.add(normalize_key(str(key).split(".")[-1]))
+            names.add(normalize_key(display))
+    except Exception:
+        pass
+    return names
+
+
+def _split_catchup_tokens(text):
+    out = []
+    for part in str(text or "").split(","):
+        token = part.strip()
+        if token:
+            out.append(token)
+    return out
+
+
+def _catchup_token_name(token):
+    compact = "".join(ch.lower() for ch in token if ch.isalnum() or ch in "+x")
+    import re
+    compact = re.sub(r"\+\d+", "", compact)
+    compact = re.sub(r"x\d+$", "", compact)
+    return compact
+
+
+@app.route('/api/playalong/catchup-validate', methods=['POST', 'OPTIONS'])
+def playalong_catchup_validate():
+    """Check bonus item names. Asks the running game when it is connected."""
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        chunks = []
+        if isinstance(data.get("items"), str):
+            chunks.append(data.get("items"))
+        chunks.append(data.get("all_regions_bonus_items") or "")
+        for boss in ("goo", "tengu", "dm300", "king"):
+            row = data.get(boss)
+            if isinstance(row, dict):
+                chunks.append(row.get("bonus_items") or "")
+            elif isinstance(row, str):
+                chunks.append(row)
+        items = ", ".join(str(c) for c in chunks if str(c).strip())
+        allow_artifacts = bool(data.get("allow_artifacts"))
+        if game_ws_app:
+            request_id = str(uuid.uuid4())
+            ev = threading.Event()
+            with spawn_lock:
+                pending_spawns[request_id] = {'event': ev, 'success': False}
+            _send_to_game({
+                "command": "catchup_validate",
+                "request_id": request_id,
+                "items": items,
+                "allow_artifacts": allow_artifacts,
+            })
+            if ev.wait(timeout=SPAWN_RESULT_TIMEOUT):
+                with spawn_lock:
+                    pending = pending_spawns.pop(request_id, {})
+                return jsonify({
+                    "ok": True,
+                    "source": "game",
+                    "unknown": pending.get("unknown") or [],
+                    "capped": pending.get("capped") or [],
+                })
+            with spawn_lock:
+                pending_spawns.pop(request_id, None)
+        known = _catchup_local_names()
+        unknown = []
+        for token in _split_catchup_tokens(items):
+            name = _catchup_token_name(token)
+            if name and name not in known:
+                unknown.append(token)
+        return jsonify({
+            "ok": True,
+            "source": "name-list",
+            "unknown": unknown,
+            "capped": [],
+            "note": "Game was not connected; checked the exported item name list.",
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+
+
+@app.route('/api/streamer-debug/catchup-test', methods=['POST', 'OPTIONS'])
+def streamer_debug_catchup_test():
+    """Debug: build a catch-up kit description for every region."""
+    return _forward_streamer_debug('streamer_catchup_test', 'Catch-up test failed')
+
+
+@app.route('/api/streamer-debug/catchup-apply/<boss>', methods=['POST', 'OPTIONS'])
+def streamer_debug_catchup_apply(boss):
+    """Debug-mode only: put one region's catch-up kit on the current hero."""
+    boss_id = str(boss or "").strip().lower()
+    if boss_id not in ("goo", "tengu", "dm300", "king"):
+        return jsonify({"ok": False, "error": "Unknown region"}), 400
+    return _forward_streamer_debug('streamer_catchup_apply_' + boss_id, 'Catch-up apply failed')
 
 
 @app.route('/api/streamer-debug/heal-all', methods=['POST', 'OPTIONS'])

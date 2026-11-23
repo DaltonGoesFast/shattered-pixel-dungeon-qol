@@ -178,6 +178,65 @@ public class StreamingServer extends WebSocketServer {
 					addChatter(resp, usernameFinal);
 					broadcast(resp.toString());
 				}
+			} else if ("play_along_catchup_config".equals(cmd)) {
+				final String raw = obj.has("play_along_catchup") ? obj.get("play_along_catchup").toString() : "";
+				Gdx.app.postRunnable(() -> {
+					String err = null;
+					try {
+						com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.applyConfigJson(raw);
+					} catch (Throwable t) {
+						err = (t.getMessage() != null) ? t.getMessage() : "Invalid play_along_catchup";
+					}
+					JsonObject resp = new JsonObject();
+					resp.addProperty("type", "catchup_result");
+					if (requestId != null && !requestId.isEmpty()) resp.addProperty("request_id", requestId);
+					resp.addProperty("success", err == null);
+					if (err != null) resp.addProperty("error", err);
+					else resp.addProperty("message", "catch-up config live");
+					broadcast(resp.toString());
+				});
+			} else if ("catchup_describe".equals(cmd)) {
+				Gdx.app.postRunnable(() -> {
+					String text = com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.describeForCommand();
+					JsonObject resp = new JsonObject();
+					resp.addProperty("type", "catchup_result");
+					if (requestId != null && !requestId.isEmpty()) resp.addProperty("request_id", requestId);
+					resp.addProperty("success", true);
+					resp.addProperty("message", text);
+					broadcast(resp.toString());
+				});
+			} else if ("catchup_catalog".equals(cmd)) {
+				Gdx.app.postRunnable(() -> {
+					java.util.List<String> names = com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchupItems.knownNames();
+					JsonObject resp = new JsonObject();
+					resp.addProperty("type", "catchup_catalog_result");
+					if (requestId != null && !requestId.isEmpty()) resp.addProperty("request_id", requestId);
+					resp.addProperty("success", true);
+					com.google.gson.JsonArray arr = new com.google.gson.JsonArray();
+					for (String name : names) arr.add(name);
+					resp.add("names", arr);
+					broadcast(resp.toString());
+				});
+			} else if ("catchup_validate".equals(cmd)) {
+				final String items = obj.has("items") ? obj.get("items").getAsString() : "";
+				final boolean allowArtifacts = obj.has("allow_artifacts") && obj.get("allow_artifacts").getAsBoolean();
+				Gdx.app.postRunnable(() -> {
+					java.util.List<com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchupItems.Parsed> parsed =
+							com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchupItems.parse(items, allowArtifacts);
+					com.google.gson.JsonArray unknown = new com.google.gson.JsonArray();
+					com.google.gson.JsonArray capped = new com.google.gson.JsonArray();
+					for (com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchupItems.Parsed p : parsed) {
+						if (p.skipped && "unknown item".equals(p.reason)) unknown.add(p.token);
+						else if ("capped".equals(p.reason)) capped.add(p.token);
+					}
+					JsonObject resp = new JsonObject();
+					resp.addProperty("type", "catchup_validate_result");
+					if (requestId != null && !requestId.isEmpty()) resp.addProperty("request_id", requestId);
+					resp.addProperty("success", true);
+					resp.add("unknown", unknown);
+					resp.add("capped", capped);
+					broadcast(resp.toString());
+				});
 			} else if ("spawn_scale_config".equals(cmd)) {
 				Gdx.app.postRunnable(() -> {
 					String err = null;

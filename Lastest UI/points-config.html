@@ -1114,6 +1114,22 @@
     </div>
     <div id="paLinkedList" class="session-user-lists" style="max-height:140px;">—</div>
   </section>
+
+  <section id="section-play_along_catchup" data-section="play_along_catchup">
+    <h2><span class="section-drag-handle" title="Drag to reorder">⋮⋮</span>Play Along Catch-up</h2>
+    <p class="sub" style="margin-bottom:0.5rem;">When Dalton has killed a region boss, a new racer (not a resume) spawns on that row's floor with this kit. Save costs writes the JSON and pushes it to the running game. Viewers use the host's copy.</p>
+    <div class="row"><label for="cu_enabled">Enabled:</label><input type="checkbox" id="cu_enabled" checked></div>
+    <div class="row"><label for="cu_exp_after" title="Donor points from kill EXP start only after the racer leaves their spawn floor">EXP rewards after first floor:</label><input type="checkbox" id="cu_exp_after" checked></div>
+    <div class="row"><label for="cu_once" title="One catch-up per viewer per session. A Soul Pact wipe lets them catch up again">Once per session:</label><input type="checkbox" id="cu_once" checked></div>
+    <div class="row"><label for="cu_artifacts" title="Bonus items may include artifacts only when this is on">Allow artifacts:</label><input type="checkbox" id="cu_artifacts"></div>
+    <div class="row"><label for="cu_all_bonus" title="Comma-separated. Names are lowercase class names. xN = quantity, +N = upgrade. Example: potionofstrengthx10, wandoflightning+1">All-regions bonus items:</label><input type="text" id="cu_all_bonus" placeholder="potionofstrengthx2" style="flex:1;min-width:180px;"></div>
+    <p class="sub" style="margin:0.35rem 0;">Per boss. Spawn floor is the first floor of the host's current region by default. SoU go in the backpack unused. Caps: +5 and x20.</p>
+    <div id="cuRows"></div>
+    <div class="row" style="gap:8px;margin-top:0.4rem;">
+      <button type="button" id="cuValidate">Validate bonus items</button>
+      <span id="cuValidateStatus" class="sub">—</span>
+    </div>
+  </section>
   <div class="column-drop-zone" data-column="left" id="dropZoneLeft">Drop here</div>
   </div>
 
@@ -1195,6 +1211,11 @@
       <button type="button" data-dbg="reveal-map">Reveal map</button>
       <button type="button" data-dbg="goto-stairs-down">Stairs ↓</button>
       <button type="button" data-dbg="goto-stairs-up">Stairs ↑</button>
+      <button type="button" data-dbg="catchup-test" title="Build a test catch-up kit description for Goo, Tengu, DM-300, and the Dwarf King">Test catch-up kits</button>
+      <button type="button" data-dbg="catchup-apply/goo" title="Debug mode only. Puts the Goo catch-up kit on the current hero">Apply Goo kit</button>
+      <button type="button" data-dbg="catchup-apply/tengu" title="Debug mode only">Apply Tengu kit</button>
+      <button type="button" data-dbg="catchup-apply/dm300" title="Debug mode only">Apply DM-300 kit</button>
+      <button type="button" data-dbg="catchup-apply/king" title="Debug mode only">Apply King kit</button>
     </div>
     <h3>Give item</h3>
     <div class="dbg-row">
@@ -2544,6 +2565,112 @@
       kill_donor_per_exp: 1,
     };
 
+    const CATCHUP_BOSSES = [
+      ['goo', 'Goo', 6, 6, 11, 2, 2, 2],
+      ['tengu', 'Tengu', 11, 11, 12, 4, 3, 3],
+      ['dm300', 'DM-300', 16, 16, 13, 6, 4, 4],
+      ['king', 'Dwarf King', 21, 21, 14, 8, 4, 4],
+    ];
+
+    function ensureCatchupRows() {
+      const host = document.getElementById('cuRows');
+      if (!host || host.childElementCount) return;
+      CATCHUP_BOSSES.forEach(([id, label]) => {
+        const wrap = document.createElement('div');
+        wrap.style.margin = '0.35rem 0 0.6rem';
+        wrap.innerHTML =
+          '<strong>' + label + '</strong>' +
+          '<div class="row"><label>Floor</label><input type="number" id="cu_' + id + '_floor" min="2" max="24" style="width:64px;">' +
+          '<label>Level</label><input type="number" id="cu_' + id + '_level" min="1" max="30" style="width:64px;">' +
+          '<label>STR</label><input type="number" id="cu_' + id + '_str" min="10" max="20" style="width:64px;"></div>' +
+          '<div class="row"><label>SoU</label><input type="number" id="cu_' + id + '_sou" min="0" max="20" style="width:64px;">' +
+          '<label>Wpn tier</label><input type="number" id="cu_' + id + '_wpn" min="1" max="5" style="width:64px;">' +
+          '<label>Arm tier</label><input type="number" id="cu_' + id + '_arm" min="1" max="5" style="width:64px;"></div>' +
+          '<div class="row"><label>Bonus items</label><input type="text" id="cu_' + id + '_bonus" style="flex:1;min-width:180px;" placeholder="dartx20"></div>';
+        host.appendChild(wrap);
+      });
+    }
+
+    function applyCatchupToForm(cu) {
+      ensureCatchupRows();
+      const d = cu || {};
+      const setC = (id, v) => { const e = document.getElementById(id); if (e) e.checked = !!v; };
+      const setV = (id, v) => { const e = document.getElementById(id); if (e) e.value = v == null ? '' : v; };
+      setC('cu_enabled', d.enabled !== false);
+      setC('cu_exp_after', d.exp_rewards_after_first_floor !== false);
+      setC('cu_once', d.once_per_session !== false);
+      setC('cu_artifacts', !!d.allow_artifacts);
+      setV('cu_all_bonus', d.all_regions_bonus_items || '');
+      CATCHUP_BOSSES.forEach(([id, _label, floor, level, str, sou, wpn, arm]) => {
+        const row = d[id] || {};
+        setV('cu_' + id + '_floor', row.spawn_floor ?? floor);
+        setV('cu_' + id + '_level', row.level ?? level);
+        setV('cu_' + id + '_str', row.str ?? str);
+        setV('cu_' + id + '_sou', row.sou ?? sou);
+        setV('cu_' + id + '_wpn', row.weapon_tier ?? wpn);
+        setV('cu_' + id + '_arm', row.armor_tier ?? arm);
+        setV('cu_' + id + '_bonus', row.bonus_items || '');
+      });
+    }
+
+    function collectCatchup() {
+      ensureCatchupRows();
+      const num = (id, def) => {
+        const e = document.getElementById(id);
+        const v = parseInt(e && e.value, 10);
+        return Number.isNaN(v) ? def : v;
+      };
+      const chk = (id, def) => {
+        const e = document.getElementById(id);
+        return e ? !!e.checked : def;
+      };
+      const out = {
+        enabled: chk('cu_enabled', true),
+        exp_rewards_after_first_floor: chk('cu_exp_after', true),
+        once_per_session: chk('cu_once', true),
+        allow_artifacts: chk('cu_artifacts', false),
+        all_regions_bonus_items: (document.getElementById('cu_all_bonus')?.value || '').trim(),
+      };
+      CATCHUP_BOSSES.forEach(([id, _label, floor, level, str, sou, wpn, arm]) => {
+        out[id] = {
+          spawn_floor: num('cu_' + id + '_floor', floor),
+          level: num('cu_' + id + '_level', level),
+          str: num('cu_' + id + '_str', str),
+          sou: num('cu_' + id + '_sou', sou),
+          weapon_tier: num('cu_' + id + '_wpn', wpn),
+          armor_tier: num('cu_' + id + '_arm', arm),
+          bonus_items: (document.getElementById('cu_' + id + '_bonus')?.value || '').trim(),
+        };
+      });
+      return out;
+    }
+
+    function validateCatchupItems() {
+      const status = document.getElementById('cuValidateStatus');
+      if (status) status.textContent = 'Checking…';
+      const body = collectCatchup();
+      fetch('/api/playalong/catchup-validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (!data || data.ok === false) throw new Error((data && data.error) || 'Validate failed');
+          const unknown = data.unknown || [];
+          const capped = data.capped || [];
+          let text = unknown.length ? ('Unknown: ' + unknown.join(', ')) : 'Bonus item names look valid.';
+          if (capped.length) text += ' Capped at +5 / x20: ' + capped.join(', ');
+          if (data.note) text += ' ' + data.note;
+          if (status) status.textContent = text;
+          showMsg(text, unknown.length === 0);
+        })
+        .catch(e => {
+          if (status) status.textContent = e.message;
+          showMsg(e.message, false);
+        });
+    }
+
     function applyPlayAlongRewardsToForm(pa) {
       const d = Object.assign({}, PLAY_ALONG_REWARDS_DEFAULT, pa || {});
       const setN = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
@@ -2638,6 +2765,7 @@
           const deathCostEl = document.getElementById('death_cost_inflation_enabled');
           if (deathCostEl) deathCostEl.checked = data.death_cost_inflation_enabled !== false;
           applyPlayAlongRewardsToForm(data.play_along_rewards);
+          applyCatchupToForm(data.play_along_catchup);
           applySpawnScaleToForm(data.spawn_scale);
           renderCmdDisableGrid(data.command_allowed_roles || {});
           const monsters = data.cost_per_monster || {};
@@ -2751,6 +2879,7 @@
         death_cost_inflation_enabled: !!document.getElementById('death_cost_inflation_enabled')?.checked,
         command_allowed_roles: collectCommandAllowedRoles(),
         play_along_rewards: collectPlayAlongRewards(),
+        play_along_catchup: collectCatchup(),
         spawn_scale: collectSpawnScale(),
       };
       return fetch('/api/points-config', {
@@ -2763,8 +2892,9 @@
           if (data.error) throw new Error(data.error);
           setCostsDirty(false);
           const pushed = data.spawn_scale_pushed;
+          const catchupPushed = data.catchup_pushed;
           setSpawnScalePushStatus(pushed ? 'Saved + pushed to game' : 'Saved to disk (game not connected)');
-          showMsg(pushed ? 'Saved! (scaling pushed to game)' : 'Saved! (game not connected — reconnect will push)', true);
+          showMsg((pushed || catchupPushed) ? 'Saved! (live settings pushed to game)' : 'Saved! (game not connected — reconnect will push)', true);
           logActivity('Costs saved');
           refreshLiveStatus();
           return true;
@@ -3186,7 +3316,7 @@
         grid.classList.add('col-' + Math.max(1, Math.min(3, cfg.columns)));
         applyColumnWidths();
       }
-      ['general', 'monsters', 'spawn_scale', 'play_along', 'viewer', 'game', 'debug', 'obs-ui', 'score', 'nine-challenge-deaths', 'session', 'bestiary', 'companion', 'activity'].forEach(id => {
+      ['general', 'monsters', 'spawn_scale', 'play_along', 'play_along_catchup', 'viewer', 'game', 'debug', 'obs-ui', 'score', 'nine-challenge-deaths', 'session', 'bestiary', 'companion', 'activity'].forEach(id => {
         const el = document.getElementById('section-' + id);
         if (el) el.style.display = (cfg.sections[id] !== false) ? '' : 'none';
       });
@@ -3201,6 +3331,11 @@
         const gi = order.indexOf('game');
         if (gi >= 0) order.splice(gi + 1, 0, 'obs-ui');
         else order.push('obs-ui');
+      }
+      if (!order.includes('play_along_catchup')) {
+        const pi = order.indexOf('play_along');
+        if (pi >= 0) order.splice(pi + 1, 0, 'play_along_catchup');
+        else order.push('play_along_catchup');
       }
       const orderFiltered = order.filter(id => id !== 'activity');
       let counts = cfg.columnCounts || [2, 1, 4];
@@ -3764,7 +3899,7 @@
       if (file) importConfigFile(file);
       e.target.value = '';
     });
-    ['section-general', 'section-monsters', 'section-spawn_scale', 'section-play_along'].forEach(id => {
+    ['section-general', 'section-monsters', 'section-spawn_scale', 'section-play_along', 'section-play_along_catchup'].forEach(id => {
       const sec = document.getElementById(id);
       if (!sec) return;
       sec.addEventListener('input', () => setCostsDirty(true));
@@ -3773,6 +3908,8 @@
     document.getElementById('paLinkedRefresh')?.addEventListener('click', () => {
       refreshLinkedClients().then(() => showMsg('Linked clients refreshed', true));
     });
+    document.getElementById('cuValidate')?.addEventListener('click', validateCatchupItems);
+    ensureCatchupRows();
     const bestiarySec = document.getElementById('section-bestiary');
     if (bestiarySec) {
       bestiarySec.addEventListener('input', () => setBestiaryDirty(true));

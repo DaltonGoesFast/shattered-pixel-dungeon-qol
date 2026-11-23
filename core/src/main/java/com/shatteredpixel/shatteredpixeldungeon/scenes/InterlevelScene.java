@@ -641,10 +641,14 @@ public class InterlevelScene extends PixelScene {
 			if (looping) Legacy.deleteFloorFiles( GamesInProgress.curSlot );
 			GameLog.wipe();
 
+			// Catch-up racers start on a later floor of the shared seed. Generating the
+			// earlier branch-0 floors first keeps that floor aligned with the host.
+			int catchupDepth = com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.prepareSpawnDepth();
+
 			//When debugging, we may start a game at a later depth to quickly test something
 			// if this happens, the games quickly generates all prior levels on branch 0 first,
 			// which ensures levelgen consistency with a regular game that was played to that depth.
-			if (DeviceCompat.isDebug()){
+			if (DeviceCompat.isDebug() || catchupDepth > 1){
 				int trueDepth = Dungeon.depth;
 				int trueBranch = Dungeon.branch;
 				for (int i = 1; i < trueDepth + (trueBranch == 0 ? 0 : 1); i++){
@@ -660,6 +664,9 @@ public class InterlevelScene extends PixelScene {
 			}
 
 			Level level = Dungeon.newLevel();
+			if (catchupDepth > 1) {
+				com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.finishSpawn();
+			}
 			Dungeon.switchLevel( level, -1 );
 		} else {
 			if (curTransition.destBranch != Dungeon.branch && Dungeon.depth >= 16 && Dungeon.depth <= 20) {

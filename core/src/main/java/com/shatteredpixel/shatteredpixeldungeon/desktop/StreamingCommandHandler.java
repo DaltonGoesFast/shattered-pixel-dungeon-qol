@@ -1759,7 +1759,13 @@ public final class StreamingCommandHandler {
 			case "streamer_goto_stairs_down": return handleStreamerGotoStairs(username, true);
 			case "streamer_goto_stairs_up": return handleStreamerGotoStairs(username, false);
 			case "streamer_give_bags": return handleStreamerGiveBags(username);
-			default: return "ERR:Unknown streamer command: " + command;
+			case "streamer_catchup_test": return com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.debugReport();
+			default:
+				if (command.startsWith("streamer_catchup_apply_")) {
+					return com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.debugApply(
+							command.substring("streamer_catchup_apply_".length()));
+				}
+				return "ERR:Unknown streamer command: " + command;
 		}
 	}
 

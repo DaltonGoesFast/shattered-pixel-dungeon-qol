@@ -543,6 +543,7 @@ public final class PlayAlongService {
 	// ---- Starting & Joining Runs ----
 
 	public static void onHostRunStarted() {
+		PlayAlongCatchup.onNewHostRun();
 		startOrResumeHostSession(false, false, false);
 	}
 
@@ -752,6 +753,7 @@ public final class PlayAlongService {
 		GamesInProgress.curSlot = slot;
 		Dungeon.deleteGame(slot, true);
 		PlayAlongArchives.remember(session.sessionId, slot);
+		PlayAlongCatchup.prepareNewRacer(session);
 
 		Dungeon.hero = null;
 		Dungeon.daily = Dungeon.dailyReplay = false;
@@ -812,6 +814,7 @@ public final class PlayAlongService {
 
 		GamesInProgress.curSlot = slot;
 		PlayAlongArchives.touch(session.sessionId);
+		PlayAlongCatchup.clearPending();
 		ActionIndicator.clearAction();
 
 		int depth = info != null ? Math.max(1, info.depth) : 1;
@@ -1026,6 +1029,7 @@ public final class PlayAlongService {
 
 			@Override
 			public void onHostDied(WireMessage msg) {
+				PlayAlongCatchup.onClientWiped();
 				triggerHostWipeOnClient(msg.depth, msg.cause, msg.victims);
 			}
 
@@ -1088,6 +1092,11 @@ public final class PlayAlongService {
 			public void onChatCommand(WireMessage msg) {
 				if (msg == null || msg.chatCommand == null) return;
 				final ChatCommandPayload p = msg.chatCommand;
+				if ("catchup".equals(p.command)) {
+					Game.runOnRenderThread(() -> com.shatteredpixel.shatteredpixeldungeon.utils.GLog.i(
+							PlayAlongCatchup.describeForCommand()));
+					return;
+				}
 				final boolean isConfig = "spawn_scale_config".equals(p.command);
 				if (!isConfig) {
 					if (role != Role.CLIENT) return;
@@ -1260,6 +1269,7 @@ public final class PlayAlongService {
 
 	public static void onKillExp(int exp) {
 		if (role != Role.CLIENT || exp <= 0) return;
+		if (PlayAlongCatchup.blocksKillExpReward()) return;
 		if (lastKillExpDepth < 0) {
 			lastKillExpDepth = Dungeon.depth;
 		}
@@ -1268,6 +1278,7 @@ public final class PlayAlongService {
 
 	private static void maybeFlushKillExpOnDepthChange() {
 		int cur = Dungeon.depth;
+		PlayAlongCatchup.noteDepth(cur);
 		if (lastKillExpDepth < 0) {
 			lastKillExpDepth = cur;
 			return;
@@ -1295,6 +1306,9 @@ public final class PlayAlongService {
 	}
 
 	public static void onBossSlain(int depth) {
+		if (role != Role.CLIENT) {
+			PlayAlongCatchup.noteBossSlain(depth);
+		}
 		if (role == Role.CLIENT && client != null) {
 			WireMessage msg = new WireMessage();
 			msg.type = "player_boss_slain";
@@ -1682,6 +1696,7 @@ public final class PlayAlongService {
 				? Math.max(0f, Math.min(1f, (float) Dungeon.hero.HP / Dungeon.hero.HT))
 				: 0f;
 		msg.action = action;
+		msg.catchup = PlayAlongCatchup.isCatchupHero();
 		if (Dungeon.hero != null && Dungeon.hero.sprite != null) {
 			msg.facingLeft = Dungeon.hero.sprite.flipHorizontal;
 		}
@@ -1703,6 +1718,7 @@ public final class PlayAlongService {
 				: 1f;
 		g.action = action;
 		g.isHost = isHost;
+		g.catchup = !isHost && PlayAlongCatchup.isCatchupHero();
 		g.lastUpdateMs = System.currentTimeMillis();
 		return g;
 	}

@@ -246,6 +246,7 @@ public class Dungeon {
 	
 	public static void init() {
 
+		com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.onDungeonInit();
 		initialVersion = version = Game.versionCode;
 		debugRun = ShatteredPixelDungeon.debugSession;
 		boolean looping = Legacy.loopPending();
@@ -749,6 +750,7 @@ public class Dungeon {
 			SecretRoom.storeRoomsInBundle( bundle );
 			
 			Statistics.storeInBundle( bundle );
+			com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.store( bundle );
 			Notes.storeInBundle( bundle );
 			Generator.storeInBundle( bundle );
 
@@ -907,6 +909,7 @@ public class Dungeon {
 		energy = bundle.getInt( ENERGY );
 
 		Statistics.restoreFromBundle( bundle );
+		com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.restore( bundle );
 		Generator.restoreFromBundle( bundle );
 
 		Modifiers.migrateEvolutionOnLoad();

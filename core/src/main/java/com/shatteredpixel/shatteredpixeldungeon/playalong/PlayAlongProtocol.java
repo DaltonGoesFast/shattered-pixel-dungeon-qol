@@ -77,6 +77,11 @@ public final class PlayAlongProtocol {
 		public int hostHp = 20;
 		public int hostHt = 20;
 		public int activePlayers = 0;
+		/** Host catch-up settings. Empty boss means Dalton has not killed a region boss yet. */
+		public boolean catchupEnabled = false;
+		public String catchupBoss = "";
+		public int catchupEpoch = 0;
+		public String catchupConfig = "";
 	}
 
 	public static class StreamEconomyState {
@@ -124,6 +129,7 @@ public final class PlayAlongProtocol {
 		public float hpPct = 1f;
 		public String action = "IDLE"; // IDLE, MOVE, ATTACK, OPERATE, DEAD
 		public boolean isHost = false;
+		public boolean catchup = false;
 		public long lastUpdateMs = 0L;
 	}
 
@@ -199,6 +205,7 @@ public final class PlayAlongProtocol {
 		public int pointsAwarded;
 		public String rewardKind;
 		public int killExp;
+		public boolean catchup;
 		public StreamEconomyState economy;
 		public ChatCommandPayload chatCommand;
 	}

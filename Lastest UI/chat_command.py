@@ -60,7 +60,7 @@ _spend_recent: dict[str, float] = {}
 # pact/pacts stay here so R1's POST is answered from game_summary.json — do not skip them.
 STREAM_INFO_COMMANDS = frozenset({
     "kesha", "mimic", "tooth", "seed", "challenge", "challenges",
-    "pact", "pacts",
+    "pact", "pacts", "catchup",
 })
 
 # Modifiers.MASKS.length — "all pacts" reply when every pact is on.
@@ -886,6 +886,41 @@ def _format_pacts(pacts: list) -> str:
     return "None"
 
 
+def handle_catchup() -> ChatResult:
+    """Describe the catch-up kit for Dalton's current region."""
+    cfg = get_config().get("play_along_catchup") or {}
+    data = _load_game_summary()
+    stats = data.get("stats") if isinstance(data.get("stats"), dict) else {}
+    boss = str(stats.get("play_along_last_boss") or "").strip().lower()
+    if not boss:
+        try:
+            depth = int(stats.get("depth") or stats.get("max_depth") or 0)
+        except (TypeError, ValueError):
+            depth = 0
+        if depth >= 21:
+            boss = "king"
+        elif depth >= 16:
+            boss = "dm300"
+        elif depth >= 11:
+            boss = "tengu"
+        elif depth >= 6:
+            boss = "goo"
+    labels = {"goo": "Goo", "tengu": "Tengu", "dm300": "DM-300", "king": "Dwarf King"}
+    if not cfg.get("enabled", True) or boss not in labels:
+        return ChatResult(
+            ok=True,
+            message="Catch-up is off until a region boss is down.",
+            extra={"command": "catchup"},
+        )
+    row = cfg.get(boss) if isinstance(cfg.get(boss), dict) else {}
+    msg = (
+        f"Catch-up after {labels[boss]}: floor {row.get('spawn_floor')}, "
+        f"lvl {row.get('level')}, STR {row.get('str')}, {row.get('sou')} SoU, "
+        f"tier {row.get('weapon_tier')}/{row.get('armor_tier')}."
+    )
+    return ChatResult(ok=True, message=msg, extra={"command": "catchup", "boss": boss})
+
+
 def handle_stream_info(cmd: str) -> ChatResult:
     """Silent ok for OBS/sound commands; chat replies for seed/challenges/pacts."""
     if cmd in ("kesha", "mimic", "tooth"):
@@ -1148,6 +1183,8 @@ def _dispatch_chat_command_inner(body: dict) -> ChatResult:
             result = handle_economy()
         elif cmd in SPEND_COMMANDS or cmd in COMMAND_ALIASES:
             result = handle_spend(cmd, args, username)
+        elif cmd == "catchup":
+            result = handle_catchup()
         elif cmd in STREAM_INFO_COMMANDS:
             result = handle_stream_info(cmd)
         else:
