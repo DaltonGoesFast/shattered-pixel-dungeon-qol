@@ -33,7 +33,9 @@ Topology
     Unchanged Play Along JSON (``join``, ``status_ping``, ``player_state``, ...).
     The relay does not interpret those messages. Incoming player frames are
     capped at 4096 bytes (the game's packet limit) and at a small per-socket
-    rate so one player cannot fill the shared host link.
+    rate so one player cannot fill the shared host link. Host → player frames
+    are queued per player (bounded). A slow player or a burst of snapshots
+    cannot stall the host read loop, which would drop the room on ping timeout.
 
 Host link multiplexing (host socket only)::
 
@@ -101,6 +103,11 @@ class RelayConfig:
     reclaim_grace: float = 120.0
 
 
+# Host → player frames kept per socket. Older world snapshots are dropped
+# first so a burst cannot pin the shared host reader.
+PLAYER_OUTBOUND_MAX = 8
+
+
 class Player:
     def __init__(self, client_id: str, ws: ServerConnection) -> None:
         self.client_id = client_id
@@ -108,6 +115,8 @@ class Player:
         self.send_lock = asyncio.Lock()
         self.window_start = time.monotonic()
         self.window_count = 0
+        self.outbound: Deque[str] = deque()
+        self.draining = False
 
 
 class Room:
@@ -642,21 +651,56 @@ class Relay:
             except Exception:
                 pass
             return
+        # Do not await the player socket here. handle_host_frames is the only
+        # reader on the host link; a blocked send stops ping/pong and the
+        # relay then closes the whole room.
+        self._enqueue_outbound(room, player, payload)
+
+    def _enqueue_outbound(self, room: Room, player: Player, payload: str) -> None:
+        while len(player.outbound) >= PLAYER_OUTBOUND_MAX:
+            if not _drop_queued_world_state(player.outbound):
+                player.outbound.popleft()
+        player.outbound.append(payload)
+        if not player.draining:
+            player.draining = True
+            asyncio.create_task(self._drain_player(room, player))
+
+    async def _drain_player(self, room: Room, player: Player) -> None:
         try:
-            async with player.send_lock:
-                await player.ws.send(payload)
+            while True:
+                async with room.lock:
+                    if room.closed or room.players.get(player.client_id) is not player:
+                        player.outbound.clear()
+                        player.draining = False
+                        return
+                    if not player.outbound:
+                        player.draining = False
+                        if player.outbound:
+                            player.draining = True
+                            continue
+                        return
+                    payload = player.outbound.popleft()
+                try:
+                    async with player.send_lock:
+                        await player.ws.send(payload)
+                except Exception:
+                    player.outbound.clear()
+                    player.draining = False
+                    await self.close_player(room, player.client_id, "send failed")
+                    try:
+                        await room.send(envelope("close", player.client_id))
+                    except Exception:
+                        pass
+                    return
         except Exception:
-            await self.close_player(room, cid, "send failed")
-            try:
-                await room.send(envelope("close", cid))
-            except Exception:
-                pass
+            player.draining = False
 
     async def close_player(self, room: Room, cid: str, reason: str) -> None:
         async with room.lock:
             player = room.players.pop(cid, None)
         if player is None:
             return
+        player.outbound.clear()
         log.info("player leave room=%s id=%s reason=%s", room.code, cid, reason)
         await _safe_close(player.ws, 1000, reason)
 
@@ -666,6 +710,7 @@ class Relay:
             closed = room.closed
         if player is None:
             return
+        player.outbound.clear()
         log.info("player leave room=%s id=%s reason=disconnect", room.code, cid)
         if notify_host and not closed:
             try:
@@ -714,6 +759,15 @@ class Relay:
         except Exception:
             pass
         await _safe_close(ws, 1008, reason)
+
+
+def _drop_queued_world_state(outbound: Deque[str]) -> bool:
+    """Drop one stale snapshot so chat batches survive a full queue."""
+    for i, queued in enumerate(outbound):
+        if '"type":"world_state"' in queued[:64]:
+            del outbound[i]
+            return True
+    return False
 
 
 def client_ip(ws: ServerConnection) -> str:

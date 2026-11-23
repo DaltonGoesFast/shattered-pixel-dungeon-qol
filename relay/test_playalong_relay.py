@@ -383,6 +383,49 @@ async def test_named_public_room():
         await server.wait_closed()
 
 
+async def test_slow_player_does_not_stall_room():
+    """A player that never reads must not block frames for everyone else."""
+    config = RelayConfig(host="127.0.0.1", port=0, reserved_token="t")
+    _relay, server, port = await _start(config)
+    base = "ws://127.0.0.1:%d" % port
+    try:
+        host = await connect(base + "/host", open_timeout=2)
+        room = await _recv_json(host)
+        code = room["d"]
+
+        slow = await connect(base + "/join/" + code, open_timeout=2)
+        opened_slow = await _recv_json(host)
+        assert opened_slow["t"] == "open"
+        fast = await connect(base + "/join/" + code, open_timeout=2)
+        opened_fast = await _recv_json(host)
+        assert opened_fast["t"] == "open"
+
+        # More than the per-player outbound cap, and enough bytes that a
+        # blocking send would fill the slow socket and stall the host reader.
+        blob = "S" * 3000
+        for i in range(20):
+            await host.send(json.dumps({
+                "t": "msg",
+                "c": opened_slow["c"],
+                "d": blob + str(i),
+            }))
+        await host.send(json.dumps({
+            "t": "msg",
+            "c": opened_fast["c"],
+            "d": '{"type":"world_state","n":1}',
+        }))
+        got = await asyncio.wait_for(fast.recv(), 2)
+        assert "world_state" in got
+        # The slow socket never reads, so a server close frame would sit
+        # behind those bytes. Close it from this side.
+        await slow.close()
+        await host.close()
+        await _expect_closed(fast)
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
 async def main():
     await test_host_and_two_players()
     await test_reserved_room()
@@ -390,6 +433,7 @@ async def main():
     await test_player_frame_limits()
     await test_private_room_reclaim()
     await test_named_public_room()
+    await test_slow_player_does_not_stall_room()
     print("playalong relay tests passed")
 
 
