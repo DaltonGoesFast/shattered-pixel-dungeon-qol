@@ -104,8 +104,14 @@ class RelayConfig:
 
 
 # Host → player frames kept per socket. Older world snapshots are dropped
-# first so a burst cannot pin the shared host reader.
+# first so a burst cannot pin the shared host reader. Count alone is not
+# enough: the host link still accepts up to max_message_bytes (8 MiB), and a
+# private /host needs no token. Bound bytes too, or one host can pin eight
+# huge copies on every joiner that never reads.
 PLAYER_OUTBOUND_MAX = 8
+# Above the game's 48 KiB host→player snapshot. Larger d is dropped, not queued.
+PLAYER_OUTBOUND_MAX_FRAME_BYTES = 64 * 1024
+PLAYER_OUTBOUND_MAX_BYTES = 256 * 1024
 
 
 class Player:
@@ -116,7 +122,12 @@ class Player:
         self.window_start = time.monotonic()
         self.window_count = 0
         self.outbound: Deque[str] = deque()
+        self.outbound_bytes = 0
         self.draining = False
+
+    def clear_outbound(self) -> None:
+        self.outbound.clear()
+        self.outbound_bytes = 0
 
 
 class Room:
@@ -657,10 +668,23 @@ class Relay:
         self._enqueue_outbound(room, player, payload)
 
     def _enqueue_outbound(self, room: Room, player: Player, payload: str) -> None:
-        while len(player.outbound) >= PLAYER_OUTBOUND_MAX:
-            if not _drop_queued_world_state(player.outbound):
-                player.outbound.popleft()
+        size = _utf8_len(payload)
+        if size > PLAYER_OUTBOUND_MAX_FRAME_BYTES:
+            log.info(
+                "drop oversize host frame room=%s id=%s bytes=%s",
+                room.code,
+                player.client_id,
+                size,
+            )
+            return
+        while player.outbound and (
+            len(player.outbound) >= PLAYER_OUTBOUND_MAX
+            or player.outbound_bytes + size > PLAYER_OUTBOUND_MAX_BYTES
+        ):
+            if not _drop_queued_world_state(player):
+                _discard_outbound(player, 0)
         player.outbound.append(payload)
+        player.outbound_bytes += size
         if not player.draining:
             player.draining = True
             asyncio.create_task(self._drain_player(room, player))
@@ -670,7 +694,7 @@ class Relay:
             while True:
                 async with room.lock:
                     if room.closed or room.players.get(player.client_id) is not player:
-                        player.outbound.clear()
+                        player.clear_outbound()
                         player.draining = False
                         return
                     if not player.outbound:
@@ -679,12 +703,12 @@ class Relay:
                             player.draining = True
                             continue
                         return
-                    payload = player.outbound.popleft()
+                    payload = _pop_outbound(player)
                 try:
                     async with player.send_lock:
                         await player.ws.send(payload)
                 except Exception:
-                    player.outbound.clear()
+                    player.clear_outbound()
                     player.draining = False
                     await self.close_player(room, player.client_id, "send failed")
                     try:
@@ -700,7 +724,7 @@ class Relay:
             player = room.players.pop(cid, None)
         if player is None:
             return
-        player.outbound.clear()
+        player.clear_outbound()
         log.info("player leave room=%s id=%s reason=%s", room.code, cid, reason)
         await _safe_close(player.ws, 1000, reason)
 
@@ -710,7 +734,7 @@ class Relay:
             closed = room.closed
         if player is None:
             return
-        player.outbound.clear()
+        player.clear_outbound()
         log.info("player leave room=%s id=%s reason=disconnect", room.code, cid)
         if notify_host and not closed:
             try:
@@ -746,6 +770,7 @@ class Relay:
             len(players),
         )
         for player in players:
+            player.clear_outbound()
             await _safe_close(player.ws, 1001, "host disconnected")
         await _safe_close(room.ws, 1001, reason)
 
@@ -761,11 +786,33 @@ class Relay:
         await _safe_close(ws, 1008, reason)
 
 
-def _drop_queued_world_state(outbound: Deque[str]) -> bool:
+def _utf8_len(text: str) -> int:
+    return len(text.encode("utf-8"))
+
+
+def _account_outbound(player: Player, dropped: str) -> None:
+    player.outbound_bytes -= _utf8_len(dropped)
+    if player.outbound_bytes < 0:
+        player.outbound_bytes = 0
+
+
+def _pop_outbound(player: Player) -> str:
+    payload = player.outbound.popleft()
+    _account_outbound(player, payload)
+    return payload
+
+
+def _discard_outbound(player: Player, index: int) -> None:
+    dropped = player.outbound[index]
+    del player.outbound[index]
+    _account_outbound(player, dropped)
+
+
+def _drop_queued_world_state(player: Player) -> bool:
     """Drop one stale snapshot so chat batches survive a full queue."""
-    for i, queued in enumerate(outbound):
+    for i, queued in enumerate(player.outbound):
         if '"type":"world_state"' in queued[:64]:
-            del outbound[i]
+            _discard_outbound(player, i)
             return True
     return False
 

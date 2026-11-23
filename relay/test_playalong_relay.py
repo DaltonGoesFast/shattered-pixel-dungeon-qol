@@ -426,6 +426,58 @@ async def test_slow_player_does_not_stall_room():
         await server.wait_closed()
 
 
+async def test_outbound_queue_bounds_bytes():
+    """Huge host frames are not copied onto player queues."""
+    relay, server, port = await _start(RelayConfig(host="127.0.0.1", port=0, reserved_token="t"))
+    base = "ws://127.0.0.1:%d" % port
+    try:
+        host = await connect(base + "/host", open_timeout=2)
+        room = await _recv_json(host)
+        code = room["d"]
+        slow = await connect(base + "/join/" + code, open_timeout=2)
+        opened = await _recv_json(host)
+        cid = opened["c"]
+
+        huge = "H" * (playalong_relay.PLAYER_OUTBOUND_MAX_FRAME_BYTES + 32)
+        await host.send(json.dumps({"t": "msg", "c": cid, "d": huge}))
+        chunk = "B" * 20000
+        for i in range(30):
+            await host.send(json.dumps({"t": "msg", "c": cid, "d": chunk + str(i)}))
+        await asyncio.sleep(0.05)
+
+        queued = relay.rooms[code].players[cid]
+        assert queued.outbound_bytes <= playalong_relay.PLAYER_OUTBOUND_MAX_BYTES
+        assert len(queued.outbound) <= playalong_relay.PLAYER_OUTBOUND_MAX
+        for item in queued.outbound:
+            assert len(item.encode("utf-8")) <= playalong_relay.PLAYER_OUTBOUND_MAX_FRAME_BYTES
+            assert not item.startswith("H" * 64)
+
+        await host.send(json.dumps({
+            "t": "msg",
+            "c": cid,
+            "d": '{"type":"world_state","n":1}',
+        }))
+        # Drain whatever is already buffered, then the snapshot must arrive
+        # without the dropped oversized frame in front of it forever.
+        deadline = asyncio.get_event_loop().time() + 2
+        saw_state = False
+        while asyncio.get_event_loop().time() < deadline:
+            try:
+                got = await asyncio.wait_for(slow.recv(), 0.5)
+            except asyncio.TimeoutError:
+                break
+            assert len(got.encode("utf-8")) <= playalong_relay.PLAYER_OUTBOUND_MAX_FRAME_BYTES
+            if "world_state" in got:
+                saw_state = True
+                break
+        assert saw_state
+        await slow.close()
+        await host.close()
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
 async def main():
     await test_host_and_two_players()
     await test_reserved_room()
@@ -434,6 +486,7 @@ async def main():
     await test_private_room_reclaim()
     await test_named_public_room()
     await test_slow_player_does_not_stall_room()
+    await test_outbound_queue_bounds_bytes()
     print("playalong relay tests passed")
 
 
