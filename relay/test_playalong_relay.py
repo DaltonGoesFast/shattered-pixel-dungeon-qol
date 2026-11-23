@@ -276,11 +276,60 @@ async def test_player_frame_limits():
         await server.wait_closed()
 
 
+async def test_private_room_reclaim():
+    config = RelayConfig(host="127.0.0.1", port=0, reserved_token="t")
+    _relay, server, port = await _start(config)
+    base = "ws://127.0.0.1:%d" % port
+    try:
+        host = await connect(base + "/host", open_timeout=2)
+        room = await _recv_json(host)
+        code = room["d"]
+        secret = room["k"]
+        assert isinstance(secret, str) and len(secret) > 8
+
+        player = await connect(base + "/join/" + code, open_timeout=2)
+        opened = await _recv_json(host)
+        assert opened["t"] == "open"
+        await host.close()
+        await _expect_closed(player)
+
+        # While the code is held, a retry is not a fatal join_error.
+        retry = await connect(base + "/join/" + code, open_timeout=2)
+        try:
+            raw = await asyncio.wait_for(retry.recv(), 2)
+            assert "join_error" not in raw
+        except ConnectionClosed as exc:
+            assert exc.rcvd is not None and exc.rcvd.code == 1013
+
+        thief = await connect(base + "/host/" + code, open_timeout=2)
+        await thief.send(json.dumps({"t": "auth", "d": "nope"}))
+        denied = await _expect_closed(thief)
+        assert denied.rcvd is not None and denied.rcvd.code == 4001
+
+        host2 = await connect(base + "/host/" + code, open_timeout=2)
+        await host2.send(json.dumps({"t": "auth", "d": secret}))
+        again = await _recv_json(host2)
+        assert again["d"] == code and again["k"] == secret
+
+        player2 = await connect(base + "/join/" + code, open_timeout=2)
+        opened2 = await _recv_json(host2)
+        assert opened2["t"] == "open"
+        await player2.send('{"type":"status_ping"}')
+        msg = await _recv_json(host2)
+        assert msg["t"] == "msg" and msg["c"] == opened2["c"]
+        await host2.close()
+        await _expect_closed(player2)
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
 async def main():
     await test_host_and_two_players()
     await test_reserved_room()
     await test_rate_limit()
     await test_player_frame_limits()
+    await test_private_room_reclaim()
     print("playalong relay tests passed")
 
 

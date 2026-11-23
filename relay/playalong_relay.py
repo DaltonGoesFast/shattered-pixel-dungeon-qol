@@ -87,6 +87,8 @@ class RelayConfig:
     rate_limit: int = 40
     rate_window: float = 30.0
     auth_timeout: float = 5.0
+    # How long a private code can be reclaimed after the host socket drops.
+    reclaim_grace: float = 120.0
 
 
 class Player:
@@ -108,6 +110,8 @@ class Room:
         self.send_lock = asyncio.Lock()
         self.closed = False
         self.ready = False
+        self.host_secret = ""
+        self.reserved = False
 
     async def send(self, text: str) -> None:
         async with self.send_lock:
@@ -146,6 +150,13 @@ def envelope(kind: str, client_id: str, payload: Optional[str] = None) -> str:
     return json.dumps(obj, separators=(",", ":"), ensure_ascii=False)
 
 
+def room_frame(code: str, host_secret: str = "") -> str:
+    obj = {"t": "room", "c": "", "d": code}
+    if host_secret:
+        obj["k"] = host_secret
+    return json.dumps(obj, separators=(",", ":"), ensure_ascii=False)
+
+
 def token_matches(got: Optional[str], expected: str) -> bool:
     if not expected or not isinstance(got, str):
         return False
@@ -160,6 +171,8 @@ class Relay:
     def __init__(self, config: RelayConfig) -> None:
         self.config = config
         self.rooms: Dict[str, Room] = {}
+        # code -> (host_secret, expiry monotonic). Private rooms only.
+        self.reclaim: Dict[str, tuple] = {}
         self.rooms_lock = asyncio.Lock()
         self.limiter = RateLimiter(config.rate_limit, config.rate_window)
 
@@ -211,14 +224,23 @@ class Relay:
             if room is not None:
                 await self.handle_host_frames(room)
             return
-        if requested.strip().lower() != self.config.reserved_room.lower():
+        if requested.strip().lower() == self.config.reserved_room.lower():
+            if not await self.authorize_reserved(ws):
+                return
+            room = await self.adopt_room(
+                ws, self.config.reserved_room.lower(), ip, reserved=True
+            )
+            if room is not None:
+                await self.handle_host_frames(room)
+            return
+        code = self.canonical_join(requested)
+        if code is None:
             await ws.close(1008, "unknown room")
             return
-        if not await self.authorize_reserved(ws):
+        secret = await self.authorize_reclaim(ws, code)
+        if secret is None:
             return
-        room = await self.adopt_room(
-            ws, self.config.reserved_room.lower(), ip, reserved=True
-        )
+        room = await self.adopt_room(ws, code, ip, reserved=False, host_secret=secret)
         if room is not None:
             await self.handle_host_frames(room)
 
@@ -247,25 +269,53 @@ class Relay:
             return False
         return True
 
+    async def authorize_reclaim(self, ws: ServerConnection, code: str) -> Optional[str]:
+        """Return the room secret when this host may take the code back."""
+        try:
+            raw = await asyncio.wait_for(ws.recv(), timeout=self.config.auth_timeout)
+        except (asyncio.TimeoutError, ConnectionClosed):
+            await _safe_close(ws, 4001, "unauthorized")
+            return None
+        token = None
+        if isinstance(raw, str):
+            try:
+                msg = json.loads(raw)
+            except json.JSONDecodeError:
+                msg = None
+            if isinstance(msg, dict) and msg.get("t") == "auth" and isinstance(msg.get("d"), str):
+                token = msg.get("d")
+        async with self.rooms_lock:
+            expected = self._secret_locked(code)
+        if not token_matches(token, expected):
+            log.warning("room reclaim failed code=%s", code)
+            await _safe_close(ws, 4001, "unauthorized")
+            return None
+        return expected
+
     async def adopt_room(
         self,
         ws: ServerConnection,
         code: Optional[str],
         ip: str,
         reserved: bool,
+        host_secret: Optional[str] = None,
     ) -> Optional[Room]:
         async with self.rooms_lock:
             if code is None:
                 code = self._allocate_locked()
+                host_secret = secrets.token_urlsafe(18)
             old = self.rooms.get(code)
             room = Room(code, ws)
+            room.reserved = reserved
+            room.host_secret = "" if reserved else (host_secret or "")
             # Not joinable until the host has the room frame, so a player cannot
             # emit "open" ahead of {"t":"room"}.
             self.rooms[code] = room
+            self.reclaim.pop(code, None)
         if old is not None:
             await self.close_room(old, "host replaced")
         try:
-            await room.send(envelope("room", "", code))
+            await room.send(room_frame(code, room.host_secret))
         except Exception:
             log.warning("room open failed code=%s", code)
             await self.close_room(room, "host send failed")
@@ -282,9 +332,22 @@ class Relay:
                 code = "".join(secrets.choice(ALPHABET) for _ in range(length))
                 if code.lower() == reserved:
                     continue
-                if code not in self.rooms:
+                if code not in self.rooms and not self._secret_locked(code):
                     return code
         raise RuntimeError("room code space exhausted")
+
+    def _secret_locked(self, code: str) -> str:
+        room = self.rooms.get(code)
+        if room is not None and room.host_secret:
+            return room.host_secret
+        held = self.reclaim.get(code)
+        if not held:
+            return ""
+        secret, expiry = held
+        if time.monotonic() > expiry:
+            self.reclaim.pop(code, None)
+            return ""
+        return secret
 
     async def handle_host_frames(self, room: Room) -> None:
         try:
@@ -320,7 +383,14 @@ class Relay:
             return
         async with self.rooms_lock:
             room = self.rooms.get(code)
+            held = room is None and bool(self._secret_locked(code))
         if room is None:
+            if held:
+                # Host dropped but can still reclaim this code. Ask the client
+                # to retry instead of ending the run with join_error.
+                log.info("player wait room=%s reason=host reconnecting", code)
+                await _safe_close(ws, 1013, "host reconnecting")
+                return
             await self.reject_player(
                 ws,
                 "No Play Along room with that code is open.",
@@ -330,25 +400,31 @@ class Relay:
         async with room.lock:
             if room.closed or not room.ready:
                 room_gone = True
+                waiting = not room.ready and not room.closed
                 full = False
                 player = None
             elif len(room.players) >= self.config.max_players:
                 room_gone = False
+                waiting = False
                 full = True
                 player = None
             else:
                 room_gone = False
+                waiting = False
                 full = False
                 cid = str(room.next_id)
                 room.next_id += 1
                 player = Player(cid, ws)
                 room.players[cid] = player
         if room_gone:
-            await self.reject_player(
-                ws,
-                "No Play Along room with that code is open.",
-                "room not found",
-            )
+            if waiting:
+                await _safe_close(ws, 1013, "host reconnecting")
+            else:
+                await self.reject_player(
+                    ws,
+                    "No Play Along room with that code is open.",
+                    "room not found",
+                )
             return
         if full or player is None:
             await self.reject_player(ws, "Play Along lobby is full.", "room full")
@@ -458,6 +534,11 @@ class Relay:
         async with self.rooms_lock:
             if self.rooms.get(room.code) is room:
                 del self.rooms[room.code]
+                if room.host_secret and not room.reserved and reason != "host send failed":
+                    self.reclaim[room.code] = (
+                        room.host_secret,
+                        time.monotonic() + self.config.reclaim_grace,
+                    )
         async with room.lock:
             if room.closed:
                 return

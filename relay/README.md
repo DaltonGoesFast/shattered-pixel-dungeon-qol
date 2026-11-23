@@ -23,6 +23,8 @@ The host socket is the only place that uses a multiplexing envelope:
 
 `d` is a JSON string, so the player text is forwarded unchanged.
 
+A private room frame also includes `"k"`, a secret only the host sees. If that host socket drops, the relay keeps the code for 2 minutes. The host redials `/host/<CODE>`, sends `{"t":"auth","d":"<k>"}`, and gets the same code back. During that window, players who retry `/join/<CODE>` are closed with "host reconnecting" and no `join_error`, so the game keeps retrying instead of ending the run. A wrong secret does not take the room. After the window, the code is free and a new `/host` connection gets a new one.
+
 Reserved room:
 
 1. Host connects to `/host/dalton`.

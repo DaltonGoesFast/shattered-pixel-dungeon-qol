@@ -65,6 +65,8 @@ public final class PlayAlongRelayHost {
 		public String t;
 		public String c;
 		public String d;
+		/** Host-only reclaim secret. Present on private {@code room} frames. */
+		public String k;
 	}
 
 	/**
@@ -80,6 +82,8 @@ public final class PlayAlongRelayHost {
 
 	private volatile WebSocketClient socket;
 	private volatile String roomCode = "";
+	/** Lets a private room reclaim the same code after a host-link blip. */
+	private volatile String hostSecret = "";
 	private volatile boolean running = false;
 	private final AtomicBoolean reconnecting = new AtomicBoolean(false);
 	private int reconnectDelayMs = 2000;
@@ -112,6 +116,7 @@ public final class PlayAlongRelayHost {
 		WebSocketClient cur = socket;
 		socket = null;
 		roomCode = "";
+		hostSecret = "";
 		if (cur != null) {
 			try {
 				cur.close();
@@ -125,9 +130,17 @@ public final class PlayAlongRelayHost {
 		if (!running) return;
 		final String token = SPDSettings.playAlongRelayToken();
 		final boolean reserved = token != null && !token.isEmpty();
+		final String savedCode = roomCode;
+		final String savedSecret = hostSecret;
+		final boolean resumePrivate = !reserved
+				&& savedCode != null && !savedCode.isEmpty()
+				&& savedSecret != null && !savedSecret.isEmpty()
+				&& !PlayAlongProtocol.isReservedRoom(savedCode);
 		final String url = reserved
 				? PlayAlongProtocol.relayHostAddress(SPDSettings.PLAY_ALONG_RELAY_ROOM)
-				: PlayAlongProtocol.relayHostAddress(null);
+				: (resumePrivate
+				? PlayAlongProtocol.relayHostAddress(savedCode)
+				: PlayAlongProtocol.relayHostAddress(null));
 		final URI uri;
 		try {
 			uri = new URI(url);
@@ -143,10 +156,10 @@ public final class PlayAlongRelayHost {
 			@Override
 			public void onOpen(ServerHandshake handshakedata) {
 				opened.set(true);
-				if (reserved) {
+				if (reserved || resumePrivate) {
 					Env auth = new Env();
 					auth.t = "auth";
-					auth.d = token;
+					auth.d = reserved ? token : savedSecret;
 					try {
 						send(PlayAlongProtocol.GSON.toJson(auth));
 					} catch (Exception ignored) {
@@ -169,14 +182,18 @@ public final class PlayAlongRelayHost {
 			public void onClose(int code, String reason, boolean remote) {
 				if (socket != this) return;
 				socket = null;
-				roomCode = "";
 				dropVirtuals();
 				if (!running) return;
 				String why = reason == null ? "" : reason.toLowerCase(Locale.ROOT);
-				if (why.contains("unauthorized") || why.contains("reserved room disabled")) {
+				if (why.contains("reserved room disabled") || (reserved && why.contains("unauthorized"))) {
 					running = false;
 					if (listener != null) listener.onRelayDenied();
 					return;
+				}
+				if (why.contains("unauthorized")) {
+					// Grace for this private code has ended. Open a new one.
+					roomCode = "";
+					hostSecret = "";
 				}
 				notifyDown();
 				scheduleReconnect();
@@ -229,6 +246,11 @@ public final class PlayAlongRelayHost {
 		if (env == null || env.t == null || server == null) return;
 		if ("room".equals(env.t)) {
 			roomCode = env.d == null ? "" : env.d.trim();
+			if (env.k != null && !env.k.isEmpty()) {
+				hostSecret = env.k;
+			} else if (PlayAlongProtocol.isReservedRoom(roomCode)) {
+				hostSecret = "";
+			}
 			reconnectDelayMs = 2000;
 			if (listener != null && !roomCode.isEmpty()) {
 				listener.onRoomReady(roomCode);
