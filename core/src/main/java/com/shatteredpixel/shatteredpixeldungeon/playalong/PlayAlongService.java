@@ -1525,6 +1525,7 @@ public final class PlayAlongService {
 
 	/** Other hosts' rooms. Dalton's public room uses the title-screen button instead. */
 	public static void promptRoomCodeJoin() {
+		if (!PlayAlongProtocol.ROOM_CODES_ENABLED) return;
 		if (Game.scene() == null) return;
 		String initial = SPDSettings.playAlongLastRoom();
 		try {

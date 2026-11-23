@@ -973,17 +973,19 @@ public class WndSettings extends WndTabbed {
 			sepPlayAlong = new ColorBlock(1, 1, 0xFF000000);
 			add(sepPlayAlong);
 
-			hdrPlayAlongJoin = PixelScene.renderTextBlock(Messages.get(this, "playalong_section_join"), 8);
-			hdrPlayAlongJoin.hardlight(TITLE_COLOR);
-			add(hdrPlayAlongJoin);
+			if (com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.ROOM_CODES_ENABLED) {
+				hdrPlayAlongJoin = PixelScene.renderTextBlock(Messages.get(this, "playalong_section_join"), 8);
+				hdrPlayAlongJoin.hardlight(TITLE_COLOR);
+				add(hdrPlayAlongJoin);
 
-			btnJoinRoomCode = new RedButton(Messages.get(this, "playalong_join_code"), 8) {
-				@Override
-				protected void onClick() {
-					com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.promptRoomCodeJoin();
-				}
-			};
-			add(btnJoinRoomCode);
+				btnJoinRoomCode = new RedButton(Messages.get(this, "playalong_join_code"), 8) {
+					@Override
+					protected void onClick() {
+						com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.promptRoomCodeJoin();
+					}
+				};
+				add(btnJoinRoomCode);
+			}
 
 			if (DeviceCompat.isDesktop()) {
 				hdrPlayAlongHost = PixelScene.renderTextBlock(Messages.get(this, "playalong_section_host"), 8);
@@ -1248,12 +1250,16 @@ public class WndSettings extends WndTabbed {
 			sepPlayAlong.y = pos + GAP;
 			pos = sepPlayAlong.y + 1;
 
-			hdrPlayAlongJoin.maxWidth((int)width);
-			hdrPlayAlongJoin.setPos(0, pos + GAP);
-			pos = hdrPlayAlongJoin.bottom();
+			if (hdrPlayAlongJoin != null) {
+				hdrPlayAlongJoin.maxWidth((int)width);
+				hdrPlayAlongJoin.setPos(0, pos + GAP);
+				pos = hdrPlayAlongJoin.bottom();
+			}
 
-			btnJoinRoomCode.setRect(0, pos + GAP, width, BTN_HEIGHT);
-			pos = btnJoinRoomCode.bottom();
+			if (btnJoinRoomCode != null) {
+				btnJoinRoomCode.setRect(0, pos + GAP, width, BTN_HEIGHT);
+				pos = btnJoinRoomCode.bottom();
+			}
 
 			if (hdrPlayAlongHost != null) {
 				hdrPlayAlongHost.maxWidth((int)width);

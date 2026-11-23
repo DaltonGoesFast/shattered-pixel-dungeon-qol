@@ -43,6 +43,12 @@ public final class PlayAlongProtocol {
 	public static final long RECONNECT_GRACE_MS = 30_000L;
 	public static final long CLIENT_RECONNECT_GRACE_MS = 120_000L;
 
+	/**
+	 * When false, Join-with-room-code UI is hidden everywhere. Dalton's
+	 * title-screen Play Along drop-in is unchanged. Flip to true to re-enable.
+	 */
+	public static final boolean ROOM_CODES_ENABLED = false;
+
 	public static final Gson GSON = new Gson();
 
 	private static final Pattern USERNAME_PATTERN = Pattern.compile("^[a-zA-Z0-9_ ]{3,16}$");

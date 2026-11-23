@@ -235,15 +235,17 @@ public class WndPlayAlongJoin extends Window {
 			}
 		}
 
-		RedButton btnRoom = new RedButton(Messages.get(this, "join_code"), 7) {
-			@Override
-			protected void onClick() {
-				PlayAlongService.promptRoomCodeJoin();
-			}
-		};
-		btnRoom.setRect(0, pos, WIDTH, 16);
-		add(btnRoom);
-		pos = btnRoom.bottom() + GAP;
+		if (PlayAlongProtocol.ROOM_CODES_ENABLED) {
+			RedButton btnRoom = new RedButton(Messages.get(this, "join_code"), 7) {
+				@Override
+				protected void onClick() {
+					PlayAlongService.promptRoomCodeJoin();
+				}
+			};
+			btnRoom.setRect(0, pos, WIDTH, 16);
+			add(btnRoom);
+			pos = btnRoom.bottom() + GAP;
+		}
 
 		RedButton btnYt = new RedButton("Open YouTube Channel", 7) {
 			@Override

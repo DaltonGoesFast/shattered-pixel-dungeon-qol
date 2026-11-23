@@ -33,6 +33,7 @@ public class Mod_Changes {
 
 	public static void addAllChanges( ArrayList<ChangeInfo> changeInfos ){
 		addOverview(changeInfos);
+		add_v4_0_2_QoL_23(changeInfos);
 		add_v4_0_2_QoL_22(changeInfos);
 		add_v4_0_2_QoL_19(changeInfos);
 		add_v4_0_2_QoL_18(changeInfos);
@@ -49,6 +50,21 @@ public class Mod_Changes {
 		add_v4_0_0_QoL_6(changeInfos);
 		add_v4_0_0_QoL_5(changeInfos);
 		add_v4_0_0(changeInfos);
+	}
+
+	private static void add_v4_0_2_QoL_23( ArrayList<ChangeInfo> changeInfos ) {
+		ChangeInfo changes = new ChangeInfo("4.0.2-QoL-23", true, "");
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes = new ChangeInfo(Messages.get(ChangesScene.class, "changes"), false, null);
+		changes.hardlight(CharSprite.WARNING);
+		changeInfos.add(changes);
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.PREFS), "Room Codes Hidden",
+				"**-** Join-with-room-code UI is hidden for now (Settings, title offline menu, Play Along lobby)\n" +
+				"**-** Dalton's title-screen Play Along drop-in is unchanged\n" +
+				"**-** Desktop host / relay / Advanced settings still available for streaming"));
 	}
 
 	private static void add_v4_0_2_QoL_22( ArrayList<ChangeInfo> changeInfos ) {
