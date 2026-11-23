@@ -611,6 +611,14 @@ public class PrisonBossLevel extends Level {
 	protected void createMobs() {
 		tengu = new Tengu(); //We want to keep track of tengu independently of other mobs, he's not always in the level.
 	}
+
+	@Override
+	public void clearBossForAscent() {
+		if (state == State.WON) return;
+		state = State.WON;
+		setMapEnd();
+		buildFlagMaps();
+	}
 	
 	public Actor addRespawner() {
 		return null;

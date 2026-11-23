@@ -73,6 +73,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.WarHammer;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.Whip;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.WornShortsword;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Bestiary;
+import com.shatteredpixel.shatteredpixeldungeon.levels.Level;
 import com.shatteredpixel.shatteredpixeldungeon.levels.features.LevelTransition;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchupItems.Parsed;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.SessionInfo;
@@ -347,6 +348,24 @@ public final class PlayAlongCatchup {
 
 	public static void markFreshFloor(boolean freshlyGenerated) {
 		pendingFreshFloor = freshlyGenerated;
+	}
+
+	/**
+	 * Boss floors the joiner actually enters (including one loaded from the skipped-floor
+	 * replay) are the cleared arena. Generation also does this when the Amulet flag is set;
+	 * this covers a floor that was built earlier as a live fight and is now being entered.
+	 */
+	public static void prepareEnteredLevel(Level level) {
+		if (level == null || !Dungeon.bossLevel()) return;
+		if (!enteringAscentFloor()) return;
+		level.clearBossForAscent();
+	}
+
+	private static boolean enteringAscentFloor() {
+		if (ascentMirror) {
+			return spawnDepth <= 1 || Dungeon.depth >= spawnDepth;
+		}
+		return PlayAlongService.isSpectating() && PlayAlongService.isHostAscending();
 	}
 
 	/**

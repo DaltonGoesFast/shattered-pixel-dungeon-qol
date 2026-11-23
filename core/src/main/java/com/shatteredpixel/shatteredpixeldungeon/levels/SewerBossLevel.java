@@ -132,6 +132,15 @@ public class SewerBossLevel extends SewerLevel {
 	@Override
 	protected void createMobs() {
 	}
+
+	@Override
+	public void clearBossForAscent() {
+		for (Mob mob : mobs.toArray(new Mob[0])) {
+			if (mob instanceof Goo) {
+				mobs.remove(mob);
+			}
+		}
+	}
 	
 	public Actor addRespawner() {
 		return null;

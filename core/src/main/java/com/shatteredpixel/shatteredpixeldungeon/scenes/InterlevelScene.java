@@ -890,6 +890,7 @@ public class InterlevelScene extends PixelScene {
 	}
 
 	private void enterLevel(Level level, int pos, boolean freshlyGenerated) {
+		com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.prepareEnteredLevel(level);
 		com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.markFreshFloor(freshlyGenerated);
 		Dungeon.switchLevel(level, pos);
 	}

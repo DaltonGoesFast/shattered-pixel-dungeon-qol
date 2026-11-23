@@ -97,6 +97,14 @@ public final class PlayAlongAscent {
 	}
 
 	/**
+	 * Goo, Tengu, DM-300, the Dwarf King, and Yog are already dead on the climb.
+	 * A floor built while the Amulet is held must not arm those fights again.
+	 */
+	public static boolean clearsBossOnBuild(boolean amuletObtained, int depth) {
+		return amuletObtained && isBossFloor(depth);
+	}
+
+	/**
 	 * Drop-ins still cannot take the stairs up to floors above where they joined.
 	 * Ascent does not open that seal; it only changes the run they are playing below it.
 	 */

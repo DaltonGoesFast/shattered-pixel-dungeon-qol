@@ -200,6 +200,18 @@ public class HallsBossLevel extends Level {
 	protected void createMobs() {
 	}
 
+	@Override
+	public void clearBossForAscent() {
+		for (Mob mob : mobs.toArray(new Mob[0])) {
+			if (mob instanceof YogDzewa) {
+				mobs.remove(mob);
+			}
+		}
+		if (map[exit()] != Terrain.EXIT) {
+			set(exit(), Terrain.EXIT, this);
+		}
+	}
+
 	public Actor addRespawner() {
 		return null;
 	}

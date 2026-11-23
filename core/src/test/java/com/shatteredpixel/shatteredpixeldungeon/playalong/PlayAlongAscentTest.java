@@ -92,6 +92,17 @@ public class PlayAlongAscentTest {
 	}
 
 	@Test
+	public void amuletClearsBossFloorsInsteadOfRearmingThem() {
+		assertFalse(PlayAlongAscent.clearsBossOnBuild(false, 15));
+		assertFalse(PlayAlongAscent.clearsBossOnBuild(true, 13));
+		assertTrue(PlayAlongAscent.clearsBossOnBuild(true, 5));
+		assertTrue(PlayAlongAscent.clearsBossOnBuild(true, 10));
+		assertTrue(PlayAlongAscent.clearsBossOnBuild(true, 15));
+		assertTrue(PlayAlongAscent.clearsBossOnBuild(true, 20));
+		assertTrue(PlayAlongAscent.clearsBossOnBuild(true, 25));
+	}
+
+	@Test
 	public void freshFloorsBelowTheJoinStillConvert() {
 		assertFalse(PlayAlongAscent.needsUnvisitedConversion(13, 13, true, true, false));
 		assertTrue(PlayAlongAscent.needsUnvisitedConversion(13, 14, true, false, false));
