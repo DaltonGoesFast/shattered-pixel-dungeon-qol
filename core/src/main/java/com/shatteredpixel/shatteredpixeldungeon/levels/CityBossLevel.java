@@ -277,6 +277,7 @@ public class CityBossLevel extends Level {
 		if (map[bottomDoor] == Terrain.LOCKED_DOOR) {
 			set(bottomDoor, Terrain.DOOR, this);
 		}
+		unlockClearedBoss();
 	}
 
 	public Actor addRespawner() {

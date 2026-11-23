@@ -237,6 +237,11 @@ public class CavesBossLevel extends Level {
 		for (int x = gate.left; x < gate.right; x++) {
 			set(row + x, Terrain.EMPTY, this);
 		}
+		if (map[entrance()] != Terrain.ENTRANCE) {
+			set(entrance(), Terrain.ENTRANCE, this);
+		}
+		blobs.remove(PylonEnergy.class);
+		unlockClearedBoss();
 	}
 
 	@Override

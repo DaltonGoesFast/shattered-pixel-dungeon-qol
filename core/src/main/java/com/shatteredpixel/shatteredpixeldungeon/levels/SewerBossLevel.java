@@ -140,6 +140,10 @@ public class SewerBossLevel extends SewerLevel {
 				mobs.remove(mob);
 			}
 		}
+		if (map[entrance()] != Terrain.ENTRANCE) {
+			set(entrance(), Terrain.ENTRANCE, this);
+		}
+		unlockClearedBoss();
 	}
 	
 	public Actor addRespawner() {

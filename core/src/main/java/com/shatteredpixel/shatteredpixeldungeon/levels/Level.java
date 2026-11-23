@@ -566,6 +566,14 @@ public abstract class Level implements Bundlable {
 	public void clearBossForAscent() {
 	}
 
+	/** Drop the boss-lock without the unseal VFX. Safe while {@link Dungeon#level} is still null. */
+	protected void unlockClearedBoss() {
+		locked = false;
+		if (Dungeon.hero != null && Dungeon.hero.buff(LockedFloor.class) != null) {
+			Dungeon.hero.buff(LockedFloor.class).detach();
+		}
+	}
+
 	abstract protected boolean build();
 	
 	private ArrayList<Class<?extends Mob>> mobsToSpawn = new ArrayList<>();
