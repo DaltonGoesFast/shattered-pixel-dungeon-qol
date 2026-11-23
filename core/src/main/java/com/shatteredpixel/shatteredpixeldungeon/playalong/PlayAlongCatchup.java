@@ -26,6 +26,11 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Pylon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Tengu;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.KingsCrown;
+import com.shatteredpixel.shatteredpixeldungeon.items.bags.Bag;
+import com.shatteredpixel.shatteredpixeldungeon.items.bags.MagicalHolster;
+import com.shatteredpixel.shatteredpixeldungeon.items.bags.PotionBandolier;
+import com.shatteredpixel.shatteredpixeldungeon.items.bags.ScrollHolder;
+import com.shatteredpixel.shatteredpixeldungeon.items.bags.VelvetPouch;
 import com.shatteredpixel.shatteredpixeldungeon.items.TengusMask;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.Armor;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.ClothArmor;
@@ -88,6 +93,7 @@ import java.util.Locale;
 /**
  * Play Along catch-up: a new racer who drops in after Dalton has killed a region boss
  * starts on the first floor of that region with a plain kit, and cannot go back up.
+ * The kit includes the containers a normal run would already own by the host's depth.
  */
 public final class PlayAlongCatchup {
 
@@ -339,7 +345,9 @@ public final class PlayAlongCatchup {
 		sb.append(", STR ").append(row.str);
 		sb.append(", ").append(row.sou).append(" SoU");
 		sb.append(", tier ").append(row.weaponTier).append("/").append(row.armorTier);
-		sb.append(" weapon/armor, +0 wand or ring, healing, food, identify.");
+		sb.append(" weapon/armor, +0 wand or ring, healing, food, identify, ");
+		sb.append(bagList(bagProgressDepth(PlayAlongService.getHostDepth(), row.spawnFloor, boss)));
+		sb.append(".");
 		String bonus = combinedBonus(cfg, row);
 		if (!bonus.isEmpty()) {
 			sb.append(" Bonus: ").append(bonus).append(".");
@@ -491,6 +499,11 @@ public final class PlayAlongCatchup {
 
 		raiseSignature(hero);
 
+		// Bags before consumables so scrolls, potions, and thrown weapons collect into them.
+		// These are the containers earlier shops sell; the way back up is sealed.
+		int bagDepth = bagProgressDepth(PlayAlongService.getHostDepth(), row.spawnFloor, boss);
+		ensureBags(hero.belongings.backpack, bagDepth);
+
 		if (row.sou > 0) {
 			ScrollOfUpgrade sou = new ScrollOfUpgrade();
 			sou.quantity(row.sou);
@@ -514,7 +527,8 @@ public final class PlayAlongCatchup {
 			new KingsCrown().collect();
 		}
 
-		kitSummary = describeKit(hero, boss, row);
+		tuckIntoBags(hero.belongings.backpack);
+		kitSummary = describeKit(hero, boss, row, bagDepth);
 	}
 
 	private static void KindOfWeaponSwap(Hero hero, MeleeWeapon weapon) {
@@ -620,16 +634,100 @@ public final class PlayAlongCatchup {
 		armor.level(0);
 	}
 
-	private static String describeKit(Hero hero, String boss, Row row) {
+	private static String describeKit(Hero hero, String boss, Row row, int bagDepth) {
 		String weapon = hero.belongings.weapon != null ? hero.belongings.weapon.getClass().getSimpleName() : "none";
 		String armor = hero.belongings.armor != null ? hero.belongings.armor.getClass().getSimpleName() : "none";
 		return "Catch-up (" + label(boss) + "): floor " + row.spawnFloor
 				+ ", level " + hero.lvl + ", STR " + hero.STR
 				+ ", " + row.sou + " upgrade scrolls, "
 				+ weapon + " / " + armor
+				+ ", bags [" + bagList(bagDepth) + "]"
 				+ ". Upstairs is sealed. Donor EXP "
 				+ (current().expRewardsAfterFirstFloor && !rewardsUnlocked
 				? "starts after you go down." : "is on.");
+	}
+
+	/**
+	 * Containers a normal run already owns by {@code depth}.
+	 * The hero starts with a velvet pouch. Shops on 6, 11, and 16 each sell one more,
+	 * in that order: scroll holder, potion bandolier, magical holster.
+	 * Leaving floor 16 (or being past floor 20, including the ascent) means all four.
+	 */
+	static List<Class<? extends Item>> bagsForDepth(int depth) {
+		List<Class<? extends Item>> bags = new ArrayList<>();
+		bags.add(VelvetPouch.class);
+		if (depth > 20) {
+			bags.add(ScrollHolder.class);
+			bags.add(PotionBandolier.class);
+			bags.add(MagicalHolster.class);
+			return bags;
+		}
+		if (depth > 6) bags.add(ScrollHolder.class);
+		if (depth > 11) bags.add(PotionBandolier.class);
+		if (depth > 16) bags.add(MagicalHolster.class);
+		return bags;
+	}
+
+	/**
+	 * Depth used to pick bags. The host's current floor wins when they are ahead of the
+	 * drop-in floor. After the Dwarf King, progress is at least 21 so an ascent
+	 * (host floor back above the drop-in floor) still grants every bag.
+	 */
+	static int bagProgressDepth(int hostDepth, int spawnFloor, String boss) {
+		int progress = Math.max(hostDepth, Math.max(spawnFloor, 1));
+		if (bossAtLeast(boss, "king")) {
+			progress = Math.max(progress, 21);
+		}
+		return progress;
+	}
+
+	static String bagList(int depth) {
+		StringBuilder sb = new StringBuilder();
+		for (Class<? extends Item> type : bagsForDepth(depth)) {
+			if (sb.length() > 0) sb.append(", ");
+			sb.append(type.getSimpleName());
+		}
+		return sb.toString();
+	}
+
+	/** Give any missing bags for {@code depth} and remember them so later shops do not sell a copy. */
+	static void ensureBags(Bag pack, int depth) {
+		if (pack == null) return;
+		for (Class<? extends Item> type : bagsForDepth(depth)) {
+			if (owns(pack, type)) {
+				markBagFound(type);
+				continue;
+			}
+			Item bag = Reflection.newInstance(type);
+			if (bag == null) continue;
+			if (bag.collect(pack)) {
+				markBagFound(type);
+			}
+		}
+	}
+
+	/** Pull loose kit items into bags that were granted after those items were collected. */
+	static void tuckIntoBags(Bag pack) {
+		if (pack == null) return;
+		for (Item item : new ArrayList<>(pack.items)) {
+			if (item instanceof Bag) {
+				((Bag) item).grabItems(pack);
+			}
+		}
+	}
+
+	private static boolean owns(Bag pack, Class<? extends Item> type) {
+		for (Item item : pack) {
+			if (type.isInstance(item)) return true;
+		}
+		return false;
+	}
+
+	private static void markBagFound(Class<? extends Item> type) {
+		if (type == VelvetPouch.class) Dungeon.LimitedDrops.VELVET_POUCH.drop();
+		else if (type == ScrollHolder.class) Dungeon.LimitedDrops.SCROLL_HOLDER.drop();
+		else if (type == PotionBandolier.class) Dungeon.LimitedDrops.POTION_BANDOLIER.drop();
+		else if (type == MagicalHolster.class) Dungeon.LimitedDrops.MAGICAL_HOLSTER.drop();
 	}
 
 	private static void markBossesSeen(String boss) {
