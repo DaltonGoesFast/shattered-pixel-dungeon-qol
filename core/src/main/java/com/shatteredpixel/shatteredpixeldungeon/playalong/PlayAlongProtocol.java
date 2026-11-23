@@ -256,23 +256,88 @@ public final class PlayAlongProtocol {
 		return URI.create("ws://" + addr);
 	}
 
-	/** {@code dalton} or a 4–5 character room code. Empty when the text is not a code. */
-	public static String normalizeRoomCode(String raw) {
+	/** Custom public room slug shared with relay/playalong_relay.py. */
+	private static final java.util.regex.Pattern PUBLIC_ROOM_NAME =
+			java.util.regex.Pattern.compile("^[a-z][a-z0-9_-]{2,23}$");
+
+	/**
+	 * Parse a join field: room code, public name, {@code dalton}, or a full
+	 * {@code ws(s)://…/join/…} URL. Empty when the text is not a join target.
+	 */
+	public static String parseJoinInput(String raw) {
 		if (raw == null) return "";
-		String s = raw.trim().replace(" ", "").replace("-", "");
+		String s = raw.trim().replace(" ", "");
+		if (s.isEmpty()) return "";
+		String lowerFull = s.toLowerCase(Locale.ROOT);
+		int mark = lowerFull.indexOf("/join/");
+		if (mark >= 0) {
+			s = s.substring(mark + "/join/".length());
+			int cut = s.indexOf('?');
+			if (cut >= 0) s = s.substring(0, cut);
+			cut = s.indexOf('#');
+			if (cut >= 0) s = s.substring(0, cut);
+			cut = s.indexOf('/');
+			if (cut >= 0) s = s.substring(0, cut);
+		}
+		if (s.isEmpty()) return "";
 		if (s.equalsIgnoreCase(SPDSettings.PLAY_ALONG_RELAY_ROOM)) {
 			return SPDSettings.PLAY_ALONG_RELAY_ROOM;
 		}
-		s = s.toUpperCase(Locale.ROOT);
-		if (s.length() < 4 || s.length() > 5) return "";
-		for (int i = 0; i < s.length(); i++) {
-			if (RELAY_ROOM_ALPHABET.indexOf(s.charAt(i)) < 0) return "";
+		String lower = s.toLowerCase(Locale.ROOT);
+		if (isPublicRoomName(lower)) {
+			return lower;
 		}
-		return s;
+		String code = s.replace("-", "").toUpperCase(Locale.ROOT);
+		if (isPrivateRoomCode(code)) {
+			return code;
+		}
+		return "";
+	}
+
+	/** {@code dalton}, a public name, or a 4–5 character room code. */
+	public static String normalizeRoomCode(String raw) {
+		return parseJoinInput(raw);
 	}
 
 	public static boolean isReservedRoom(String room) {
 		return room != null && room.equalsIgnoreCase(SPDSettings.PLAY_ALONG_RELAY_ROOM);
+	}
+
+	public static boolean isPrivateRoomCode(String room) {
+		if (room == null) return false;
+		String s = room.trim().toUpperCase(Locale.ROOT);
+		if (s.length() < 4 || s.length() > 5) return false;
+		for (int i = 0; i < s.length(); i++) {
+			if (RELAY_ROOM_ALPHABET.indexOf(s.charAt(i)) < 0) return false;
+		}
+		return true;
+	}
+
+	/** Custom public slug (not the reserved {@code dalton} room). */
+	public static boolean isPublicRoomName(String room) {
+		if (room == null) return false;
+		String s = room.trim().toLowerCase(Locale.ROOT);
+		if (s.equals(SPDSettings.PLAY_ALONG_RELAY_ROOM)) return false;
+		return PUBLIC_ROOM_NAME.matcher(s).matches();
+	}
+
+	/** Reserved or custom public name — not a private random code. */
+	public static boolean isPublicJoinTarget(String room) {
+		return isReservedRoom(room) || isPublicRoomName(room);
+	}
+
+	/**
+	 * Normalize a host-configured public room name. Empty when invalid.
+	 * Accepts {@code dalton} or a custom slug.
+	 */
+	public static String normalizeHostRoomName(String raw) {
+		if (raw == null) return "";
+		String s = raw.trim().toLowerCase(Locale.ROOT);
+		if (s.isEmpty()) return "";
+		if (s.equals(SPDSettings.PLAY_ALONG_RELAY_ROOM)) {
+			return SPDSettings.PLAY_ALONG_RELAY_ROOM;
+		}
+		return isPublicRoomName(s) ? s : "";
 	}
 
 	public static String relayBase() {

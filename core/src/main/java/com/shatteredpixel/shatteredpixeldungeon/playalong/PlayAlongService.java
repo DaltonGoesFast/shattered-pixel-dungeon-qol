@@ -280,7 +280,7 @@ public final class PlayAlongService {
 	}
 
 	public static boolean relayRoomIsPublic() {
-		return PlayAlongProtocol.isReservedRoom(relayRoomCode());
+		return PlayAlongProtocol.isPublicJoinTarget(relayRoomCode());
 	}
 
 	public static String hostConnectionSummary() {
@@ -292,8 +292,11 @@ public final class PlayAlongService {
 		if (code == null || code.isEmpty()) {
 			return Messages.get(PlayAlongService.class, "roster_wait", direct);
 		}
-		if (relayRoomIsPublic()) {
+		if (PlayAlongProtocol.isReservedRoom(code)) {
 			return Messages.get(PlayAlongService.class, "roster_public", code, direct);
+		}
+		if (PlayAlongProtocol.isPublicRoomName(code)) {
+			return Messages.get(PlayAlongService.class, "roster_named", code, direct);
 		}
 		return Messages.get(PlayAlongService.class, "roster_code", code, direct);
 	}
@@ -451,12 +454,16 @@ public final class PlayAlongService {
 			}
 		});
 		relayHost = host;
-		String token = SPDSettings.playAlongRelayToken();
+		if (SPDSettings.playAlongRelayPublicNameMissingSecret()) {
+			System.out.println("[PlayAlong] Public room name needs a host secret.");
+			GLog.w(Messages.get(PlayAlongService.class, "room_name_needs_secret"));
+		}
+		String publicRoom = SPDSettings.playAlongRelayHostRoomOrNull();
 		System.out.println("[PlayAlong] Dialing relay "
-				+ (token.isEmpty()
+				+ (publicRoom == null
 				? PlayAlongProtocol.relayHostAddress(null)
-				: PlayAlongProtocol.relayHostAddress(SPDSettings.PLAY_ALONG_RELAY_ROOM))
-				+ (token.isEmpty() ? " (private room code)" : " (public room)"));
+				: PlayAlongProtocol.relayHostAddress(publicRoom))
+				+ (publicRoom == null ? " (private room code)" : " (public room " + publicRoom + ")"));
 		host.start();
 	}
 
@@ -473,10 +480,13 @@ public final class PlayAlongService {
 		if (PlayAlongProtocol.isReservedRoom(code)) {
 			GLog.p(Messages.get(PlayAlongService.class, "room_ready_public", code));
 			System.out.println("[PlayAlong] Public relay room '" + code + "' is live.");
+		} else if (PlayAlongProtocol.isPublicRoomName(code)) {
+			GLog.p(Messages.get(PlayAlongService.class, "room_ready_named", code));
+			System.out.println("[PlayAlong] Public relay room '" + code + "' is live.");
 		} else {
 			GLog.p(Messages.get(PlayAlongService.class, "room_ready", code));
 			System.out.println("[PlayAlong] Relay room code " + code
-					+ ". Set the Dalton room token to claim the public room.");
+					+ ". Set a public room name + host secret to claim a named room.");
 		}
 	}
 
@@ -1516,19 +1526,30 @@ public final class PlayAlongService {
 	/** Other hosts' rooms. Dalton's public room uses the title-screen button instead. */
 	public static void promptRoomCodeJoin() {
 		if (Game.scene() == null) return;
-		final String initial = SPDSettings.playAlongLastRoom();
+		String initial = SPDSettings.playAlongLastRoom();
+		try {
+			if (com.badlogic.gdx.Gdx.app != null && com.badlogic.gdx.Gdx.app.getClipboard() != null
+					&& com.badlogic.gdx.Gdx.app.getClipboard().hasContents()) {
+				String clip = com.badlogic.gdx.Gdx.app.getClipboard().getContents();
+				String fromClip = PlayAlongProtocol.parseJoinInput(clip);
+				if (!fromClip.isEmpty()) {
+					initial = clip.trim();
+				}
+			}
+		} catch (Exception ignored) {
+		}
 		Game.scene().addToFront(new WndTextInput(
 				Messages.get(PlayAlongService.class, "code_title"),
 				Messages.get(PlayAlongService.class, "code_prompt"),
 				initial == null ? "" : initial,
-				16,
+				120,
 				false,
 				Messages.get(PlayAlongService.class, "code_ok"),
 				Messages.get(PlayAlongService.class, "code_cancel")) {
 			@Override
 			public void onSelect(boolean positive, String text) {
 				if (!positive) return;
-				final String code = PlayAlongProtocol.normalizeRoomCode(text);
+				final String code = PlayAlongProtocol.parseJoinInput(text);
 				if (code.isEmpty()) {
 					GLog.w(Messages.get(PlayAlongService.class, "code_invalid"));
 					return;

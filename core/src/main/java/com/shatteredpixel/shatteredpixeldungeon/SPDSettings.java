@@ -851,6 +851,7 @@ public class SPDSettings extends GameSettings {
 	public static final String KEY_PLAY_ALONG_RELAY_URL = "play_along_relay_url";
 	public static final String KEY_PLAY_ALONG_RELAY_HOST = "play_along_relay_host";
 	public static final String KEY_PLAY_ALONG_RELAY_TOKEN = "play_along_relay_token";
+	public static final String KEY_PLAY_ALONG_RELAY_ROOM_NAME = "play_along_relay_room_name";
 	public static final String KEY_PLAY_ALONG_LAST_ROOM = "play_along_last_room";
 
 	public static void playAlongRelayUrl( String value ) {
@@ -891,8 +892,9 @@ public class SPDSettings extends GameSettings {
 	}
 
 	/**
-	 * Secret that claims {@link #PLAY_ALONG_RELAY_ROOM}. Empty means a private
-	 * room code. Settings win; otherwise {@code PLAYALONG_HOST_TOKEN} or
+	 * Secret that claims a public room ({@link #PLAY_ALONG_RELAY_ROOM} or a
+	 * custom name). Empty with no room name means a private room code.
+	 * Settings win; otherwise {@code PLAYALONG_HOST_TOKEN} or
 	 * {@code PLAYALONG_DALTON_TOKEN} from the environment.
 	 */
 	public static String playAlongRelayToken() {
@@ -907,6 +909,43 @@ public class SPDSettings extends GameSettings {
 
 	public static boolean playAlongRelayTokenConfigured() {
 		return !playAlongRelayToken().isEmpty();
+	}
+
+	public static void playAlongRelayRoomName( String value ) {
+		String normalized = com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol
+				.normalizeHostRoomName(value);
+		put( KEY_PLAY_ALONG_RELAY_ROOM_NAME, normalized );
+	}
+
+	/**
+	 * Host public room name. Empty + secret → {@link #PLAY_ALONG_RELAY_ROOM};
+	 * empty + no secret → private code; custom slug requires a secret.
+	 */
+	public static String playAlongRelayRoomName() {
+		String s = getString( KEY_PLAY_ALONG_RELAY_ROOM_NAME, "" );
+		return com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol
+				.normalizeHostRoomName(s);
+	}
+
+	/**
+	 * Room path segment for {@code /host/<name>}, or {@code null} for a random
+	 * private code. Returns null when a custom name is set without a secret.
+	 */
+	public static String playAlongRelayHostRoomOrNull() {
+		String name = playAlongRelayRoomName();
+		String token = playAlongRelayToken();
+		if (!name.isEmpty()) {
+			return token.isEmpty() ? null : name;
+		}
+		if (!token.isEmpty()) {
+			return PLAY_ALONG_RELAY_ROOM;
+		}
+		return null;
+	}
+
+	/** True when the host set a public room name but no secret. */
+	public static boolean playAlongRelayPublicNameMissingSecret() {
+		return !playAlongRelayRoomName().isEmpty() && playAlongRelayToken().isEmpty();
 	}
 
 	public static void playAlongLastRoom( String value ) {

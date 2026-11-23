@@ -23,7 +23,13 @@ Topology
     current host. Viewers of the public stream join ``/join/dalton`` with no
     code; the game's title-screen button does that itself.
 
-* Player -> ws://127.0.0.1:8765/join/<CODE>
+* Host  ->  ws://127.0.0.1:8765/host/<name>
+    Custom public room (slug ``[a-z][a-z0-9_-]{2,23}``, not ``dalton``). Same
+    auth frame; the first successful secret binds the name for the life of the
+    relay process. Matching secret takeovers; wrong secret is refused and does
+    not kick the live host. Joiners use ``/join/<name>`` with no secret.
+
+* Player -> ws://127.0.0.1:8765/join/<CODE-or-name>
     Unchanged Play Along JSON (``join``, ``status_ping``, ``player_state``, ...).
     The relay does not interpret those messages. Incoming player frames are
     capped at 4096 bytes (the game's packet limit) and at a small per-socket
@@ -52,6 +58,7 @@ import hmac
 import json
 import logging
 import os
+import re
 import secrets
 import time
 from collections import deque
@@ -66,6 +73,8 @@ log = logging.getLogger("playalong_relay")
 
 # Unambiguous alphabet: no 0/O/1/I. 32 symbols, 4 characters.
 ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+# Custom public room names (stored lowercase). Not the reserved dalton room.
+PUBLIC_NAME_RE = re.compile(r"^[a-z][a-z0-9_-]{2,23}$")
 
 
 @dataclass
@@ -113,6 +122,8 @@ class Room:
         self.ready = False
         self.host_secret = ""
         self.reserved = False
+        # Custom public name claimed with a host-chosen secret (not env-reserved).
+        self.named = False
 
     async def send(self, text: str) -> None:
         async with self.send_lock:
@@ -168,12 +179,27 @@ def token_matches(got: Optional[str], expected: str) -> bool:
     return hmac.compare_digest(got_b, exp_b)
 
 
+def is_public_room_name(name: str, reserved_room: str = "dalton") -> bool:
+    """True when name is a custom public slug (not the env-reserved room)."""
+    if not name or name == reserved_room.lower():
+        return False
+    return PUBLIC_NAME_RE.match(name) is not None
+
+
+def is_private_room_code(code: str) -> bool:
+    if not code or len(code) < 4 or len(code) > 5:
+        return False
+    return all(ch in ALPHABET for ch in code)
+
+
 class Relay:
     def __init__(self, config: RelayConfig) -> None:
         self.config = config
         self.rooms: Dict[str, Room] = {}
         # code -> (host_secret, expiry monotonic). Private rooms only.
         self.reclaim: Dict[str, tuple] = {}
+        # lowercase public name -> host secret. Process lifetime.
+        self.claims: Dict[str, str] = {}
         self.rooms_lock = asyncio.Lock()
         self.limiter = RateLimiter(config.rate_limit, config.rate_window)
 
@@ -225,7 +251,9 @@ class Relay:
             if room is not None:
                 await self.handle_host_frames(room)
             return
-        if requested.strip().lower() == self.config.reserved_room.lower():
+        lower = requested.strip().lower()
+        upper = requested.strip().upper()
+        if lower == self.config.reserved_room.lower():
             if not await self.authorize_reserved(ws):
                 return
             room = await self.adopt_room(
@@ -234,16 +262,36 @@ class Relay:
             if room is not None:
                 await self.handle_host_frames(room)
             return
-        code = self.canonical_join(requested)
-        if code is None:
-            await ws.close(1008, "unknown room")
+        # 4–5 alphabet paths are private codes when that uppercase key is live
+        # or in reclaim; otherwise a matching slug can still be a named claim.
+        if is_private_room_code(upper):
+            async with self.rooms_lock:
+                live = self.rooms.get(upper)
+                private_held = bool(self._secret_locked(upper))
+                prefer_private = private_held or (
+                    live is not None and not live.named and not live.reserved
+                )
+            if prefer_private or not is_public_room_name(lower, self.config.reserved_room):
+                secret = await self.authorize_reclaim(ws, upper)
+                if secret is None:
+                    return
+                room = await self.adopt_room(
+                    ws, upper, ip, reserved=False, host_secret=secret
+                )
+                if room is not None:
+                    await self.handle_host_frames(room)
+                return
+        if is_public_room_name(lower, self.config.reserved_room):
+            secret = await self.authorize_named_claim(ws, lower)
+            if secret is None:
+                return
+            room = await self.adopt_room(
+                ws, lower, ip, reserved=False, host_secret="", named=True
+            )
+            if room is not None:
+                await self.handle_host_frames(room)
             return
-        secret = await self.authorize_reclaim(ws, code)
-        if secret is None:
-            return
-        room = await self.adopt_room(ws, code, ip, reserved=False, host_secret=secret)
-        if room is not None:
-            await self.handle_host_frames(room)
+        await ws.close(1008, "unknown room")
 
     async def authorize_reserved(self, ws: ServerConnection) -> bool:
         expected = self.config.reserved_token
@@ -272,19 +320,9 @@ class Relay:
 
     async def authorize_reclaim(self, ws: ServerConnection, code: str) -> Optional[str]:
         """Return the room secret when this host may take the code back."""
-        try:
-            raw = await asyncio.wait_for(ws.recv(), timeout=self.config.auth_timeout)
-        except (asyncio.TimeoutError, ConnectionClosed):
-            await _safe_close(ws, 4001, "unauthorized")
+        token = await self._recv_auth_token(ws)
+        if token is None:
             return None
-        token = None
-        if isinstance(raw, str):
-            try:
-                msg = json.loads(raw)
-            except json.JSONDecodeError:
-                msg = None
-            if isinstance(msg, dict) and msg.get("t") == "auth" and isinstance(msg.get("d"), str):
-                token = msg.get("d")
         async with self.rooms_lock:
             expected = self._secret_locked(code)
         if not token_matches(token, expected):
@@ -293,6 +331,42 @@ class Relay:
             return None
         return expected
 
+    async def authorize_named_claim(self, ws: ServerConnection, name: str) -> Optional[str]:
+        """Bind or match a process-lifetime secret for a custom public name."""
+        token = await self._recv_auth_token(ws)
+        if token is None:
+            return None
+        if not token:
+            log.warning("named room auth empty name=%s", name)
+            await _safe_close(ws, 4001, "unauthorized")
+            return None
+        async with self.rooms_lock:
+            expected = self.claims.get(name)
+            if expected is None:
+                self.claims[name] = token
+                return token
+            if token_matches(token, expected):
+                return expected
+        log.warning("named room auth failed name=%s", name)
+        await _safe_close(ws, 4001, "unauthorized")
+        return None
+
+    async def _recv_auth_token(self, ws: ServerConnection) -> Optional[str]:
+        try:
+            raw = await asyncio.wait_for(ws.recv(), timeout=self.config.auth_timeout)
+        except (asyncio.TimeoutError, ConnectionClosed):
+            await _safe_close(ws, 4001, "unauthorized")
+            return None
+        if isinstance(raw, str):
+            try:
+                msg = json.loads(raw)
+            except json.JSONDecodeError:
+                msg = None
+            if isinstance(msg, dict) and msg.get("t") == "auth" and isinstance(msg.get("d"), str):
+                return msg.get("d")
+        await _safe_close(ws, 4001, "unauthorized")
+        return None
+
     async def adopt_room(
         self,
         ws: ServerConnection,
@@ -300,6 +374,7 @@ class Relay:
         ip: str,
         reserved: bool,
         host_secret: Optional[str] = None,
+        named: bool = False,
     ) -> Optional[Room]:
         async with self.rooms_lock:
             if code is None:
@@ -308,7 +383,12 @@ class Relay:
             old = self.rooms.get(code)
             room = Room(code, ws)
             room.reserved = reserved
-            room.host_secret = "" if reserved else (host_secret or "")
+            room.named = named
+            # Named + reserved rooms: client already holds the secret; no "k".
+            if reserved or named:
+                room.host_secret = ""
+            else:
+                room.host_secret = host_secret or ""
             # Not joinable until the host has the room frame, so a player cannot
             # emit "open" ahead of {"t":"room"}.
             self.rooms[code] = room
@@ -323,7 +403,13 @@ class Relay:
             return None
         async with room.lock:
             room.ready = True
-        log.info("room open code=%s reserved=%s ip=%s", code, str(reserved).lower(), ip)
+        log.info(
+            "room open code=%s reserved=%s named=%s ip=%s",
+            code,
+            str(reserved).lower(),
+            str(named).lower(),
+            ip,
+        )
         return room
 
     def _allocate_locked(self) -> str:
@@ -333,6 +419,10 @@ class Relay:
                 code = "".join(secrets.choice(ALPHABET) for _ in range(length))
                 if code.lower() == reserved:
                     continue
+                if code.lower() in self.claims:
+                    continue
+                if code.lower() in self.rooms:
+                    continue
                 if code not in self.rooms and not self._secret_locked(code):
                     return code
         raise RuntimeError("room code space exhausted")
@@ -341,6 +431,8 @@ class Relay:
         async with self.rooms_lock:
             current = self.rooms.get(code)
             if current is not None and not current.closed:
+                return True
+            if code in self.claims:
                 return True
             return bool(self._secret_locked(code))
 
@@ -356,6 +448,33 @@ class Relay:
             self.reclaim.pop(code, None)
             return ""
         return secret
+
+    def resolve_join_key_locked(self, raw: str) -> Optional[str]:
+        """Map a /join path to a room key. Caller holds rooms_lock when possible."""
+        name = unquote(raw).strip()
+        if not name or "/" in name or len(name) > 32:
+            return None
+        lower = name.lower()
+        reserved = self.config.reserved_room.lower()
+        if lower == reserved:
+            return reserved
+        upper = name.upper()
+        private_shape = is_private_room_code(upper)
+        public_shape = is_public_room_name(lower, self.config.reserved_room)
+        if public_shape and lower in self.rooms:
+            return lower
+        if private_shape and upper in self.rooms:
+            return upper
+        if public_shape and lower in self.claims:
+            return lower
+        if private_shape and self._secret_locked(upper):
+            return upper
+        # Offline: keep lowercase private-code joins working (code.lower()).
+        if private_shape:
+            return upper
+        if public_shape:
+            return lower
+        return None
 
     async def handle_host_frames(self, room: Room) -> None:
         try:
@@ -385,17 +504,23 @@ class Relay:
             await self.close_room(room, "host disconnected")
 
     async def handle_player(self, ws: ServerConnection, raw_code: str, ip: str) -> None:
-        code = self.canonical_join(raw_code)
+        async with self.rooms_lock:
+            code = self.resolve_join_key_locked(raw_code)
+            if code is None:
+                room = None
+                held = False
+            else:
+                room = self.rooms.get(code)
+                held = room is None and (
+                    bool(self._secret_locked(code)) or code in self.claims
+                )
         if code is None:
             await self.reject_player(ws, "That room code is not valid.", "bad code")
             return
-        async with self.rooms_lock:
-            room = self.rooms.get(code)
-            held = room is None and bool(self._secret_locked(code))
         if room is None:
             if held:
-                # Host dropped but can still reclaim this code. Ask the client
-                # to retry instead of ending the run with join_error.
+                # Host dropped but can still reclaim this code/name. Ask the
+                # client to retry instead of ending the run with join_error.
                 log.info("player wait room=%s reason=host reconnecting", code)
                 await _safe_close(ws, 1013, "host reconnecting")
                 return
@@ -487,17 +612,24 @@ class Relay:
         return "ok"
 
     def canonical_join(self, raw: str) -> Optional[str]:
+        """Stateless parse for tests / callers that do not need live lookup."""
         name = unquote(raw).strip()
         if not name or "/" in name or len(name) > 32:
             return None
-        if name.lower() == self.config.reserved_room.lower():
+        lower = name.lower()
+        if lower == self.config.reserved_room.lower():
             return self.config.reserved_room.lower()
-        code = name.upper()
-        if len(code) < 4 or len(code) > 5:
-            return None
-        if any(ch not in ALPHABET for ch in code):
-            return None
-        return code
+        if is_public_room_name(lower, self.config.reserved_room):
+            # Prefer private-code shape when both match so code.lower() joins work
+            # offline; live named rooms are resolved via resolve_join_key_locked.
+            upper = name.upper()
+            if is_private_room_code(upper):
+                return upper
+            return lower
+        upper = name.upper()
+        if is_private_room_code(upper):
+            return upper
+        return None
 
     async def forward_to_player(self, room: Room, cid: str, payload: str) -> None:
         async with room.lock:
@@ -545,7 +677,13 @@ class Relay:
         async with self.rooms_lock:
             if self.rooms.get(room.code) is room:
                 del self.rooms[room.code]
-                if room.host_secret and not room.reserved and reason != "host send failed":
+                # Named claims stay in self.claims for process lifetime.
+                if (
+                    room.host_secret
+                    and not room.reserved
+                    and not room.named
+                    and reason != "host send failed"
+                ):
                     self.reclaim[room.code] = (
                         room.host_secret,
                         time.monotonic() + self.config.reclaim_grace,

@@ -86,6 +86,12 @@ public class WndSettings extends WndTabbed {
 
 	public static int last_index = 0;
 
+	/** Grow the window if Play Along Advanced needs more height; never shrink below other tabs. */
+	private void resizeToFitPlayAlong(int w, int contentH) {
+		resize(w, Math.max(height, contentH));
+		layoutTabs();
+	}
+
 	public WndSettings() {
 		super();
 
@@ -847,15 +853,22 @@ public class WndSettings extends WndTabbed {
 		CheckBox chkBetas;
 		CheckBox chkWifi;
 		ColorBlock sepPlayAlong;
-		RedButton btnPlayAlongServer;
-		OptionSlider optPlayAlongGhostOpacity;
+		RenderedTextBlock hdrPlayAlongJoin;
 		RedButton btnJoinRoomCode;
+		RenderedTextBlock hdrPlayAlongHost;
 		CheckBox chkPlayAlongHost;
 		CheckBox chkPlayAlongRelay;
 		RedButton btnPlayAlongRoom;
+		RedButton btnPlayAlongAdvanced;
+		RedButton btnPlayAlongRoomName;
 		RedButton btnPlayAlongToken;
 		RedButton btnPlayAlongRelayUrl;
+		RedButton btnPlayAlongServer;
+		RenderedTextBlock hdrPlayAlongDisplay;
+		OptionSlider optPlayAlongGhostOpacity;
 		CheckBox chkPlayAlongSharedChat;
+		boolean showPlayAlongAdvanced = false;
+		String lastPlayAlongStatusLabel = "";
 
 		@Override
 		protected void createChildren() {
@@ -960,42 +973,9 @@ public class WndSettings extends WndTabbed {
 			sepPlayAlong = new ColorBlock(1, 1, 0xFF000000);
 			add(sepPlayAlong);
 
-			btnPlayAlongServer = new RedButton(Messages.get(this, "playalong_direct", SPDSettings.playAlongAddress()), 8) {
-				@Override
-				protected void onClick() {
-					ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
-							Messages.get(DataTab.this, "playalong_direct_title"),
-							Messages.get(DataTab.this, "playalong_direct_prompt"),
-							SPDSettings.playAlongAddress(),
-							64,
-							false,
-							"Save",
-							"Reset Default") {
-						@Override
-						public void onSelect(boolean positive, String text) {
-							if (positive) {
-								SPDSettings.playAlongAddress(text);
-							} else {
-								SPDSettings.playAlongAddress(SPDSettings.DEFAULT_PLAY_ALONG_ADDRESS);
-							}
-							btnPlayAlongServer.text(Messages.get(DataTab.this, "playalong_direct", SPDSettings.playAlongAddress()));
-							com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.pollLiveStatus(true);
-						}
-					});
-				}
-			};
-			add(btnPlayAlongServer);
-
-			optPlayAlongGhostOpacity = new OptionSlider(Messages.get(this, "play_along_ghost_opacity"),
-					Messages.get(this, "play_along_ghost_opacity_min"),
-					Messages.get(this, "play_along_ghost_opacity_max"), 1, 10) {
-				@Override
-				protected void onChange() {
-					SPDSettings.playAlongGhostOpacity(getSelectedValue());
-				}
-			};
-			optPlayAlongGhostOpacity.setSelectedValue(SPDSettings.playAlongGhostOpacity());
-			add(optPlayAlongGhostOpacity);
+			hdrPlayAlongJoin = PixelScene.renderTextBlock(Messages.get(this, "playalong_section_join"), 8);
+			hdrPlayAlongJoin.hardlight(TITLE_COLOR);
+			add(hdrPlayAlongJoin);
 
 			btnJoinRoomCode = new RedButton(Messages.get(this, "playalong_join_code"), 8) {
 				@Override
@@ -1006,7 +986,11 @@ public class WndSettings extends WndTabbed {
 			add(btnJoinRoomCode);
 
 			if (DeviceCompat.isDesktop()) {
-				chkPlayAlongHost = new CheckBox("Host Play Along Lobby") {
+				hdrPlayAlongHost = PixelScene.renderTextBlock(Messages.get(this, "playalong_section_host"), 8);
+				hdrPlayAlongHost.hardlight(TITLE_COLOR);
+				add(hdrPlayAlongHost);
+
+				chkPlayAlongHost = new CheckBox(Messages.get(this, "playalong_host")) {
 					@Override
 					protected void onClick() {
 						super.onClick();
@@ -1023,15 +1007,13 @@ public class WndSettings extends WndTabbed {
 						super.onClick();
 						SPDSettings.playAlongRelayHost(checked());
 						com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onRelaySettingChanged(checked());
-						if (btnPlayAlongRoom != null) {
-							btnPlayAlongRoom.text(playAlongRoomLabel());
-						}
+						refreshPlayAlongStatus();
 					}
 				};
 				chkPlayAlongRelay.checked(SPDSettings.playAlongRelayHost());
 				add(chkPlayAlongRelay);
 
-				btnPlayAlongRoom = new RedButton(playAlongRoomLabel(), 8) {
+				btnPlayAlongRoom = new RedButton(playAlongStatusLabel(), 8) {
 					@Override
 					protected void onClick() {
 						String code = com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.relayRoomCode();
@@ -1040,8 +1022,16 @@ public class WndSettings extends WndTabbed {
 							body = Messages.get(DataTab.this, "playalong_room_body_wait");
 						} else {
 							String url = com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.relayJoinAddress(code);
-							if (com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.relayRoomIsPublic()) {
+							try {
+								if (com.badlogic.gdx.Gdx.app != null && com.badlogic.gdx.Gdx.app.getClipboard() != null) {
+									com.badlogic.gdx.Gdx.app.getClipboard().setContents(url);
+								}
+							} catch (Exception ignored) {
+							}
+							if (com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.isReservedRoom(code)) {
 								body = Messages.get(DataTab.this, "playalong_room_body_public", url);
+							} else if (com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.isPublicRoomName(code)) {
+								body = Messages.get(DataTab.this, "playalong_room_body_named", code, url);
 							} else {
 								body = Messages.get(DataTab.this, "playalong_room_body_code", code, url);
 							}
@@ -1050,6 +1040,55 @@ public class WndSettings extends WndTabbed {
 					}
 				};
 				add(btnPlayAlongRoom);
+				lastPlayAlongStatusLabel = btnPlayAlongRoom.text();
+
+				btnPlayAlongAdvanced = new RedButton(Messages.get(this, "playalong_advanced_show"), 8) {
+					@Override
+					protected void onClick() {
+						showPlayAlongAdvanced = !showPlayAlongAdvanced;
+						text(Messages.get(DataTab.this,
+								showPlayAlongAdvanced ? "playalong_advanced_hide" : "playalong_advanced_show"));
+						applyPlayAlongAdvancedVisibility();
+						layout();
+						resizePlayAlongParent();
+					}
+				};
+				add(btnPlayAlongAdvanced);
+
+				btnPlayAlongRoomName = new RedButton(playAlongRoomNameLabel(), 8) {
+					@Override
+					protected void onClick() {
+						ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
+								Messages.get(DataTab.this, "playalong_room_name_title"),
+								Messages.get(DataTab.this, "playalong_room_name_prompt"),
+								SPDSettings.playAlongRelayRoomName(),
+								24,
+								false,
+								"Save",
+								"Clear") {
+							@Override
+							public void onSelect(boolean positive, String text) {
+								if (positive) {
+									String next = text == null ? "" : text.trim();
+									if (!next.isEmpty()
+											&& com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol
+											.normalizeHostRoomName(next).isEmpty()) {
+										ShatteredPixelDungeon.scene().addToFront(new WndMessage(
+												Messages.get(DataTab.this, "playalong_room_name_bad")));
+										return;
+									}
+									SPDSettings.playAlongRelayRoomName(next);
+								} else {
+									SPDSettings.playAlongRelayRoomName("");
+								}
+								btnPlayAlongRoomName.text(playAlongRoomNameLabel());
+								com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onRelayEndpointChanged();
+								refreshPlayAlongStatus();
+							}
+						});
+					}
+				};
+				add(btnPlayAlongRoomName);
 
 				btnPlayAlongToken = new RedButton(playAlongTokenLabel(), 8) {
 					@Override
@@ -1071,6 +1110,7 @@ public class WndSettings extends WndTabbed {
 								}
 								btnPlayAlongToken.text(playAlongTokenLabel());
 								com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onRelayEndpointChanged();
+								refreshPlayAlongStatus();
 							}
 						});
 					}
@@ -1099,13 +1139,59 @@ public class WndSettings extends WndTabbed {
 								SPDSettings.playAlongRelayUrl(next);
 								btnPlayAlongRelayUrl.text(Messages.get(DataTab.this, "playalong_relay_url", SPDSettings.playAlongRelayUrl()));
 								com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onRelayEndpointChanged();
+								refreshPlayAlongStatus();
 							}
 						});
 					}
 				};
 				add(btnPlayAlongRelayUrl);
 
-				chkPlayAlongSharedChat = new CheckBox("Mirror Chat Cmds to Play Along") {
+				btnPlayAlongServer = new RedButton(Messages.get(this, "playalong_direct", SPDSettings.playAlongAddress()), 8) {
+					@Override
+					protected void onClick() {
+						ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
+								Messages.get(DataTab.this, "playalong_direct_title"),
+								Messages.get(DataTab.this, "playalong_direct_prompt"),
+								SPDSettings.playAlongAddress(),
+								64,
+								false,
+								"Save",
+								"Reset Default") {
+							@Override
+							public void onSelect(boolean positive, String text) {
+								if (positive) {
+									SPDSettings.playAlongAddress(text);
+								} else {
+									SPDSettings.playAlongAddress(SPDSettings.DEFAULT_PLAY_ALONG_ADDRESS);
+								}
+								btnPlayAlongServer.text(Messages.get(DataTab.this, "playalong_direct", SPDSettings.playAlongAddress()));
+								com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.pollLiveStatus(true);
+							}
+						});
+					}
+				};
+				add(btnPlayAlongServer);
+
+				applyPlayAlongAdvancedVisibility();
+			}
+
+			hdrPlayAlongDisplay = PixelScene.renderTextBlock(Messages.get(this, "playalong_section_display"), 8);
+			hdrPlayAlongDisplay.hardlight(TITLE_COLOR);
+			add(hdrPlayAlongDisplay);
+
+			optPlayAlongGhostOpacity = new OptionSlider(Messages.get(this, "play_along_ghost_opacity"),
+					Messages.get(this, "play_along_ghost_opacity_min"),
+					Messages.get(this, "play_along_ghost_opacity_max"), 1, 10) {
+				@Override
+				protected void onChange() {
+					SPDSettings.playAlongGhostOpacity(getSelectedValue());
+				}
+			};
+			optPlayAlongGhostOpacity.setSelectedValue(SPDSettings.playAlongGhostOpacity());
+			add(optPlayAlongGhostOpacity);
+
+			if (DeviceCompat.isDesktop()) {
+				chkPlayAlongSharedChat = new CheckBox(Messages.get(this, "playalong_shared_chat")) {
 					@Override
 					protected void onClick() {
 						super.onClick();
@@ -1115,6 +1201,12 @@ public class WndSettings extends WndTabbed {
 				chkPlayAlongSharedChat.checked(SPDSettings.playAlongSharedChat());
 				add(chkPlayAlongSharedChat);
 			}
+		}
+
+		@Override
+		public void update() {
+			super.update();
+			refreshPlayAlongStatus();
 		}
 
 		@Override
@@ -1156,15 +1248,17 @@ public class WndSettings extends WndTabbed {
 			sepPlayAlong.y = pos + GAP;
 			pos = sepPlayAlong.y + 1;
 
-			btnPlayAlongServer.setRect(0, pos + GAP, width, BTN_HEIGHT);
-			pos = btnPlayAlongServer.bottom();
+			hdrPlayAlongJoin.maxWidth((int)width);
+			hdrPlayAlongJoin.setPos(0, pos + GAP);
+			pos = hdrPlayAlongJoin.bottom();
 
-			optPlayAlongGhostOpacity.setRect(0, pos + GAP, width, SLIDER_HEIGHT);
-			pos = optPlayAlongGhostOpacity.bottom();
+			btnJoinRoomCode.setRect(0, pos + GAP, width, BTN_HEIGHT);
+			pos = btnJoinRoomCode.bottom();
 
-			if (btnJoinRoomCode != null) {
-				btnJoinRoomCode.setRect(0, pos + GAP, width, BTN_HEIGHT);
-				pos = btnJoinRoomCode.bottom();
+			if (hdrPlayAlongHost != null) {
+				hdrPlayAlongHost.maxWidth((int)width);
+				hdrPlayAlongHost.setPos(0, pos + GAP);
+				pos = hdrPlayAlongHost.bottom();
 			}
 
 			if (chkPlayAlongHost != null){
@@ -1182,15 +1276,33 @@ public class WndSettings extends WndTabbed {
 				pos = btnPlayAlongRoom.bottom();
 			}
 
-			if (btnPlayAlongToken != null) {
-				btnPlayAlongToken.setRect(0, pos + GAP, width, BTN_HEIGHT);
-				pos = btnPlayAlongToken.bottom();
+			if (btnPlayAlongAdvanced != null) {
+				btnPlayAlongAdvanced.setRect(0, pos + GAP, width, BTN_HEIGHT);
+				pos = btnPlayAlongAdvanced.bottom();
 			}
 
-			if (btnPlayAlongRelayUrl != null) {
+			if (showPlayAlongAdvanced && btnPlayAlongToken != null) {
+				btnPlayAlongRoomName.setRect(0, pos + GAP, width, BTN_HEIGHT);
+				pos = btnPlayAlongRoomName.bottom();
+				btnPlayAlongToken.setRect(0, pos + GAP, width, BTN_HEIGHT);
+				pos = btnPlayAlongToken.bottom();
 				btnPlayAlongRelayUrl.setRect(0, pos + GAP, width, BTN_HEIGHT);
 				pos = btnPlayAlongRelayUrl.bottom();
+				btnPlayAlongServer.setRect(0, pos + GAP, width, BTN_HEIGHT);
+				pos = btnPlayAlongServer.bottom();
+			} else if (btnPlayAlongToken != null) {
+				btnPlayAlongRoomName.setRect(0, 0, 0, 0);
+				btnPlayAlongToken.setRect(0, 0, 0, 0);
+				btnPlayAlongRelayUrl.setRect(0, 0, 0, 0);
+				btnPlayAlongServer.setRect(0, 0, 0, 0);
 			}
+
+			hdrPlayAlongDisplay.maxWidth((int)width);
+			hdrPlayAlongDisplay.setPos(0, pos + GAP);
+			pos = hdrPlayAlongDisplay.bottom();
+
+			optPlayAlongGhostOpacity.setRect(0, pos + GAP, width, SLIDER_HEIGHT);
+			pos = optPlayAlongGhostOpacity.bottom();
 
 			if (chkPlayAlongSharedChat != null){
 				chkPlayAlongSharedChat.setRect(0, pos + GAP, width, BTN_HEIGHT);
@@ -1198,21 +1310,50 @@ public class WndSettings extends WndTabbed {
 			}
 
 			height = pos;
-
 		}
 
-		private String playAlongRoomLabel() {
+		private void applyPlayAlongAdvancedVisibility() {
+			boolean show = showPlayAlongAdvanced;
+			if (btnPlayAlongRoomName != null) {
+				btnPlayAlongRoomName.visible = btnPlayAlongRoomName.active = show;
+			}
+			if (btnPlayAlongToken != null) {
+				btnPlayAlongToken.visible = btnPlayAlongToken.active = show;
+			}
+			if (btnPlayAlongRelayUrl != null) {
+				btnPlayAlongRelayUrl.visible = btnPlayAlongRelayUrl.active = show;
+			}
+			if (btnPlayAlongServer != null) {
+				btnPlayAlongServer.visible = btnPlayAlongServer.active = show;
+			}
+		}
+
+		private void resizePlayAlongParent() {
+			if (!(parent instanceof WndSettings)) return;
+			((WndSettings) parent).resizeToFitPlayAlong((int) width, (int) Math.ceil(height));
+		}
+
+		private void refreshPlayAlongStatus() {
+			if (btnPlayAlongRoom == null) return;
+			String label = playAlongStatusLabel();
+			if (!label.equals(lastPlayAlongStatusLabel)) {
+				lastPlayAlongStatusLabel = label;
+				btnPlayAlongRoom.text(label);
+			}
+		}
+
+		private String playAlongStatusLabel() {
 			if (!SPDSettings.playAlongRelayHost()) {
-				return Messages.get(this, "playalong_room_off");
+				return Messages.get(this, "playalong_status_off");
 			}
 			String code = com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.relayRoomCode();
 			if (code == null || code.isEmpty()) {
-				return Messages.get(this, "playalong_room_wait");
+				return Messages.get(this, "playalong_status_wait");
 			}
 			if (com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.relayRoomIsPublic()) {
-				return Messages.get(this, "playalong_room_public", code);
+				return Messages.get(this, "playalong_status_public", code);
 			}
-			return Messages.get(this, "playalong_room", code);
+			return Messages.get(this, "playalong_status_code", code);
 		}
 
 		private String playAlongTokenLabel() {
@@ -1220,6 +1361,14 @@ public class WndSettings extends WndTabbed {
 					? Messages.get(this, "playalong_token_set")
 					: Messages.get(this, "playalong_token_unset");
 			return Messages.get(this, "playalong_token", state);
+		}
+
+		private String playAlongRoomNameLabel() {
+			String name = SPDSettings.playAlongRelayRoomName();
+			if (name.isEmpty()) {
+				name = Messages.get(this, "playalong_room_name_unset");
+			}
+			return Messages.get(this, "playalong_room_name", name);
 		}
 	}
 

@@ -33,6 +33,7 @@ public class Mod_Changes {
 
 	public static void addAllChanges( ArrayList<ChangeInfo> changeInfos ){
 		addOverview(changeInfos);
+		add_v4_0_2_QoL_22(changeInfos);
 		add_v4_0_2_QoL_19(changeInfos);
 		add_v4_0_2_QoL_18(changeInfos);
 		add_v4_0_2_QoL_17(changeInfos);
@@ -48,6 +49,35 @@ public class Mod_Changes {
 		add_v4_0_0_QoL_6(changeInfos);
 		add_v4_0_0_QoL_5(changeInfos);
 		add_v4_0_0(changeInfos);
+	}
+
+	private static void add_v4_0_2_QoL_22( ArrayList<ChangeInfo> changeInfos ) {
+		ChangeInfo changes = new ChangeInfo("4.0.2-QoL-22", true, "");
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes = new ChangeInfo(Messages.get(ChangesScene.class, "new"), false, null);
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.CHALLENGE_COLOR), "Play Along Room-Code Relay",
+				"**-** Hosts dial out to a public relay — no Playit or port forward required\n" +
+				"**-** Dalton's viewers join from the title-screen button (`dalton` room)\n" +
+				"**-** Other hosts get a short private room code, or claim a **custom public name** with a host secret\n" +
+				"**-** Joiners can paste a code, name, or full `wss://…/join/…` URL"));
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.CHALLENGE_COLOR), "Play Along Catch-up",
+				"**-** Late drop-in racers can buy catch-up kits (configured in Lastest UI points)\n" +
+				"**-** Kits scale with host depth so you can rejoin a mid-run race"));
+
+		changes = new ChangeInfo(Messages.get(ChangesScene.class, "changes"), false, null);
+		changes.hardlight(CharSprite.WARNING);
+		changeInfos.add(changes);
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.PREFS), "Connectivity Settings",
+				"**-** Play Along settings grouped into Join / Host / Display\n" +
+				"**-** Host secret, room name, relay URL, and Playit fallback sit under **Advanced…**\n" +
+				"**-** Live status line refreshes while settings are open; tap copies the join URL"));
 	}
 
 	private static void add_v4_0_2_QoL_19( ArrayList<ChangeInfo> changeInfos ) {

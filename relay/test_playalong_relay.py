@@ -324,12 +324,72 @@ async def test_private_room_reclaim():
         await server.wait_closed()
 
 
+async def test_named_public_room():
+    config = RelayConfig(host="127.0.0.1", port=0, reserved_token="t", max_players=8)
+    relay, server, port = await _start(config)
+    base = "ws://127.0.0.1:%d" % port
+    try:
+        bad = await connect(base + "/host/freddy", open_timeout=2)
+        await bad.send(json.dumps({"t": "auth", "d": "nope-secret"}))
+        # First claim binds; "bad" here is actually the first host — rename flow:
+        room_bad = await _recv_json(bad)
+        assert room_bad["t"] == "room" and room_bad["d"] == "freddy", room_bad
+        assert "k" not in room_bad or not room_bad.get("k")
+        await bad.close()
+
+        # Claim survives host disconnect (process lifetime).
+        assert "freddy" in relay.claims
+
+        thief = await connect(base + "/host/freddy", open_timeout=2)
+        await thief.send(json.dumps({"t": "auth", "d": "other-secret"}))
+        denied = await _expect_closed(thief)
+        assert denied.rcvd is not None and denied.rcvd.code == 4001
+
+        host = await connect(base + "/host/Freddy", open_timeout=2)
+        await host.send(json.dumps({"t": "auth", "d": "nope-secret"}))
+        room = await _recv_json(host)
+        assert room["t"] == "room" and room["d"] == "freddy", room
+
+        player = await connect(base + "/join/freddy", open_timeout=2)
+        opened = await _recv_json(host)
+        assert opened["t"] == "open", opened
+        await player.send('{"type":"status_ping"}')
+        msg = await _recv_json(host)
+        assert msg["t"] == "msg" and msg["d"] == '{"type":"status_ping"}'
+
+        # Matching secret takeovers; old players drop.
+        host2 = await connect(base + "/host/freddy", open_timeout=2)
+        await host2.send(json.dumps({"t": "auth", "d": "nope-secret"}))
+        room2 = await _recv_json(host2)
+        assert room2["d"] == "freddy"
+        await _expect_closed(host)
+        await _expect_closed(player)
+
+        player2 = await connect(base + "/join/FREDDY", open_timeout=2)
+        opened2 = await _recv_json(host2)
+        assert opened2["t"] == "open"
+        await host2.close()
+        await _expect_closed(player2)
+
+        # While claimed but offline, joiners wait (not join_error).
+        retry = await connect(base + "/join/freddy", open_timeout=2)
+        try:
+            raw = await asyncio.wait_for(retry.recv(), 2)
+            assert "join_error" not in raw
+        except ConnectionClosed as exc:
+            assert exc.rcvd is not None and exc.rcvd.code == 1013
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
 async def main():
     await test_host_and_two_players()
     await test_reserved_room()
     await test_rate_limit()
     await test_player_frame_limits()
     await test_private_room_reclaim()
+    await test_named_public_room()
     print("playalong relay tests passed")
 
 

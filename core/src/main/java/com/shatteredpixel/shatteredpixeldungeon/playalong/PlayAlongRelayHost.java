@@ -128,16 +128,23 @@ public final class PlayAlongRelayHost {
 
 	private void connect() {
 		if (!running) return;
+		if (SPDSettings.playAlongRelayPublicNameMissingSecret()) {
+			System.err.println("[PlayAlong] Public room name set but host secret is empty.");
+			running = false;
+			if (listener != null) listener.onRelayDenied();
+			return;
+		}
 		final String token = SPDSettings.playAlongRelayToken();
-		final boolean reserved = token != null && !token.isEmpty();
+		final String publicRoom = SPDSettings.playAlongRelayHostRoomOrNull();
+		final boolean claimPublic = publicRoom != null && !publicRoom.isEmpty();
 		final String savedCode = roomCode;
 		final String savedSecret = hostSecret;
-		final boolean resumePrivate = !reserved
+		final boolean resumePrivate = !claimPublic
 				&& savedCode != null && !savedCode.isEmpty()
 				&& savedSecret != null && !savedSecret.isEmpty()
-				&& !PlayAlongProtocol.isReservedRoom(savedCode);
-		final String url = reserved
-				? PlayAlongProtocol.relayHostAddress(SPDSettings.PLAY_ALONG_RELAY_ROOM)
+				&& PlayAlongProtocol.isPrivateRoomCode(savedCode);
+		final String url = claimPublic
+				? PlayAlongProtocol.relayHostAddress(publicRoom)
 				: (resumePrivate
 				? PlayAlongProtocol.relayHostAddress(savedCode)
 				: PlayAlongProtocol.relayHostAddress(null));
@@ -156,10 +163,10 @@ public final class PlayAlongRelayHost {
 			@Override
 			public void onOpen(ServerHandshake handshakedata) {
 				opened.set(true);
-				if (reserved || resumePrivate) {
+				if (claimPublic || resumePrivate) {
 					Env auth = new Env();
 					auth.t = "auth";
-					auth.d = reserved ? token : savedSecret;
+					auth.d = claimPublic ? token : savedSecret;
 					try {
 						send(PlayAlongProtocol.GSON.toJson(auth));
 					} catch (Exception ignored) {
@@ -189,7 +196,7 @@ public final class PlayAlongRelayHost {
 				// close code still arrives when a proxy drops the reason text.
 				boolean authRejected = code == 4001 || why.contains("unauthorized");
 				boolean reservedDisabled = code == 1011 || why.contains("reserved room disabled");
-				if (reserved && (authRejected || reservedDisabled)) {
+				if (claimPublic && (authRejected || reservedDisabled)) {
 					running = false;
 					if (listener != null) listener.onRelayDenied();
 					return;
@@ -252,7 +259,7 @@ public final class PlayAlongRelayHost {
 			roomCode = env.d == null ? "" : env.d.trim();
 			if (env.k != null && !env.k.isEmpty()) {
 				hostSecret = env.k;
-			} else if (PlayAlongProtocol.isReservedRoom(roomCode)) {
+			} else if (PlayAlongProtocol.isPublicJoinTarget(roomCode)) {
 				hostSecret = "";
 			}
 			reconnectDelayMs = 2000;
