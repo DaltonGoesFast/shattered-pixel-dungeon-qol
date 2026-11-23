@@ -1588,19 +1588,28 @@ public final class PlayAlongService {
 	/** Queue mirrored bombs/spawns and apply a few per frame so a raid cannot freeze the client. */
 	private static void enqueueMirroredChat(List<ChatCommandPayload> incoming) {
 		if (incoming == null) return;
+		boolean gameplay = false;
 		for (ChatCommandPayload p : incoming) {
 			if (p == null || p.command == null) continue;
 			if ("catchup".equals(p.command)) {
 				GLog.i(PlayAlongCatchup.describeForCommand());
 				continue;
 			}
+			// Spawn scaling used to apply immediately, including after death.
+			// It must not sit behind a raid queue or get cleared with it.
+			if ("spawn_scale_config".equals(p.command)) {
+				StreamingCommandHandler.executeMirroredChatCommand(p);
+				continue;
+			}
 			if (!acceptMirroredChat(p)) continue;
+			if (Dungeon.hero == null || !Dungeon.hero.isAlive()) continue;
 			while (pendingChatCommands.size() >= MAX_PENDING_CHAT) {
 				pendingChatCommands.remove(0);
 			}
 			pendingChatCommands.add(p);
+			gameplay = true;
 		}
-		if (Dungeon.hero != null && Dungeon.level != null && Game.scene() instanceof GameScene) {
+		if (gameplay && Dungeon.hero != null && Dungeon.level != null && Game.scene() instanceof GameScene) {
 			scheduleChatDrain();
 		}
 	}
@@ -1642,7 +1651,7 @@ public final class PlayAlongService {
 					return;
 				}
 				if (!Dungeon.hero.isAlive()) {
-					pendingChatCommands.clear();
+					applyQueuedConfigAndDropRest();
 					return;
 				}
 				StreamingCommandHandler.executeMirroredChatCommand(p);
@@ -1650,6 +1659,20 @@ public final class PlayAlongService {
 			}
 			if (!pendingChatCommands.isEmpty()) scheduleChatDrain();
 		});
+	}
+
+	/** A death mid-raid drops bombs and spawns. Spawn-scale config still applies. */
+	private static void applyQueuedConfigAndDropRest() {
+		List<ChatCommandPayload> config = new ArrayList<>();
+		for (ChatCommandPayload queued : pendingChatCommands) {
+			if (queued != null && "spawn_scale_config".equals(queued.command)) {
+				config.add(queued);
+			}
+		}
+		pendingChatCommands.clear();
+		for (ChatCommandPayload queued : config) {
+			StreamingCommandHandler.executeMirroredChatCommand(queued);
+		}
 	}
 
 	public static void disconnect() {

@@ -110,9 +110,8 @@ public class PlayAlongServer extends WebSocketServer {
 	private volatile boolean dirty = false;
 	/**
 	 * Chat mirrors (bombs, spawns, …) queued so a raid becomes one frame per
-	 * broadcast tick instead of one frame per command per player. The relay
-	 * host loop awaits each player send; a burst otherwise stalls that loop,
-	 * the host stops answering pings, and every player is dropped.
+	 * broadcast tick instead of one frame per command per player. The tick
+	 * flushes this queue without also sending a world snapshot.
 	 */
 	private final ArrayDeque<ChatCommandPayload> chatQueue = new ArrayDeque<>();
 	private final long serverStartedAtMs = System.currentTimeMillis();
@@ -772,7 +771,10 @@ public class PlayAlongServer extends WebSocketServer {
 			synchronized (chatQueue) {
 				chatPending = !chatQueue.isEmpty();
 			}
-			if (!dirty && !removed && !chatPending) return;
+			// Chat is flushed on this timer by itself. A raid must not also push
+			// a full world snapshot five times a second when ghosts have not moved.
+			boolean worldDirty = dirty;
+			if (!worldDirty && !removed && !chatPending) return;
 			dirty = false;
 
 			SessionInfo session = activeSession;
@@ -787,11 +789,12 @@ public class PlayAlongServer extends WebSocketServer {
 			synchronized (chatQueue) {
 				batch = PlayAlongProtocol.takeChatBatch(chatQueue, session.sessionId,
 						PlayAlongProtocol.MAX_CHAT_BATCH, PlayAlongProtocol.MAX_HOST_FRAME_CHARS);
-				if (!chatQueue.isEmpty()) dirty = true;
 			}
 			if (!batch.isEmpty()) {
 				sendToAliveClients(PlayAlongProtocol.chatBatchJson(session.sessionId, batch));
 			}
+
+			if (!worldDirty && !removed) return;
 
 			WireMessage world = buildWorldStateMessage();
 			session.activePlayers = world.activePlayers;
@@ -1193,7 +1196,6 @@ public class PlayAlongServer extends WebSocketServer {
 			}
 			chatQueue.addLast(payload);
 		}
-		dirty = true;
 	}
 
 	private void sendToAliveClients(String json) {
