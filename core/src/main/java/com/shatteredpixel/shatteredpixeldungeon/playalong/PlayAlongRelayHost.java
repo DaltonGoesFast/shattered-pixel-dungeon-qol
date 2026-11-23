@@ -185,10 +185,10 @@ public final class PlayAlongRelayHost {
 				dropVirtuals();
 				if (!running) return;
 				String why = reason == null ? "" : reason.toLowerCase(Locale.ROOT);
-				// 4001 is unauthorized and 1011 is reserved-room-disabled. The
-				// close code still arrives when a proxy drops the reason text.
+				// 4001 unauthorized, 4011 reserved-room-disabled. 1011 is also the
+				// keepalive ping timeout, so a bare 1011 must keep reconnecting.
 				boolean authRejected = code == 4001 || why.contains("unauthorized");
-				boolean reservedDisabled = code == 1011 || why.contains("reserved room disabled");
+				boolean reservedDisabled = code == 4011 || why.contains("reserved room disabled");
 				if (reserved && (authRejected || reservedDisabled)) {
 					running = false;
 					if (listener != null) listener.onRelayDenied();

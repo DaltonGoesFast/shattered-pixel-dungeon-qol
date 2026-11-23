@@ -249,7 +249,9 @@ class Relay:
         expected = self.config.reserved_token
         if not expected:
             log.warning("reserved room refused because PLAYALONG_DALTON_TOKEN is empty")
-            await ws.close(1011, "reserved room disabled")
+            # 4011 is private-use. 1011 is also keepalive ping timeout, so it must
+            # not mean "stop reconnecting".
+            await ws.close(4011, "reserved room disabled")
             return False
         try:
             raw = await asyncio.wait_for(ws.recv(), timeout=self.config.auth_timeout)
