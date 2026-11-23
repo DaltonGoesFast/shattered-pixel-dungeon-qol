@@ -248,7 +248,31 @@ public class AscensionChallenge extends Buff {
 
 	private boolean stacksLowered = false;
 
+	private boolean convertedThisSwitch = false;
+
+	/** Play Along drop-in: match the host's curse before the first floor arrival adds its own stacks. */
+	public void setStacksForJoin(float value) {
+		stacks = Math.max(0f, value);
+	}
+
+	public boolean consumedSwitchConversion() {
+		boolean converted = convertedThisSwitch;
+		convertedThisSwitch = false;
+		return converted;
+	}
+
+	/**
+	 * A floor generated on a joiner during the host's climb, not loaded from the descent.
+	 * Same population as an ascent arrival, without moving curse progress backward.
+	 */
+	public void convertUnvisitedAscentFloor() {
+		if (Dungeon.level == null || Dungeon.bossLevel()) return;
+		thinAscentMobs();
+		fleeAscentShops();
+	}
+
 	public void onLevelSwitch(){
+		convertedThisSwitch = false;
 		if (Dungeon.depth < Statistics.highestAscent){
 			Statistics.highestAscent = Dungeon.depth;
 			justAscended = true;
@@ -257,33 +281,39 @@ public class AscensionChallenge extends Buff {
 				Buff.affect(Dungeon.hero, Healing.class).setHeal(Dungeon.hero.HT, 0, 20);
 			} else {
 				stacks += 2f;
-
-				//doors locked by the hero are reset, to prevent blocking out enemies
-				for (int i = 0; i < Dungeon.level.length(); i++){
-					if (Dungeon.level.map[i] == Terrain.HERO_LKD_DR){
-						Level.set(i, Terrain.DOOR, Dungeon.level);
-					}
-				}
-
-				//clears any existing mobs from the level and adds one initial one
-				//this helps balance difficulty between levels with lots of mobs left, and ones with few
-				for (Mob mob : Dungeon.level.mobs.toArray( new Mob[0] )) {
-					if (!mob.reset()) {
-						Dungeon.level.mobs.remove( mob );
-					}
-				}
-				Dungeon.level.spawnMob(12);
-
+				thinAscentMobs();
+				convertedThisSwitch = true;
 			}
 		}
-		if (Statistics.highestAscent < 20){
-			for (Mob m : Dungeon.level.mobs.toArray(new Mob[0])){
-				if (m instanceof Shopkeeper){
-					((Shopkeeper) m).flee();
-				}
+		fleeAscentShops();
+	}
+
+	private void thinAscentMobs() {
+		if (Dungeon.level == null) return;
+		//doors locked by the hero are reset, to prevent blocking out enemies
+		for (int i = 0; i < Dungeon.level.length(); i++){
+			if (Dungeon.level.map[i] == Terrain.HERO_LKD_DR){
+				Level.set(i, Terrain.DOOR, Dungeon.level);
 			}
 		}
 
+		//clears any existing mobs from the level and adds one initial one
+		//this helps balance difficulty between levels with lots of mobs left, and ones with few
+		for (Mob mob : Dungeon.level.mobs.toArray( new Mob[0] )) {
+			if (!mob.reset()) {
+				Dungeon.level.mobs.remove( mob );
+			}
+		}
+		Dungeon.level.spawnMob(12);
+	}
+
+	private void fleeAscentShops() {
+		if (Statistics.highestAscent >= 20 || Dungeon.level == null) return;
+		for (Mob m : Dungeon.level.mobs.toArray(new Mob[0])){
+			if (m instanceof Shopkeeper){
+				((Shopkeeper) m).flee();
+			}
+		}
 	}
 
 	//messages at boss levels only trigger on first ascent

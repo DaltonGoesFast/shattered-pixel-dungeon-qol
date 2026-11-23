@@ -133,6 +133,7 @@ public final class PlayAlongService {
 	private static final Map<Integer, Integer> depthCounts = new ConcurrentHashMap<>();
 
 	private static volatile int hostDepth = 1;
+	private static volatile boolean hostAscendingLive = false;
 	private static volatile int hostBranch = 0;
 	private static volatile int hostPos = 0;
 	private static volatile int aliveCount = 0;
@@ -196,6 +197,20 @@ public final class PlayAlongService {
 
 	public static int getHostDepth() {
 		return hostDepth;
+	}
+
+	/** Host is currently climbing out. Updated from the session snapshot and from world state. */
+	public static boolean isHostAscending() {
+		return hostAscendingLive;
+	}
+
+	public static void noteHostAscent(boolean amuletObtained, boolean ascending, int highestAscent) {
+		hostAscendingLive = ascending;
+		SessionInfo session = activeClientSession;
+		if (session == null) return;
+		session.amuletObtained = amuletObtained;
+		session.ascending = ascending;
+		session.highestAscent = highestAscent;
 	}
 
 	public static int getHostBranch() {
@@ -760,6 +775,7 @@ public final class PlayAlongService {
 		runStartMs = System.currentTimeMillis();
 		hostDepth = session.hostDepth;
 		hostPos = session.hostPos;
+		noteHostAscent(session.amuletObtained, session.ascending, session.highestAscent);
 
 		int slot = PlayAlongArchives.allocateForNewRun(session.sessionId);
 		GamesInProgress.selectedClass = heroClass;
@@ -821,6 +837,7 @@ public final class PlayAlongService {
 		runStartMs = System.currentTimeMillis();
 		hostDepth = session.hostDepth;
 		hostPos = session.hostPos;
+		noteHostAscent(session.amuletObtained, session.ascending, session.highestAscent);
 		if (clientServerAddress == null || clientServerAddress.isEmpty()) {
 			clientServerAddress = discoveredAddress != null && !discoveredAddress.isEmpty()
 					? discoveredAddress
@@ -995,6 +1012,7 @@ public final class PlayAlongService {
 				}
 				if (msg.session != null) {
 					activeClientSession = msg.session;
+					noteHostAscent(msg.session.amuletObtained, msg.session.ascending, msg.session.highestAscent);
 				}
 				final boolean wasReconnect = clientHasJoinedOnce;
 				clientHasJoinedOnce = true;
@@ -1026,6 +1044,7 @@ public final class PlayAlongService {
 
 			@Override
 			public void onWorldState(WireMessage msg) {
+				noteHostAscent(msg.amuletObtained, msg.ascending, msg.highestAscent);
 				applyWorldStateSnapshot(msg.hostGhost, msg.ghosts, msg.tombstones, msg.activePlayers, msg.depthCounts);
 			}
 
@@ -1780,6 +1799,7 @@ public final class PlayAlongService {
 	private static void resetRuntimeCollections() {
 		remoteGhosts.clear();
 		hostGhost = null;
+		hostAscendingLive = false;
 		tombstones.clear();
 		depthCounts.clear();
 		pendingChatCommands.clear();

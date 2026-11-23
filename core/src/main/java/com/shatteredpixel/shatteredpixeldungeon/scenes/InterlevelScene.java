@@ -678,7 +678,7 @@ public class InterlevelScene extends PixelScene {
 			if (catchupDepth > 1) {
 				com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.finishSpawn();
 			}
-			Dungeon.switchLevel( level, -1 );
+			enterLevel( level, -1, true );
 		} else {
 			if (curTransition.destBranch != Dungeon.branch && Dungeon.depth >= 16 && Dungeon.depth <= 20) {
 				//FIXME avoids holding allies when entering city quest area, this is very sloppy though
@@ -692,15 +692,18 @@ public class InterlevelScene extends PixelScene {
 			Dungeon.depth = curTransition.destDepth;
 			Dungeon.branch = curTransition.destBranch;
 
+			boolean fresh;
 			if (Dungeon.levelHasBeenGenerated(Dungeon.depth, Dungeon.branch)) {
 				level = Dungeon.loadLevel( GamesInProgress.curSlot );
+				fresh = false;
 			} else {
 				level = Dungeon.newLevel();
+				fresh = true;
 			}
 
 			LevelTransition destTransition = level.getTransition(curTransition.destType);
 			curTransition = null;
-			Dungeon.switchLevel( level, destTransition.cell() );
+			enterLevel( level, destTransition.cell(), fresh );
 		}
 
 	}
@@ -715,12 +718,15 @@ public class InterlevelScene extends PixelScene {
 
 		Level level;
 		Dungeon.depth++;
+		boolean fresh;
 		if (Dungeon.levelHasBeenGenerated(Dungeon.depth, Dungeon.branch)) {
 			level = Dungeon.loadLevel( GamesInProgress.curSlot );
+			fresh = false;
 		} else {
 			level = Dungeon.newLevel();
+			fresh = true;
 		}
-		Dungeon.switchLevel( level, level.fallCell( fallIntoPit ));
+		enterLevel( level, level.fallCell( fallIntoPit ), fresh );
 	}
 
 	private void ascend() throws IOException {
@@ -736,15 +742,18 @@ public class InterlevelScene extends PixelScene {
 		Dungeon.depth = curTransition.destDepth;
 		Dungeon.branch = curTransition.destBranch;
 
+		boolean fresh;
 		if (Dungeon.levelHasBeenGenerated(Dungeon.depth, Dungeon.branch)) {
 			level = Dungeon.loadLevel( GamesInProgress.curSlot );
+			fresh = false;
 		} else {
 			level = Dungeon.newLevel();
+			fresh = true;
 		}
 
 		LevelTransition destTransition = level.getTransition(curTransition.destType);
 		curTransition = null;
-		Dungeon.switchLevel( level, destTransition.cell() );
+		enterLevel( level, destTransition.cell(), fresh );
 	}
 	
 	private void returnTo() throws IOException {
@@ -776,17 +785,20 @@ public class InterlevelScene extends PixelScene {
 		Level level;
 		Dungeon.depth = returnDepth;
 		Dungeon.branch = returnBranch;
+		boolean fresh = false;
 		if (Dungeon.levelHasBeenGenerated(Dungeon.depth, Dungeon.branch)) {
 			try {
 				level = Dungeon.loadLevel( GamesInProgress.curSlot );
 			} catch (Exception e) {
 				level = Dungeon.newLevel();
+				fresh = true;
 			}
 		} else {
 			level = Dungeon.newLevel();
+			fresh = true;
 		}
 
-		Dungeon.switchLevel( level, returnPos );
+		enterLevel( level, returnPos, fresh );
 	}
 	
 	private void restore() throws IOException {
@@ -796,12 +808,13 @@ public class InterlevelScene extends PixelScene {
 		GameLog.wipe();
 
 		Dungeon.loadGame( GamesInProgress.curSlot );
+		com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.afterClientLoad();
 		if (Dungeon.depth == -1) {
 			Dungeon.depth = Statistics.deepestFloor;
-			Dungeon.switchLevel( Dungeon.loadLevel( GamesInProgress.curSlot ), -1 );
+			enterLevel( Dungeon.loadLevel( GamesInProgress.curSlot ), -1, false );
 		} else {
 			Level level = Dungeon.loadLevel( GamesInProgress.curSlot );
-			Dungeon.switchLevel( level, Dungeon.hero.pos );
+			enterLevel( level, Dungeon.hero.pos, false );
 		}
 		if (!GamesInProgress.isPlayAlongSlot(GamesInProgress.curSlot)) {
 			com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onHostRunLoaded();
@@ -813,11 +826,13 @@ public class InterlevelScene extends PixelScene {
 		Mob.holdAllies( Dungeon.level );
 
 		Level level;
+		boolean fresh = false;
 		if (Dungeon.level.locked) {
 			ArrayList<Item> preservedItems = Dungeon.level.getItemsToPreserveFromSealedResurrect();
 
 			Dungeon.hero.resurrect();
 			level = Dungeon.newLevel();
+			fresh = true;
 			Dungeon.hero.pos = level.randomRespawnCell(Dungeon.hero);
 			if (Dungeon.hero.pos == -1) Dungeon.hero.pos = level.entrance();
 
@@ -861,7 +876,7 @@ public class InterlevelScene extends PixelScene {
 
 		Notes.add(Notes.Landmark.LOST_PACK);
 
-		Dungeon.switchLevel( level, Dungeon.hero.pos );
+		enterLevel( level, Dungeon.hero.pos, fresh );
 	}
 
 	private void reset() throws IOException {
@@ -871,7 +886,12 @@ public class InterlevelScene extends PixelScene {
 		SpecialRoom.resetPitRoom(Dungeon.depth+1);
 
 		Level level = Dungeon.newLevel();
-		Dungeon.switchLevel( level, level.entrance() );
+		enterLevel( level, level.entrance(), true );
+	}
+
+	private void enterLevel(Level level, int pos, boolean freshlyGenerated) {
+		com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.markFreshFloor(freshlyGenerated);
+		Dungeon.switchLevel(level, pos);
 	}
 	
 	@Override

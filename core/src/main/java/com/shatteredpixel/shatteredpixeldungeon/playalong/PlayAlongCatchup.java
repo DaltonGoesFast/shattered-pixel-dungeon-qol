@@ -16,6 +16,8 @@ package com.shatteredpixel.shatteredpixeldungeon.playalong;
 import com.google.gson.annotations.SerializedName;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.AscensionChallenge;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroClass;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.DM300;
@@ -23,6 +25,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.DwarfKing;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Goo;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Pylon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Tengu;
+import com.shatteredpixel.shatteredpixeldungeon.items.Amulet;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.KingsCrown;
 import com.shatteredpixel.shatteredpixeldungeon.items.bags.Bag;
@@ -73,6 +76,7 @@ import com.shatteredpixel.shatteredpixeldungeon.journal.Bestiary;
 import com.shatteredpixel.shatteredpixeldungeon.levels.features.LevelTransition;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchupItems.Parsed;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.SessionInfo;
+import com.shatteredpixel.shatteredpixeldungeon.scenes.InterlevelScene;
 import com.watabou.utils.Bundle;
 import com.watabou.utils.DeviceCompat;
 import com.watabou.utils.GameSettings;
@@ -90,6 +94,8 @@ import java.util.Locale;
  * Play Along catch-up: a new racer who drops in after Dalton has killed a region boss
  * starts on the first floor of that region with a plain kit, and cannot go back up.
  * The kit includes the containers a normal run would already own by the host's depth.
+ * If Dalton is already climbing out with the Amulet, the drop-in starts on his floor
+ * in that same ascent instead of a fresh descending run. The upstairs seal stays.
  */
 public final class PlayAlongCatchup {
 
@@ -113,6 +119,10 @@ public final class PlayAlongCatchup {
 	private static String bossId = "";
 	private static String kitSummary = "";
 	private static String arrivalMessage = "";
+	/** This racer joined (or resumed) while the host was ascending. Kept across level changes. */
+	private static boolean ascentMirror = false;
+	/** The floor about to be entered was just built, not loaded. */
+	private static boolean pendingFreshFloor = false;
 
 	private PlayAlongCatchup() {}
 
@@ -143,6 +153,8 @@ public final class PlayAlongCatchup {
 		bossId = "";
 		kitSummary = "";
 		arrivalMessage = "";
+		ascentMirror = false;
+		pendingFreshFloor = false;
 		slainMask = 0;
 	}
 
@@ -197,12 +209,13 @@ public final class PlayAlongCatchup {
 	}
 
 	public static boolean blockAscent(LevelTransition transition) {
-		if (!active || transition == null || spawnDepth <= 1) return false;
+		if (!active || transition == null) return false;
 		if (transition.type != LevelTransition.Type.REGULAR_ENTRANCE
 				&& transition.type != LevelTransition.Type.SURFACE) {
 			return false;
 		}
-		return transition.destDepth < spawnDepth;
+		// Ascent drop-ins use the same seal: they cannot climb above the floor they joined on.
+		return PlayAlongAscent.sealsUpward(spawnDepth, transition.destDepth);
 	}
 
 	public static void clearPending() {
@@ -230,33 +243,72 @@ public final class PlayAlongCatchup {
 	/**
 	 * After {@link Dungeon#init()} on a new client run. Applies the kit and points
 	 * {@link Dungeon#depth} at the spawn floor. Returns that floor, or 0 when catch-up is not used.
+	 * When the host is ascending, the floor is the host's current depth and the run is an ascent.
 	 */
 	public static int prepareSpawnDepth() {
 		Offer offer = pending;
 		pending = null;
-		if (offer == null || !PlayAlongService.isClient()) return 0;
+		if (!PlayAlongService.isClient() || Dungeon.hero == null) return 0;
+		PlayAlongAscent.Plan ascent = PlayAlongAscent.plan(PlayAlongService.getClientSession());
+		if (offer == null) {
+			if (!ascent.active) return 0;
+			return beginAscentDropIn(ascent);
+		}
 		try {
 			Hero hero = Dungeon.hero;
-			if (hero == null) return 0;
 			Row row = offer.config.row(offer.boss);
 			applyKit(hero, offer.boss, row, offer.config);
 			active = true;
-			spawnDepth = clamp(row.spawnFloor, 2, 24);
+			spawnDepth = ascent.active ? ascent.spawnDepth : clamp(row.spawnFloor, 2, 24);
 			bossId = offer.boss;
 			rewardsUnlocked = !offer.config.expRewardsAfterFirstFloor;
 			Dungeon.depth = spawnDepth;
 			rememberGrant(offer.sessionId, offer.epoch);
-			arrivalMessage = "Catch-up: you arrive on floor " + spawnDepth
-					+ " (" + label(offer.boss) + "). The way back is sealed.";
-			System.out.println("[PlayAlongCatchup] spawned " + offer.boss + " kit on floor " + spawnDepth);
+			if (ascent.active) {
+				applyAscentPlan(ascent);
+				arrivalMessage = "Catch-up: Dalton is ascending. You arrive on floor " + spawnDepth
+						+ ". The way back is sealed.";
+			} else {
+				arrivalMessage = "Catch-up: you arrive on floor " + spawnDepth
+						+ " (" + label(offer.boss) + "). The way back is sealed.";
+			}
+			System.out.println("[PlayAlongCatchup] spawned " + offer.boss + " kit on floor " + spawnDepth
+					+ (ascent.active ? " (ascent)" : ""));
 			return spawnDepth;
 		} catch (Throwable t) {
 			System.out.println("[PlayAlongCatchup] kit failed, starting on floor 1: " + t);
 			active = false;
 			spawnDepth = 0;
+			ascentMirror = false;
 			Dungeon.depth = 1;
+			if (ascent.active) {
+				return beginAscentDropIn(ascent);
+			}
 			return 0;
 		}
+	}
+
+	private static int beginAscentDropIn(PlayAlongAscent.Plan ascent) {
+		active = true;
+		spawnDepth = ascent.spawnDepth;
+		rewardsUnlocked = true;
+		bossId = "";
+		Dungeon.depth = spawnDepth;
+		applyAscentPlan(ascent);
+		arrivalMessage = "Dalton is ascending. You arrive on floor " + spawnDepth
+				+ ". The way back is sealed.";
+		System.out.println("[PlayAlongCatchup] ascent drop-in on floor " + spawnDepth);
+		return spawnDepth;
+	}
+
+	private static void applyAscentPlan(PlayAlongAscent.Plan ascent) {
+		ascentMirror = true;
+		Statistics.highestAscent = ascent.primedHighestAscent;
+		Hero hero = Dungeon.hero;
+		if (hero == null) return;
+		AscensionChallenge chal = Buff.affect(hero, AscensionChallenge.class);
+		chal.setStacksForJoin(ascent.primedStacks);
+		giveAmulet(hero);
 	}
 
 	/** After the spawn floor itself has been generated. */
@@ -269,6 +321,74 @@ public final class PlayAlongCatchup {
 		}
 		markBossesSeen(bossId);
 		com.shatteredpixel.shatteredpixeldungeon.FirstDescent.pending = false;
+	}
+
+	/**
+	 * Called before a floor is built. Keeps an ascent drop-in (and a spectator following
+	 * an ascending host) from generating that floor as a fresh descending run.
+	 * Floors above the join point are still built the way the host built them on the way down,
+	 * so the shared seed stays aligned; the joiner cannot climb to those floors.
+	 */
+	public static void maintainAscent() {
+		boolean mirror = ascentMirror;
+		boolean spectate = !mirror && PlayAlongService.isSpectating() && PlayAlongService.isHostAscending();
+		if (!mirror && !spectate) return;
+		if (replayingDescentFloors()) return;
+		Statistics.amuletObtained = true;
+		Hero hero = Dungeon.hero;
+		if (hero == null) return;
+		if (hero.buff(AscensionChallenge.class) == null) {
+			Buff.affect(hero, AscensionChallenge.class);
+		}
+		if (mirror) {
+			giveAmulet(hero);
+		}
+	}
+
+	public static void markFreshFloor(boolean freshlyGenerated) {
+		pendingFreshFloor = freshlyGenerated;
+	}
+
+	/**
+	 * After {@link AscensionChallenge#onLevelSwitch()} and before actors are restarted.
+	 * Fresh floors the switch did not already treat as a new high-water mark are still
+	 * converted, so a later descent does not come back as a full descending floor.
+	 */
+	public static void consumeFreshAscentFloor() {
+		boolean fresh = pendingFreshFloor;
+		pendingFreshFloor = false;
+		if (!fresh) return;
+		boolean mirror = ascentMirror;
+		boolean spectate = !mirror && PlayAlongService.isSpectating() && PlayAlongService.isHostAscending();
+		if (!mirror && !spectate) return;
+		if (Dungeon.hero == null || Dungeon.bossLevel()) return;
+		AscensionChallenge chal = Dungeon.hero.buff(AscensionChallenge.class);
+		if (chal == null) return;
+		boolean already = chal.consumedSwitchConversion();
+		if (PlayAlongAscent.needsUnvisitedConversion(
+				Statistics.highestAscent, Dungeon.depth, true, already, false)) {
+			chal.convertUnvisitedAscentFloor();
+		}
+	}
+
+	/** Resumed ascent drop-in. Does not rewrite a floor that was already saved. */
+	public static void afterClientLoad() {
+		if (!ascentMirror) return;
+		maintainAscent();
+	}
+
+	private static boolean replayingDescentFloors() {
+		if (InterlevelScene.debugGenerateSkipped) return true;
+		return ascentMirror && spawnDepth > 1 && Dungeon.depth > 0 && Dungeon.depth < spawnDepth
+				&& !Statistics.amuletObtained;
+	}
+
+	private static void giveAmulet(Hero hero) {
+		if (hero == null || hero.belongings == null) return;
+		if (hero.belongings.getItem(Amulet.class) != null) return;
+		Amulet amulet = new Amulet();
+		amulet.identify();
+		amulet.collect();
 	}
 
 	public static void showArrivalMessage() {
@@ -379,6 +499,7 @@ public final class PlayAlongCatchup {
 		sub.put("kit", kitSummary == null ? "" : kitSummary);
 		sub.put("epoch", epoch);
 		sub.put("slain", slainMask);
+		sub.put("ascent", ascentMirror);
 		bundle.put(BUNDLE_KEY, sub);
 	}
 
@@ -388,6 +509,8 @@ public final class PlayAlongCatchup {
 		rewardsUnlocked = false;
 		bossId = "";
 		kitSummary = "";
+		ascentMirror = false;
+		pendingFreshFloor = false;
 		if (bundle == null || !bundle.contains(BUNDLE_KEY)) return;
 		Bundle sub = bundle.getBundle(BUNDLE_KEY);
 		if (sub == null || sub.isNull()) return;
@@ -398,6 +521,7 @@ public final class PlayAlongCatchup {
 		kitSummary = sub.contains("kit") ? sub.getString("kit") : "";
 		if (sub.contains("epoch")) epoch = sub.getInt("epoch");
 		if (sub.contains("slain")) slainMask = sub.getInt("slain");
+		ascentMirror = sub.getBoolean("ascent");
 	}
 
 	private static void applyKit(Hero hero, String boss, Row row, Config cfg) {

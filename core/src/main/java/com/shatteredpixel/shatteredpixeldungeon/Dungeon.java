@@ -355,7 +355,9 @@ public class Dungeon {
 	}
 	
 	public static Level newLevel() {
-		
+
+		com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.maintainAscent();
+
 		Dungeon.level = null;
 		Actor.clear();
 		
@@ -545,6 +547,7 @@ public class Dungeon {
 		if (hero.buff(AscensionChallenge.class) != null){
 			hero.buff(AscensionChallenge.class).onLevelSwitch();
 		}
+		com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.consumeFreshAscentFloor();
 
 		Mob.restoreAllies( level, pos );
 
