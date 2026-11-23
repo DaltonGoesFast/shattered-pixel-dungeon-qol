@@ -730,6 +730,46 @@ public final class PlayAlongCatchup {
 		else if (type == MagicalHolster.class) Dungeon.LimitedDrops.MAGICAL_HOLSTER.drop();
 	}
 
+	/**
+	 * Dropped-state of the four containers just before skipped floors are generated.
+	 * Null when those floors are not being sealed.
+	 */
+	private static boolean[] sealedBagDrops;
+
+	/**
+	 * Skipped floors are generated before the spawn floor, and their shops would
+	 * otherwise claim the next bag via {@code LimitedDrops}. Those floors are behind
+	 * the sealed stair, so hold every bag as already dropped until generation finishes.
+	 */
+	public static void sealShopBagsForPregen() {
+		if (sealedBagDrops != null) return;
+		Dungeon.LimitedDrops[] bags = bagDrops();
+		sealedBagDrops = new boolean[bags.length];
+		for (int i = 0; i < bags.length; i++) {
+			sealedBagDrops[i] = bags[i].dropped();
+			bags[i].drop();
+		}
+	}
+
+	/** Restore bags the racer does not own, so the spawn floor and later shops can still sell them. */
+	public static void unsealShopBagsAfterPregen() {
+		if (sealedBagDrops == null) return;
+		Dungeon.LimitedDrops[] bags = bagDrops();
+		for (int i = 0; i < bags.length && i < sealedBagDrops.length; i++) {
+			if (!sealedBagDrops[i]) bags[i].count = 0;
+		}
+		sealedBagDrops = null;
+	}
+
+	private static Dungeon.LimitedDrops[] bagDrops() {
+		return new Dungeon.LimitedDrops[] {
+				Dungeon.LimitedDrops.VELVET_POUCH,
+				Dungeon.LimitedDrops.SCROLL_HOLDER,
+				Dungeon.LimitedDrops.POTION_BANDOLIER,
+				Dungeon.LimitedDrops.MAGICAL_HOLSTER
+		};
+	}
+
 	private static void markBossesSeen(String boss) {
 		if (!bossAtLeast(boss, "goo")) return;
 		Bestiary.setSeen(Goo.class);

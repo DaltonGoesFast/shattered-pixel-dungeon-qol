@@ -47,6 +47,7 @@ public class PlayAlongCatchupBagsTest {
 
 	@After
 	public void restore() {
+		PlayAlongCatchup.unsealShopBagsAfterPregen();
 		Dungeon.debugRun = previousDebug;
 		Dungeon.LimitedDrops.reset();
 	}
@@ -164,6 +165,25 @@ public class PlayAlongCatchupBagsTest {
 
 	/** Potion without a sprite. Same bag rules as Potion of Healing. */
 	public static final class KitPotion extends Potion {
+	}
+
+	@Test
+	public void skippedFloorShopsDoNotKeepBagsTheSpawnFloorCanStillSell() {
+		Dungeon.LimitedDrops.VELVET_POUCH.drop();
+		Dungeon.LimitedDrops.SCROLL_HOLDER.drop();
+
+		PlayAlongCatchup.sealShopBagsForPregen();
+		assertTrue(Dungeon.LimitedDrops.POTION_BANDOLIER.dropped());
+		assertTrue(Dungeon.LimitedDrops.MAGICAL_HOLSTER.dropped());
+
+		PlayAlongCatchup.unsealShopBagsAfterPregen();
+		assertTrue(Dungeon.LimitedDrops.VELVET_POUCH.dropped());
+		assertTrue(Dungeon.LimitedDrops.SCROLL_HOLDER.dropped());
+		assertFalse(Dungeon.LimitedDrops.POTION_BANDOLIER.dropped());
+		assertFalse(Dungeon.LimitedDrops.MAGICAL_HOLSTER.dropped());
+
+		PlayAlongCatchup.unsealShopBagsAfterPregen();
+		assertFalse(Dungeon.LimitedDrops.POTION_BANDOLIER.dropped());
 	}
 
 	@SafeVarargs
