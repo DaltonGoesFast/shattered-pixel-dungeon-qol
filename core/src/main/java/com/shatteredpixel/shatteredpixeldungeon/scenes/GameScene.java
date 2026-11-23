@@ -1920,10 +1920,39 @@ public class GameScene extends PixelScene {
 		);
 		scene.add(menu);
 
+		StyledButton titleScreen = new StyledButton(Chrome.Type.GREY_BUTTON_TR, Messages.get(WndGame.class, "menu"), 9){
+			@Override
+			protected void onClick() {
+				try {
+					Dungeon.saveAll();
+				} catch (java.io.IOException e) {
+					ShatteredPixelDungeon.reportException(e);
+				}
+				com.shatteredpixel.shatteredpixeldungeon.utils.TrainingExport.onSessionEnd();
+				PlayAlongService.onQuitToTitle();
+				Game.switchScene(TitleScene.class);
+			}
+
+			@Override
+			public void update() {
+				alpha((float)Math.pow(gameOver.am, 2));
+				super.update();
+			}
+		};
+		titleScreen.icon(Icons.get(Icons.DISPLAY));
+		titleScreen.alpha(0);
+		titleScreen.camera = uiCamera;
+		titleScreen.setSize(Math.max(80, titleScreen.reqWidth()), 20);
+		titleScreen.setPos(
+				align(uiCamera, (titleScreen.camera.width - titleScreen.width()) / 2),
+				menu.bottom() + 2
+		);
+		scene.add(titleScreen);
+
 		if (wipeText != null) {
 			wipeText.setPos(
 					align(uiCamera, (uiCamera.width - wipeText.width()) / 2),
-					menu.bottom() + 6
+					titleScreen.bottom() + 6
 			);
 			wipeText.camera = uiCamera;
 			scene.add(wipeText);
@@ -1948,7 +1977,7 @@ public class GameScene extends PixelScene {
 			spiritCam.setSize(Math.max(80, spiritCam.reqWidth()), 20);
 			spiritCam.setPos(
 					align(uiCamera, (spiritCam.camera.width - spiritCam.width()) / 2),
-					menu.bottom() + 2
+					titleScreen.bottom() + 2
 			);
 			scene.add(spiritCam);
 		}

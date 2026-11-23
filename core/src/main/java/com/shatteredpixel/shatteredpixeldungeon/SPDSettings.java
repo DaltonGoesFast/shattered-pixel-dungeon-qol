@@ -758,6 +758,7 @@ public class SPDSettings extends GameSettings {
 	public static final String KEY_PLAY_ALONG_SHARED_CHAT = "play_along_shared_chat";
 	public static final String KEY_PLAY_ALONG_USERNAME = "play_along_username";
 	public static final String KEY_PLAY_ALONG_ARCHIVES = "play_along_archives";
+	public static final String KEY_PLAY_ALONG_GHOST_OPACITY = "play_along_ghost_opacity";
 	public static final String KEY_STREAM_CLIENT_TOKEN = "stream_client_token";
 
 	public static synchronized String streamClientToken() {
@@ -822,5 +823,18 @@ public class SPDSettings extends GameSettings {
 	public static String playAlongArchivesJson() {
 		String s = getString( KEY_PLAY_ALONG_ARCHIVES, "" );
 		return s == null ? "" : s;
+	}
+
+	/** 1–10: tenths of default Play Along ghost opacity (1 = 10%, 10 = 100% / current look). */
+	public static void playAlongGhostOpacity( int tenths ) {
+		put( KEY_PLAY_ALONG_GHOST_OPACITY, Math.max(1, Math.min(10, tenths)) );
+	}
+
+	public static int playAlongGhostOpacity() {
+		return getInt( KEY_PLAY_ALONG_GHOST_OPACITY, 10, 1, 10 );
+	}
+
+	public static float playAlongGhostOpacityScale() {
+		return playAlongGhostOpacity() / 10f;
 	}
 }

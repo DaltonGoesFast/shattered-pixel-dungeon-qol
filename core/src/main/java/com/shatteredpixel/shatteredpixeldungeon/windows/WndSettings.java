@@ -848,6 +848,7 @@ public class WndSettings extends WndTabbed {
 		CheckBox chkWifi;
 		ColorBlock sepPlayAlong;
 		RedButton btnPlayAlongServer;
+		OptionSlider optPlayAlongGhostOpacity;
 		CheckBox chkPlayAlongHost;
 		CheckBox chkPlayAlongSharedChat;
 
@@ -980,6 +981,17 @@ public class WndSettings extends WndTabbed {
 			};
 			add(btnPlayAlongServer);
 
+			optPlayAlongGhostOpacity = new OptionSlider(Messages.get(this, "play_along_ghost_opacity"),
+					Messages.get(this, "play_along_ghost_opacity_min"),
+					Messages.get(this, "play_along_ghost_opacity_max"), 1, 10) {
+				@Override
+				protected void onChange() {
+					SPDSettings.playAlongGhostOpacity(getSelectedValue());
+				}
+			};
+			optPlayAlongGhostOpacity.setSelectedValue(SPDSettings.playAlongGhostOpacity());
+			add(optPlayAlongGhostOpacity);
+
 			if (DeviceCompat.isDesktop()) {
 				chkPlayAlongHost = new CheckBox("Host Play Along Lobby") {
 					@Override
@@ -1045,6 +1057,9 @@ public class WndSettings extends WndTabbed {
 
 			btnPlayAlongServer.setRect(0, pos + GAP, width, BTN_HEIGHT);
 			pos = btnPlayAlongServer.bottom();
+
+			optPlayAlongGhostOpacity.setRect(0, pos + GAP, width, SLIDER_HEIGHT);
+			pos = optPlayAlongGhostOpacity.bottom();
 
 			if (chkPlayAlongHost != null){
 				chkPlayAlongHost.setRect(0, pos + GAP, width, BTN_HEIGHT);

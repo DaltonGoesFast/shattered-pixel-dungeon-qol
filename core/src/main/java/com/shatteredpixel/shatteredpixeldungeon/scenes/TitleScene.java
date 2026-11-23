@@ -549,11 +549,12 @@ public class TitleScene extends PixelScene {
 		@Override
 		protected void onClick() {
 			PlayAlongProtocol.SessionInfo live = PlayAlongService.getLiveSession();
-			if (live != null && (live.active || live.inDungeon)) {
-				ShatteredPixelDungeon.scene().addToFront(new WndPlayAlongJoin(live));
-			} else {
-				ShatteredPixelDungeon.platform.openURI("https://www.youtube.com/@DaltonGoesFast");
+			if (live == null) {
+				live = new PlayAlongProtocol.SessionInfo();
+				live.active = false;
+				live.inDungeon = false;
 			}
+			ShatteredPixelDungeon.scene().addToFront(new WndPlayAlongJoin(live));
 		}
 
 		@Override

@@ -22,6 +22,7 @@
 package com.shatteredpixel.shatteredpixeldungeon.playalong;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroClass;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.GhostState;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
@@ -161,20 +162,21 @@ public class GhostSprite extends Group implements Tweener.Listener, MovieClip.Li
 	}
 
 	private void applyTintAndAlpha() {
+		float scale = SPDSettings.playAlongGhostOpacityScale();
 		if (isHost) {
 			body.hardlight(1.25f, 0.85f, 0.28f);
-			body.alpha(0.85f);
-			nameTag.alpha(0.95f);
+			body.alpha(0.85f * scale);
+			nameTag.alpha(0.95f * scale);
 			hpBar.visible = true;
 		} else if (crowded) {
 			body.hardlight(0.55f, 0.85f, 1.3f);
-			body.alpha(0.28f);
-			nameTag.alpha(0.35f);
+			body.alpha(0.28f * scale);
+			nameTag.alpha(0.35f * scale);
 			hpBar.visible = false;
 		} else {
 			body.hardlight(0.55f, 0.85f, 1.3f);
-			body.alpha(0.65f);
-			nameTag.alpha(0.85f);
+			body.alpha(0.65f * scale);
+			nameTag.alpha(0.85f * scale);
 			hpBar.visible = true;
 		}
 	}

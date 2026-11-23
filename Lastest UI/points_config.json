@@ -69,12 +69,14 @@
   "play_along_rewards": {
     "enabled": true,
     "boss_ignore_chat_cap": false,
-    "boss_goo_pts": 25,
-    "boss_tengu_pts": 40,
-    "boss_dm300_pts": 60,
-    "boss_king_pts": 80,
-    "boss_yog_pts": 100,
-    "victory_donor_pts": 150
+    "boss_goo_pts": 100,
+    "boss_tengu_pts": 150,
+    "boss_dm300_pts": 300,
+    "boss_king_pts": 500,
+    "boss_yog_pts": 700,
+    "victory_donor_pts": 50,
+    "kill_rewards_enabled": true,
+    "kill_donor_per_exp": 1.0
   },
   "spawn_scale": {
     "overall_power": 0.8,

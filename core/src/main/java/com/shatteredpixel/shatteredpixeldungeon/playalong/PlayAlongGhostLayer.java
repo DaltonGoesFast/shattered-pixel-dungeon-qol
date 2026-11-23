@@ -22,6 +22,7 @@
 package com.shatteredpixel.shatteredpixeldungeon.playalong;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.GhostState;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.TombstoneState;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSprite;
@@ -88,17 +89,31 @@ public class PlayAlongGhostLayer extends Group {
 			}
 		}
 
+		float tombAlpha = 0.75f * SPDSettings.playAlongGhostOpacityScale();
 		List<TombstoneState> floorTombs = PlayAlongService.getTombstonesForFloor(Dungeon.depth, Dungeon.branch);
+		Set<String> seenTombs = new HashSet<>();
 		for (TombstoneState t : floorTombs) {
-			if (t.userId == null || tombSprites.containsKey(t.userId)) continue;
-			ItemSprite tomb = new ItemSprite(ItemSpriteSheet.TOMB, null);
-			PointF p = DungeonTilemap.tileToWorld(Math.max(0, Math.min(Dungeon.level.length() - 1, t.pos)));
-			tomb.x = p.x + (DungeonTilemap.SIZE - tomb.width()) / 2f;
-			tomb.y = p.y + (DungeonTilemap.SIZE - tomb.height()) / 2f;
-			tomb.hardlight(0.55f, 0.9f, 1.3f);
-			tomb.alpha(0.75f);
-			tombSprites.put(t.userId, tomb);
-			addToBack(tomb);
+			if (t.userId == null) continue;
+			seenTombs.add(t.userId);
+			ItemSprite tomb = tombSprites.get(t.userId);
+			if (tomb == null) {
+				tomb = new ItemSprite(ItemSpriteSheet.TOMB, null);
+				PointF p = DungeonTilemap.tileToWorld(Math.max(0, Math.min(Dungeon.level.length() - 1, t.pos)));
+				tomb.x = p.x + (DungeonTilemap.SIZE - tomb.width()) / 2f;
+				tomb.y = p.y + (DungeonTilemap.SIZE - tomb.height()) / 2f;
+				tomb.hardlight(0.55f, 0.9f, 1.3f);
+				tombSprites.put(t.userId, tomb);
+				addToBack(tomb);
+			}
+			tomb.alpha(tombAlpha);
+		}
+		Iterator<Map.Entry<String, ItemSprite>> tIt = tombSprites.entrySet().iterator();
+		while (tIt.hasNext()) {
+			Map.Entry<String, ItemSprite> e = tIt.next();
+			if (!seenTombs.contains(e.getKey())) {
+				e.getValue().killAndErase();
+				tIt.remove();
+			}
 		}
 	}
 
