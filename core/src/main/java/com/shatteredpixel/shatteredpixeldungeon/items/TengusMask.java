@@ -95,8 +95,10 @@ public class TengusMask extends Item {
 	}
 	
 	public void choose( HeroSubClass way ) {
-		// Play Along opens the chooser without Item.execute, so curUser is still null.
-		choose( curUser != null ? curUser : Dungeon.hero, way );
+		// Item.curUser is a static leftover from the last item action. Play Along
+		// opens this chooser without execute(), so curUser may be null or a hero
+		// whose sprite does not exist yet. The window passes its hero explicitly.
+		choose( Dungeon.hero, way );
 	}
 
 	public void choose( Hero hero, HeroSubClass way ) {
@@ -111,7 +113,6 @@ public class TengusMask extends Item {
 				&& hero.belongings.backpack.contains( this );
 
 		if (held) {
-			curUser = hero;
 			detach( hero.belongings.backpack );
 			Catalog.countUse( getClass() );
 
@@ -134,8 +135,10 @@ public class TengusMask extends Item {
 			Sample.INSTANCE.play( Assets.Sounds.MASTERY );
 
 			Emitter e = hero.sprite.centerEmitter();
-			e.pos(e.x-2, e.y-6, 4, 4);
-			e.start(Speck.factory(Speck.MASK), 0.05f, 20);
+			if (e != null) {
+				e.pos(e.x-2, e.y-6, 4, 4);
+				e.start(Speck.factory(Speck.MASK), 0.05f, 20);
+			}
 			GLog.p( Messages.get(this, "used"));
 		}
 		Chimera.grantSignature( hero, Chimera.classOf( way ) );

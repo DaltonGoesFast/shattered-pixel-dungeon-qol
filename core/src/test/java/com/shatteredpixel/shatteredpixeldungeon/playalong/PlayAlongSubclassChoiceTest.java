@@ -131,6 +131,33 @@ public class PlayAlongSubclassChoiceTest {
 	}
 
 	@Test
+	public void curUserPresentWithNullSpriteDoesNotCrash() {
+		Hero stale = new Hero();
+		assertNull(hero.sprite);
+		assertNull(stale.sprite);
+		setCurUser(stale);
+
+		TengusMask mask = new TengusMask();
+		hero.belongings.backpack.items.add(mask);
+		// QoL-23 called this overload and then curUser.sprite.operate.
+		mask.choose(HeroSubClass.BERSERKER);
+
+		assertEquals(HeroSubClass.BERSERKER, hero.subClass);
+		assertEquals(HeroSubClass.NONE, stale.subClass);
+		assertFalse(hero.belongings.backpack.contains(mask));
+		assertNull(hero.sprite);
+
+		KingsCrown crown = new KingsCrown();
+		hero.belongings.backpack.items.add(crown);
+		crown.upgradeArmor(hero, null, new HeroicLeap());
+
+		assertTrue(hero.armorAbility instanceof HeroicLeap);
+		assertFalse(hero.belongings.backpack.contains(crown));
+		assertEquals(HeroSubClass.NONE, stale.subClass);
+		assertNull(hero.sprite);
+	}
+
+	@Test
 	public void invisibleAssassinGainsPreparationWithoutConsumingAMask() {
 		hero.invisible = 1;
 

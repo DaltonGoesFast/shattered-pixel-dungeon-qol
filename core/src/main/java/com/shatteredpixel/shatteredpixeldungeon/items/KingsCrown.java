@@ -40,6 +40,7 @@ import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSpriteSheet;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndChooseAbility;
 import com.watabou.noosa.audio.Sample;
+import com.watabou.noosa.particles.Emitter;
 
 import java.util.ArrayList;
 
@@ -106,7 +107,10 @@ public class KingsCrown extends Item {
 		Catalog.countUse( getClass() );
 
 		if (hero.sprite != null) {
-			hero.sprite.emitter().burst( Speck.factory( Speck.CROWN), 12 );
+			Emitter emitter = hero.sprite.emitter();
+			if (emitter != null) {
+				emitter.burst( Speck.factory( Speck.CROWN), 12 );
+			}
 		}
 		hero.spend(Actor.TICK);
 		hero.busy();
