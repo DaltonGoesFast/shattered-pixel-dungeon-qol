@@ -24,6 +24,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.abilities.warrior.He
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.KingsCrown;
 import com.shatteredpixel.shatteredpixeldungeon.items.TengusMask;
+import com.watabou.noosa.Game;
 import com.watabou.utils.GameSettings;
 
 import org.junit.After;
@@ -65,6 +66,9 @@ public class PlayAlongSubclassChoiceTest {
 		hero.ready = true;
 		Dungeon.hero = hero;
 		setCurUser(null);
+		if (Game.version == null) {
+			Game.version = "test";
+		}
 	}
 
 	@After
@@ -191,6 +195,41 @@ public class PlayAlongSubclassChoiceTest {
 		assertFalse(hero.belongings.backpack.contains(crown));
 		assertTrue(hero.armorAbility instanceof HeroicLeap);
 		assertNull(hero.talentAutoOrderTier4);
+	}
+
+	@Test
+	public void catchupKitGivesMaskAfterTenguAndCrownAfterKing() {
+		PlayAlongCatchup.giveMasteryItems(hero, "goo", 2);
+		assertNull(hero.belongings.getItem(TengusMask.class));
+		assertNull(hero.belongings.getItem(KingsCrown.class));
+
+		PlayAlongCatchup.giveMasteryItems(hero, "tengu", 3);
+		assertNotNull(hero.belongings.getItem(TengusMask.class));
+		assertNull(hero.belongings.getItem(KingsCrown.class));
+		assertEquals(1, count(TengusMask.class));
+
+		PlayAlongCatchup.giveMasteryItems(hero, "dm300", 4);
+		assertEquals(1, count(TengusMask.class));
+		assertNull(hero.belongings.getItem(KingsCrown.class));
+
+		assertNull(hero.belongings.armor());
+		PlayAlongCatchup.giveMasteryItems(hero, "king", 4);
+		assertEquals(1, count(TengusMask.class));
+		assertEquals(1, count(KingsCrown.class));
+		assertNotNull(hero.belongings.armor());
+		assertFalse(hero.belongings.armor() instanceof com.shatteredpixel.shatteredpixeldungeon.items.armor.ClassArmor);
+
+		PlayAlongCatchup.giveMasteryItems(hero, "king", 4);
+		assertEquals(1, count(TengusMask.class));
+		assertEquals(1, count(KingsCrown.class));
+	}
+
+	private int count(Class<? extends Item> type) {
+		int n = 0;
+		for (Item item : hero.belongings.backpack.items) {
+			if (type.isInstance(item)) n++;
+		}
+		return n;
 	}
 
 	private static Hero curUser() {

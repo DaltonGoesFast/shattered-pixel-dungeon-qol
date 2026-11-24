@@ -967,7 +967,7 @@ public class GameScene extends PixelScene {
 			return;
 		}
 
-		com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.tickChoicePrompt();
+		com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.showArrivalMessage();
 
 		if (logBg != null) {
 			logBg.visible = SPDSettings.obsChromaMasks();

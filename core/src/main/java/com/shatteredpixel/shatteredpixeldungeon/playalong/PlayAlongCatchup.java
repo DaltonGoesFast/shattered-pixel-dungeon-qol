@@ -18,7 +18,6 @@ import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroClass;
-import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroSubClass;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.DM300;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.DwarfKing;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Goo;
@@ -74,9 +73,6 @@ import com.shatteredpixel.shatteredpixeldungeon.journal.Bestiary;
 import com.shatteredpixel.shatteredpixeldungeon.levels.features.LevelTransition;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchupItems.Parsed;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.SessionInfo;
-import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
-import com.shatteredpixel.shatteredpixeldungeon.windows.WndChooseAbility;
-import com.shatteredpixel.shatteredpixeldungeon.windows.WndChooseSubclass;
 import com.watabou.utils.Bundle;
 import com.watabou.utils.DeviceCompat;
 import com.watabou.utils.GameSettings;
@@ -116,10 +112,6 @@ public final class PlayAlongCatchup {
 	private static boolean rewardsUnlocked = false;
 	private static String bossId = "";
 	private static String kitSummary = "";
-	private static boolean offerSubclass = false;
-	private static boolean offerAbility = false;
-	private static boolean subclassPrompted = false;
-	private static boolean abilityPrompted = false;
 	private static String arrivalMessage = "";
 
 	private PlayAlongCatchup() {}
@@ -150,10 +142,6 @@ public final class PlayAlongCatchup {
 		rewardsUnlocked = false;
 		bossId = "";
 		kitSummary = "";
-		offerSubclass = false;
-		offerAbility = false;
-		subclassPrompted = false;
-		abilityPrompted = false;
 		arrivalMessage = "";
 		slainMask = 0;
 	}
@@ -256,8 +244,6 @@ public final class PlayAlongCatchup {
 			spawnDepth = clamp(row.spawnFloor, 2, 24);
 			bossId = offer.boss;
 			rewardsUnlocked = !offer.config.expRewardsAfterFirstFloor;
-			offerSubclass = bossAtLeast(offer.boss, "tengu");
-			offerAbility = "king".equals(offer.boss);
 			Dungeon.depth = spawnDepth;
 			rememberGrant(offer.sessionId, offer.epoch);
 			arrivalMessage = "Catch-up: you arrive on floor " + spawnDepth
@@ -290,35 +276,6 @@ public final class PlayAlongCatchup {
 		String msg = arrivalMessage;
 		arrivalMessage = "";
 		com.shatteredpixel.shatteredpixeldungeon.utils.GLog.p(msg);
-	}
-
-	public static void tickChoicePrompt() {
-		if (!active || Dungeon.hero == null) return;
-		showArrivalMessage();
-		Hero hero = Dungeon.hero;
-		if (offerSubclass && !subclassPrompted && (hero.subClass == null || hero.subClass == HeroSubClass.NONE)) {
-			subclassPrompted = true;
-			TengusMask mask = hero.belongings.getItem(TengusMask.class);
-			if (mask == null) {
-				mask = new TengusMask();
-				mask.identify().collect();
-			}
-			if (mask != null) {
-				GameScene.show(new WndChooseSubclass(mask, hero));
-			}
-			return;
-		}
-		if (offerAbility && !abilityPrompted && hero.armorAbility == null
-				&& hero.subClass != null && hero.subClass != HeroSubClass.NONE
-				&& hero.belongings.armor() != null) {
-			abilityPrompted = true;
-			KingsCrown crown = hero.belongings.getItem(KingsCrown.class);
-			if (crown == null) {
-				crown = new KingsCrown();
-				crown.collect();
-			}
-			GameScene.show(new WndChooseAbility(crown, hero.belongings.armor(), hero));
-		}
 	}
 
 	public static String describeForCommand() {
@@ -400,10 +357,6 @@ public final class PlayAlongCatchup {
 			spawnDepth = current().row(id).spawnFloor;
 			bossId = id;
 			rewardsUnlocked = !current().expRewardsAfterFirstFloor;
-			offerSubclass = bossAtLeast(id, "tengu");
-			offerAbility = "king".equals(id);
-			subclassPrompted = false;
-			abilityPrompted = false;
 			for (int floor = 1; floor < spawnDepth; floor++) {
 				if (!Statistics.floorsExplored.containsKey(floor)) {
 					Statistics.floorsExplored.put(floor, 1f);
@@ -424,10 +377,6 @@ public final class PlayAlongCatchup {
 		sub.put("rewards", rewardsUnlocked);
 		sub.put("boss", bossId == null ? "" : bossId);
 		sub.put("kit", kitSummary == null ? "" : kitSummary);
-		sub.put("sub", offerSubclass);
-		sub.put("ability", offerAbility);
-		sub.put("sub_prompted", subclassPrompted);
-		sub.put("ability_prompted", abilityPrompted);
 		sub.put("epoch", epoch);
 		sub.put("slain", slainMask);
 		bundle.put(BUNDLE_KEY, sub);
@@ -439,10 +388,6 @@ public final class PlayAlongCatchup {
 		rewardsUnlocked = false;
 		bossId = "";
 		kitSummary = "";
-		offerSubclass = false;
-		offerAbility = false;
-		subclassPrompted = false;
-		abilityPrompted = false;
 		if (bundle == null || !bundle.contains(BUNDLE_KEY)) return;
 		Bundle sub = bundle.getBundle(BUNDLE_KEY);
 		if (sub == null || sub.isNull()) return;
@@ -451,10 +396,6 @@ public final class PlayAlongCatchup {
 		rewardsUnlocked = sub.getBoolean("rewards");
 		bossId = sub.contains("boss") ? sub.getString("boss") : "";
 		kitSummary = sub.contains("kit") ? sub.getString("kit") : "";
-		offerSubclass = sub.getBoolean("sub");
-		offerAbility = sub.getBoolean("ability");
-		subclassPrompted = sub.getBoolean("sub_prompted");
-		abilityPrompted = sub.getBoolean("ability_prompted");
 		if (sub.contains("epoch")) epoch = sub.getInt("epoch");
 		if (sub.contains("slain")) slainMask = sub.getInt("slain");
 	}
@@ -519,16 +460,32 @@ public final class PlayAlongCatchup {
 
 		giveRandomWandOrRing(hero);
 		giveBonus(hero, combinedBonus(cfg, row), cfg.allowArtifacts);
-
-		if (bossAtLeast(boss, "tengu") && hero.belongings.getItem(TengusMask.class) == null) {
-			new TengusMask().collect();
-		}
-		if ("king".equals(boss) && hero.belongings.getItem(KingsCrown.class) == null) {
-			new KingsCrown().collect();
-		}
+		giveMasteryItems(hero, boss, row.armorTier);
 
 		tuckIntoBags(hero.belongings.backpack);
 		kitSummary = describeKit(hero, boss, row, bagDepth);
+	}
+
+	/**
+	 * Tengu's Mask once the host has killed Tengu, and the King's Crown once the
+	 * host has killed the Dwarf King. The player uses them from the backpack.
+	 * The crown needs equipped armor, which the kit provides.
+	 */
+	static void giveMasteryItems(Hero hero, String boss, int armorTier) {
+		if (hero == null || hero.belongings == null) return;
+		if (bossAtLeast(boss, "tengu") && hero.belongings.getItem(TengusMask.class) == null) {
+			new TengusMask().collect();
+		}
+		if (!bossAtLeast(boss, "king")) return;
+		if (hero.belongings.armor() == null) {
+			Armor armor = armorFor(armorTier);
+			prepareArmor(armor);
+			hero.belongings.armor = armor;
+			armor.activate(hero);
+		}
+		if (hero.belongings.getItem(KingsCrown.class) == null) {
+			new KingsCrown().collect();
+		}
 	}
 
 	private static void KindOfWeaponSwap(Hero hero, MeleeWeapon weapon) {
