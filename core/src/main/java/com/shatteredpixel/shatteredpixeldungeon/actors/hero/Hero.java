@@ -361,6 +361,7 @@ public class Hero extends Char {
 	private static final String ATTACK		= "attackSkill";
 	private static final String DEFENSE		= "defenseSkill";
 	private static final String STRENGTH	= "STR";
+	private static final String STR_BONUS	= "STR_BONUS";
 	private static final String LEVEL		= "lvl";
 	private static final String EXPERIENCE	= "exp";
 	private static final String HTBOOST     = "htboost";
@@ -422,6 +423,8 @@ public class Hero extends Char {
 		bundle.put( DEFENSE, defenseSkill );
 		
 		bundle.put( STRENGTH, STR );
+		//store the bonus for previewing runs
+		bundle.put( STR_BONUS, STR() - STR );
 		
 		bundle.put( LEVEL, lvl );
 		bundle.put( EXPERIENCE, exp );
@@ -545,6 +548,7 @@ public class Hero extends Char {
 	public static void preview( GamesInProgress.Info info, Bundle bundle ) {
 		info.level = bundle.getInt( LEVEL );
 		info.str = bundle.getInt( STRENGTH );
+		info.strBonus = bundle.getInt( STR_BONUS );
 		info.exp = bundle.getInt( EXPERIENCE );
 		info.hp = bundle.getInt( Char.TAG_HP );
 		info.ht = bundle.getInt( Char.TAG_HT );
@@ -1014,7 +1018,11 @@ public class Hero extends Char {
 		if (!RingOfForce.fightingUnarmed(this)) {
 			dmg = wep.damageRoll( this );
 
-			if (!(wep instanceof MissileWeapon)) dmg += RingOfForce.armedDamageBonus(this);
+			int forceDmg = RingOfForce.armedDamageBonus(this, wep);
+			if (wep instanceof MeleeWeapon && ((MeleeWeapon) wep).augment != null){
+				forceDmg = ((MeleeWeapon) wep).augment.damageFactor(forceDmg);
+			}
+			dmg += forceDmg;
 		} else {
 			dmg = RingOfForce.damageRoll(this);
 			if (RingOfForce.unarmedGetsWeaponAugment(this)){
@@ -1195,6 +1203,9 @@ public class Hero extends Char {
 		}
 		
 		checkVisibleMobs();
+		if (buff(TalismanOfForesight.Foresight.class) != null){
+			buff(TalismanOfForesight.Foresight.class).checkAwareness();
+		}
 		BuffIndicator.refreshHero();
 		BuffIndicator.refreshBoss();
 
@@ -2038,7 +2049,7 @@ public class Hero extends Char {
 		dmg = Math.round(damage);
 
 		//we ceil this one to avoid letting the player easily take 0 dmg from tenacity early
-		dmg = (int)Math.ceil(dmg * RingOfTenacity.damageMultiplier( this ));
+		dmg = (int)Math.ceil(dmg * RingOfTenacity.effectiveDamageMultiplier( this ));
 
 		int preHP = HP + shielding();
 		if (src instanceof Hunger) preHP -= shielding();
@@ -2262,9 +2273,10 @@ public class Hero extends Char {
 			if (subClass == HeroSubClass.FREERUNNER){
 				Buff.affect(this, Momentum.class).gainStack();
 			}
-			
-			sprite.move(pos, step);
+
+			int oldPos = pos;
 			move(step);
+			sprite.move(oldPos, pos);
 
 			spend( delay / speed() );
 			

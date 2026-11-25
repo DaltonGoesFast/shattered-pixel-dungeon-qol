@@ -579,6 +579,13 @@ public enum Rankings {
 		} catch (IOException e) {
 		}
 	}
+
+	//clears all loaded data
+	public void unload(){
+		records = null;
+		lastRecord = totalNumber = wonNumber = 0;
+		latestDaily = null;
+	}
 	
 	public static class Record implements Bundlable {
 

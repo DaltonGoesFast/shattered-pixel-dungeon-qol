@@ -822,7 +822,7 @@ public class CharSprite extends MovieClip implements Tweener.Listener, MovieClip
 				dirty = false;
 			}
 
-			NoosaScript script = script();
+			NoosaScript script = NoosaScript.get();
 
 			texture.bind();
 

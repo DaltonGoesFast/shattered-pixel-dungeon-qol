@@ -121,7 +121,6 @@ import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.watabou.utils.Bundle;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 
@@ -396,6 +395,15 @@ public enum Catalog {
 			}
 		}
 
+	}
+
+	public static void unload(){
+		for (Catalog cat : values()) {
+			for (Class cls : cat.seen.keySet()){
+				cat.seen.put(cls, false);
+				cat.useCount.put(cls, 0);
+			}
+		}
 	}
 	
 }
