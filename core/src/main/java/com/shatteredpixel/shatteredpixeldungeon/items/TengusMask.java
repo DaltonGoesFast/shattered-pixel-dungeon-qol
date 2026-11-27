@@ -24,6 +24,7 @@ package com.shatteredpixel.shatteredpixeldungeon.items;
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Chimera;
+import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Preparation;
@@ -94,31 +95,53 @@ public class TengusMask extends Item {
 	}
 	
 	public void choose( HeroSubClass way ) {
-		
-		detach( curUser.belongings.backpack );
-		Catalog.countUse( getClass() );
-		
-		curUser.spend( Actor.TICK );
-		curUser.busy();
-		
-		curUser.talentAutoOrderTier3 = null;
-		curUser.clearTalentAutoSpendHistory( 3 );
-		curUser.subClass = way;
-		Talent.initSubclassTalents(curUser);
-		TalentAutoPlan.tryApply( curUser );
+		// Item.curUser is a static leftover from the last item action. Play Along
+		// opens this chooser without execute(), so curUser may be null or a hero
+		// whose sprite does not exist yet. The window passes its hero explicitly.
+		choose( Dungeon.hero, way );
+	}
 
-		if (way == HeroSubClass.ASSASSIN && curUser.invisible > 0){
-			Buff.affect(curUser, Preparation.class);
+	public void choose( Hero hero, HeroSubClass way ) {
+		if (hero == null || way == null) {
+			return;
 		}
-		
-		curUser.sprite.operate( curUser.pos );
-		Sample.INSTANCE.play( Assets.Sounds.MASTERY );
-		
-		Emitter e = curUser.sprite.centerEmitter();
-		e.pos(e.x-2, e.y-6, 4, 4);
-		e.start(Speck.factory(Speck.MASK), 0.05f, 20);
-		GLog.p( Messages.get(this, "used"));
-		Chimera.grantSignature( curUser, Chimera.classOf( way ) );
-		
+
+		// Consume and play the mask-use effects only when this mask is actually held.
+		// A drop-in chooser must still apply the subclass when the hero has no mask.
+		boolean held = hero.belongings != null
+				&& hero.belongings.backpack != null
+				&& hero.belongings.backpack.contains( this );
+
+		if (held) {
+			detach( hero.belongings.backpack );
+			Catalog.countUse( getClass() );
+
+			hero.spend( Actor.TICK );
+			hero.busy();
+		}
+
+		hero.talentAutoOrderTier3 = null;
+		hero.clearTalentAutoSpendHistory( 3 );
+		hero.subClass = way;
+		Talent.initSubclassTalents(hero);
+		TalentAutoPlan.tryApply( hero );
+
+		if (way == HeroSubClass.ASSASSIN && hero.invisible > 0){
+			Buff.affect(hero, Preparation.class);
+		}
+
+		if (held && hero.sprite != null) {
+			hero.sprite.operate( hero.pos );
+			Sample.INSTANCE.play( Assets.Sounds.MASTERY );
+
+			Emitter e = hero.sprite.centerEmitter();
+			if (e != null) {
+				e.pos(e.x-2, e.y-6, 4, 4);
+				e.start(Speck.factory(Speck.MASK), 0.05f, 20);
+			}
+			GLog.p( Messages.get(this, "used"));
+		}
+		Chimera.grantSignature( hero, Chimera.classOf( way ) );
+
 	}
 }

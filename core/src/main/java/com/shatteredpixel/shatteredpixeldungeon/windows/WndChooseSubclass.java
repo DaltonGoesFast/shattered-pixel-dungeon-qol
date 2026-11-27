@@ -70,7 +70,7 @@ public class WndChooseSubclass extends Window {
 						if (index == 0){
 							WndChooseSubclass.this.hide();
 							HeroSubClass cls = Random.oneOf(Chimera.subclassChoices(hero));
-							tome.choose(cls);
+							tome.choose(hero, cls);
 							GameScene.show(new WndInfoSubclass(hero.heroClass, cls));
 						}
 					}
@@ -114,7 +114,7 @@ public class WndChooseSubclass extends Window {
 							hide();
 							if (index == 0 && WndChooseSubclass.this.parent != null){
 								WndChooseSubclass.this.hide();
-								tome.choose( subCls );
+								tome.choose( hero, subCls );
 								Statistics.qualifiedForRandomVictoryBadge = false;
 							}
 						}

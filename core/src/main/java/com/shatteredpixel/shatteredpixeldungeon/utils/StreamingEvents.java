@@ -365,7 +365,7 @@ public class StreamingEvents {
 		f.put("item_class", item.getClass().getSimpleName());
 		try {
 			f.put("item_name", item.name());
-		} catch (Exception ignored) {
+		} catch (Throwable ignored) {
 			f.put("item_name", item.getClass().getSimpleName());
 		}
 		f.put("depth", Dungeon.depth);
