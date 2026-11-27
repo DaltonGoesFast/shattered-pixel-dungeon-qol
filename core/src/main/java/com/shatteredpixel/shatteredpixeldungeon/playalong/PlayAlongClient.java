@@ -84,6 +84,7 @@ public class PlayAlongClient {
 	private volatile String lastUsername;
 	private volatile String lastClientToken;
 	private volatile String lastHeroClass;
+	private volatile int lastHeroLvl = 1;
 	private volatile String lastModVersion;
 	private volatile String lastSessionId;
 	private volatile int lastDepth = 1;
@@ -230,6 +231,13 @@ public class PlayAlongClient {
 	public synchronized void connect(String address, String userId, String username,
 	                                 String clientToken, String heroClass, String modVersion, String sessionId,
 	                                 int depth, int branch, int pos, boolean isRejoin) {
+		connect(address, userId, username, clientToken, heroClass, 1, modVersion, sessionId,
+				depth, branch, pos, isRejoin);
+	}
+
+	public synchronized void connect(String address, String userId, String username,
+	                                 String clientToken, String heroClass, int heroLvl, String modVersion,
+	                                 String sessionId, int depth, int branch, int pos, boolean isRejoin) {
 		closeInternal();
 		this.intentionalClose = false;
 		this.disconnectedSinceMs = 0L;
@@ -241,6 +249,7 @@ public class PlayAlongClient {
 		this.lastUsername = username;
 		this.lastClientToken = clientToken;
 		this.lastHeroClass = heroClass;
+		this.lastHeroLvl = Math.max(1, heroLvl);
 		this.lastModVersion = modVersion;
 		this.lastSessionId = sessionId;
 		this.lastDepth = depth;
@@ -279,6 +288,7 @@ public class PlayAlongClient {
 					join.username = lastUsername;
 					join.clientToken = lastClientToken;
 					join.heroClass = lastHeroClass;
+					join.heroLvl = lastHeroLvl;
 					join.modVersion = lastModVersion;
 					join.depth = lastDepth;
 					join.branch = lastBranch;

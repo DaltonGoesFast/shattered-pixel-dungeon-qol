@@ -22,11 +22,11 @@
 package com.shatteredpixel.shatteredpixeldungeon.playalong;
 
 /**
- * Live roster & depth ladder window for Play Along Mode (delegates to tabbed Stream Command Deck).
+ * Live roster window for Play Along (community sessions: roster only, no stream tabs).
  */
 public class WndPlayAlongStatus extends WndStreamCommands {
 
 	public WndPlayAlongStatus() {
-		super(WndStreamCommands.TAB_ROSTER);
+		super(WndStreamCommands.TAB_ROSTER, true);
 	}
 }

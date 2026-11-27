@@ -666,19 +666,66 @@ public final class PlayAlongService {
 
 	/** Enable relay hosting from the community lobby (desktop + Android). */
 	public static void enableCommunityHostFromLobby() {
+		startHostFromLobby(true, null);
+	}
+
+	/**
+	 * Claim a private or public relay room, then the caller jumps to hero select.
+	 * @param privateRoom true clears the public room name so the relay assigns a code
+	 * @param publicNameOrNull normalized public slug when not private
+	 */
+	public static void startHostFromLobby(boolean privateRoom, String publicNameOrNull) {
 		if (!canHostPlayAlong()) {
 			GLog.w(Messages.get(PlayAlongService.class, "host_desktop_only"));
 			return;
 		}
+		if (privateRoom) {
+			SPDSettings.playAlongRelayRoomName("");
+		} else {
+			String name = PlayAlongProtocol.normalizeHostRoomName(publicNameOrNull);
+			if (name.isEmpty() || PlayAlongProtocol.isReservedRoom(name)
+					|| !PlayAlongProtocol.isPublicRoomName(name)) {
+				GLog.w(Messages.get(PlayAlongService.class, "host_public_name_bad"));
+				return;
+			}
+			if (SPDSettings.playAlongRelayToken().isEmpty()) {
+				GLog.w(Messages.get(PlayAlongService.class, "room_name_needs_secret"));
+				return;
+			}
+			SPDSettings.playAlongRelayRoomName(name);
+		}
 		SPDSettings.playAlongHostEnabled(true);
 		SPDSettings.playAlongRelayHost(true);
+		lastAnnouncedRoom = null;
 		ensureHostServerStarted();
+		onRelayEndpointChanged();
 		onHostSettingChanged(true);
-		if (DeviceCompat.isAndroid()) {
-			GLog.p(Messages.get(PlayAlongService.class, "host_lobby_ready_android"));
-		} else {
-			GLog.p(Messages.get(PlayAlongService.class, "host_lobby_ready"));
+		GLog.p(Messages.get(PlayAlongService.class, "host_lobby_starting"));
+	}
+
+	/** Stop hosting from the lobby panel. */
+	public static void stopCommunityHostFromLobby() {
+		SPDSettings.playAlongHostEnabled(false);
+		onHostSettingChanged(false);
+		stopRelay();
+		GLog.w(Messages.get(PlayAlongService.class, "host_lobby_stopped"));
+	}
+
+	/** Copy the current relay join URL (or wait message) to the clipboard. */
+	public static void copyCurrentHostJoinLink() {
+		String code = relayRoomCode();
+		if (code == null || code.isEmpty()) {
+			GLog.w(Messages.get(PlayAlongService.class, "host_lobby_copy_wait"));
+			return;
 		}
+		String url = PlayAlongProtocol.relayJoinAddress(code);
+		try {
+			if (com.badlogic.gdx.Gdx.app != null && com.badlogic.gdx.Gdx.app.getClipboard() != null) {
+				com.badlogic.gdx.Gdx.app.getClipboard().setContents(url);
+			}
+		} catch (Exception ignored) {
+		}
+		GLog.p(Messages.get(PlayAlongService.class, "code_copied", url));
 	}
 
 	/** Join a listed or typed room after a successful status ping. */
@@ -1342,8 +1389,9 @@ public final class PlayAlongService {
 		});
 
 		String ver = Game.version != null ? Game.version : "";
+		int heroLvl = Dungeon.hero != null ? Math.max(1, Dungeon.hero.lvl) : 1;
 		client.connect(effectiveAddress(), localUserId, username, SPDSettings.streamClientToken(),
-				heroClass, ver, session.sessionId, depth, branch, pos, isRejoin);
+				heroClass, heroLvl, ver, session.sessionId, depth, branch, pos, isRejoin);
 	}
 
 	// ---- In-Game Hooks ----
@@ -2006,6 +2054,7 @@ public final class PlayAlongService {
 		msg.type = "player_state";
 		msg.userId = localUserId;
 		msg.heroClass = Dungeon.hero != null ? Dungeon.hero.heroClass.name() : "WARRIOR";
+		msg.heroLvl = Dungeon.hero != null ? Math.max(1, Dungeon.hero.lvl) : 1;
 		msg.armorTier = Dungeon.hero != null ? Dungeon.hero.tier() : 0;
 		msg.depth = Dungeon.depth;
 		msg.branch = Dungeon.branch;
@@ -2024,8 +2073,21 @@ public final class PlayAlongService {
 	private static GhostState buildLocalGhostState(String action, int pos, boolean isHost) {
 		GhostState g = new GhostState();
 		g.userId = isHost ? "host" : localUserId;
-		g.username = isHost ? "Dalton" : clientUsername;
+		if (isHost) {
+			boolean daltonRoom = hostHoldsStreamRoom()
+					|| PlayAlongProtocol.isReservedRoom(SPDSettings.playAlongRelayHostRoomOrNull())
+					|| PlayAlongProtocol.isReservedRoom(relayRoomCode());
+			if (daltonRoom) {
+				g.username = "Dalton";
+			} else {
+				String n = SPDSettings.playAlongUsername();
+				g.username = (n == null || n.isEmpty()) ? "Host" : n;
+			}
+		} else {
+			g.username = clientUsername;
+		}
 		g.heroClass = Dungeon.hero != null ? Dungeon.hero.heroClass.name() : "WARRIOR";
+		g.heroLvl = Dungeon.hero != null ? Math.max(1, Dungeon.hero.lvl) : 1;
 		g.armorTier = Dungeon.hero != null ? Dungeon.hero.tier() : 0;
 		g.depth = Dungeon.depth;
 		g.branch = Dungeon.branch;

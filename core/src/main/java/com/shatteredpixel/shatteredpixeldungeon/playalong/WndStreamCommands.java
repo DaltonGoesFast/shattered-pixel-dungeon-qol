@@ -232,6 +232,8 @@ public class WndStreamCommands extends WndTabbed {
 	private int currentTab;
 	private int winHeight;
 	private float listTop;
+	/** Community / non-dalton sessions: roster list only, no stream deck tabs. */
+	private final boolean rosterOnly;
 
 	private StreamEconomyState eco;
 	private String pendingLinkCode = null;
@@ -248,15 +250,21 @@ public class WndStreamCommands extends WndTabbed {
 	private final List<CompactLabeledTab> tabButtons = new ArrayList<>();
 
 	public WndStreamCommands() {
-		this(TAB_SPAWN);
+		this(TAB_SPAWN, !PlayAlongService.streamFeaturesVisible());
 	}
 
 	public WndStreamCommands(int initialTab) {
+		this(initialTab, !PlayAlongService.streamFeaturesVisible());
+	}
+
+	public WndStreamCommands(int initialTab, boolean rosterOnly) {
 		super();
-		this.currentTab = Math.max(0, Math.min(4, initialTab));
+		this.rosterOnly = rosterOnly;
+		this.currentTab = rosterOnly ? TAB_ROSTER : Math.max(0, Math.min(4, initialTab));
 		this.eco = PlayAlongService.getCachedEconomy();
 
-		int maxH = Math.max(140, (int) (PixelScene.uiCamera.height - chrome.marginVer() - tabHeight() - 10));
+		int tabPad = rosterOnly ? 0 : tabHeight();
+		int maxH = Math.max(140, (int) (PixelScene.uiCamera.height - chrome.marginVer() - tabPad - 10));
 		this.winHeight = Math.min(206, maxH);
 		resize(WIDTH, winHeight);
 
@@ -272,34 +280,38 @@ public class WndStreamCommands extends WndTabbed {
 		headerGroup = new ClearableGroup();
 		add(headerGroup);
 
-		String[] labels = {"Spawn", "Chaos", "Help", "Comm.", "Roster"};
-		for (int i = 0; i < labels.length; i++) {
-			final int idx = i;
-			CompactLabeledTab tab = new CompactLabeledTab(labels[i]) {
-				@Override
-				protected void select(boolean value) {
-					super.select(value);
-					if (selected && currentTab != idx) {
-						currentTab = idx;
-						rebuildTabPage(true);
+		if (!rosterOnly) {
+			String[] labels = {"Spawn", "Chaos", "Help", "Comm.", "Roster"};
+			for (int i = 0; i < labels.length; i++) {
+				final int idx = i;
+				CompactLabeledTab tab = new CompactLabeledTab(labels[i]) {
+					@Override
+					protected void select(boolean value) {
+						super.select(value);
+						if (selected && currentTab != idx) {
+							currentTab = idx;
+							rebuildTabPage(true);
+						}
 					}
-				}
-			};
-			tabButtons.add(tab);
-			add(tab);
+				};
+				tabButtons.add(tab);
+				add(tab);
+			}
+			layoutTabs();
 		}
-		layoutTabs();
 
 		buildHeader();
 		rebuildTabPage(true);
-		select(currentTab);
-
-		refreshEconomy(false);
+		if (!rosterOnly) {
+			select(currentTab);
+			refreshEconomy(false);
+		}
 	}
 
 	@Override
 	public void update() {
 		super.update();
+		if (rosterOnly) return;
 		refreshAccum += Game.elapsed;
 		if (refreshAccum >= 4.0f) {
 			refreshAccum = 0f;
@@ -438,6 +450,21 @@ public class WndStreamCommands extends WndTabbed {
 		headerGroup.destroyAndClear();
 		float py = 1f;
 
+		if (rosterOnly) {
+			RenderedTextBlock title = PixelScene.renderTextBlock(
+					Messages.get(WndPlayAlongStatus.class, "title"), 9);
+			title.hardlight(TITLE_COLOR);
+			title.setPos(0, py);
+			headerGroup.add(title);
+			py = title.bottom() + 2;
+			ColorBlock sep = new ColorBlock(WIDTH, 1, 0xFF444444);
+			sep.x = 0;
+			sep.y = py;
+			headerGroup.add(sep);
+			listTop = py + 3;
+			return;
+		}
+
 		RenderedTextBlock title = PixelScene.renderTextBlock("Stream Command Deck", 9);
 		title.hardlight(TITLE_COLOR);
 		title.setPos(0, py);
@@ -561,7 +588,9 @@ public class WndStreamCommands extends WndTabbed {
 		content.destroyAndClear();
 		float cy = 0f;
 
-		if (currentTab == TAB_SPAWN) {
+		if (rosterOnly || currentTab == TAB_ROSTER) {
+			cy = buildRosterTab(cy);
+		} else if (currentTab == TAB_SPAWN) {
 			cy = buildSpawnTab(cy);
 		} else if (currentTab == TAB_CHAOS) {
 			cy = buildChaosTab(cy);
@@ -854,8 +883,7 @@ public class WndStreamCommands extends WndTabbed {
 	}
 
 	private float buildRosterTab(float cy) {
-		if (com.watabou.utils.DeviceCompat.isDesktop()
-				&& (PlayAlongService.isHosting() || SPDSettings.playAlongHostEnabled()
+		if ((PlayAlongService.isHosting() || SPDSettings.playAlongHostEnabled()
 				|| PlayAlongService.isLocalHostServerRunning())) {
 			RenderedTextBlock hostLine = PixelScene.renderTextBlock(PlayAlongService.hostConnectionSummary(), 6);
 			hostLine.hardlight(0xFFCC88);
@@ -865,8 +893,10 @@ public class WndStreamCommands extends WndTabbed {
 			cy = hostLine.bottom() + 4;
 		}
 
-		if (com.watabou.utils.DeviceCompat.isDesktop()
-				&& (PlayAlongService.isHosting() || SPDSettings.playAlongHostEnabled())) {
+		if (!rosterOnly
+				&& com.watabou.utils.DeviceCompat.isDesktop()
+				&& (PlayAlongService.isHosting() || SPDSettings.playAlongHostEnabled())
+				&& PlayAlongService.streamFeaturesVisible()) {
 			final boolean sharedOn = SPDSettings.playAlongSharedChat();
 			RedButton btnSharedChat = new RedButton("Mirror Chat Cmds to Racers: " + (sharedOn ? "ON" : "OFF"), 6) {
 				@Override
@@ -886,7 +916,10 @@ public class WndStreamCommands extends WndTabbed {
 				&& Dungeon.level != null
 				&& (Dungeon.depth != PlayAlongService.getHostDepth()
 				|| Dungeon.branch != PlayAlongService.getHostBranch())) {
-			RedButton btnFollow = new RedButton("Follow Dalton (Depth " + PlayAlongService.getHostDepth() + ")", 7) {
+			String followLabel = PlayAlongService.streamFeaturesVisible()
+					? ("Follow Dalton (Depth " + PlayAlongService.getHostDepth() + ")")
+					: ("Follow host (Depth " + PlayAlongService.getHostDepth() + ")");
+			RedButton btnFollow = new RedButton(followLabel, 7) {
 				@Override
 				protected void onClick() {
 					hide();
@@ -925,9 +958,11 @@ public class WndStreamCommands extends WndTabbed {
 					cy = btnTitle.bottom() + 4;
 				}
 			} else {
-				String soloTxt = (eco != null && eco.inDungeon)
+				String soloTxt = rosterOnly
+						? "No Play Along session is active."
+						: ((eco != null && eco.inDungeon)
 						? ("Dalton is in a solo stream run on Depth " + eco.hostDepth + ".")
-						: "No Play Along ghost race is currently active.";
+						: "No Play Along ghost race is currently active.");
 				RenderedTextBlock note = PixelScene.renderTextBlock(soloTxt, 6);
 				note.hardlight(0xCCCCCC);
 				note.maxWidth(WIDTH - 4);
@@ -940,7 +975,7 @@ public class WndStreamCommands extends WndTabbed {
 
 		List<GhostState> roster = PlayAlongService.getAllRosterGhosts();
 		if (roster.isEmpty()) {
-			RenderedTextBlock empty = PixelScene.renderTextBlock("No other racers connected yet.", 6);
+			RenderedTextBlock empty = PixelScene.renderTextBlock("No other players connected yet.", 6);
 			empty.maxWidth(WIDTH - 6);
 			empty.setPos(2, cy);
 			content.add(empty);
@@ -953,7 +988,11 @@ public class WndStreamCommands extends WndTabbed {
 				String cls = g.heroClass != null
 						? g.heroClass.substring(0, 1) + g.heroClass.substring(1).toLowerCase(Locale.ROOT)
 						: "";
-				String line = roleTag + g.username + " — D" + g.depth + " (" + cls + " " + hpPct + "%)"
+				int lvl = Math.max(1, g.heroLvl);
+				String line = roleTag + g.username
+						+ " — D" + g.depth
+						+ " · " + cls + " L" + lvl
+						+ " (" + hpPct + "%)"
 						+ (g.catchup ? " · catch-up" : "");
 				RenderedTextBlock row = PixelScene.renderTextBlock(line, 6);
 				row.maxWidth(WIDTH - 8);

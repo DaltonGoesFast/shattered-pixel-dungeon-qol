@@ -561,6 +561,7 @@ public class PlayAlongServer extends WebSocketServer {
 			rec.ghost.userId = userId;
 			rec.ghost.username = safeName;
 			rec.ghost.heroClass = safeHeroClass(msg.heroClass);
+			rec.ghost.heroLvl = Math.max(1, Math.min(30, msg.heroLvl > 0 ? msg.heroLvl : 1));
 			rec.ghost.armorTier = Math.max(0, Math.min(6, msg.armorTier));
 			rec.ghost.depth = Math.max(1, msg.depth);
 			rec.ghost.branch = msg.branch;
@@ -582,6 +583,7 @@ public class PlayAlongServer extends WebSocketServer {
 				rec.username = safeName;
 				rec.ghost.username = safeName;
 				rec.ghost.heroClass = safeHeroClass(msg.heroClass);
+				rec.ghost.heroLvl = Math.max(1, Math.min(30, msg.heroLvl > 0 ? msg.heroLvl : 1));
 				rec.alive = true;
 				rec.won = false;
 				rec.claimedBossDepths.clear();
@@ -589,6 +591,9 @@ public class PlayAlongServer extends WebSocketServer {
 				if (msg.depth > 0) rec.ghost.depth = Math.max(1, Math.min(50, msg.depth));
 				rec.ghost.branch = Math.max(0, Math.min(10, msg.branch));
 				rec.ghost.pos = Math.max(0, msg.pos);
+				if (msg.heroLvl > 0) {
+					rec.ghost.heroLvl = Math.max(1, Math.min(30, msg.heroLvl));
+				}
 				rec.ghost.lastUpdateMs = System.currentTimeMillis();
 			}
 		}
@@ -625,6 +630,9 @@ public class PlayAlongServer extends WebSocketServer {
 		if (rec == null || !rec.alive || rec.ghost == null) return;
 
 		rec.ghost.heroClass = safeHeroClass(msg.heroClass != null ? msg.heroClass : rec.ghost.heroClass);
+		if (msg.heroLvl > 0) {
+			rec.ghost.heroLvl = Math.max(1, Math.min(30, msg.heroLvl));
+		}
 		rec.ghost.armorTier = Math.max(0, Math.min(6, msg.armorTier));
 		rec.ghost.depth = Math.max(1, Math.min(50, msg.depth));
 		rec.ghost.branch = Math.max(0, Math.min(10, msg.branch));

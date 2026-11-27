@@ -195,6 +195,7 @@ public final class PlayAlongProtocol {
 		public String userId = "";
 		public String username = "";
 		public String heroClass = "WARRIOR";
+		public int heroLvl = 1;
 		public int armorTier = 0;
 		public int depth = 1;
 		public int branch = 0;
@@ -248,6 +249,7 @@ public final class PlayAlongProtocol {
 		public String userId;
 		public String username;
 		public String heroClass;
+		public int heroLvl = 1;
 		public int armorTier;
 		public int depth;
 		public int branch;

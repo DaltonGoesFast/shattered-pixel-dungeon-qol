@@ -33,6 +33,7 @@ public class Mod_Changes {
 
 	public static void addAllChanges( ArrayList<ChangeInfo> changeInfos ){
 		addOverview(changeInfos);
+		add_v4_0_3_QoL_26(changeInfos);
 		add_v4_0_3_QoL_25(changeInfos);
 		add_v4_0_3_QoL_24(changeInfos);
 		add_v4_0_2_QoL_23(changeInfos);
@@ -52,6 +53,29 @@ public class Mod_Changes {
 		add_v4_0_0_QoL_6(changeInfos);
 		add_v4_0_0_QoL_5(changeInfos);
 		add_v4_0_0(changeInfos);
+	}
+
+	private static void add_v4_0_3_QoL_26( ArrayList<ChangeInfo> changeInfos ) {
+		ChangeInfo changes = new ChangeInfo("4.0.3-QoL-26", true, "");
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes = new ChangeInfo(Messages.get(ChangesScene.class, "new"), false, null);
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.ENTER), "Host UX Polish",
+				"**-** **Host a room** opens a short wizard: private code (default) or public name + secret\n" +
+				"**-** After claim, jump straight into hero select; reopen Play Along while hosting for code / copy / stop\n" +
+				"**-** Android confirms that leaving the app drops the room"));
+
+		changes = new ChangeInfo(Messages.get(ChangesScene.class, "changes"), false, null);
+		changes.hardlight(CharSprite.WARNING);
+		changeInfos.add(changes);
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.RANKINGS), "Community LIVE Strip",
+				"**-** In non-dalton rooms, the LIVE strip opens a roster-only panel (name, class, depth, hero level)\n" +
+				"**-** Spawn / Chaos / Help / Comm / points stay on Dalton stream sessions only"));
 	}
 
 	private static void add_v4_0_3_QoL_25( ArrayList<ChangeInfo> changeInfos ) {
