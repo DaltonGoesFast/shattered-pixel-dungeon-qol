@@ -168,12 +168,21 @@ public class AndroidLauncher extends AndroidApplication {
 		Button.longClick = ViewConfiguration.getLongPressTimeout()/1000f;
 		
 		initialize(new ShatteredPixelDungeon(support), config);
-		
+
+		if (SPDSettings.playAlongHostEnabled()) {
+			com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.ensureHostServerStarted();
+		}
 	}
 
 	@Override
 	public AndroidAudio createAudio(Context context, AndroidApplicationConfiguration config) {
 		return new AsynchronousAndroidAudio(context, config);
+	}
+
+	@Override
+	protected void onPause() {
+		com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onAndroidLifecyclePause();
+		super.onPause();
 	}
 
 	@Override
@@ -184,6 +193,7 @@ public class AndroidLauncher extends AndroidApplication {
 		}
 		super.onResume();
 		AndroidUpdateInstaller.onResume();
+		com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onAndroidLifecycleResume();
 	}
 
 	@SuppressLint("GestureBackNavigation")

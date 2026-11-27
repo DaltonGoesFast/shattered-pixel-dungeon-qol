@@ -32,12 +32,22 @@ Reserved room (`dalton`):
 3. The token must match `PLAYALONG_DALTON_TOKEN` on the server. It is never logged.
 4. A good token replaces the previous holder (reconnect after a crash). A bad token is closed with `4001` and does not kick the live host.
 
-Custom public names (slug `[a-z][a-z0-9_-]{2,23}`, not `dalton`):
+Custom public names (slug `[a-z][a-z0-9_-]{2,23}`, not `dalton` / blocked lookalikes such as `daltongoesfast` or `official`):
 
 1. Host connects to `/host/<name>` and sends `{"t":"auth","d":"<secret>"}`.
-2. The first successful secret binds that name for the life of the relay process (survives host disconnect; cleared on relay restart).
-3. Matching secret takeovers; wrong secret is `4001` and does not kick the live host.
-4. Joiners use `/join/<name>` with no secret. While the name is claimed but the host is offline, joins get "host reconnecting" (same retry path as private reclaim).
+2. The secret binds that name while the host is live and for the same **2-minute reclaim window** as private codes after disconnect (not for the whole relay process lifetime).
+3. Matching secret takeovers / reclaim; wrong secret is `4001` and does not kick the live host. After the window the name is free for a new secret.
+4. Joiners use `/join/<name>` with no secret. While the name is held offline, joins get "host reconnecting" (same retry path as private reclaim).
+
+Host meta (optional lobby fields) on the host link:
+
+```json
+{"t":"meta","d":{"displayName":"Freddy","version":"…","protocolVersion":1,"hostDepth":7,"inDungeon":true}}
+```
+
+Allowed keys only; `official` from the host is ignored. Display names are length-capped, control-stripped, and blocklist-filtered. Meta updates are rate-limited and size-capped.
+
+`GET /rooms` returns a JSON array of **live public rooms** (named + reserved). Private codes are never listed. The relay alone sets `"official": true` for the token-held reserved room. The list is cached a few seconds and rate-limited per IP — game clients should poll every **10–15 seconds**, not every second.
 
 Other limits: per-room player cap (default 80), player frames capped at 4096 bytes (the game packet limit) and 30 forwarded messages/second per socket (a flood is dropped, then the socket is closed), host-link frames capped at 8 MiB so a long run's world-state (including every tombstone) still fits, WebSocket ping interval/timeout (default 20s/20s), and a per-IP connection rate limit (default 40 new sockets / 30s). Behind Cloudflare the client IP is `CF-Connecting-IP` or `X-Forwarded-For`. `GET /health` returns `ok`.
 
@@ -50,11 +60,14 @@ PLAYALONG_DALTON_TOKEN='choose-a-long-secret' \
   relay/.venv/bin/python relay/playalong_relay.py --host 127.0.0.1 --port 8765
 ```
 
-Health check:
+Health check and room browser:
 
 ```bash
 curl -fsS http://127.0.0.1:8765/health
+curl -fsS http://127.0.0.1:8765/rooms
 ```
+
+Restarting the relay drops every live room. Prefer a quiet window; hosts that keep dialing can reclaim named/private rooms within two minutes.
 
 In the desktop game (Settings → Connectivity):
 

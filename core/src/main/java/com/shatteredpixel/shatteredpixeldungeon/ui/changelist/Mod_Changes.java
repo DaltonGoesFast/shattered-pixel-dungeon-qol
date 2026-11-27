@@ -33,6 +33,7 @@ public class Mod_Changes {
 
 	public static void addAllChanges( ArrayList<ChangeInfo> changeInfos ){
 		addOverview(changeInfos);
+		add_v4_0_3_QoL_25(changeInfos);
 		add_v4_0_3_QoL_24(changeInfos);
 		add_v4_0_2_QoL_23(changeInfos);
 		add_v4_0_2_QoL_22(changeInfos);
@@ -51,6 +52,30 @@ public class Mod_Changes {
 		add_v4_0_0_QoL_6(changeInfos);
 		add_v4_0_0_QoL_5(changeInfos);
 		add_v4_0_0(changeInfos);
+	}
+
+	private static void add_v4_0_3_QoL_25( ArrayList<ChangeInfo> changeInfos ) {
+		ChangeInfo changes = new ChangeInfo("4.0.3-QoL-25", true, "");
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes = new ChangeInfo(Messages.get(ChangesScene.class, "new"), false, null);
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.ENTER), "Public Play Along",
+				"**-** Title-screen **Play Along** button opens a community lobby (browse public rooms, join by code, host)\n" +
+				"**-** Public rooms appear in the relay server browser; private rooms stay code-only\n" +
+				"**-** Desktop and Android can host through the outbound relay (Android: keep the game open)\n" +
+				"**-** DaltonGoesFast stream drop-in is unchanged"));
+
+		changes = new ChangeInfo(Messages.get(ChangesScene.class, "changes"), false, null);
+		changes.hardlight(CharSprite.WARNING);
+		changeInfos.add(changes);
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.PREFS), "Stream Features Stay on Dalton",
+				"**-** Points, chat-command mirrors, and Stream Commands only work when the host holds the reserved **dalton** room\n" +
+				"**-** Community rooms keep ghosts / catch-up / world sync without stream economy"));
 	}
 
 	private static void add_v4_0_3_QoL_24( ArrayList<ChangeInfo> changeInfos ) {

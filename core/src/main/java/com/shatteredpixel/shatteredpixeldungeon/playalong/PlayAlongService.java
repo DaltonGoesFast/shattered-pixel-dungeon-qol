@@ -35,6 +35,7 @@ import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.ChatCommandPayload;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.GhostState;
+import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.RoomListing;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.SessionInfo;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.StreamEconomyState;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.TombstoneState;
@@ -52,7 +53,13 @@ import com.watabou.noosa.Game;
 import com.watabou.noosa.audio.Sample;
 import com.watabou.utils.DeviceCompat;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -113,6 +120,7 @@ public final class PlayAlongService {
 	/** Address the latest title-screen live check actually reached. */
 	private static volatile String discoveredAddress = null;
 	private static volatile String lastAnnouncedRoom = null;
+	private static volatile long lastMetaPublishMs = 0L;
 	private static volatile boolean relayDownAnnounced = false;
 	private static volatile boolean connectHintShown = false;
 	/** One desync line per outage. Cleared when a rejoin is acknowledged. */
@@ -257,7 +265,7 @@ public final class PlayAlongService {
 
 	private static String effectiveAddress() {
 		// The machine that is hosting talks to its own server for stream commands.
-		if (DeviceCompat.isDesktop() && hostServer != null
+		if (canHostPlayAlong() && hostServer != null
 				&& role != Role.CLIENT && role != Role.SPECTATOR && !clientJoinPending) {
 			return "127.0.0.1:" + SPDSettings.playAlongPort();
 		}
@@ -303,9 +311,43 @@ public final class PlayAlongService {
 		return PlayAlongProtocol.isPublicJoinTarget(relayRoomCode());
 	}
 
+	/**
+	 * Host-authoritative stream economy. True only when this process holds the
+	 * reserved {@code dalton} room via the relay — not based on client claims.
+	 */
+	public static boolean hostHoldsStreamRoom() {
+		return PlayAlongProtocol.isReservedRoom(relayRoomCode());
+	}
+
+	/** UX helper: stream commands / points UI only for dalton sessions. */
+	public static boolean streamFeaturesVisible() {
+		if (role == Role.HOST) {
+			return hostHoldsStreamRoom();
+		}
+		String join = clientServerAddress;
+		if (join == null || join.isEmpty()) join = discoveredAddress;
+		if (join == null || join.isEmpty()) join = peekJoinAddress();
+		return isDaltonJoinAddress(join);
+	}
+
+	private static boolean isDaltonJoinAddress(String addr) {
+		if (addr == null || addr.isEmpty()) return false;
+		String lower = addr.toLowerCase(Locale.ROOT);
+		int mark = lower.indexOf("/join/");
+		if (mark >= 0) {
+			String room = addr.substring(mark + "/join/".length());
+			int cut = room.indexOf('?');
+			if (cut >= 0) room = room.substring(0, cut);
+			cut = room.indexOf('/');
+			if (cut >= 0) room = room.substring(0, cut);
+			return PlayAlongProtocol.isReservedRoom(room);
+		}
+		return lower.contains("/join/" + SPDSettings.PLAY_ALONG_RELAY_ROOM);
+	}
+
 	public static String hostConnectionSummary() {
 		String direct = SPDSettings.playAlongAddress();
-		if (!DeviceCompat.isDesktop() || !SPDSettings.playAlongRelayHost()) {
+		if (!canHostPlayAlong() || !SPDSettings.playAlongRelayHost()) {
 			return Messages.get(PlayAlongService.class, "roster_off", direct);
 		}
 		String code = relayRoomCode();
@@ -370,10 +412,15 @@ public final class PlayAlongService {
 		return new LinkedHashMap<>(depthCounts);
 	}
 
-	// ---- Host Server Lifecycle (Desktop) ----
+	/** Desktop or Android may host; Android is foreground/outbound-relay only. */
+	public static boolean canHostPlayAlong() {
+		return DeviceCompat.isDesktop() || DeviceCompat.isAndroid();
+	}
+
+	// ---- Host Server Lifecycle (Desktop + Android) ----
 
 	public static synchronized void ensureHostServerStarted() {
-		if (!DeviceCompat.isDesktop()) return;
+		if (!canHostPlayAlong()) return;
 		if (hostServer != null) {
 			if (SPDSettings.playAlongRelayHost()) startRelay();
 			return;
@@ -433,7 +480,7 @@ public final class PlayAlongService {
 	}
 
 	public static synchronized void onRelaySettingChanged(boolean enabled) {
-		if (!DeviceCompat.isDesktop()) return;
+		if (!canHostPlayAlong()) return;
 		if (enabled) {
 			ensureHostServerStarted();
 		} else {
@@ -443,10 +490,26 @@ public final class PlayAlongService {
 
 	/** Relay URL or Dalton room token changed. Re-dial so the new values apply. */
 	public static synchronized void onRelayEndpointChanged() {
-		if (!DeviceCompat.isDesktop()) return;
+		if (!canHostPlayAlong()) return;
 		boolean restart = SPDSettings.playAlongRelayHost() && hostServer != null;
 		stopRelay();
 		if (restart) startRelay();
+	}
+
+	/**
+	 * Android hosting is foreground-only. Pause drops the relay room into the
+	 * reclaim window; resume redials if hosting is still enabled.
+	 */
+	public static synchronized void onAndroidLifecyclePause() {
+		if (!DeviceCompat.isAndroid()) return;
+		stopRelay();
+	}
+
+	public static synchronized void onAndroidLifecycleResume() {
+		if (!DeviceCompat.isAndroid()) return;
+		if (SPDSettings.playAlongHostEnabled() && SPDSettings.playAlongRelayHost()) {
+			ensureHostServerStarted();
+		}
 	}
 
 	private static void startRelay() {
@@ -508,6 +571,7 @@ public final class PlayAlongService {
 			System.out.println("[PlayAlong] Relay room code " + code
 					+ ". Set a public room name + host secret to claim a named room.");
 		}
+		publishRelayMeta(true);
 	}
 
 	private static void announceRelayDown() {
@@ -516,6 +580,124 @@ public final class PlayAlongService {
 		relayDownAnnounced = true;
 		GLog.w(Messages.get(PlayAlongService.class, "relay_down"));
 		System.out.println("[PlayAlong] Relay unavailable. Direct host:port still works.");
+	}
+
+	/**
+	 * Publish lobby listing fields to the relay. Only public/named/reserved rooms
+	 * appear in {@code GET /rooms}; private codes are never listed.
+	 */
+	public static void publishRelayMeta() {
+		publishRelayMeta(false);
+	}
+
+	public static void publishRelayMeta(boolean force) {
+		PlayAlongRelayHost host = relayHost;
+		if (host == null || !host.isUp()) return;
+		long now = System.currentTimeMillis();
+		if (!force && now - lastMetaPublishMs < 5_000L) return;
+		lastMetaPublishMs = now;
+		Map<String, Object> meta = new LinkedHashMap<>();
+		String display = SPDSettings.playAlongUsername();
+		if (display == null || display.isEmpty()) display = "Host";
+		meta.put("displayName", display);
+		meta.put("version", Game.version == null ? "" : Game.version);
+		meta.put("protocolVersion", PlayAlongProtocol.PROTOCOL_VERSION);
+		boolean inDungeon = Dungeon.hero != null && Dungeon.level != null;
+		meta.put("inDungeon", inDungeon);
+		if (inDungeon) {
+			meta.put("hostDepth", Dungeon.depth);
+			meta.put("challenges", Dungeon.challenges);
+			meta.put("modifiers", Dungeon.modifiers);
+		} else if (hostServer != null) {
+			SessionInfo info = hostServer.getActiveSession();
+			if (info != null) {
+				meta.put("hostDepth", info.hostDepth);
+				meta.put("inDungeon", info.inDungeon);
+				meta.put("challenges", info.challenges);
+				meta.put("modifiers", info.modifiers);
+			}
+		}
+		host.sendMeta(meta);
+	}
+
+	public interface RoomsCallback {
+		void accept(List<RoomListing> rooms);
+	}
+
+	/** Background fetch of {@code GET /rooms}. Callback always on the render thread. */
+	public static void fetchPublicRooms(RoomsCallback callback) {
+		if (callback == null) return;
+		Thread t = new Thread(() -> {
+			List<RoomListing> rooms = fetchPublicRoomsSync();
+			Game.runOnRenderThread(() -> callback.accept(rooms));
+		}, "PlayAlongRooms");
+		t.setDaemon(true);
+		t.start();
+	}
+
+	private static List<RoomListing> fetchPublicRoomsSync() {
+		HttpURLConnection conn = null;
+		try {
+			URL url = new URL(PlayAlongProtocol.relayRoomsUrl());
+			conn = (HttpURLConnection) url.openConnection();
+			conn.setConnectTimeout(4000);
+			conn.setReadTimeout(4000);
+			conn.setRequestMethod("GET");
+			conn.setRequestProperty("Accept", "application/json");
+			int code = conn.getResponseCode();
+			if (code != 200) return new ArrayList<>();
+			StringBuilder sb = new StringBuilder();
+			try (BufferedReader reader = new BufferedReader(
+					new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+				String line;
+				while ((line = reader.readLine()) != null) {
+					sb.append(line);
+				}
+			}
+			RoomListing[] parsed = PlayAlongProtocol.GSON.fromJson(sb.toString(), RoomListing[].class);
+			if (parsed == null) return new ArrayList<>();
+			return new ArrayList<>(Arrays.asList(parsed));
+		} catch (Exception e) {
+			return new ArrayList<>();
+		} finally {
+			if (conn != null) conn.disconnect();
+		}
+	}
+
+	/** Enable relay hosting from the community lobby (desktop + Android). */
+	public static void enableCommunityHostFromLobby() {
+		if (!canHostPlayAlong()) {
+			GLog.w(Messages.get(PlayAlongService.class, "host_desktop_only"));
+			return;
+		}
+		SPDSettings.playAlongHostEnabled(true);
+		SPDSettings.playAlongRelayHost(true);
+		ensureHostServerStarted();
+		onHostSettingChanged(true);
+		if (DeviceCompat.isAndroid()) {
+			GLog.p(Messages.get(PlayAlongService.class, "host_lobby_ready_android"));
+		} else {
+			GLog.p(Messages.get(PlayAlongService.class, "host_lobby_ready"));
+		}
+	}
+
+	/** Join a listed or typed room after a successful status ping. */
+	public static void openJoinLobbyForRoom(String roomCode) {
+		if (roomCode == null || roomCode.isEmpty()) return;
+		SPDSettings.playAlongLastRoom(roomCode);
+		final String url = PlayAlongProtocol.relayJoinAddress(roomCode);
+		PlayAlongClient.pingStatus(url, info -> Game.runOnRenderThread(() -> {
+			if (info == null || (!info.active && !info.inDungeon)) {
+				GLog.w(Messages.get(PlayAlongService.class, "code_offline"));
+				return;
+			}
+			clientServerAddress = url;
+			discoveredAddress = url;
+			liveSessionInfo = info;
+			if (Game.scene() != null) {
+				Game.scene().addToFront(new WndPlayAlongJoin(info));
+			}
+		}));
 	}
 
 	// ---- Title Screen Live Status Polling ----
@@ -527,7 +709,7 @@ public final class PlayAlongService {
 		lastPollTimeMs = now;
 		// The host's own title button watches the local server. Everyone else
 		// tries the public relay room first, then the direct host:port fallback.
-		if (DeviceCompat.isDesktop() && hostServer != null) {
+		if (canHostPlayAlong() && hostServer != null) {
 			PlayAlongClient.pingStatus("127.0.0.1:" + SPDSettings.playAlongPort(), info -> {
 				statusPolling = false;
 				applyPolledSession(info, null, false);
@@ -596,7 +778,7 @@ public final class PlayAlongService {
 	}
 
 	public static void onHostSettingChanged(boolean enabled) {
-		if (!DeviceCompat.isDesktop()) return;
+		if (!canHostPlayAlong()) return;
 		if (enabled) {
 			ensureHostServerStarted();
 			if (role == Role.NONE && !isClientJoining()
@@ -615,7 +797,7 @@ public final class PlayAlongService {
 	}
 
 	public static void onHostSaveDeleted(String deletedSessionId) {
-		if (!DeviceCompat.isDesktop() || hostServer == null
+		if (!canHostPlayAlong() || hostServer == null
 				|| deletedSessionId == null || deletedSessionId.trim().isEmpty()) {
 			return;
 		}
@@ -627,7 +809,7 @@ public final class PlayAlongService {
 
 	private static void startOrResumeHostSession(boolean allowResumeExisting, boolean isLoadedSave,
 	                                             boolean persistIdIfNew) {
-		if (!DeviceCompat.isDesktop() || isClientJoining()
+		if (!canHostPlayAlong() || isClientJoining()
 				|| role == Role.CLIENT || role == Role.SPECTATOR) {
 			return;
 		}
@@ -1195,6 +1377,7 @@ public final class PlayAlongService {
 			hostPos = Dungeon.hero.pos;
 			hostServer.updateHostState(hg);
 			hostServer.updateHostVitals(Dungeon.hero.HP, Dungeon.hero.HT);
+			publishRelayMeta();
 		} else if ((role == Role.CLIENT || role == Role.SPECTATOR) && client != null) {
 			if (role == Role.CLIENT) {
 				maybeFlushKillExpOnDepthChange();
@@ -1332,7 +1515,12 @@ public final class PlayAlongService {
 
 	public static void broadcastHostChatCommand(ChatCommandPayload payload) {
 		if (payload == null) return;
-		if (!"spawn_scale_config".equals(payload.command) && !SPDSettings.playAlongSharedChat()) {
+		boolean isConfig = "spawn_scale_config".equals(payload.command);
+		if (!isConfig && !SPDSettings.playAlongSharedChat()) {
+			return;
+		}
+		// Chat mirrors (and stream economy) only while this host holds dalton.
+		if (!isConfig && !hostHoldsStreamRoom()) {
 			return;
 		}
 		if (role == Role.HOST && hostServer != null) {

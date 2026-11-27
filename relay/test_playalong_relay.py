@@ -325,20 +325,26 @@ async def test_private_room_reclaim():
 
 
 async def test_named_public_room():
-    config = RelayConfig(host="127.0.0.1", port=0, reserved_token="t", max_players=8)
+    config = RelayConfig(
+        host="127.0.0.1",
+        port=0,
+        reserved_token="t",
+        max_players=8,
+        reclaim_grace=120.0,
+    )
     relay, server, port = await _start(config)
     base = "ws://127.0.0.1:%d" % port
     try:
-        bad = await connect(base + "/host/freddy", open_timeout=2)
-        await bad.send(json.dumps({"t": "auth", "d": "nope-secret"}))
-        # First claim binds; "bad" here is actually the first host — rename flow:
-        room_bad = await _recv_json(bad)
-        assert room_bad["t"] == "room" and room_bad["d"] == "freddy", room_bad
-        assert "k" not in room_bad or not room_bad.get("k")
-        await bad.close()
+        first = await connect(base + "/host/freddy", open_timeout=2)
+        await first.send(json.dumps({"t": "auth", "d": "nope-secret"}))
+        room_first = await _recv_json(first)
+        assert room_first["t"] == "room" and room_first["d"] == "freddy", room_first
+        assert room_first.get("k") == "nope-secret"
+        await first.close()
+        await asyncio.sleep(0.05)
 
-        # Claim survives host disconnect (process lifetime).
-        assert "freddy" in relay.claims
+        # Name is held for reclaim_grace, not process lifetime.
+        assert "freddy" in relay.reclaim
 
         thief = await connect(base + "/host/freddy", open_timeout=2)
         await thief.send(json.dumps({"t": "auth", "d": "other-secret"}))
@@ -378,6 +384,125 @@ async def test_named_public_room():
             assert "join_error" not in raw
         except ConnectionClosed as exc:
             assert exc.rcvd is not None and exc.rcvd.code == 1013
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
+def _http_rooms(port: int):
+    with urllib.request.urlopen("http://127.0.0.1:%d/rooms" % port, timeout=2) as resp:
+        body = resp.read().decode("utf-8")
+        if resp.status != 200:
+            raise AssertionError("rooms status %s" % resp.status)
+        return json.loads(body)
+
+
+async def test_rooms_list_meta_and_official():
+    config = RelayConfig(
+        host="127.0.0.1",
+        port=0,
+        reserved_room="dalton",
+        reserved_token="s3cret-token",
+        rooms_cache_seconds=0.5,
+        meta_min_interval=0.0,
+    )
+    relay, server, port = await _start(config)
+    base = "ws://127.0.0.1:%d" % port
+    try:
+        # Private room must never appear in /rooms.
+        private = await connect(base + "/host", open_timeout=2)
+        priv_room = await _recv_json(private)
+        priv_code = priv_room["d"]
+
+        named = await connect(base + "/host/freddy", open_timeout=2)
+        await named.send(json.dumps({"t": "auth", "d": "named-secret"}))
+        named_room = await _recv_json(named)
+        assert named_room["d"] == "freddy"
+
+        # Host cannot set official; blocked keys dropped; displayName sanitized.
+        await named.send(json.dumps({
+            "t": "meta",
+            "d": {
+                "displayName": "Freddy's Run",
+                "version": "4.0.2-QoL",
+                "protocolVersion": 1,
+                "hostDepth": 7,
+                "inDungeon": True,
+                "official": True,
+                "evilKey": "nope",
+            },
+        }))
+        await asyncio.sleep(0.05)
+        relay.invalidate_rooms_cache()
+        listing = await asyncio.to_thread(_http_rooms, port)
+        codes = {row["code"]: row for row in listing}
+        assert priv_code not in codes
+        assert "freddy" in codes
+        assert codes["freddy"].get("official") is False
+        assert codes["freddy"]["displayName"] == "Freddy's Run"
+        assert codes["freddy"]["hostDepth"] == 7
+        assert codes["freddy"]["inDungeon"] is True
+        assert "evilKey" not in codes["freddy"]
+
+        host = await connect(base + "/host/dalton", open_timeout=2)
+        await host.send(json.dumps({"t": "auth", "d": "s3cret-token"}))
+        dalton = await _recv_json(host)
+        assert dalton["d"] == "dalton"
+        await host.send(json.dumps({
+            "t": "meta",
+            "d": {"displayName": "Fake Official", "official": False},
+        }))
+        await asyncio.sleep(0.05)
+        relay.invalidate_rooms_cache()
+        listing = await asyncio.to_thread(_http_rooms, port)
+        codes = {row["code"]: row for row in listing}
+        assert codes["dalton"]["official"] is True
+        assert codes["dalton"]["displayName"] == "Fake Official"
+
+        # Blocked public names refuse host path.
+        blocked = await connect(base + "/host/daltongoesfast", open_timeout=2)
+        closed = await _expect_closed(blocked)
+        assert closed.rcvd is not None and closed.rcvd.code == 1008
+
+        await private.close()
+        await named.close()
+        await host.close()
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
+async def test_named_room_frees_after_reclaim():
+    config = RelayConfig(
+        host="127.0.0.1",
+        port=0,
+        reserved_token="t",
+        reclaim_grace=0.3,
+    )
+    relay, server, port = await _start(config)
+    base = "ws://127.0.0.1:%d" % port
+    try:
+        host = await connect(base + "/host/freddy", open_timeout=2)
+        await host.send(json.dumps({"t": "auth", "d": "old-secret"}))
+        room = await _recv_json(host)
+        assert room["d"] == "freddy"
+        assert room.get("k") == "old-secret"
+        await host.close()
+        for _ in range(20):
+            if "freddy" in relay.reclaim:
+                break
+            await asyncio.sleep(0.05)
+        assert "freddy" in relay.reclaim
+
+        await asyncio.sleep(0.45)
+        assert not relay._secret_locked("freddy")
+
+        # New secret can claim after reclaim expires.
+        host2 = await connect(base + "/host/freddy", open_timeout=2)
+        await host2.send(json.dumps({"t": "auth", "d": "new-secret"}))
+        room2 = await _recv_json(host2)
+        assert room2["d"] == "freddy" and room2.get("k") == "new-secret"
+        await host2.close()
     finally:
         server.close()
         await server.wait_closed()
@@ -485,6 +610,8 @@ async def main():
     await test_player_frame_limits()
     await test_private_room_reclaim()
     await test_named_public_room()
+    await test_rooms_list_meta_and_official()
+    await test_named_room_frees_after_reclaim()
     await test_slow_player_does_not_stall_room()
     await test_outbound_queue_bounds_bytes()
     print("playalong relay tests passed")

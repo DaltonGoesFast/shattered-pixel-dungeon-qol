@@ -994,7 +994,7 @@ public class WndSettings extends WndTabbed {
 				add(btnJoinRoomCode);
 			}
 
-			if (DeviceCompat.isDesktop()) {
+			if (DeviceCompat.isDesktop() || DeviceCompat.isAndroid()) {
 				hdrPlayAlongHost = PixelScene.renderTextBlock(Messages.get(this, "playalong_section_host"), 8);
 				hdrPlayAlongHost.hardlight(TITLE_COLOR);
 				add(hdrPlayAlongHost);
@@ -1004,6 +1004,10 @@ public class WndSettings extends WndTabbed {
 					protected void onClick() {
 						super.onClick();
 						SPDSettings.playAlongHostEnabled(checked());
+						if (checked() && DeviceCompat.isAndroid()) {
+							SPDSettings.playAlongRelayHost(true);
+							if (chkPlayAlongRelay != null) chkPlayAlongRelay.checked(true);
+						}
 						com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.onHostSettingChanged(checked());
 					}
 				};
@@ -1058,7 +1062,7 @@ public class WndSettings extends WndTabbed {
 						text(Messages.get(DataTab.this,
 								showPlayAlongAdvanced ? "playalong_advanced_hide" : "playalong_advanced_show"));
 						applyPlayAlongAdvancedVisibility();
-						layout();
+						DataTab.this.layout();
 						resizePlayAlongParent();
 					}
 				};

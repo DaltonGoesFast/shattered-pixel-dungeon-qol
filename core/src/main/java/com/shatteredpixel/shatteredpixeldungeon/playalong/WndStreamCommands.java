@@ -332,6 +332,12 @@ public class WndStreamCommands extends WndTabbed {
 
 	private void refreshEconomy(boolean showSpinStatus) {
 		if (isWindowDestroyed() || fetchingEconomy) return;
+		if (!PlayAlongService.streamFeaturesVisible()) {
+			statusText = "Stream features only on Dalton's room.";
+			statusColor = 0xAAAAAA;
+			if (showSpinStatus) rebuildAllPreservingScroll();
+			return;
+		}
 		fetchingEconomy = true;
 		if (showSpinStatus) {
 			statusText = "Refreshing...";

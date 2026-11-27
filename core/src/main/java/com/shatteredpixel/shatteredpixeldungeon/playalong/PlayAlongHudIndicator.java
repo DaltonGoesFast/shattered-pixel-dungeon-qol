@@ -116,7 +116,8 @@ public class PlayAlongHudIndicator extends StyledButton {
 	@Override
 	protected void onClick() {
 		super.onClick();
-		int tab = (PlayAlongService.isHosting() || PlayAlongService.isSpectating())
+		boolean stream = PlayAlongService.streamFeaturesVisible();
+		int tab = (PlayAlongService.isHosting() || PlayAlongService.isSpectating() || !stream)
 				? WndStreamCommands.TAB_ROSTER
 				: WndStreamCommands.TAB_SPAWN;
 		GameScene.show(new WndStreamCommands(tab));

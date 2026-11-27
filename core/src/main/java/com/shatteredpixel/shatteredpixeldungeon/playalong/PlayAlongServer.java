@@ -122,7 +122,14 @@ public class PlayAlongServer extends WebSocketServer {
 	private ExecutorService httpPool;
 
 	public PlayAlongServer(int port, HostCallbacks callbacks) {
-		super(new InetSocketAddress("0.0.0.0", port),
+		// Android hosts only dial out via the relay; bind loopback so nothing
+		// listens on the public interface. Desktop keeps 0.0.0.0 for Playit.
+		this(com.watabou.utils.DeviceCompat.isAndroid() ? "127.0.0.1" : "0.0.0.0",
+				port, callbacks);
+	}
+
+	public PlayAlongServer(String bindHost, int port, HostCallbacks callbacks) {
+		super(new InetSocketAddress(bindHost == null || bindHost.isEmpty() ? "0.0.0.0" : bindHost, port),
 				Collections.singletonList(PlayAlongProtocol.websocketDraft()));
 		this.callbacks = callbacks;
 		setReuseAddr(true);
@@ -284,6 +291,9 @@ public class PlayAlongServer extends WebSocketServer {
 		if (session == null || !session.active || payload == null) return;
 
 		boolean isConfig = "spawn_scale_config".equals(payload.command);
+		if (!isConfig && !PlayAlongService.hostHoldsStreamRoom()) {
+			return;
+		}
 		if (!isConfig) {
 			enqueueChatCommand(payload);
 			return;
@@ -700,6 +710,7 @@ public class PlayAlongServer extends WebSocketServer {
 			rec.claimedBossDepths.add(depth);
 		}
 
+		if (!PlayAlongService.hostHoldsStreamRoom()) return;
 		String token = (msg.clientToken != null && !msg.clientToken.trim().isEmpty())
 				? msg.clientToken.trim() : rec.clientToken;
 		triggerMilestoneRewardAsync(conn, rec, session.sessionId, token, "boss_" + depth, depth);
@@ -709,6 +720,7 @@ public class PlayAlongServer extends WebSocketServer {
 		ClientRecord rec = connToClient.get(conn);
 		SessionInfo session = activeSession;
 		if (rec == null || session == null || !session.active) return;
+		if (!PlayAlongService.hostHoldsStreamRoom()) return;
 
 		int exp = msg.killExp;
 		if (exp <= 0) return;
@@ -903,7 +915,9 @@ public class PlayAlongServer extends WebSocketServer {
 		final String reqId = msg.requestId;
 		submitHttp(() -> {
 			SessionInfo snap = snapshotSessionInfo();
-			StreamEconomyState eco = fetchEconomyStateFromOverlay(token, snap);
+			StreamEconomyState eco = PlayAlongService.hostHoldsStreamRoom()
+					? fetchEconomyStateFromOverlay(token, snap)
+					: disabledEconomy(snap);
 			WireMessage resp = new WireMessage();
 			resp.type = "stream_state_resp";
 			resp.requestId = reqId;
@@ -920,6 +934,13 @@ public class PlayAlongServer extends WebSocketServer {
 			WireMessage resp = new WireMessage();
 			resp.type = "stream_link_resp";
 			resp.requestId = reqId;
+			if (!PlayAlongService.hostHoldsStreamRoom()) {
+				resp.commandOk = false;
+				resp.message = "Stream features are only available in Dalton's room.";
+				resp.economy = disabledEconomy(snap);
+				safeSend(conn, PlayAlongProtocol.GSON.toJson(resp));
+				return;
+			}
 			try {
 				JsonObject body = new JsonObject();
 				body.addProperty("token", token);
@@ -952,6 +973,13 @@ public class PlayAlongServer extends WebSocketServer {
 			WireMessage resp = new WireMessage();
 			resp.type = "stream_cmd_resp";
 			resp.requestId = reqId;
+			if (!PlayAlongService.hostHoldsStreamRoom()) {
+				resp.commandOk = false;
+				resp.message = "Stream features are only available in Dalton's room.";
+				resp.economy = disabledEconomy(snap);
+				safeSend(conn, PlayAlongProtocol.GSON.toJson(resp));
+				return;
+			}
 			try {
 				JsonObject body = new JsonObject();
 				body.addProperty("token", token);
@@ -987,6 +1015,7 @@ public class PlayAlongServer extends WebSocketServer {
 	                                         final String sessionId, final String token,
 	                                         final String milestone, final int bossDepth) {
 		if (token == null || token.isEmpty()) return;
+		if (!PlayAlongService.hostHoldsStreamRoom()) return;
 		submitHttp(() -> {
 			try {
 				JsonObject body = new JsonObject();
@@ -1024,6 +1053,7 @@ public class PlayAlongServer extends WebSocketServer {
 	}
 
 	private void syncLinkedUsernameForJoin(ClientRecord rec, String token, String shortSuffix) {
+		if (!PlayAlongService.hostHoldsStreamRoom()) return;
 		try {
 			StreamEconomyState eco = fetchEconomyStateFromOverlay(token, snapshotSessionInfo());
 			if (eco != null && eco.linked && eco.linkedUsername != null && !eco.linkedUsername.trim().isEmpty()) {
@@ -1036,6 +1066,20 @@ public class PlayAlongServer extends WebSocketServer {
 			}
 		} catch (Exception ignored) {
 		}
+	}
+
+	private static StreamEconomyState disabledEconomy(SessionInfo snap) {
+		StreamEconomyState eco = new StreamEconomyState();
+		eco.serverOnline = false;
+		eco.spendDisabled = true;
+		if (snap != null) {
+			eco.inDungeon = snap.inDungeon;
+			eco.playAlongActive = snap.active;
+			eco.hostDepth = snap.hostDepth;
+			eco.hostHp = snap.hostHp;
+			eco.hostHt = snap.hostHt;
+		}
+		return eco;
 	}
 
 	private StreamEconomyState fetchEconomyStateFromOverlay(String token, SessionInfo snap) {

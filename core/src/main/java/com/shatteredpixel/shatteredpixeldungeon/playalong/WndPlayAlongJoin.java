@@ -108,16 +108,18 @@ public class WndPlayAlongJoin extends Window {
 		add(linkInfo);
 		pos = linkInfo.bottom() + GAP;
 
-		RedButton btnCommands = new RedButton("STREAM COMMANDS & POINTS", 7) {
-			@Override
-			protected void onClick() {
-				ShatteredPixelDungeon.scene().addToFront(new WndStreamCommands());
-			}
-		};
-		btnCommands.textColor(0x55FF55);
-		btnCommands.setRect(0, pos, WIDTH, 18);
-		add(btnCommands);
-		pos = btnCommands.bottom() + GAP;
+		if (PlayAlongService.streamFeaturesVisible()) {
+			RedButton btnCommands = new RedButton("STREAM COMMANDS & POINTS", 7) {
+				@Override
+				protected void onClick() {
+					ShatteredPixelDungeon.scene().addToFront(new WndStreamCommands());
+				}
+			};
+			btnCommands.textColor(0x55FF55);
+			btnCommands.setRect(0, pos, WIDTH, 18);
+			add(btnCommands);
+			pos = btnCommands.bottom() + GAP;
+		}
 
 		if (session.active) {
 			int chalCount = Challenges.activeChallenges(session.challenges);

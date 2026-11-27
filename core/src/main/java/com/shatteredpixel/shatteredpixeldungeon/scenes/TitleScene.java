@@ -205,14 +205,13 @@ public class TitleScene extends PixelScene {
 		btnJournal.icon(Icons.get(Icons.JOURNAL));
 		add(btnJournal);
 
-		btnNews = new StyledButton(GREY_TR, Messages.get(this, "mod_changes")){
+		btnNews = new StyledButton(GREY_TR, Messages.get(this, "playalong")){
 			@Override
 			protected void onClick() {
-				ModChangesScene.tabSelected = 0;
-				ShatteredPixelDungeon.switchNoFade( ModChangesScene.class );
+				ShatteredPixelDungeon.scene().addToFront(new com.shatteredpixel.shatteredpixeldungeon.playalong.WndPlayAlongLobby());
 			}
 		};
-		btnNews.icon(Icons.getSettings(Icons.SETTINGS_QOL));
+		btnNews.icon(Icons.get(Icons.ENTER));
 		add(btnNews);
 
 		btnChanges = new ChangesButton(GREY_TR, Messages.get(this, "changes"));

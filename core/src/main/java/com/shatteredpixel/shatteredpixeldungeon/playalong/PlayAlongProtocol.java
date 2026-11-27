@@ -88,17 +88,36 @@ public final class PlayAlongProtocol {
 
 	/**
 	 * When false, Join-with-room-code UI is hidden everywhere. Dalton's
-	 * title-screen Play Along drop-in is unchanged. Flip to true to re-enable.
+	 * title-screen Play Along drop-in is unchanged.
 	 */
-	public static final boolean ROOM_CODES_ENABLED = false;
+	public static final boolean ROOM_CODES_ENABLED = true;
+
+	/** Lobby clients should poll {@link #relayRoomsUrl()} on this interval. */
+	public static final long ROOMS_POLL_INTERVAL_MS = 12_000L;
 
 	public static final Gson GSON = new Gson();
 
 	private static final Pattern USERNAME_PATTERN = Pattern.compile("^[a-zA-Z0-9_ ]{3,16}$");
 
 	private static final List<String> RESERVED_HOST_NAMES = Arrays.asList(
-			"dalton", "daltongoesfast", "host", "streamer"
+			"dalton", "daltongoesfast", "host", "streamer",
+			"official", "admin", "moderator", "mod", "staff", "system", "server",
+			"playalong", "spd"
 	);
+
+	/** Public lobby row from relay {@code GET /rooms}. */
+	public static class RoomListing {
+		public String code = "";
+		public boolean official = false;
+		public int players = 0;
+		public String displayName = "";
+		public String version = "";
+		public int protocolVersion = 0;
+		public int hostDepth = 0;
+		public boolean inDungeon = false;
+		public int challenges = 0;
+		public int modifiers = 0;
+	}
 
 	// Mirrors Lastest UI/hero_name_blocklist.txt for client/cross-platform stream safety.
 	private static final List<String> NAME_BLOCKLIST = Arrays.asList(
@@ -373,12 +392,41 @@ public final class PlayAlongProtocol {
 		return true;
 	}
 
-	/** Custom public slug (not the reserved {@code dalton} room). */
+	/** Custom public slug (not the reserved {@code dalton} room / blocked lookalikes). */
 	public static boolean isPublicRoomName(String room) {
 		if (room == null) return false;
 		String s = room.trim().toLowerCase(Locale.ROOT);
 		if (s.equals(SPDSettings.PLAY_ALONG_RELAY_ROOM)) return false;
+		if (isBlockedPublicRoomName(s)) return false;
 		return PUBLIC_ROOM_NAME.matcher(s).matches();
+	}
+
+	/** Matches relay blocked public slugs / dalton lookalikes. */
+	public static boolean isBlockedPublicRoomName(String room) {
+		if (room == null || room.isEmpty()) return true;
+		String lower = room.trim().toLowerCase(Locale.ROOT);
+		String collapsed = lower.replaceAll("[^a-z0-9]", "");
+		if (collapsed.contains("dalton")) return true;
+		for (String reserved : RESERVED_HOST_NAMES) {
+			if (lower.equals(reserved) || collapsed.equals(reserved.replace("_", ""))) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** True when a lobby row matches this client's protocol / game version. */
+	public static boolean roomListingCompatible(RoomListing room, String localVersion) {
+		if (room == null) return false;
+		if (room.protocolVersion > 0 && room.protocolVersion != PROTOCOL_VERSION) {
+			return false;
+		}
+		if (room.version != null && !room.version.isEmpty()
+				&& localVersion != null && !localVersion.isEmpty()
+				&& !room.version.equals(localVersion)) {
+			return false;
+		}
+		return true;
 	}
 
 	/** Reserved or custom public name — not a private random code. */
@@ -411,6 +459,20 @@ public final class PlayAlongProtocol {
 	/** Public drop-in URL. Viewers of Dalton's stream use this with no room code. */
 	public static String daltonJoinAddress() {
 		return relayJoinAddress(SPDSettings.PLAY_ALONG_RELAY_ROOM);
+	}
+
+	/**
+	 * HTTP URL for {@code GET /rooms}. Converts {@code wss://} → {@code https://}
+	 * and {@code ws://} → {@code http://}.
+	 */
+	public static String relayRoomsUrl() {
+		String base = relayBase();
+		if (base.startsWith("wss://")) {
+			base = "https://" + base.substring("wss://".length());
+		} else if (base.startsWith("ws://")) {
+			base = "http://" + base.substring("ws://".length());
+		}
+		return base + "/rooms";
 	}
 
 	public static String relayJoinAddress(String room) {

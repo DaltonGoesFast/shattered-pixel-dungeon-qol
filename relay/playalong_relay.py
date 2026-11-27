@@ -24,10 +24,12 @@ Topology
     code; the game's title-screen button does that itself.
 
 * Host  ->  ws://127.0.0.1:8765/host/<name>
-    Custom public room (slug ``[a-z][a-z0-9_-]{2,23}``, not ``dalton``). Same
-    auth frame; the first successful secret binds the name for the life of the
-    relay process. Matching secret takeovers; wrong secret is refused and does
-    not kick the live host. Joiners use ``/join/<name>`` with no secret.
+    Custom public room (slug ``[a-z][a-z0-9_-]{2,23}``, not ``dalton`` / blocked
+    lookalikes). Same auth frame; the secret binds the name while the host is
+    live and for ``reclaim_grace`` (default 2 minutes) after disconnect.
+    Matching secret takeovers / reclaim; wrong secret is refused and does not
+    kick the live host. After the reclaim window the name is free. Joiners use
+    ``/join/<name>`` with no secret.
 
 * Player -> ws://127.0.0.1:8765/join/<CODE-or-name>
     Unchanged Play Along JSON (``join``, ``status_ping``, ``player_state``, ...).
@@ -42,14 +44,20 @@ Host link multiplexing (host socket only)::
     {"t":"open","c":"<id>"}
     {"t":"msg","c":"<id>","d":"<raw player text>"}
     {"t":"close","c":"<id>"}
+    {"t":"meta","d":{...}}   # optional lobby listing fields (no ``official``)
 
 The host uses the same envelope to send ``msg`` and ``close`` back. ``d`` is a
-string, so player bytes are forwarded unchanged.
+string, so player bytes are forwarded unchanged. Meta ``d`` may be an object or
+a JSON object string; the relay sanitizes and stores it for ``GET /rooms``.
 
 Cloudflare terminates TLS. This process speaks plain WebSocket and binds
 127.0.0.1 by default. Point the tunnel at http://localhost:8765.
 
 GET /health returns plain text ``ok``.
+GET /rooms returns a JSON array of live **public** rooms (named + reserved).
+Private codes are never listed. ``official`` is set only by the relay for the
+token-held reserved room. Responses are cached a few seconds; clients should
+poll every 10–15s.
 """
 
 from __future__ import annotations
@@ -78,6 +86,51 @@ ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 # Custom public room names (stored lowercase). Not the reserved dalton room.
 PUBLIC_NAME_RE = re.compile(r"^[a-z][a-z0-9_-]{2,23}$")
 
+# Blocked public slugs (plus anything that collapses to dalton*). Keep in sync
+# with PlayAlongProtocol reserved / blocked host names on the game side.
+BLOCKED_PUBLIC_NAMES = frozenset({
+    "dalton",
+    "daltongoesfast",
+    "host",
+    "streamer",
+    "official",
+    "admin",
+    "moderator",
+    "mod",
+    "staff",
+    "system",
+    "server",
+    "playalong",
+    "spd",
+})
+
+# Host meta → /rooms. No host-supplied "official".
+META_ALLOWED_KEYS = frozenset({
+    "displayName",
+    "version",
+    "protocolVersion",
+    "hostDepth",
+    "activePlayers",
+    "inDungeon",
+    "challenges",
+    "modifiers",
+})
+META_DISPLAY_NAME_MAX = 24
+META_MAX_BYTES = 512
+META_MIN_INTERVAL = 2.0
+ROOMS_CACHE_SECONDS = 4.0
+# Separate from websocket connect limiting: lobbies poll /rooms.
+ROOMS_HTTP_RATE_LIMIT = 30
+ROOMS_HTTP_RATE_WINDOW = 30.0
+
+# Mirrors PlayAlongProtocol username blocklist (basic public-text filter).
+_META_NAME_BLOCKLIST = (
+    "nigger", "nigga", "faggot", "retard", "rape", "hitler", "nazi",
+    "pedo", "paedo", "fuck", "shit", "cunt", "asshole", "bitch",
+    "whore", "slut", "dick", "cock", "pussy", "porn", "sex",
+    "kill yourself", "kys",
+)
+
 
 @dataclass
 class RelayConfig:
@@ -99,8 +152,13 @@ class RelayConfig:
     rate_limit: int = 40
     rate_window: float = 30.0
     auth_timeout: float = 5.0
-    # How long a private code can be reclaimed after the host socket drops.
+    # How long a private/named room can be reclaimed after the host socket drops.
     reclaim_grace: float = 120.0
+    rooms_cache_seconds: float = ROOMS_CACHE_SECONDS
+    rooms_http_rate_limit: int = ROOMS_HTTP_RATE_LIMIT
+    rooms_http_rate_window: float = ROOMS_HTTP_RATE_WINDOW
+    meta_min_interval: float = META_MIN_INTERVAL
+    meta_max_bytes: int = META_MAX_BYTES
 
 
 # Host → player frames kept per socket. Older world snapshots are dropped
@@ -144,6 +202,9 @@ class Room:
         self.reserved = False
         # Custom public name claimed with a host-chosen secret (not env-reserved).
         self.named = False
+        # Sanitized lobby fields from host meta frames (never includes official).
+        self.meta: Dict[str, object] = {}
+        self.last_meta_at = 0.0
 
     async def send(self, text: str) -> None:
         async with self.send_lock:
@@ -157,22 +218,26 @@ class RateLimiter:
         self.events: Dict[str, Deque[float]] = {}
         self.lock = asyncio.Lock()
 
-    async def allow(self, ip: str) -> bool:
+    def allow_sync(self, ip: str) -> bool:
+        """Sync path for HTTP handlers (process_request)."""
         now = time.monotonic()
+        bucket = self.events.get(ip)
+        if bucket is None:
+            bucket = deque()
+            self.events[ip] = bucket
+        while bucket and now - bucket[0] > self.window:
+            bucket.popleft()
+        if len(bucket) >= self.limit:
+            return False
+        bucket.append(now)
+        if len(self.events) > 10000:
+            self.events.clear()
+            self.events[ip] = bucket
+        return True
+
+    async def allow(self, ip: str) -> bool:
         async with self.lock:
-            bucket = self.events.get(ip)
-            if bucket is None:
-                bucket = deque()
-                self.events[ip] = bucket
-            while bucket and now - bucket[0] > self.window:
-                bucket.popleft()
-            if len(bucket) >= self.limit:
-                return False
-            bucket.append(now)
-            if len(self.events) > 10000:
-                self.events.clear()
-                self.events[ip] = bucket
-            return True
+            return self.allow_sync(ip)
 
 
 def envelope(kind: str, client_id: str, payload: Optional[str] = None) -> str:
@@ -199,9 +264,29 @@ def token_matches(got: Optional[str], expected: str) -> bool:
     return hmac.compare_digest(got_b, exp_b)
 
 
+def collapse_public_name(name: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", (name or "").lower())
+
+
+def is_blocked_public_name(name: str, reserved_room: str = "dalton") -> bool:
+    """True for reserved/lookalike/blocked public slugs."""
+    if not name:
+        return True
+    lower = name.lower()
+    reserved = (reserved_room or "dalton").lower()
+    if lower == reserved:
+        return True
+    collapsed = collapse_public_name(lower)
+    if collapsed in BLOCKED_PUBLIC_NAMES or lower in BLOCKED_PUBLIC_NAMES:
+        return True
+    if collapsed == collapse_public_name(reserved) or "dalton" in collapsed:
+        return True
+    return False
+
+
 def is_public_room_name(name: str, reserved_room: str = "dalton") -> bool:
-    """True when name is a custom public slug (not the env-reserved room)."""
-    if not name or name == reserved_room.lower():
+    """True when name is a custom public slug (not reserved / blocked)."""
+    if not name or is_blocked_public_name(name, reserved_room):
         return False
     return PUBLIC_NAME_RE.match(name) is not None
 
@@ -212,26 +297,163 @@ def is_private_room_code(code: str) -> bool:
     return all(ch in ALPHABET for ch in code)
 
 
+def sanitize_display_name(raw: object) -> str:
+    if not isinstance(raw, str):
+        return ""
+    # Strip controls and collapse whitespace.
+    cleaned = "".join(ch for ch in raw if ch.isprintable() and ch not in "\r\n\t")
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    if len(cleaned) > META_DISPLAY_NAME_MAX:
+        cleaned = cleaned[:META_DISPLAY_NAME_MAX].rstrip()
+    lower = cleaned.lower()
+    for bad in _META_NAME_BLOCKLIST:
+        if bad in lower:
+            return ""
+    return cleaned
+
+
+def sanitize_host_meta(raw: object, max_bytes: int) -> Dict[str, object]:
+    """Return a sanitized meta dict, or {} when invalid / oversized."""
+    data = raw
+    if isinstance(raw, str):
+        if len(raw.encode("utf-8")) > max_bytes:
+            return {}
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            return {}
+    if not isinstance(data, dict):
+        return {}
+    try:
+        encoded = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
+    except (TypeError, ValueError):
+        return {}
+    if len(encoded.encode("utf-8")) > max_bytes:
+        return {}
+    out: Dict[str, object] = {}
+    for key, value in data.items():
+        if key not in META_ALLOWED_KEYS:
+            continue
+        if key == "displayName":
+            name = sanitize_display_name(value)
+            if name:
+                out[key] = name
+            continue
+        if key in ("version",):
+            if isinstance(value, str):
+                text = "".join(ch for ch in value if ch.isprintable())[:32].strip()
+                if text:
+                    out[key] = text
+            continue
+        if key == "protocolVersion":
+            if isinstance(value, bool):
+                continue
+            if isinstance(value, int) and 0 <= value <= 999:
+                out[key] = value
+            elif isinstance(value, float) and value.is_integer() and 0 <= value <= 999:
+                out[key] = int(value)
+            continue
+        if key in ("hostDepth", "activePlayers", "challenges", "modifiers"):
+            if isinstance(value, bool):
+                continue
+            if isinstance(value, int) and -1 <= value <= 1_000_000:
+                out[key] = value
+            elif isinstance(value, float) and value.is_integer() and -1 <= value <= 1_000_000:
+                out[key] = int(value)
+            continue
+        if key == "inDungeon":
+            if isinstance(value, bool):
+                out[key] = value
+            continue
+    return out
+
+
+def request_client_ip(request) -> str:
+    if request is not None:
+        for key in ("CF-Connecting-IP", "X-Forwarded-For"):
+            value = request.headers.get(key)
+            if value:
+                return value.split(",")[0].strip()
+    return "?"
+
+
 class Relay:
     def __init__(self, config: RelayConfig) -> None:
         self.config = config
         self.rooms: Dict[str, Room] = {}
-        # code -> (host_secret, expiry monotonic). Private rooms only.
+        # code/name -> (host_secret, expiry monotonic). Private + named rooms.
         self.reclaim: Dict[str, tuple] = {}
-        # lowercase public name -> host secret. Process lifetime.
-        self.claims: Dict[str, str] = {}
         self.rooms_lock = asyncio.Lock()
         self.limiter = RateLimiter(config.rate_limit, config.rate_window)
+        self.rooms_http_limiter = RateLimiter(
+            config.rooms_http_rate_limit, config.rooms_http_rate_window
+        )
+        self._rooms_cache_body = "[]\n"
+        self._rooms_cache_until = 0.0
 
     def process_request(self, connection: ServerConnection, request):
         path = route_path(request.path)
         if path == "/health" or path == "/health/":
             return connection.respond(200, "ok\n")
+        if path == "/rooms" or path == "/rooms/":
+            ip = request_client_ip(request)
+            if not self.rooms_http_limiter.allow_sync(ip):
+                return connection.respond(429, "rate limited\n")
+            body = self.rooms_list_cached()
+            # websockets 15 respond(status, text) — JSON body; clients poll slowly.
+            return connection.respond(200, body)
         # Apply this before data frames are parsed so an oversized player
         # payload is rejected from its header instead of buffered.
         if path.startswith("/join/"):
             connection.protocol.max_size = self.config.max_player_message_bytes
         return None
+
+    def rooms_list_cached(self) -> str:
+        now = time.monotonic()
+        if now < self._rooms_cache_until:
+            return self._rooms_cache_body
+        body = self.build_rooms_list_json()
+        self._rooms_cache_body = body
+        self._rooms_cache_until = now + max(0.5, self.config.rooms_cache_seconds)
+        return body
+
+    def invalidate_rooms_cache(self) -> None:
+        self._rooms_cache_until = 0.0
+
+    def build_rooms_list_json(self) -> str:
+        """Public/named/reserved rooms with a live ready host. Never private codes."""
+        listing = []
+        # Snapshot values; mutations happen on the event loop.
+        for room in list(self.rooms.values()):
+            if room.closed or not room.ready:
+                continue
+            if not room.reserved and not room.named:
+                continue
+            players = len(room.players)
+            entry = {
+                "code": room.code,
+                "official": bool(room.reserved),
+                "players": players,
+            }
+            meta = room.meta or {}
+            if "displayName" in meta:
+                entry["displayName"] = meta["displayName"]
+            if "version" in meta:
+                entry["version"] = meta["version"]
+            if "protocolVersion" in meta:
+                entry["protocolVersion"] = meta["protocolVersion"]
+            if "hostDepth" in meta:
+                entry["hostDepth"] = meta["hostDepth"]
+            if "inDungeon" in meta:
+                entry["inDungeon"] = meta["inDungeon"]
+            if "challenges" in meta:
+                entry["challenges"] = meta["challenges"]
+            if "modifiers" in meta:
+                entry["modifiers"] = meta["modifiers"]
+            # Prefer relay socket count over host-reported activePlayers.
+            listing.append(entry)
+        listing.sort(key=lambda item: (not item.get("official", False), item.get("code", "")))
+        return json.dumps(listing, separators=(",", ":"), ensure_ascii=False) + "\n"
 
     async def start(self):
         return await serve(
@@ -298,15 +520,15 @@ class Relay:
                 room = await self.adopt_room(
                     ws, upper, ip, reserved=False, host_secret=secret
                 )
-                if room is not None:
-                    await self.handle_host_frames(room)
-                return
+            if room is not None:
+                await self.handle_host_frames(room)
+            return
         if is_public_room_name(lower, self.config.reserved_room):
             secret = await self.authorize_named_claim(ws, lower)
             if secret is None:
                 return
             room = await self.adopt_room(
-                ws, lower, ip, reserved=False, host_secret="", named=True
+                ws, lower, ip, reserved=False, host_secret=secret, named=True
             )
             if room is not None:
                 await self.handle_host_frames(room)
@@ -352,7 +574,7 @@ class Relay:
         return expected
 
     async def authorize_named_claim(self, ws: ServerConnection, name: str) -> Optional[str]:
-        """Bind or match a process-lifetime secret for a custom public name."""
+        """Bind or match a reclaim-window secret for a custom public name."""
         token = await self._recv_auth_token(ws)
         if token is None:
             return None
@@ -361,15 +583,24 @@ class Relay:
             await _safe_close(ws, 4001, "unauthorized")
             return None
         async with self.rooms_lock:
-            expected = self.claims.get(name)
-            if expected is None:
-                self.claims[name] = token
-                return token
-            if token_matches(token, expected):
-                return expected
-        log.warning("named room auth failed name=%s", name)
-        await _safe_close(ws, 4001, "unauthorized")
-        return None
+            live = self.rooms.get(name)
+            if live is not None and not live.closed and live.named and live.host_secret:
+                if token_matches(token, live.host_secret):
+                    matched = live.host_secret
+                else:
+                    matched = None
+            else:
+                expected = self._secret_locked(name)
+                if expected:
+                    matched = expected if token_matches(token, expected) else None
+                else:
+                    # Name is free (or reclaim expired): first secret wins.
+                    matched = token
+        if matched is None:
+            log.warning("named room auth failed name=%s", name)
+            await _safe_close(ws, 4001, "unauthorized")
+            return None
+        return matched
 
     async def _recv_auth_token(self, ws: ServerConnection) -> Optional[str]:
         try:
@@ -404,8 +635,9 @@ class Relay:
             room = Room(code, ws)
             room.reserved = reserved
             room.named = named
-            # Named + reserved rooms: client already holds the secret; no "k".
-            if reserved or named:
+            # Reserved: token already proven; no reclaim secret on the wire.
+            # Named + private: keep host_secret for the reclaim window.
+            if reserved:
                 room.host_secret = ""
             else:
                 room.host_secret = host_secret or ""
@@ -413,16 +645,21 @@ class Relay:
             # emit "open" ahead of {"t":"room"}.
             self.rooms[code] = room
             self.reclaim.pop(code, None)
+            self.invalidate_rooms_cache()
         if old is not None:
             await self.close_room(old, "host replaced")
+        # Private rooms get "k" for reclaim. Named hosts already know their
+        # settings secret; still echo "k" so reconnect matches private UX.
+        wire_secret = "" if reserved else room.host_secret
         try:
-            await room.send(room_frame(code, room.host_secret))
+            await room.send(room_frame(code, wire_secret))
         except Exception:
             log.warning("room open failed code=%s", code)
             await self.close_room(room, "host send failed")
             return None
         async with room.lock:
             room.ready = True
+        self.invalidate_rooms_cache()
         log.info(
             "room open code=%s reserved=%s named=%s ip=%s",
             code,
@@ -439,7 +676,7 @@ class Relay:
                 code = "".join(secrets.choice(ALPHABET) for _ in range(length))
                 if code.lower() == reserved:
                     continue
-                if code.lower() in self.claims:
+                if is_blocked_public_name(code.lower(), self.config.reserved_room):
                     continue
                 if code.lower() in self.rooms:
                     continue
@@ -451,8 +688,6 @@ class Relay:
         async with self.rooms_lock:
             current = self.rooms.get(code)
             if current is not None and not current.closed:
-                return True
-            if code in self.claims:
                 return True
             return bool(self._secret_locked(code))
 
@@ -485,7 +720,7 @@ class Relay:
             return lower
         if private_shape and upper in self.rooms:
             return upper
-        if public_shape and lower in self.claims:
+        if public_shape and self._secret_locked(lower):
             return lower
         if private_shape and self._secret_locked(upper):
             return upper
@@ -508,6 +743,9 @@ class Relay:
                 if not isinstance(env, dict):
                     continue
                 kind = env.get("t")
+                if kind == "meta":
+                    self.apply_host_meta(room, env.get("d"))
+                    continue
                 cid = env.get("c")
                 if not isinstance(cid, str) or not cid:
                     continue
@@ -523,6 +761,21 @@ class Relay:
         finally:
             await self.close_room(room, "host disconnected")
 
+    def apply_host_meta(self, room: Room, raw: object) -> None:
+        if room.closed:
+            return
+        now = time.monotonic()
+        if now - room.last_meta_at < self.config.meta_min_interval:
+            return
+        cleaned = sanitize_host_meta(raw, self.config.meta_max_bytes)
+        if not cleaned:
+            return
+        # Hosts cannot claim official via meta; ignore if smuggled somehow.
+        cleaned.pop("official", None)
+        room.last_meta_at = now
+        room.meta = cleaned
+        self.invalidate_rooms_cache()
+
     async def handle_player(self, ws: ServerConnection, raw_code: str, ip: str) -> None:
         async with self.rooms_lock:
             code = self.resolve_join_key_locked(raw_code)
@@ -531,9 +784,7 @@ class Relay:
                 held = False
             else:
                 room = self.rooms.get(code)
-                held = room is None and (
-                    bool(self._secret_locked(code)) or code in self.claims
-                )
+                held = room is None and bool(self._secret_locked(code))
         if code is None:
             await self.reject_player(ws, "That room code is not valid.", "bad code")
             return
@@ -746,21 +997,23 @@ class Relay:
         async with self.rooms_lock:
             if self.rooms.get(room.code) is room:
                 del self.rooms[room.code]
-                # Named claims stay in self.claims for process lifetime.
+                # Private + named: reclaim window with host secret.
+                # Reserved dalton uses token auth on every connect (no reclaim).
                 if (
                     room.host_secret
                     and not room.reserved
-                    and not room.named
                     and reason != "host send failed"
                 ):
                     self.reclaim[room.code] = (
                         room.host_secret,
                         time.monotonic() + self.config.reclaim_grace,
                     )
+                self.invalidate_rooms_cache()
         async with room.lock:
             if room.closed:
                 return
             room.closed = True
+            room.meta = {}
             players = list(room.players.values())
             room.players.clear()
         log.info(

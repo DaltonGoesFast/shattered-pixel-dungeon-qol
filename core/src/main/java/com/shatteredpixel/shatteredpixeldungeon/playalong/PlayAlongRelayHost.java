@@ -308,6 +308,16 @@ public final class PlayAlongRelayHost {
 		}
 	}
 
+	/** Push sanitized lobby fields to the relay ({@code GET /rooms}). */
+	public boolean sendMeta(Object metaObject) {
+		if (metaObject == null || roomCode() == null) return false;
+		Env env = new Env();
+		env.t = "meta";
+		env.c = "";
+		env.d = PlayAlongProtocol.GSON.toJson(metaObject);
+		return sendEnvelope(env);
+	}
+
 	private void dropVirtuals() {
 		for (VirtualClient client : virtuals.values()) {
 			client.remoteClose();
