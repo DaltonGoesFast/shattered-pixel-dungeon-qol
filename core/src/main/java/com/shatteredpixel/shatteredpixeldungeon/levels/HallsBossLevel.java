@@ -32,6 +32,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.YogDzewa;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.YogFist;
 import com.shatteredpixel.shatteredpixeldungeon.effects.CellEmitter;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Pushing;
 import com.shatteredpixel.shatteredpixeldungeon.effects.particles.FlameParticle;
@@ -198,6 +199,24 @@ public class HallsBossLevel extends Level {
 
 	@Override
 	protected void createMobs() {
+	}
+
+	@Override
+	public void clearBossForAscent() {
+		for (Mob mob : mobs.toArray(new Mob[0])) {
+			if (mob instanceof YogDzewa || mob instanceof YogDzewa.Larva || mob instanceof YogFist
+					|| mob instanceof YogDzewa.YogRipper || mob instanceof YogDzewa.YogEye
+					|| mob instanceof YogDzewa.YogScorpio) {
+				mobs.remove(mob);
+			}
+		}
+		if (map[entrance()] != Terrain.ENTRANCE) {
+			set(entrance(), Terrain.ENTRANCE, this);
+		}
+		if (map[exit()] != Terrain.EXIT) {
+			set(exit(), Terrain.EXIT, this);
+		}
+		unlockClearedBoss();
 	}
 
 	public Actor addRespawner() {

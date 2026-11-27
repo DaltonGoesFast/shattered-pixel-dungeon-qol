@@ -264,6 +264,22 @@ public class CityBossLevel extends Level {
 	protected void createMobs() {
 	}
 
+	@Override
+	public void clearBossForAscent() {
+		for (Mob mob : mobs.toArray(new Mob[0])) {
+			if (mob instanceof DwarfKing) {
+				mobs.remove(mob);
+			}
+		}
+		if (map[topDoor] == Terrain.LOCKED_DOOR) {
+			set(topDoor, Terrain.DOOR, this);
+		}
+		if (map[bottomDoor] == Terrain.LOCKED_DOOR) {
+			set(bottomDoor, Terrain.DOOR, this);
+		}
+		unlockClearedBoss();
+	}
+
 	public Actor addRespawner() {
 		return null;
 	}

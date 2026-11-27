@@ -304,9 +304,12 @@ public class PrisonBossLevel extends Level {
 		
 		setMapStart();
 		
-		for (Heap h : heaps.valueList()){
+		for (Heap h : heaps.valueList().toArray(new Heap[0])){
 			if (h.peek() instanceof IronKey){
-				h.destroy();
+				// Heap.destroy() uses Dungeon.level, which is still null during Level.create().
+				heaps.remove(h.pos);
+				if (h.sprite != null) h.sprite.kill();
+				if (h.items != null) h.items.clear();
 			}
 		}
 		
@@ -610,6 +613,22 @@ public class PrisonBossLevel extends Level {
 	@Override
 	protected void createMobs() {
 		tengu = new Tengu(); //We want to keep track of tengu independently of other mobs, he's not always in the level.
+	}
+
+	@Override
+	public void clearBossForAscent() {
+		if (state == State.WON && !locked) return;
+		for (Mob mob : mobs.toArray(new Mob[0])) {
+			if (mob instanceof Tengu) mobs.remove(mob);
+		}
+		tengu = null;
+		// setMapEnd -> setMapStart adds the entrance and exit. Clear first so a second
+		// call during Level.create() does not stack duplicate transitions.
+		transitions.clear();
+		state = State.WON;
+		setMapEnd();
+		unlockClearedBoss();
+		buildFlagMaps();
 	}
 	
 	public Actor addRespawner() {

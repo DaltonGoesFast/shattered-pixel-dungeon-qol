@@ -336,6 +336,11 @@ public abstract class Level implements Bundlable {
 			}
 		}
 
+		if (com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongAscent.clearsBossOnBuild(
+				Statistics.amuletObtained, Dungeon.depth)) {
+			clearBossForAscent();
+		}
+
 		} finally {
 			Modifiers.markingDungeonLoot = false;
 		}
@@ -554,6 +559,21 @@ public abstract class Level implements Bundlable {
 		return Assets.Environment.TERRAIN_FEATURES;
 	}
 	
+	/**
+	 * A boss floor built after the Amulet is taken is the empty arena the climb walks
+	 * back through, not a second fight. No-op on ordinary floors.
+	 */
+	public void clearBossForAscent() {
+	}
+
+	/** Drop the boss-lock without the unseal VFX. Safe while {@link Dungeon#level} is still null. */
+	protected void unlockClearedBoss() {
+		locked = false;
+		if (Dungeon.hero != null && Dungeon.hero.buff(LockedFloor.class) != null) {
+			Dungeon.hero.buff(LockedFloor.class).detach();
+		}
+	}
+
 	abstract protected boolean build();
 	
 	private ArrayList<Class<?extends Mob>> mobsToSpawn = new ArrayList<>();

@@ -26,6 +26,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.GhostState;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.SessionInfo;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.StreamEconomyState;
@@ -830,6 +831,13 @@ public class PlayAlongServer extends WebSocketServer {
 		world.tombstones = PlayAlongProtocol.tail(tombstones, PlayAlongProtocol.MAX_WIRE_TOMBSTONES);
 		world.depthCounts = depths;
 		world.activePlayers = alive;
+		try {
+			world.amuletObtained = Statistics.amuletObtained;
+			world.highestAscent = Statistics.highestAscent;
+			world.ascending = Dungeon.hero != null
+					&& Dungeon.hero.buff(com.shatteredpixel.shatteredpixeldungeon.actors.buffs.AscensionChallenge.class) != null;
+		} catch (Throwable ignored) {
+		}
 		return world;
 	}
 
@@ -874,7 +882,20 @@ public class PlayAlongServer extends WebSocketServer {
 		copy.hostHt = src.hostHt;
 		copy.activePlayers = countAliveClients();
 		PlayAlongCatchup.fillSession(copy);
+		stampAscent(copy);
 		return copy;
+	}
+
+	/** Live climb state. Joiners read this off the status snapshot, not a stale session copy. */
+	private static void stampAscent(SessionInfo copy) {
+		if (copy == null) return;
+		try {
+			copy.amuletObtained = Statistics.amuletObtained;
+			copy.highestAscent = Statistics.highestAscent;
+			copy.ascending = Dungeon.hero != null
+					&& Dungeon.hero.buff(com.shatteredpixel.shatteredpixeldungeon.actors.buffs.AscensionChallenge.class) != null;
+		} catch (Throwable ignored) {
+		}
 	}
 
 	private void handleStreamStateRequest(final WebSocket conn, WireMessage msg) {

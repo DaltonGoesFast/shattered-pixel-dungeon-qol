@@ -227,6 +227,24 @@ public class CavesBossLevel extends Level {
 	}
 
 	@Override
+	public void clearBossForAscent() {
+		for (Mob mob : mobs.toArray(new Mob[0])) {
+			if (mob instanceof Pylon || mob instanceof DM300) {
+				mobs.remove(mob);
+			}
+		}
+		int row = gate.top * width();
+		for (int x = gate.left; x < gate.right; x++) {
+			set(row + x, Terrain.EMPTY, this);
+		}
+		if (map[entrance()] != Terrain.ENTRANCE) {
+			set(entrance(), Terrain.ENTRANCE, this);
+		}
+		blobs.remove(PylonEnergy.class);
+		unlockClearedBoss();
+	}
+
+	@Override
 	public Actor addRespawner() {
 		return null;
 	}

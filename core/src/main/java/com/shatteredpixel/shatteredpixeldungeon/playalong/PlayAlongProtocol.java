@@ -126,6 +126,12 @@ public final class PlayAlongProtocol {
 		public int hostHp = 20;
 		public int hostHt = 20;
 		public int activePlayers = 0;
+		/** Host has the Amulet of Yendor. */
+		public boolean amuletObtained = false;
+		/** Host is climbing back out (AscensionChallenge is on). */
+		public boolean ascending = false;
+		/** Shallowest floor reached since the climb started. 0 while still descending. */
+		public int highestAscent = 0;
 		/** Host catch-up settings. Empty boss means Dalton has not killed a region boss yet. */
 		public boolean catchupEnabled = false;
 		public String catchupBoss = "";
@@ -255,6 +261,9 @@ public final class PlayAlongProtocol {
 		public String rewardKind;
 		public int killExp;
 		public boolean catchup;
+		public boolean amuletObtained;
+		public boolean ascending;
+		public int highestAscent;
 		public StreamEconomyState economy;
 		public ChatCommandPayload chatCommand;
 		/** Several chat mirrors packed into one frame during a burst. */
