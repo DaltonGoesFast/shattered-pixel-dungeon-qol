@@ -719,6 +719,10 @@ public class InventoryPane extends Component {
 		protected void onClick() {
 			super.onClick();
 			GameScene.cancel();
+			if (parent != null && !parent.visible ){
+				//show the inventory of it is hidden
+				GameScene.toggleInvPane();
+			}
 			lastBag = bag;
 			refresh();
 		}

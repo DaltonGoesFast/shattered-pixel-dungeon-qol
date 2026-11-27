@@ -52,6 +52,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.keys.CrystalKey;
 import com.shatteredpixel.shatteredpixeldungeon.items.keys.GoldenKey;
 import com.shatteredpixel.shatteredpixeldungeon.items.keys.Key;
 import com.shatteredpixel.shatteredpixeldungeon.items.trinkets.CrackedSpyglass;
+import com.shatteredpixel.shatteredpixeldungeon.items.trinkets.ExoticCrystals;
 import com.shatteredpixel.shatteredpixeldungeon.items.trinkets.MimicTooth;
 import com.shatteredpixel.shatteredpixeldungeon.items.trinkets.TrinketCatalyst;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Document;
@@ -252,13 +253,19 @@ public abstract class RegularLevel extends Level {
 
 		PathFinder.buildDistanceMap(entrance(), entranceWalkable, 8);
 
-		Mob mob = null;
-		// Consecutive rooms that rejected this mob. The entrance sits inside the 8-tile
-		// exclusion, so dropping the slot on the first miss deletes a floor-1 rat and
-		// leaves the hero at 9/10. Drop only after every candidate room has failed.
+		// Champions are rolled up front (v4.0.3) so traps and other createMob() callers
+		// do not mint champions. Placement still retries every room before dropping a
+		// slot, so floor 1 does not lose a rat to the entrance exclusion.
+		ArrayList<Mob> spawning = new ArrayList<>();
+		while (spawning.size() < mobsToSpawn){
+			Mob mob = createMob();
+			rollForChampion(mob);
+			spawning.add(mob);
+		}
+
 		int roomMisses = 0;
-		while (mobsToSpawn > 0) {
-			if (mob == null) mob = createMob();
+		while (!spawning.isEmpty()) {
+			Mob mob = spawning.get(0);
 			Room roomToSpawn;
 			
 			if (!stdRoomIter.hasNext()) {
@@ -280,14 +287,13 @@ public abstract class RegularLevel extends Level {
 					|| (!openSpace[mob.pos] && mob.properties().contains(Char.Property.LARGE))));
 
 			if (tries >= 0) {
-				mobsToSpawn--;
 				mobs.add(mob);
-				mob = null;
+				spawning.remove(mob);
 				roomMisses = 0;
 
 				//chance to add a second mob to this room, except on floor 1
-				if (Dungeon.depth > 1 && mobsToSpawn > 0 && Random.Int(4) == 0){
-					mob = createMob();
+				if (Dungeon.depth > 1 && !spawning.isEmpty() && Random.Int(4) == 0){
+					mob = spawning.get(0);
 
 					tries = 30;
 					do {
@@ -303,9 +309,8 @@ public abstract class RegularLevel extends Level {
 							|| (!openSpace[mob.pos] && mob.properties().contains(Char.Property.LARGE))));
 
 					if (tries >= 0) {
-						mobsToSpawn--;
 						mobs.add(mob);
-						mob = null;
+						spawning.remove(mob);
 						roomMisses = 0;
 					}
 					// else keep this mob and try another room next iteration
@@ -314,8 +319,7 @@ public abstract class RegularLevel extends Level {
 				roomMisses++;
 				if (stdRooms.isEmpty() || roomMisses >= stdRooms.size()) {
 					// large / awkward mob could not fit in any room — drop this spawn slot
-					mobsToSpawn--;
-					mob = null;
+					spawning.remove(mob);
 					roomMisses = 0;
 				}
 			}
@@ -722,6 +726,19 @@ public abstract class RegularLevel extends Level {
 				drop(item, randomDropCell()).type = Heap.Type.HEAP;
 			}
 		}
+
+		//extra exotic crystals loot
+		Random.pushGenerator(Random.Long());
+			if (Random.Float() < ExoticCrystals.extraConsumableChance()){
+				Item item = Generator.random(Random.oneOf(Generator.Category.POTION, Generator.Category.SCROLL));
+				int cell = randomDropCell();
+				if (map[cell] == Terrain.HIGH_GRASS || map[cell] == Terrain.FURROWED_GRASS) {
+					map[cell] = Terrain.GRASS;
+					losBlocking[cell] = false;
+				}
+				drop( item, cell );
+			}
+		Random.popGenerator();
 
 	}
 
