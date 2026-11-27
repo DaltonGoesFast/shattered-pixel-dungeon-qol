@@ -472,12 +472,54 @@ async def test_rooms_list_meta_and_official():
         await server.wait_closed()
 
 
+async def test_empty_grace_closes_named_room():
+    """After a joiner leaves, empty_grace drops the room (no reclaim)."""
+    config = RelayConfig(
+        host="127.0.0.1",
+        port=0,
+        reserved_token="t",
+        empty_grace=0.4,
+        reclaim_grace=120.0,
+    )
+    relay, server, port = await _start(config)
+    base = "ws://127.0.0.1:%d" % port
+    try:
+        host = await connect(base + "/host/emptyroom", open_timeout=2)
+        await host.send(json.dumps({"t": "auth", "d": "secret-empty"}))
+        room = await _recv_json(host)
+        assert room["d"] == "emptyroom"
+        assert "emptyroom" in relay.rooms
+
+        # Never joined: room stays open past empty_grace.
+        await asyncio.sleep(0.7)
+        assert "emptyroom" in relay.rooms
+
+        player = await connect(base + "/join/emptyroom", open_timeout=2)
+        opened = await _recv_json(host)
+        assert opened["t"] == "open"
+        await player.close()
+        close_env = await _recv_json(host)
+        assert close_env["t"] == "close"
+
+        closed = await _expect_closed(host, timeout=2.0)
+        why = (closed.reason or "").lower()
+        if not why and closed.rcvd is not None:
+            why = (getattr(closed.rcvd, "reason", None) or "").lower()
+        assert "empty" in why, closed
+        assert "emptyroom" not in relay.rooms
+        assert "emptyroom" not in relay.reclaim
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
 async def test_named_room_frees_after_reclaim():
     config = RelayConfig(
         host="127.0.0.1",
         port=0,
         reserved_token="t",
         reclaim_grace=0.3,
+        empty_grace=0,  # reclaim test holds an empty host briefly
     )
     relay, server, port = await _start(config)
     base = "ws://127.0.0.1:%d" % port
@@ -611,6 +653,7 @@ async def main():
     await test_private_room_reclaim()
     await test_named_public_room()
     await test_rooms_list_meta_and_official()
+    await test_empty_grace_closes_named_room()
     await test_named_room_frees_after_reclaim()
     await test_slow_player_does_not_stall_room()
     await test_outbound_queue_bounds_bytes()

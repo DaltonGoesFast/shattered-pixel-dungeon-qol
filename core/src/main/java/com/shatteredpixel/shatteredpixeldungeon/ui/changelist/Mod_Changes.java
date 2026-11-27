@@ -33,6 +33,7 @@ public class Mod_Changes {
 
 	public static void addAllChanges( ArrayList<ChangeInfo> changeInfos ){
 		addOverview(changeInfos);
+		add_v4_0_3_QoL_29(changeInfos);
 		add_v4_0_3_QoL_28(changeInfos);
 		add_v4_0_3_QoL_27(changeInfos);
 		add_v4_0_3_QoL_26(changeInfos);
@@ -55,6 +56,21 @@ public class Mod_Changes {
 		add_v4_0_0_QoL_6(changeInfos);
 		add_v4_0_0_QoL_5(changeInfos);
 		add_v4_0_0(changeInfos);
+	}
+
+	private static void add_v4_0_3_QoL_29( ArrayList<ChangeInfo> changeInfos ) {
+		ChangeInfo changes = new ChangeInfo("4.0.3-QoL-29", true, "");
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes = new ChangeInfo(Messages.get(ChangesScene.class, "new"), false, null);
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.ENTER), "Empty Room Timeout",
+				"**-** Community rooms close 30 seconds after the last joiner leaves\n" +
+				"**-** Timer starts only after someone has joined at least once (hero select is safe)\n" +
+				"**-** Host must claim a new room afterward; Dalton's reserved room is unchanged"));
 	}
 
 	private static void add_v4_0_3_QoL_28( ArrayList<ChangeInfo> changeInfos ) {

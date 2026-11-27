@@ -251,7 +251,7 @@ public final class PlayAlongService {
 
 	public static boolean isStreamServerLive() {
 		SessionInfo info = liveSessionInfo;
-		return info != null && (info.active || info.inDungeon);
+		return info != null && info.inDungeon;
 	}
 
 	public static boolean isPlayAlongRunLive() {
@@ -533,6 +533,25 @@ public final class PlayAlongService {
 					lastAnnouncedRoom = null;
 					GLog.w(Messages.get(PlayAlongService.class, "relay_denied"));
 					System.out.println("[PlayAlong] Reserved room token was rejected.");
+				});
+			}
+
+			@Override
+			public void onRelayEmptyTimeout() {
+				Game.runOnRenderThread(() -> {
+					lastAnnouncedRoom = null;
+					SPDSettings.playAlongHostEnabled(false);
+					onHostSettingChanged(false);
+					PlayAlongRelayHost dying = relayHost;
+					relayHost = null;
+					if (dying != null) {
+						try {
+							dying.stop();
+						} catch (Exception ignored) {
+						}
+					}
+					GLog.w(Messages.get(PlayAlongService.class, "host_empty_timeout"));
+					System.out.println("[PlayAlong] Room closed: empty for too long. Host again to claim a new room.");
 				});
 			}
 		});
@@ -817,7 +836,13 @@ public final class PlayAlongService {
 		if (canHostPlayAlong() && hostServer != null) {
 			PlayAlongClient.pingStatus("127.0.0.1:" + SPDSettings.playAlongPort(), info -> {
 				statusPolling = false;
-				applyPolledSession(info, null, false);
+				// Parked quit-to-title sessions stay active for reconnect, but are not
+				// "LIVE" for the title button — only advertise when actually in dungeon.
+				if (info != null && info.inDungeon) {
+					applyPolledSession(info, null, false);
+				} else {
+					applyPolledSession(null, null, false);
+				}
 			});
 			return;
 		}

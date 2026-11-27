@@ -58,6 +58,8 @@ public final class PlayAlongRelayHost {
 		void onRoomReady(String code);
 		void onRelayDown();
 		void onRelayDenied();
+		/** Relay closed the room after too long with zero joiners. */
+		void onRelayEmptyTimeout();
 	}
 
 	/** Gson shape of the relay multiplexing envelope. */
@@ -196,9 +198,18 @@ public final class PlayAlongRelayHost {
 				// close code still arrives when a proxy drops the reason text.
 				boolean authRejected = code == 4001 || why.contains("unauthorized");
 				boolean reservedDisabled = code == 1011 || why.contains("reserved room disabled");
+				boolean emptyTimeout = why.contains("empty timeout");
 				if (claimPublic && (authRejected || reservedDisabled)) {
 					running = false;
 					if (listener != null) listener.onRelayDenied();
+					return;
+				}
+				if (emptyTimeout) {
+					// Room was reaped for zero joiners — do not auto-reclaim.
+					running = false;
+					roomCode = "";
+					hostSecret = "";
+					if (listener != null) listener.onRelayEmptyTimeout();
 					return;
 				}
 				if (authRejected) {

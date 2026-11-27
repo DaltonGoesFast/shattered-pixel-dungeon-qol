@@ -57,7 +57,9 @@ GET /health returns plain text ``ok``.
 GET /rooms returns a JSON array of live **public** rooms (named + reserved).
 Private codes are never listed. ``official`` is set only by the relay for the
 token-held reserved room. Responses are cached a few seconds; clients should
-poll every 10–15s.
+poll every 10–15s. Non-dalton rooms that have had a joiner, then sit at
+zero joiners for ``empty_grace`` (default 30s), are closed; unused lobbies
+(no one ever joined) stay up. The reserved stream room is exempt.
 """
 
 from __future__ import annotations
@@ -154,6 +156,8 @@ class RelayConfig:
     auth_timeout: float = 5.0
     # How long a private/named room can be reclaimed after the host socket drops.
     reclaim_grace: float = 120.0
+    # Non-dalton rooms with zero joiners are closed after this many seconds.
+    empty_grace: float = 30.0
     rooms_cache_seconds: float = ROOMS_CACHE_SECONDS
     rooms_http_rate_limit: int = ROOMS_HTTP_RATE_LIMIT
     rooms_http_rate_window: float = ROOMS_HTTP_RATE_WINDOW
@@ -205,6 +209,10 @@ class Room:
         # Sanitized lobby fields from host meta frames (never includes official).
         self.meta: Dict[str, object] = {}
         self.last_meta_at = 0.0
+        # Monotonic time when joiner count hit zero (None while occupied / reserved).
+        self.empty_since: Optional[float] = None
+        # Empty-grace countdown only after the room has had at least one joiner.
+        self.had_joiner: bool = False
 
     async def send(self, text: str) -> None:
         async with self.send_lock:
@@ -390,6 +398,7 @@ class Relay:
         )
         self._rooms_cache_body = "[]\n"
         self._rooms_cache_until = 0.0
+        self._empty_sweeper: Optional[asyncio.Task] = None
 
     def process_request(self, connection: ServerConnection, request):
         path = route_path(request.path)
@@ -456,7 +465,7 @@ class Relay:
         return json.dumps(listing, separators=(",", ":"), ensure_ascii=False) + "\n"
 
     async def start(self):
-        return await serve(
+        server = await serve(
             self.handler,
             self.config.host,
             self.config.port,
@@ -467,6 +476,60 @@ class Relay:
             ping_timeout=self.config.ping_timeout,
             logger=log,
         )
+        if self.config.empty_grace > 0 and (
+            self._empty_sweeper is None or self._empty_sweeper.done()
+        ):
+            self._empty_sweeper = asyncio.create_task(self.empty_room_sweeper())
+        return server
+
+    def note_room_occupancy(self, room: Room) -> None:
+        """Track empty joiner windows for non-reserved rooms.
+
+        Countdown starts only after the room has had at least one joiner, so
+        hero-select / setup time does not reap an unused lobby.
+        """
+        if room.reserved or room.closed or not room.ready:
+            room.empty_since = None
+            return
+        if room.players:
+            room.had_joiner = True
+            room.empty_since = None
+        elif room.had_joiner and room.empty_since is None:
+            room.empty_since = time.monotonic()
+        elif not room.had_joiner:
+            room.empty_since = None
+
+    async def empty_room_sweeper(self) -> None:
+        grace = self.config.empty_grace
+        if grace <= 0:
+            return
+        interval = min(5.0, max(0.25, grace / 6.0))
+        while True:
+            try:
+                await asyncio.sleep(interval)
+            except asyncio.CancelledError:
+                return
+            now = time.monotonic()
+            stale: list = []
+            async with self.rooms_lock:
+                for room in list(self.rooms.values()):
+                    if room.reserved or room.closed or not room.ready:
+                        room.empty_since = None
+                        continue
+                    if room.players:
+                        room.had_joiner = True
+                        room.empty_since = None
+                        continue
+                    if not room.had_joiner:
+                        room.empty_since = None
+                        continue
+                    if room.empty_since is None:
+                        room.empty_since = now
+                    elif now - room.empty_since >= grace:
+                        stale.append(room)
+            for room in stale:
+                log.info("room empty timeout code=%s grace=%.1fs", room.code, grace)
+                await self.close_room(room, "empty timeout")
 
     async def handler(self, ws: ServerConnection) -> None:
         ip = client_ip(ws)
@@ -659,6 +722,7 @@ class Relay:
             return None
         async with room.lock:
             room.ready = True
+        self.note_room_occupancy(room)
         self.invalidate_rooms_cache()
         log.info(
             "room open code=%s reserved=%s named=%s ip=%s",
@@ -820,6 +884,7 @@ class Relay:
                 room.next_id += 1
                 player = Player(cid, ws)
                 room.players[cid] = player
+                self.note_room_occupancy(room)
         if room_gone:
             # A join can observe the old Room after close_room has already
             # parked its secret. That is a retry, not a dead room.
@@ -976,6 +1041,7 @@ class Relay:
         if player is None:
             return
         player.clear_outbound()
+        self.note_room_occupancy(room)
         log.info("player leave room=%s id=%s reason=%s", room.code, cid, reason)
         await _safe_close(player.ws, 1000, reason)
 
@@ -986,6 +1052,8 @@ class Relay:
         if player is None:
             return
         player.clear_outbound()
+        if not closed:
+            self.note_room_occupancy(room)
         log.info("player leave room=%s id=%s reason=disconnect", room.code, cid)
         if notify_host and not closed:
             try:
@@ -999,10 +1067,12 @@ class Relay:
                 del self.rooms[room.code]
                 # Private + named: reclaim window with host secret.
                 # Reserved dalton uses token auth on every connect (no reclaim).
+                # Empty timeout frees the name immediately — host must re-claim.
                 if (
                     room.host_secret
                     and not room.reserved
                     and reason != "host send failed"
+                    and reason != "empty timeout"
                 ):
                     self.reclaim[room.code] = (
                         room.host_secret,
@@ -1154,6 +1224,12 @@ def config_from_env(argv: Optional[list] = None) -> RelayConfig:
         default=float(os.environ.get("PLAYALONG_PING_TIMEOUT", "20")),
     )
     parser.add_argument(
+        "--empty-grace",
+        type=float,
+        default=float(os.environ.get("PLAYALONG_EMPTY_GRACE", "30")),
+        help="Close non-dalton rooms after this many seconds with zero joiners",
+    )
+    parser.add_argument(
         "--rate-limit",
         type=int,
         default=int(os.environ.get("PLAYALONG_RATE_LIMIT", "40")),
@@ -1177,6 +1253,7 @@ def config_from_env(argv: Optional[list] = None) -> RelayConfig:
         player_msg_burst=max(max(1, args.player_msg_rate), max(1, args.player_msg_rate) * 2),
         ping_interval=args.ping_interval,
         ping_timeout=args.ping_timeout,
+        empty_grace=max(0.0, args.empty_grace),
         rate_limit=max(1, args.rate_limit),
         rate_window=max(1.0, args.rate_window),
     )

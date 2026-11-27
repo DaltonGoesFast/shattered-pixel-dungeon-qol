@@ -49,6 +49,8 @@ Allowed keys only; `official` from the host is ignored. Display names are length
 
 `GET /rooms` returns a JSON array of **live public rooms** (named + reserved). Private codes are never listed. The relay alone sets `"official": true` for the token-held reserved room. The list is cached a few seconds and rate-limited per IP — game clients should poll every **10–15 seconds**, not every second.
 
+Non-`dalton` rooms that have had **at least one joiner**, then sit at **zero joiners** for `empty_grace` (default **30 seconds**, env `PLAYALONG_EMPTY_GRACE`), are closed and dropped from the list. Lobbies where nobody ever joined stay up (hero select / setup). The host must claim a new room after an empty timeout (no auto-reclaim). The reserved stream room is exempt.
+
 Other limits: per-room player cap (default 80), player frames capped at 4096 bytes (the game packet limit) and 30 forwarded messages/second per socket (a flood is dropped, then the socket is closed), host-link frames capped at 8 MiB so a long run's world-state (including every tombstone) still fits, WebSocket ping interval/timeout (default 20s/20s), and a per-IP connection rate limit (default 40 new sockets / 30s). Behind Cloudflare the client IP is `CF-Connecting-IP` or `X-Forwarded-For`. `GET /health` returns `ok`.
 
 ## Run locally
