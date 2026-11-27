@@ -33,6 +33,7 @@ public class Mod_Changes {
 
 	public static void addAllChanges( ArrayList<ChangeInfo> changeInfos ){
 		addOverview(changeInfos);
+		add_v4_0_3_QoL_24(changeInfos);
 		add_v4_0_2_QoL_23(changeInfos);
 		add_v4_0_2_QoL_22(changeInfos);
 		add_v4_0_2_QoL_19(changeInfos);
@@ -50,6 +51,34 @@ public class Mod_Changes {
 		add_v4_0_0_QoL_6(changeInfos);
 		add_v4_0_0_QoL_5(changeInfos);
 		add_v4_0_0(changeInfos);
+	}
+
+	private static void add_v4_0_3_QoL_24( ArrayList<ChangeInfo> changeInfos ) {
+		ChangeInfo changes = new ChangeInfo("4.0.3-QoL-24", true, "");
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes = new ChangeInfo(Messages.get(ChangesScene.class, "new"), false, null);
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.SHPX), "Upstream 4.0.3",
+				"**-** Base game updated to official Shattered Pixel Dungeon **v4.0.3**\n" +
+				"**-** Includes Evan's balance tweaks, vault/shop/teleport fixes, Arabic support, and Android local backup"));
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.CHALLENGE_COLOR), "Play Along Catch-up",
+				"**-** Late drop-ins get the bags a normal run would already own by host depth\n" +
+				"**-** Tengu's Mask and the King's Crown go in the backpack for the player to use\n" +
+				"**-** Joining during the host's Amulet ascent starts on that floor in ascent mode"));
+
+		changes = new ChangeInfo(Messages.get(ChangesScene.class, "changes"), false, null);
+		changes.hardlight(CharSprite.WARNING);
+		changeInfos.add(changes);
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.PREFS), "Play Along Stability",
+				"**-** Chat mirrors batch under bomb/enemy spam so the shared host link stays up\n" +
+				"**-** World snapshots keep the newest tombstones and refuse oversized frames\n" +
+				"**-** Disconnect after a live session shows a desync message with close code"));
 	}
 
 	private static void add_v4_0_2_QoL_23( ArrayList<ChangeInfo> changeInfos ) {
