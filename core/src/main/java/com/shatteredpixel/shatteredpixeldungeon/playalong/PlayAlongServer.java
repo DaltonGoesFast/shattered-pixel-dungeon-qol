@@ -31,6 +31,7 @@ import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.Sess
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.StreamEconomyState;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.TombstoneState;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.WipeEvent;
+import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.ChatCommandPayload;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.WireMessage;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.InterlevelScene;
@@ -49,7 +50,9 @@ import java.net.InetSocketAddress;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -105,6 +108,12 @@ public class PlayAlongServer extends WebSocketServer {
 	private volatile GhostState hostGhost;
 	private volatile WipeEvent lastWipeEvent;
 	private volatile boolean dirty = false;
+	/**
+	 * Chat mirrors (bombs, spawns, …) queued so a raid becomes one frame per
+	 * broadcast tick instead of one frame per command per player. The tick
+	 * flushes this queue without also sending a world snapshot.
+	 */
+	private final ArrayDeque<ChatCommandPayload> chatQueue = new ArrayDeque<>();
 	private final long serverStartedAtMs = System.currentTimeMillis();
 	private volatile boolean sessionExplicitlyEnded = false;
 
@@ -112,7 +121,8 @@ public class PlayAlongServer extends WebSocketServer {
 	private ExecutorService httpPool;
 
 	public PlayAlongServer(int port, HostCallbacks callbacks) {
-		super(new InetSocketAddress("0.0.0.0", port));
+		super(new InetSocketAddress("0.0.0.0", port),
+				Collections.singletonList(PlayAlongProtocol.websocketDraft()));
 		this.callbacks = callbacks;
 		setReuseAddr(true);
 		setConnectionLostTimeout(30);
@@ -178,6 +188,9 @@ public class PlayAlongServer extends WebSocketServer {
 		this.clientsByUserId.clear();
 		this.connToClient.clear();
 		this.tombstones.clear();
+		synchronized (chatQueue) {
+			chatQueue.clear();
+		}
 		this.dirty = true;
 	}
 
@@ -219,6 +232,9 @@ public class PlayAlongServer extends WebSocketServer {
 		this.clientsByUserId.clear();
 		this.connToClient.clear();
 		this.tombstones.clear();
+		synchronized (chatQueue) {
+			chatQueue.clear();
+		}
 		this.dirty = false;
 	}
 
@@ -266,13 +282,18 @@ public class PlayAlongServer extends WebSocketServer {
 		SessionInfo session = activeSession;
 		if (session == null || !session.active || payload == null) return;
 
+		boolean isConfig = "spawn_scale_config".equals(payload.command);
+		if (!isConfig) {
+			enqueueChatCommand(payload);
+			return;
+		}
+
 		WireMessage msg = new WireMessage();
 		msg.type = "chat_command";
 		msg.sessionId = session.sessionId;
 		msg.chatCommand = payload;
 		String json = PlayAlongProtocol.GSON.toJson(msg);
 
-		boolean isConfig = "spawn_scale_config".equals(payload.command);
 		String senderNorm = normalizeChatUsername(payload.username);
 		String senderSanitized = senderNorm.isEmpty()
 				? ""
@@ -625,6 +646,9 @@ public class PlayAlongServer extends WebSocketServer {
 		tomb.pos = Math.max(0, msg.pos);
 		tomb.cause = (msg.cause != null && msg.cause.length() <= 64) ? msg.cause.trim() : "Perished";
 		tombstones.add(tomb);
+		while (tombstones.size() > PlayAlongProtocol.MAX_WIRE_TOMBSTONES) {
+			tombstones.remove(0);
+		}
 
 		WireMessage notice = new WireMessage();
 		notice.type = "player_died_notice";
@@ -743,17 +767,41 @@ public class PlayAlongServer extends WebSocketServer {
 				}
 			}
 
-			if (!dirty && !removed) return;
+			boolean chatPending;
+			synchronized (chatQueue) {
+				chatPending = !chatQueue.isEmpty();
+			}
+			// Chat is flushed on this timer by itself. A raid must not also push
+			// a full world snapshot five times a second when ghosts have not moved.
+			boolean worldDirty = dirty;
+			if (!worldDirty && !removed && !chatPending) return;
 			dirty = false;
 
 			SessionInfo session = activeSession;
-			if (session == null || !session.active) return;
+			if (session == null || !session.active) {
+				synchronized (chatQueue) {
+					chatQueue.clear();
+				}
+				return;
+			}
+
+			List<ChatCommandPayload> batch;
+			synchronized (chatQueue) {
+				batch = PlayAlongProtocol.takeChatBatch(chatQueue, session.sessionId,
+						PlayAlongProtocol.MAX_CHAT_BATCH, PlayAlongProtocol.MAX_HOST_FRAME_CHARS);
+			}
+			if (!batch.isEmpty()) {
+				sendToAliveClients(PlayAlongProtocol.chatBatchJson(session.sessionId, batch));
+			}
+
+			if (!worldDirty && !removed) return;
 
 			WireMessage world = buildWorldStateMessage();
 			session.activePlayers = world.activePlayers;
+			String worldJson = PlayAlongProtocol.fitWorldStateJson(world);
 
-			if (!connToClient.isEmpty()) {
-				sendToSessionClients(PlayAlongProtocol.GSON.toJson(world));
+			if (worldJson != null && !connToClient.isEmpty()) {
+				sendToSessionClients(worldJson);
 			}
 			if (callbacks != null) {
 				callbacks.onWorldStateUpdated(world.ghosts, world.tombstones, world.activePlayers);
@@ -779,7 +827,7 @@ public class PlayAlongServer extends WebSocketServer {
 			}
 		}
 		world.ghosts = ghosts;
-		world.tombstones = new ArrayList<>(tombstones);
+		world.tombstones = PlayAlongProtocol.tail(tombstones, PlayAlongProtocol.MAX_WIRE_TOMBSTONES);
 		world.depthCounts = depths;
 		world.activePlayers = alive;
 		return world;
@@ -1135,6 +1183,26 @@ public class PlayAlongServer extends WebSocketServer {
 				conn.send(json);
 			} catch (Exception ignored) {
 			}
+		}
+	}
+
+	private void enqueueChatCommand(ChatCommandPayload payload) {
+		if (payload.bundleJson != null && payload.bundleJson.length() > 12_000) {
+			payload.bundleJson = payload.bundleJson.substring(0, 12_000);
+		}
+		synchronized (chatQueue) {
+			while (chatQueue.size() >= PlayAlongProtocol.MAX_QUEUED_CHAT) {
+				chatQueue.removeFirst();
+			}
+			chatQueue.addLast(payload);
+		}
+	}
+
+	private void sendToAliveClients(String json) {
+		for (Map.Entry<WebSocket, ClientRecord> entry : connToClient.entrySet()) {
+			ClientRecord rec = entry.getValue();
+			if (rec == null || !rec.alive) continue;
+			safeSend(entry.getKey(), json);
 		}
 	}
 

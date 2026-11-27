@@ -159,7 +159,7 @@ public final class PlayAlongRelayHost {
 		}
 
 		final AtomicBoolean opened = new AtomicBoolean(false);
-		WebSocketClient ws = new WebSocketClient(uri) {
+		WebSocketClient ws = new WebSocketClient(uri, PlayAlongProtocol.websocketDraft()) {
 			@Override
 			public void onOpen(ServerHandshake handshakedata) {
 				opened.set(true);

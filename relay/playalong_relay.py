@@ -33,7 +33,9 @@ Topology
     Unchanged Play Along JSON (``join``, ``status_ping``, ``player_state``, ...).
     The relay does not interpret those messages. Incoming player frames are
     capped at 4096 bytes (the game's packet limit) and at a small per-socket
-    rate so one player cannot fill the shared host link.
+    rate so one player cannot fill the shared host link. Host → player frames
+    are queued per player (bounded). A slow player or a burst of snapshots
+    cannot stall the host read loop, which would drop the room on ping timeout.
 
 Host link multiplexing (host socket only)::
 
@@ -101,6 +103,17 @@ class RelayConfig:
     reclaim_grace: float = 120.0
 
 
+# Host → player frames kept per socket. Older world snapshots are dropped
+# first so a burst cannot pin the shared host reader. Count alone is not
+# enough: the host link still accepts up to max_message_bytes (8 MiB), and a
+# private /host needs no token. Bound bytes too, or one host can pin eight
+# huge copies on every joiner that never reads.
+PLAYER_OUTBOUND_MAX = 8
+# Above the game's 48 KiB host→player snapshot. Larger d is dropped, not queued.
+PLAYER_OUTBOUND_MAX_FRAME_BYTES = 64 * 1024
+PLAYER_OUTBOUND_MAX_BYTES = 256 * 1024
+
+
 class Player:
     def __init__(self, client_id: str, ws: ServerConnection) -> None:
         self.client_id = client_id
@@ -108,6 +121,13 @@ class Player:
         self.send_lock = asyncio.Lock()
         self.window_start = time.monotonic()
         self.window_count = 0
+        self.outbound: Deque[str] = deque()
+        self.outbound_bytes = 0
+        self.draining = False
+
+    def clear_outbound(self) -> None:
+        self.outbound.clear()
+        self.outbound_bytes = 0
 
 
 class Room:
@@ -642,21 +662,69 @@ class Relay:
             except Exception:
                 pass
             return
+        # Do not await the player socket here. handle_host_frames is the only
+        # reader on the host link; a blocked send stops ping/pong and the
+        # relay then closes the whole room.
+        self._enqueue_outbound(room, player, payload)
+
+    def _enqueue_outbound(self, room: Room, player: Player, payload: str) -> None:
+        size = _utf8_len(payload)
+        if size > PLAYER_OUTBOUND_MAX_FRAME_BYTES:
+            log.info(
+                "drop oversize host frame room=%s id=%s bytes=%s",
+                room.code,
+                player.client_id,
+                size,
+            )
+            return
+        while player.outbound and (
+            len(player.outbound) >= PLAYER_OUTBOUND_MAX
+            or player.outbound_bytes + size > PLAYER_OUTBOUND_MAX_BYTES
+        ):
+            if not _drop_queued_world_state(player):
+                _discard_outbound(player, 0)
+        player.outbound.append(payload)
+        player.outbound_bytes += size
+        if not player.draining:
+            player.draining = True
+            asyncio.create_task(self._drain_player(room, player))
+
+    async def _drain_player(self, room: Room, player: Player) -> None:
         try:
-            async with player.send_lock:
-                await player.ws.send(payload)
+            while True:
+                async with room.lock:
+                    if room.closed or room.players.get(player.client_id) is not player:
+                        player.clear_outbound()
+                        player.draining = False
+                        return
+                    if not player.outbound:
+                        player.draining = False
+                        if player.outbound:
+                            player.draining = True
+                            continue
+                        return
+                    payload = _pop_outbound(player)
+                try:
+                    async with player.send_lock:
+                        await player.ws.send(payload)
+                except Exception:
+                    player.clear_outbound()
+                    player.draining = False
+                    await self.close_player(room, player.client_id, "send failed")
+                    try:
+                        await room.send(envelope("close", player.client_id))
+                    except Exception:
+                        pass
+                    return
         except Exception:
-            await self.close_player(room, cid, "send failed")
-            try:
-                await room.send(envelope("close", cid))
-            except Exception:
-                pass
+            player.draining = False
 
     async def close_player(self, room: Room, cid: str, reason: str) -> None:
         async with room.lock:
             player = room.players.pop(cid, None)
         if player is None:
             return
+        player.clear_outbound()
         log.info("player leave room=%s id=%s reason=%s", room.code, cid, reason)
         await _safe_close(player.ws, 1000, reason)
 
@@ -666,6 +734,7 @@ class Relay:
             closed = room.closed
         if player is None:
             return
+        player.clear_outbound()
         log.info("player leave room=%s id=%s reason=disconnect", room.code, cid)
         if notify_host and not closed:
             try:
@@ -701,6 +770,7 @@ class Relay:
             len(players),
         )
         for player in players:
+            player.clear_outbound()
             await _safe_close(player.ws, 1001, "host disconnected")
         await _safe_close(room.ws, 1001, reason)
 
@@ -714,6 +784,37 @@ class Relay:
         except Exception:
             pass
         await _safe_close(ws, 1008, reason)
+
+
+def _utf8_len(text: str) -> int:
+    return len(text.encode("utf-8"))
+
+
+def _account_outbound(player: Player, dropped: str) -> None:
+    player.outbound_bytes -= _utf8_len(dropped)
+    if player.outbound_bytes < 0:
+        player.outbound_bytes = 0
+
+
+def _pop_outbound(player: Player) -> str:
+    payload = player.outbound.popleft()
+    _account_outbound(player, payload)
+    return payload
+
+
+def _discard_outbound(player: Player, index: int) -> None:
+    dropped = player.outbound[index]
+    del player.outbound[index]
+    _account_outbound(player, dropped)
+
+
+def _drop_queued_world_state(player: Player) -> bool:
+    """Drop one stale snapshot so chat batches survive a full queue."""
+    for i, queued in enumerate(player.outbound):
+        if '"type":"world_state"' in queued[:64]:
+            _discard_outbound(player, i)
+            return True
+    return False
 
 
 def client_ip(ws: ServerConnection) -> str:

@@ -24,9 +24,14 @@ package com.shatteredpixel.shatteredpixeldungeon.playalong;
 import com.google.gson.Gson;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 
+import org.java_websocket.drafts.Draft_6455;
+import org.java_websocket.extensions.IExtension;
+
 import java.net.URI;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -39,9 +44,47 @@ import java.util.regex.Pattern;
 public final class PlayAlongProtocol {
 
 	public static final int PROTOCOL_VERSION = 1;
+	/**
+	 * Player → host cap, in characters. The relay closes a player socket with
+	 * 1009 when an incoming player frame exceeds this many bytes. Client sends
+	 * must stay under it; one oversized frame is a disconnect, not a drop.
+	 */
 	public static final int MAX_PACKET_LENGTH = 4096;
+	/**
+	 * Largest host → player text we produce (world snapshot or one chat batch).
+	 * The relay allows 8 MiB on the host link. Staying under this keeps a busy
+	 * floor from filling that link or the client's parser.
+	 */
+	public static final int MAX_HOST_FRAME_CHARS = 48 * 1024;
+	/** Client ignores inbound text above this instead of parsing it. */
+	public static final int MAX_CLIENT_INBOUND_CHARS = 256 * 1024;
+	/**
+	 * java-websocket inbound frame cap, in bytes. The library default is
+	 * unbounded and will buffer a frame that declares a gigantic length.
+	 * 1 MiB closes that frame with 1009. Snapshots stay under
+	 * {@link #MAX_HOST_FRAME_CHARS}.
+	 */
+	public static final int MAX_WEBSOCKET_FRAME_BYTES = 1024 * 1024;
+	/** Tombstones kept in memory and on the wire. Older deaths fall off. */
+	public static final int MAX_WIRE_TOMBSTONES = 40;
+	/** Chat mirrors queued on the host before the oldest are dropped. */
+	public static final int MAX_QUEUED_CHAT = 160;
+	/** Chat mirrors packed into one host → player frame per broadcast tick. */
+	public static final int MAX_CHAT_BATCH = 24;
 	public static final long RECONNECT_GRACE_MS = 30_000L;
 	public static final long CLIENT_RECONNECT_GRACE_MS = 120_000L;
+
+	/**
+	 * Which disconnect copy to show. Network blocking is only for a socket
+	 * that never opened. A session that was up and then closed is a desync,
+	 * and the close code belongs in the message.
+	 */
+	public enum CloseCopy {
+		NETWORK_BLOCKED,
+		NETWORK_LOST,
+		DESYNC,
+		DESYNC_FINAL
+	}
 
 	/**
 	 * When false, Join-with-room-code UI is hidden everywhere. Dalton's
@@ -214,6 +257,8 @@ public final class PlayAlongProtocol {
 		public boolean catchup;
 		public StreamEconomyState economy;
 		public ChatCommandPayload chatCommand;
+		/** Several chat mirrors packed into one frame during a burst. */
+		public List<ChatCommandPayload> chatCommands;
 	}
 
 	/**
@@ -369,5 +414,85 @@ public final class PlayAlongProtocol {
 			return relayBase() + "/host";
 		}
 		return relayBase() + "/host/" + reservedRoomOrNull;
+	}
+
+	/** Shared inbound frame cap for every Play Along socket. */
+	public static Draft_6455 websocketDraft() {
+		return new Draft_6455(Collections.<IExtension>emptyList(), MAX_WEBSOCKET_FRAME_BYTES);
+	}
+
+	public static CloseCopy closeCopy(boolean everOpened, boolean permanent) {
+		if (!everOpened) {
+			return permanent ? CloseCopy.NETWORK_LOST : CloseCopy.NETWORK_BLOCKED;
+		}
+		return permanent ? CloseCopy.DESYNC_FINAL : CloseCopy.DESYNC;
+	}
+
+	/** {@code ": reason"} or empty. Newlines stripped, length capped. */
+	public static String closeSuffix(String reason) {
+		if (reason == null) return "";
+		String s = reason.replace('\n', ' ').replace('\r', ' ').trim();
+		if (s.length() > 80) s = s.substring(0, 80).trim();
+		if (s.isEmpty()) return "";
+		return ": " + s;
+	}
+
+	public static <T> List<T> tail(List<T> items, int max) {
+		if (items == null || items.isEmpty() || max <= 0) return new ArrayList<>();
+		if (items.size() <= max) return new ArrayList<>(items);
+		return new ArrayList<>(items.subList(items.size() - max, items.size()));
+	}
+
+	/**
+	 * Pull a chat batch off {@code queue}. The JSON we would send is kept at
+	 * or under {@code maxChars} unless a single command is already larger.
+	 */
+	public static List<ChatCommandPayload> takeChatBatch(ArrayDeque<ChatCommandPayload> queue,
+	                                                     String sessionId, int maxCount, int maxChars) {
+		List<ChatCommandPayload> batch = new ArrayList<>();
+		if (queue == null || maxCount <= 0) return batch;
+		while (!queue.isEmpty() && batch.size() < maxCount) {
+			batch.add(queue.peekFirst());
+			if (batch.size() > 1 && chatBatchJson(sessionId, batch).length() > maxChars) {
+				batch.remove(batch.size() - 1);
+				break;
+			}
+			queue.removeFirst();
+			if (chatBatchJson(sessionId, batch).length() > maxChars) break;
+		}
+		return batch;
+	}
+
+	public static String chatBatchJson(String sessionId, List<ChatCommandPayload> batch) {
+		WireMessage msg = new WireMessage();
+		msg.type = "chat_command_batch";
+		msg.sessionId = sessionId == null ? "" : sessionId;
+		msg.chatCommands = batch;
+		return GSON.toJson(msg);
+	}
+
+	/**
+	 * Serialize a world snapshot, dropping oldest tombstones and then extra
+	 * ghosts until it fits {@link #MAX_HOST_FRAME_CHARS}. Null when even a
+	 * minimal snapshot does not fit — the caller skips the send.
+	 */
+	public static String fitWorldStateJson(WireMessage world) {
+		if (world == null) return null;
+		if (world.tombstones != null && world.tombstones.size() > MAX_WIRE_TOMBSTONES) {
+			world.tombstones = tail(world.tombstones, MAX_WIRE_TOMBSTONES);
+		}
+		String json = GSON.toJson(world);
+		while (json.length() > MAX_HOST_FRAME_CHARS
+				&& world.tombstones != null && !world.tombstones.isEmpty()) {
+			world.tombstones.remove(0);
+			json = GSON.toJson(world);
+		}
+		while (json.length() > MAX_HOST_FRAME_CHARS
+				&& world.ghosts != null && world.ghosts.size() > 1) {
+			world.ghosts.remove(world.ghosts.size() - 1);
+			json = GSON.toJson(world);
+		}
+		if (json.length() > MAX_HOST_FRAME_CHARS) return null;
+		return json;
 	}
 }

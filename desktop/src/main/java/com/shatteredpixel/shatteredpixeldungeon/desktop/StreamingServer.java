@@ -129,7 +129,11 @@ public class StreamingServer extends WebSocketServer {
 		p.rolledClass = StreamingCommandHandler.lastRolledClass;
 		p.secondaryClass = StreamingCommandHandler.lastSecondaryClass;
 		p.positiveOnly = StreamingCommandHandler.lastPositiveOnly;
-		p.bundleJson = StreamingCommandHandler.lastBundleJson;
+		// Item bundles are only needed to mirror a wealth drop. Attaching a
+		// stale bundle to every bomb or spawn inflates the frame.
+		if ("ring_of_wealth".equals(cmd)) {
+			p.bundleJson = StreamingCommandHandler.lastBundleJson;
+		}
 		PlayAlongService.broadcastHostChatCommand(p);
 	}
 

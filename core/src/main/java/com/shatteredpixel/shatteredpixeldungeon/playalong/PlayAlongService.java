@@ -115,6 +115,11 @@ public final class PlayAlongService {
 	private static volatile String lastAnnouncedRoom = null;
 	private static volatile boolean relayDownAnnounced = false;
 	private static volatile boolean connectHintShown = false;
+	/** One desync line per outage. Cleared when a rejoin is acknowledged. */
+	private static volatile boolean desyncHintShown = false;
+	private static volatile boolean chatDrainQueued = false;
+	private static final int MAX_PENDING_CHAT = 64;
+	private static final int CHAT_APPLY_PER_FRAME = 4;
 
 	private static volatile SessionInfo activeClientSession = null;
 	private static volatile boolean clientJoinPending = false;
@@ -993,6 +998,7 @@ public final class PlayAlongService {
 				}
 				final boolean wasReconnect = clientHasJoinedOnce;
 				clientHasJoinedOnce = true;
+				desyncHintShown = false;
 				Game.runOnRenderThread(() -> {
 					if (wasReconnect) {
 						GLog.p("Reconnected to Dalton's Play Along run as %s!", clientUsername);
@@ -1100,54 +1106,36 @@ public final class PlayAlongService {
 
 			@Override
 			public void onChatCommand(WireMessage msg) {
-				if (msg == null || msg.chatCommand == null) return;
-				final ChatCommandPayload p = msg.chatCommand;
-				if ("catchup".equals(p.command)) {
-					Game.runOnRenderThread(() -> com.shatteredpixel.shatteredpixeldungeon.utils.GLog.i(
-							PlayAlongCatchup.describeForCommand()));
-					return;
-				}
-				final boolean isConfig = "spawn_scale_config".equals(p.command);
-				if (!isConfig) {
-					if (role != Role.CLIENT) return;
-					String sender = normalizeChatUsername(p.username);
-					if (!sender.isEmpty()) {
-						if (sender.equals(normalizeChatUsername(clientUsername))
-								|| sender.equals(normalizeChatUsername(SPDSettings.playAlongUsername()))) {
-							return;
-						}
-						StreamEconomyState eco = cachedEconomy;
-						if (eco != null && eco.linked
-								&& sender.equals(normalizeChatUsername(eco.linkedUsername))) {
-							return;
-						}
+				if (msg == null) return;
+				final List<ChatCommandPayload> incoming = new ArrayList<>();
+				if (msg.chatCommands != null) {
+					for (ChatCommandPayload c : msg.chatCommands) {
+						if (c != null) incoming.add(c);
 					}
 				}
-				Game.runOnRenderThread(() -> {
-					if (isConfig) {
-						StreamingCommandHandler.executeMirroredChatCommand(p);
-						return;
-					}
-					if (role != Role.CLIENT) return;
-					if (Dungeon.hero == null || Dungeon.level == null || !(Game.scene() instanceof GameScene)) {
-						if (pendingChatCommands.size() < 32) {
-							pendingChatCommands.add(p);
-						}
-						return;
-					}
-					if (Dungeon.hero.isAlive()) {
-						StreamingCommandHandler.executeMirroredChatCommand(p);
-					}
-				});
+				if (msg.chatCommand != null) incoming.add(msg.chatCommand);
+				if (incoming.isEmpty()) return;
+				Game.runOnRenderThread(() -> enqueueMirroredChat(incoming));
 			}
 
 			@Override
-			public void onConnectionLost(boolean permanentlyFailed) {
-				if (permanentlyFailed) {
-					Game.runOnRenderThread(() -> GLog.w(connectionFailureMessage(true)));
-				} else if (!connectHintShown && !clientHasJoinedOnce) {
-					connectHintShown = true;
-					Game.runOnRenderThread(() -> GLog.w(connectionFailureMessage(false)));
+			public void onConnectionLost(boolean permanentlyFailed, int closeCode, String closeReason, boolean everOpened) {
+				PlayAlongProtocol.CloseCopy copy = PlayAlongProtocol.closeCopy(everOpened, permanentlyFailed);
+				if (copy == PlayAlongProtocol.CloseCopy.NETWORK_BLOCKED
+						|| copy == PlayAlongProtocol.CloseCopy.NETWORK_LOST) {
+					if (permanentlyFailed || !connectHintShown) {
+						connectHintShown = true;
+						final boolean permanent = permanentlyFailed;
+						Game.runOnRenderThread(() -> GLog.w(connectionFailureMessage(permanent, false, closeCode, closeReason)));
+					}
+					return;
+				}
+				if (permanentlyFailed || !desyncHintShown) {
+					desyncHintShown = true;
+					final boolean permanent = permanentlyFailed;
+					final int code = closeCode;
+					final String reason = closeReason;
+					Game.runOnRenderThread(() -> GLog.w(connectionFailureMessage(permanent, true, code, reason)));
 				}
 			}
 		});
@@ -1195,12 +1183,7 @@ public final class PlayAlongService {
 			sendClientState("IDLE", Dungeon.hero.pos);
 			if (role == Role.CLIENT && Dungeon.level != null && Dungeon.hero.isAlive()
 					&& (Game.scene() instanceof GameScene) && !pendingChatCommands.isEmpty()) {
-				List<ChatCommandPayload> drained = new ArrayList<>(pendingChatCommands);
-				pendingChatCommands.clear();
-				for (ChatCommandPayload p : drained) {
-					if (!Dungeon.hero.isAlive()) break;
-					StreamingCommandHandler.executeMirroredChatCommand(p);
-				}
+				scheduleChatDrain();
 			}
 		}
 	}
@@ -1573,7 +1556,7 @@ public final class PlayAlongService {
 		});
 	}
 
-	private static String connectionFailureMessage(boolean permanent) {
+	private static String connectionFailureMessage(boolean permanent, boolean everOpened, int code, String reason) {
 		String addr = clientServerAddress == null ? "" : clientServerAddress;
 		int mark = addr.indexOf("/join/");
 		boolean privateRoom = false;
@@ -1585,10 +1568,113 @@ public final class PlayAlongService {
 			if (cut >= 0) room = room.substring(0, cut);
 			privateRoom = !room.equalsIgnoreCase(SPDSettings.PLAY_ALONG_RELAY_ROOM);
 		}
-		if (privateRoom) {
-			return Messages.get(PlayAlongService.class, permanent ? "connect_lost_room" : "connect_blocked_room");
+		PlayAlongProtocol.CloseCopy copy = PlayAlongProtocol.closeCopy(everOpened, permanent);
+		String suffix = PlayAlongProtocol.closeSuffix(reason);
+		switch (copy) {
+			case NETWORK_BLOCKED:
+				return Messages.get(PlayAlongService.class, privateRoom ? "connect_blocked_room" : "connect_blocked");
+			case NETWORK_LOST:
+				return Messages.get(PlayAlongService.class, privateRoom ? "connect_lost_room" : "connect_lost");
+			case DESYNC:
+				return Messages.get(PlayAlongService.class,
+						privateRoom ? "connect_desync_room" : "connect_desync", code, suffix);
+			case DESYNC_FINAL:
+			default:
+				return Messages.get(PlayAlongService.class,
+						privateRoom ? "connect_desync_final_room" : "connect_desync_final", code, suffix);
 		}
-		return Messages.get(PlayAlongService.class, permanent ? "connect_lost" : "connect_blocked");
+	}
+
+	/** Queue mirrored bombs/spawns and apply a few per frame so a raid cannot freeze the client. */
+	private static void enqueueMirroredChat(List<ChatCommandPayload> incoming) {
+		if (incoming == null) return;
+		boolean gameplay = false;
+		for (ChatCommandPayload p : incoming) {
+			if (p == null || p.command == null) continue;
+			if ("catchup".equals(p.command)) {
+				GLog.i(PlayAlongCatchup.describeForCommand());
+				continue;
+			}
+			// Spawn scaling used to apply immediately, including after death.
+			// It must not sit behind a raid queue or get cleared with it.
+			if ("spawn_scale_config".equals(p.command)) {
+				StreamingCommandHandler.executeMirroredChatCommand(p);
+				continue;
+			}
+			if (!acceptMirroredChat(p)) continue;
+			// Hero null means the run is still loading. Keep the command until
+			// the scene exists. Drop it only once a dead hero is actually here.
+			if (Dungeon.hero != null && !Dungeon.hero.isAlive()) continue;
+			while (pendingChatCommands.size() >= MAX_PENDING_CHAT) {
+				pendingChatCommands.remove(0);
+			}
+			pendingChatCommands.add(p);
+			gameplay = true;
+		}
+		if (gameplay && Dungeon.hero != null && Dungeon.level != null && Game.scene() instanceof GameScene) {
+			scheduleChatDrain();
+		}
+	}
+
+	private static boolean acceptMirroredChat(ChatCommandPayload p) {
+		if ("spawn_scale_config".equals(p.command)) return true;
+		if (role != Role.CLIENT) return false;
+		String sender = normalizeChatUsername(p.username);
+		if (!sender.isEmpty()) {
+			if (sender.equals(normalizeChatUsername(clientUsername))
+					|| sender.equals(normalizeChatUsername(SPDSettings.playAlongUsername()))) {
+				return false;
+			}
+			StreamEconomyState eco = cachedEconomy;
+			if (eco != null && eco.linked
+					&& sender.equals(normalizeChatUsername(eco.linkedUsername))) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private static void scheduleChatDrain() {
+		if (chatDrainQueued || pendingChatCommands.isEmpty()) return;
+		chatDrainQueued = true;
+		Game.runOnRenderThread(() -> {
+			chatDrainQueued = false;
+			int budget = CHAT_APPLY_PER_FRAME;
+			while (budget > 0 && !pendingChatCommands.isEmpty()) {
+				ChatCommandPayload p = pendingChatCommands.remove(0);
+				if ("spawn_scale_config".equals(p.command)) {
+					StreamingCommandHandler.executeMirroredChatCommand(p);
+					budget--;
+					continue;
+				}
+				if (role != Role.CLIENT || Dungeon.hero == null || Dungeon.level == null
+						|| !(Game.scene() instanceof GameScene)) {
+					pendingChatCommands.add(0, p);
+					return;
+				}
+				if (!Dungeon.hero.isAlive()) {
+					applyQueuedConfigAndDropRest();
+					return;
+				}
+				StreamingCommandHandler.executeMirroredChatCommand(p);
+				budget--;
+			}
+			if (!pendingChatCommands.isEmpty()) scheduleChatDrain();
+		});
+	}
+
+	/** A death mid-raid drops bombs and spawns. Spawn-scale config still applies. */
+	private static void applyQueuedConfigAndDropRest() {
+		List<ChatCommandPayload> config = new ArrayList<>();
+		for (ChatCommandPayload queued : pendingChatCommands) {
+			if (queued != null && "spawn_scale_config".equals(queued.command)) {
+				config.add(queued);
+			}
+		}
+		pendingChatCommands.clear();
+		for (ChatCommandPayload queued : config) {
+			StreamingCommandHandler.executeMirroredChatCommand(queued);
+		}
 	}
 
 	public static void disconnect() {
@@ -1605,6 +1691,8 @@ public final class PlayAlongService {
 		clientHasJoinedOnce = false;
 		clientServerAddress = null;
 		connectHintShown = false;
+		desyncHintShown = false;
+		chatDrainQueued = false;
 		activeClientSession = null;
 		wipeTriggeredOnClient = false;
 		pendingWipeOnScene = null;

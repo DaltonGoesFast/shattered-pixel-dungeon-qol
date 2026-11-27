@@ -59,7 +59,12 @@ public class PlayAlongClient {
 		void onKillExpRewardNotice(WireMessage msg);
 		void onStreamMessage(WireMessage msg);
 		void onChatCommand(WireMessage msg);
-		void onConnectionLost(boolean permanentlyFailed);
+		/**
+		 * @param everOpened false when the socket never completed open (connect
+		 *                   failed). True after any successful open this session,
+		 *                   including a later drop.
+		 */
+		void onConnectionLost(boolean permanentlyFailed, int closeCode, String closeReason, boolean everOpened);
 	}
 
 	private static final int PING_TIMEOUT_MS = 1600;
@@ -69,6 +74,10 @@ public class PlayAlongClient {
 	private volatile boolean intentionalClose = false;
 	private volatile boolean reconnecting = false;
 	private volatile long disconnectedSinceMs = 0L;
+	/** True after any socket in this connect() attempt reached onOpen. */
+	private volatile boolean everOpened = false;
+	private volatile int lastCloseCode = -1;
+	private volatile String lastCloseReason = "";
 
 	private volatile String lastAddress;
 	private volatile String lastUserId;
@@ -99,7 +108,7 @@ public class PlayAlongClient {
 				CountDownLatch latch = new CountDownLatch(1);
 				AtomicReference<SessionInfo> ref = new AtomicReference<>();
 
-				pingSocket = new WebSocketClient(uri) {
+				pingSocket = new WebSocketClient(uri, PlayAlongProtocol.websocketDraft()) {
 					@Override
 					public void onOpen(ServerHandshake handshakedata) {
 						WireMessage ping = new WireMessage();
@@ -163,7 +172,7 @@ public class PlayAlongClient {
 				final String reqJson = PlayAlongProtocol.GSON.toJson(req);
 				final String expectedReqId = req.requestId;
 
-				ws = new WebSocketClient(uri) {
+				ws = new WebSocketClient(uri, PlayAlongProtocol.websocketDraft()) {
 					@Override
 					public void onOpen(ServerHandshake handshakedata) {
 						send(reqJson);
@@ -224,6 +233,9 @@ public class PlayAlongClient {
 		closeInternal();
 		this.intentionalClose = false;
 		this.disconnectedSinceMs = 0L;
+		this.everOpened = false;
+		this.lastCloseCode = -1;
+		this.lastCloseReason = "";
 		this.lastAddress = address;
 		this.lastUserId = userId;
 		this.lastUsername = username;
@@ -253,10 +265,11 @@ public class PlayAlongClient {
 		try {
 			URI uri = PlayAlongProtocol.buildWebSocketUri(lastAddress);
 			final AtomicBoolean opened = new AtomicBoolean(false);
-			WebSocketClient ws = new WebSocketClient(uri) {
+			WebSocketClient ws = new WebSocketClient(uri, PlayAlongProtocol.websocketDraft()) {
 				@Override
 				public void onOpen(ServerHandshake handshakedata) {
 					opened.set(true);
+					everOpened = true;
 					reconnecting = false;
 
 					WireMessage join = new WireMessage();
@@ -276,7 +289,7 @@ public class PlayAlongClient {
 
 				@Override
 				public void onMessage(String message) {
-					if (message == null || message.length() > 65536) return;
+					if (message == null || message.length() > PlayAlongProtocol.MAX_CLIENT_INBOUND_CHARS) return;
 					try {
 						WireMessage msg = PlayAlongProtocol.GSON.fromJson(message, WireMessage.class);
 						if (msg == null || msg.type == null || listener == null) return;
@@ -322,6 +335,7 @@ public class PlayAlongClient {
 								listener.onStreamMessage(msg);
 								break;
 							case "chat_command":
+							case "chat_command_batch":
 								listener.onChatCommand(msg);
 								break;
 						}
@@ -331,6 +345,8 @@ public class PlayAlongClient {
 
 				@Override
 				public void onClose(int code, String reason, boolean remote) {
+					lastCloseCode = code;
+					lastCloseReason = reason == null ? "" : reason;
 					if (intentionalClose) return;
 					if (reason != null && reason.contains("New Play Along session")) {
 						intentionalClose = true;
@@ -373,12 +389,15 @@ public class PlayAlongClient {
 			reconnecting = false;
 			if (intentionalClose) return;
 			long elapsed = System.currentTimeMillis() - disconnectedSinceMs;
+			boolean opened = everOpened;
+			int code = lastCloseCode;
+			String reason = lastCloseReason;
 			if (elapsed > PlayAlongProtocol.CLIENT_RECONNECT_GRACE_MS) {
 				intentionalClose = true;
-				if (listener != null) listener.onConnectionLost(true);
+				if (listener != null) listener.onConnectionLost(true, code, reason, opened);
 				return;
 			}
-			if (listener != null) listener.onConnectionLost(false);
+			if (listener != null) listener.onConnectionLost(false, code, reason, opened);
 			openSocket(true);
 		}, "PlayAlongReconnect");
 		t.setDaemon(true);
@@ -399,7 +418,11 @@ public class PlayAlongClient {
 		WebSocketClient ws = socket;
 		if (ws != null && ws.isOpen()) {
 			try {
-				ws.send(PlayAlongProtocol.GSON.toJson(msg));
+				String json = PlayAlongProtocol.GSON.toJson(msg);
+				// The relay and the host both close the player with 1009 above this.
+				if (json != null && json.length() <= PlayAlongProtocol.MAX_PACKET_LENGTH) {
+					ws.send(json);
+				}
 			} catch (Exception ignored) {
 			}
 		}
