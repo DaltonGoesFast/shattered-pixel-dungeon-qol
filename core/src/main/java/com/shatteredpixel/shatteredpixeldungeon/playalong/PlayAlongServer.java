@@ -885,6 +885,7 @@ public class PlayAlongServer extends WebSocketServer {
 				if (Dungeon.hero.heroClass != null) {
 					copy.hostClass = Dungeon.hero.heroClass.name();
 				}
+				copy.hostDisplayName = PlayAlongService.hostDisplayNameForSession();
 			}
 			return copy;
 		}
@@ -896,6 +897,9 @@ public class PlayAlongServer extends WebSocketServer {
 		copy.challenges = src.challenges;
 		copy.modifiers = src.modifiers;
 		copy.hostClass = src.hostClass;
+		copy.hostDisplayName = (src.hostDisplayName != null && !src.hostDisplayName.isEmpty())
+				? src.hostDisplayName
+				: PlayAlongService.hostDisplayNameForSession();
 		copy.hostDepth = src.hostDepth;
 		copy.hostPos = src.hostPos;
 		copy.hostHp = src.hostHp;

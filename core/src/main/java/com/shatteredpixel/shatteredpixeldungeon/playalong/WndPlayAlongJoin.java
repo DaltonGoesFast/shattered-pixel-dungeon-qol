@@ -69,7 +69,11 @@ public class WndPlayAlongJoin extends Window {
 			this.username = "Chatter";
 		}
 
-		String titleTxt = session.active ? "Play Along [LIVE]" : "DaltonGoesFast [LIVE]";
+		boolean stream = PlayAlongService.streamFeaturesVisible();
+		String hostLabel = communityHostLabel(session);
+		String titleTxt = session.active
+				? "Play Along [LIVE]"
+				: (stream ? "DaltonGoesFast [LIVE]" : "Play Along");
 		RenderedTextBlock title = PixelScene.renderTextBlock(titleTxt, 10);
 		title.hardlight(0xFF4444);
 		title.setPos((WIDTH - title.width()) / 2f, 2);
@@ -83,17 +87,30 @@ public class WndPlayAlongJoin extends Window {
 			String seedDisplay = (session.customSeedText != null && !session.customSeedText.isEmpty())
 					? session.customSeedText
 					: DungeonSeed.convertToCode(session.seed);
-			statusTxt = "Dalton: Depth " + session.hostDepth
-					+ " (" + session.hostHp + "/" + session.hostHt + " HP)\n"
-					+ "Racers: " + session.activePlayers + " • Seed: " + seedDisplay + "\n"
-					+ "Goal: Get the Amulet before Dalton dies!";
+			if (stream) {
+				statusTxt = "Dalton: Depth " + session.hostDepth
+						+ " (" + session.hostHp + "/" + session.hostHt + " HP)\n"
+						+ "Racers: " + session.activePlayers + " • Seed: " + seedDisplay + "\n"
+						+ "Goal: Get the Amulet before Dalton dies!";
+			} else {
+				statusTxt = hostLabel + ": Depth " + session.hostDepth
+						+ " (" + session.hostHp + "/" + session.hostHt + " HP)\n"
+						+ "Players: " + session.activePlayers + " • Seed: " + seedDisplay + "\n"
+						+ "Goal: Get the Amulet before the host dies!";
+			}
 		} else if (session.inDungeon) {
-			statusTxt = "Dalton: Depth " + session.hostDepth
+			statusTxt = stream
+					? ("Dalton: Depth " + session.hostDepth
 					+ " (" + session.hostHp + "/" + session.hostHt + " HP)\n"
-					+ "Solo Stream Run — Stream commands are LIVE!";
+					+ "Solo Stream Run — Stream commands are LIVE!")
+					: (hostLabel + ": Depth " + session.hostDepth
+					+ " (" + session.hostHp + "/" + session.hostHt + " HP)\n"
+					+ "Host is in a solo run.");
 		} else {
-			statusTxt = "Dalton is in the menu / between runs.\n"
-					+ "Account linking & community commands are ready!";
+			statusTxt = stream
+					? ("Dalton is in the menu / between runs.\n"
+					+ "Account linking & community commands are ready!")
+					: (hostLabel + " is in the menu / between runs.");
 		}
 		RenderedTextBlock info = PixelScene.renderTextBlock(statusTxt, 6);
 		info.maxWidth(WIDTH);
@@ -101,14 +118,14 @@ public class WndPlayAlongJoin extends Window {
 		add(info);
 		pos = info.bottom() + GAP;
 
-		linkInfo = PixelScene.renderTextBlock(formatLinkLine(PlayAlongService.getCachedEconomy()), 6);
-		linkInfo.hardlight(0xCCCCCC);
-		linkInfo.maxWidth(WIDTH);
-		linkInfo.setPos(0, pos);
-		add(linkInfo);
-		pos = linkInfo.bottom() + GAP;
+		if (stream) {
+			linkInfo = PixelScene.renderTextBlock(formatLinkLine(PlayAlongService.getCachedEconomy()), 6);
+			linkInfo.hardlight(0xCCCCCC);
+			linkInfo.maxWidth(WIDTH);
+			linkInfo.setPos(0, pos);
+			add(linkInfo);
+			pos = linkInfo.bottom() + GAP;
 
-		if (PlayAlongService.streamFeaturesVisible()) {
 			RedButton btnCommands = new RedButton("STREAM COMMANDS & POINTS", 7) {
 				@Override
 				protected void onClick() {
@@ -249,30 +266,46 @@ public class WndPlayAlongJoin extends Window {
 			pos = btnRoom.bottom() + GAP;
 		}
 
-		RedButton btnYt = new RedButton("Open YouTube Channel", 7) {
-			@Override
-			protected void onClick() {
-				ShatteredPixelDungeon.platform.openURI("https://www.youtube.com/@DaltonGoesFast");
-			}
-		};
-		btnYt.setRect(0, pos, WIDTH, 16);
-		add(btnYt);
-
-		resize(WIDTH, (int) btnYt.bottom() + 1);
-
-		PlayAlongService.requestStreamEconomy(eco -> Game.runOnRenderThread(() -> {
-			if (parent == null || eco == null) return;
-			linkInfo.text(formatLinkLine(eco));
-			if (eco.linked && eco.linkedUsername != null && !eco.linkedUsername.trim().isEmpty()) {
-				username = PlayAlongProtocol.sanitizeUsername(eco.linkedUsername, "01");
-				if (btnName != null) {
-					btnName.text("Name: " + username + " (Linked)");
+		if (stream) {
+			RedButton btnYt = new RedButton("Open YouTube Channel", 7) {
+				@Override
+				protected void onClick() {
+					ShatteredPixelDungeon.platform.openURI("https://www.youtube.com/@DaltonGoesFast");
 				}
-				linkInfo.hardlight(0x88FF88);
-			} else {
-				linkInfo.hardlight(0xFFCC44);
-			}
-		}));
+			};
+			btnYt.setRect(0, pos, WIDTH, 16);
+			add(btnYt);
+			pos = btnYt.bottom() + 1;
+		}
+
+		resize(WIDTH, (int) Math.ceil(pos));
+
+		if (stream) {
+			PlayAlongService.requestStreamEconomy(eco -> Game.runOnRenderThread(() -> {
+				if (parent == null || eco == null || linkInfo == null) return;
+				linkInfo.text(formatLinkLine(eco));
+				if (eco.linked && eco.linkedUsername != null && !eco.linkedUsername.trim().isEmpty()) {
+					username = PlayAlongProtocol.sanitizeUsername(eco.linkedUsername, "01");
+					if (btnName != null) {
+						btnName.text("Name: " + username + " (Linked)");
+					}
+					linkInfo.hardlight(0x88FF88);
+				} else {
+					linkInfo.hardlight(0xFFCC44);
+				}
+			}));
+		}
+	}
+
+	private String communityHostLabel(SessionInfo session) {
+		if (session != null && session.hostDisplayName != null && !session.hostDisplayName.trim().isEmpty()) {
+			return session.hostDisplayName.trim();
+		}
+		String room = PlayAlongProtocol.parseJoinInput(joinAddress);
+		if (room != null && !room.isEmpty() && !PlayAlongProtocol.isReservedRoom(room)) {
+			return room;
+		}
+		return "Host";
 	}
 
 	private static String formatLinkLine(StreamEconomyState eco) {

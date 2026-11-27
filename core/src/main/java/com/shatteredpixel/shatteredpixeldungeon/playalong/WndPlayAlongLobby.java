@@ -34,6 +34,7 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndOptions;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndTextInput;
 import com.watabou.noosa.Game;
+import com.watabou.noosa.Gizmo;
 import com.watabou.noosa.ui.Component;
 import com.watabou.utils.DeviceCompat;
 
@@ -42,6 +43,7 @@ import java.util.List;
 
 /**
  * Community Play Along lobby: browse public rooms, join by code, host wizard.
+ * ScrollPane is a direct Window child so its content camera aligns with chrome.
  */
 public class WndPlayAlongLobby extends Window {
 
@@ -50,38 +52,76 @@ public class WndPlayAlongLobby extends Window {
 	private static final int BTN_H = 16;
 	private static final int LIST_H = 80;
 
-	private final Component root;
 	private final List<RoomListing> rooms = new ArrayList<>();
+	private final List<Gizmo> body = new ArrayList<>();
 	private float pollAccum = 0f;
 	private boolean fetching = false;
+	private String linkedUsername = null;
 
 	private ScrollPane listPane;
 	private Component listContent;
 	private RenderedTextBlock status;
 	private RenderedTextBlock hostStatus;
+	private RedButton btnDisplay;
+	private float listTopY;
 
 	public WndPlayAlongLobby() {
 		super();
-		root = new Component();
-		add(root);
 		rebuild();
 		refreshRooms(true);
+		PlayAlongService.requestLinkedUsername(name -> {
+			if (parent == null) return;
+			linkedUsername = name;
+			if (btnDisplay != null) {
+				btnDisplay.text(displayButtonLabel());
+			}
+		});
 	}
 
 	private boolean isHostingNow() {
 		return PlayAlongService.canHostPlayAlong() && SPDSettings.playAlongHostEnabled();
 	}
 
+	private void clearBody() {
+		for (Gizmo g : body) {
+			if (g != null) {
+				g.killAndErase();
+				if (g.parent != null) g.parent.remove(g);
+			}
+		}
+		body.clear();
+		listPane = null;
+		listContent = null;
+		status = null;
+		hostStatus = null;
+		btnDisplay = null;
+	}
+
+	private void addBody(Gizmo g) {
+		add(g);
+		body.add(g);
+	}
+
 	private void rebuild() {
-		root.clear();
+		clearBody();
 		float y = 2;
 
 		RenderedTextBlock title = PixelScene.renderTextBlock(
 				Messages.get(this, "title"), 9);
 		title.hardlight(TITLE_COLOR);
 		title.setPos((WIDTH - title.width()) / 2f, y);
-		root.add(title);
+		addBody(title);
 		y = title.bottom() + GAP;
+
+		btnDisplay = new RedButton(displayButtonLabel(), 7) {
+			@Override
+			protected void onClick() {
+				promptDisplayName();
+			}
+		};
+		btnDisplay.setRect(0, y, WIDTH, BTN_H);
+		addBody(btnDisplay);
+		y = btnDisplay.bottom() + GAP;
 
 		if (isHostingNow()) {
 			y = buildHostingPanel(y);
@@ -92,13 +132,14 @@ public class WndPlayAlongLobby extends Window {
 				6);
 		status.maxWidth(WIDTH);
 		status.setPos(0, y);
-		root.add(status);
+		addBody(status);
 		y = status.bottom() + GAP;
 
+		listTopY = y;
 		listContent = new Component();
 		listPane = new ScrollPane(listContent);
-		root.add(listPane);
-		listPane.setRect(0, y, WIDTH, LIST_H);
+		addBody(listPane);
+		listPane.setRect(0, listTopY, WIDTH, LIST_H);
 		y = listPane.bottom() + GAP;
 		rebuildList();
 
@@ -109,7 +150,7 @@ public class WndPlayAlongLobby extends Window {
 			}
 		};
 		btnJoin.setRect(0, y, WIDTH, BTN_H);
-		root.add(btnJoin);
+		addBody(btnJoin);
 		y = btnJoin.bottom() + GAP;
 
 		if (!isHostingNow()) {
@@ -120,7 +161,7 @@ public class WndPlayAlongLobby extends Window {
 				}
 			};
 			btnHost.setRect(0, y, WIDTH, BTN_H);
-			root.add(btnHost);
+			addBody(btnHost);
 			y = btnHost.bottom() + GAP;
 		}
 
@@ -131,17 +172,20 @@ public class WndPlayAlongLobby extends Window {
 			}
 		};
 		btnRefresh.setRect(0, y, WIDTH, BTN_H);
-		root.add(btnRefresh);
+		addBody(btnRefresh);
 		y = btnRefresh.bottom() + 2;
 
 		resize(WIDTH, (int) Math.ceil(y));
+		if (listPane != null) {
+			listPane.setRect(0, listTopY, WIDTH, LIST_H);
+		}
 	}
 
 	private float buildHostingPanel(float y) {
 		RenderedTextBlock hdr = PixelScene.renderTextBlock(Messages.get(this, "hosting_title"), 8);
 		hdr.hardlight(0xFFCC66);
 		hdr.setPos(0, y);
-		root.add(hdr);
+		addBody(hdr);
 		y = hdr.bottom() + GAP;
 
 		String code = PlayAlongService.relayRoomCode();
@@ -156,7 +200,7 @@ public class WndPlayAlongLobby extends Window {
 		hostStatus = PixelScene.renderTextBlock(line, 6);
 		hostStatus.maxWidth(WIDTH);
 		hostStatus.setPos(0, y);
-		root.add(hostStatus);
+		addBody(hostStatus);
 		y = hostStatus.bottom() + GAP;
 
 		if (DeviceCompat.isAndroid()) {
@@ -164,7 +208,7 @@ public class WndPlayAlongLobby extends Window {
 			warn.hardlight(0xFF8888);
 			warn.maxWidth(WIDTH);
 			warn.setPos(0, y);
-			root.add(warn);
+			addBody(warn);
 			y = warn.bottom() + GAP;
 		}
 
@@ -175,7 +219,7 @@ public class WndPlayAlongLobby extends Window {
 			}
 		};
 		btnCopy.setRect(0, y, WIDTH, BTN_H);
-		root.add(btnCopy);
+		addBody(btnCopy);
 		y = btnCopy.bottom() + GAP;
 
 		RedButton btnStop = new RedButton(Messages.get(this, "hosting_stop"), 7) {
@@ -186,8 +230,66 @@ public class WndPlayAlongLobby extends Window {
 			}
 		};
 		btnStop.setRect(0, y, WIDTH, BTN_H);
-		root.add(btnStop);
+		addBody(btnStop);
 		return btnStop.bottom() + GAP + 2;
+	}
+
+	private String displayButtonLabel() {
+		String cur = SPDSettings.playAlongUsername();
+		if (cur == null || cur.isEmpty()) {
+			return Messages.get(this, "display_unset");
+		}
+		if (linkedUsername != null && linkedUsername.equalsIgnoreCase(cur)) {
+			return Messages.get(this, "display_linked", cur);
+		}
+		return Messages.get(this, "display_set", cur);
+	}
+
+	private void promptDisplayName() {
+		if (linkedUsername != null && !linkedUsername.isEmpty()) {
+			ShatteredPixelDungeon.scene().addToFront(new WndOptions(
+					Messages.get(this, "display_title"),
+					Messages.get(this, "display_body", linkedUsername),
+					Messages.get(this, "display_set_custom"),
+					Messages.get(this, "display_use_linked", linkedUsername),
+					Messages.get(this, "cancel")) {
+				@Override
+				public void onSelect(int index) {
+					if (index == 0) {
+						promptDisplayNameInput();
+					} else if (index == 1) {
+						applyDisplayName(linkedUsername);
+					}
+				}
+			});
+		} else {
+			promptDisplayNameInput();
+		}
+	}
+
+	private void promptDisplayNameInput() {
+		String cur = SPDSettings.playAlongUsername();
+		ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
+				Messages.get(this, "display_title"),
+				Messages.get(this, "display_prompt"),
+				cur == null ? "" : cur,
+				16,
+				false,
+				Messages.get(this, "ok"),
+				Messages.get(this, "cancel")) {
+			@Override
+			public void onSelect(boolean positive, String text) {
+				if (!positive || text == null || text.trim().isEmpty()) return;
+				applyDisplayName(text);
+			}
+		});
+	}
+
+	private void applyDisplayName(String raw) {
+		PlayAlongService.setHostDisplayName(raw);
+		if (btnDisplay != null) {
+			btnDisplay.text(displayButtonLabel());
+		}
 	}
 
 	@Override
@@ -222,6 +324,7 @@ public class WndPlayAlongLobby extends Window {
 		}
 		PlayAlongService.fetchPublicRooms(list -> {
 			fetching = false;
+			if (parent == null) return;
 			rooms.clear();
 			if (list != null) rooms.addAll(list);
 			rebuildList();
@@ -236,6 +339,7 @@ public class WndPlayAlongLobby extends Window {
 			status.text(Messages.get(this, "empty"));
 			listPane.content().setSize(WIDTH, 1);
 			listPane.scrollTo(0, 0);
+			listPane.setRect(0, listTopY, WIDTH, LIST_H);
 			return;
 		}
 		status.text(Messages.get(this, "found", rooms.size()));
@@ -265,8 +369,9 @@ public class WndPlayAlongLobby extends Window {
 			listContent.add(row);
 			pos = row.bottom() + 1;
 		}
-		listContent.setSize(WIDTH, Math.max(pos, LIST_H));
-		listPane.content().setSize(listContent.width(), listContent.height());
+		listContent.setSize(WIDTH, Math.max(pos, 1));
+		listPane.content().setSize(WIDTH, Math.max(pos, 1));
+		listPane.setRect(0, listTopY, WIDTH, LIST_H);
 		listPane.scrollTo(0, 0);
 	}
 
@@ -277,7 +382,10 @@ public class WndPlayAlongLobby extends Window {
 		StringBuilder sb = new StringBuilder();
 		if (room.official) sb.append("* ");
 		sb.append(name);
-		sb.append(" [").append(room.code).append("]");
+		if (room.displayName != null && !room.displayName.isEmpty()
+				&& !room.displayName.equalsIgnoreCase(room.code)) {
+			sb.append(" [").append(room.code).append("]");
+		}
 		if (room.inDungeon) {
 			sb.append(" D").append(Math.max(1, room.hostDepth));
 		}
@@ -298,7 +406,7 @@ public class WndPlayAlongLobby extends Window {
 			});
 			return;
 		}
-		ShatteredPixelDungeon.scene().addToFront(new WndOptions(
+		ensureDisplayNameThen(() -> ShatteredPixelDungeon.scene().addToFront(new WndOptions(
 				Messages.get(this, "host_title"),
 				Messages.get(this, "host_wizard_body"),
 				Messages.get(this, "host_private"),
@@ -311,6 +419,36 @@ public class WndPlayAlongLobby extends Window {
 				} else if (index == 1) {
 					promptPublicName();
 				}
+			}
+		}));
+	}
+
+	private void ensureDisplayNameThen(Runnable next) {
+		String cur = SPDSettings.playAlongUsername();
+		if (cur != null && !cur.isEmpty()) {
+			next.run();
+			return;
+		}
+		if (linkedUsername != null && !linkedUsername.isEmpty()) {
+			applyDisplayName(linkedUsername);
+			next.run();
+			return;
+		}
+		ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
+				Messages.get(this, "display_title"),
+				Messages.get(this, "display_prompt_host"),
+				"",
+				16,
+				false,
+				Messages.get(this, "ok"),
+				Messages.get(this, "cancel")) {
+			@Override
+			public void onSelect(boolean positive, String text) {
+				if (!positive) return;
+				if (text != null && !text.trim().isEmpty()) {
+					applyDisplayName(text);
+				}
+				next.run();
 			}
 		});
 	}
@@ -331,7 +469,9 @@ public class WndPlayAlongLobby extends Window {
 				if (name.isEmpty() || PlayAlongProtocol.isReservedRoom(name)
 						|| PlayAlongProtocol.isBlockedPublicRoomName(name)
 						|| !PlayAlongProtocol.isPublicRoomName(name)) {
-					status.text(Messages.get(WndPlayAlongLobby.this, "host_public_name_bad"));
+					if (status != null) {
+						status.text(Messages.get(WndPlayAlongLobby.this, "host_public_name_bad"));
+					}
 					return;
 				}
 				if (SPDSettings.playAlongRelayToken().isEmpty()) {
@@ -357,7 +497,9 @@ public class WndPlayAlongLobby extends Window {
 				if (!positive) return;
 				String secret = text == null ? "" : text.trim();
 				if (secret.isEmpty()) {
-					status.text(Messages.get(WndPlayAlongLobby.this, "host_secret_needed"));
+					if (status != null) {
+						status.text(Messages.get(WndPlayAlongLobby.this, "host_secret_needed"));
+					}
 					return;
 				}
 				SPDSettings.playAlongRelayToken(secret);

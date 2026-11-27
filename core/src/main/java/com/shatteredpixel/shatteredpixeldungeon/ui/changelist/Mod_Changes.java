@@ -33,6 +33,7 @@ public class Mod_Changes {
 
 	public static void addAllChanges( ArrayList<ChangeInfo> changeInfos ){
 		addOverview(changeInfos);
+		add_v4_0_3_QoL_28(changeInfos);
 		add_v4_0_3_QoL_27(changeInfos);
 		add_v4_0_3_QoL_26(changeInfos);
 		add_v4_0_3_QoL_25(changeInfos);
@@ -54,6 +55,29 @@ public class Mod_Changes {
 		add_v4_0_0_QoL_6(changeInfos);
 		add_v4_0_0_QoL_5(changeInfos);
 		add_v4_0_0(changeInfos);
+	}
+
+	private static void add_v4_0_3_QoL_28( ArrayList<ChangeInfo> changeInfos ) {
+		ChangeInfo changes = new ChangeInfo("4.0.3-QoL-28", true, "");
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes = new ChangeInfo(Messages.get(ChangesScene.class, "new"), false, null);
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.ENTER), "Host Display Name",
+				"**-** Set your public display name from the Play Along lobby (Android + desktop)\n" +
+				"**-** One-tap use of a linked stream username when available\n" +
+				"**-** Name shows in the room browser and on the join screen"));
+
+		changes = new ChangeInfo(Messages.get(ChangesScene.class, "changes"), false, null);
+		changes.hardlight(CharSprite.WARNING);
+		changeInfos.add(changes);
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.PREFS), "Lobby & Join Polish",
+				"**-** Fixed misplaced public-room list on Android and desktop\n" +
+				"**-** Community join screens no longer say Dalton / stream-link / YouTube"));
 	}
 
 	private static void add_v4_0_3_QoL_27( ArrayList<ChangeInfo> changeInfos ) {

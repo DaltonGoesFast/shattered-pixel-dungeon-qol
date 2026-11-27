@@ -590,6 +590,65 @@ public final class PlayAlongService {
 		publishRelayMeta(false);
 	}
 
+	/** Browser / join-facing host label (never empty). */
+	public static String hostDisplayNameForSession() {
+		if (hostHoldsStreamRoom()
+				|| PlayAlongProtocol.isReservedRoom(SPDSettings.playAlongRelayHostRoomOrNull())
+				|| PlayAlongProtocol.isReservedRoom(relayRoomCode())) {
+			return "Dalton";
+		}
+		String n = SPDSettings.playAlongUsername();
+		if (n == null || n.trim().isEmpty()) return "Host";
+		return PlayAlongProtocol.sanitizeUsername(n, "01");
+	}
+
+	/** Persist display name, refresh relay meta + live session field when hosting. */
+	public static void setHostDisplayName(String raw) {
+		String safe = PlayAlongProtocol.sanitizeUsername(raw, "01");
+		SPDSettings.playAlongUsername(safe);
+		publishRelayMeta(true);
+		if (hostServer != null) {
+			SessionInfo info = hostServer.getActiveSession();
+			if (info != null) {
+				info.hostDisplayName = hostDisplayNameForSession();
+			}
+		}
+	}
+
+	public interface LinkedUsernameCallback {
+		void accept(String linkedUsernameOrNull);
+	}
+
+	/**
+	 * Resolve Twitch/YouTube linked name via the dalton stream control path
+	 * (not the local host socket). Callback always on the render thread.
+	 */
+	public static void requestLinkedUsername(LinkedUsernameCallback callback) {
+		if (callback == null) return;
+		StreamEconomyState cached = cachedEconomy;
+		if (cached != null && cached.linked && cached.linkedUsername != null
+				&& !cached.linkedUsername.trim().isEmpty()) {
+			String linked = PlayAlongProtocol.sanitizeUsername(cached.linkedUsername, "01");
+			Game.runOnRenderThread(() -> callback.accept(linked));
+			return;
+		}
+		WireMessage req = new WireMessage();
+		req.type = "stream_state_req";
+		req.requestId = UUID.randomUUID().toString();
+		req.clientToken = SPDSettings.streamClientToken();
+		PlayAlongClient.sendControlRequest(PlayAlongProtocol.daltonJoinAddress(), req, 4000, msg -> {
+			StreamEconomyState eco = (msg != null) ? msg.economy : null;
+			if (eco != null) applyEconomyUpdate(eco);
+			String linked = null;
+			if (eco != null && eco.linked && eco.linkedUsername != null
+					&& !eco.linkedUsername.trim().isEmpty()) {
+				linked = PlayAlongProtocol.sanitizeUsername(eco.linkedUsername, "01");
+			}
+			final String out = linked;
+			Game.runOnRenderThread(() -> callback.accept(out));
+		});
+	}
+
 	public static void publishRelayMeta(boolean force) {
 		PlayAlongRelayHost host = relayHost;
 		if (host == null || !host.isUp()) return;
@@ -597,8 +656,7 @@ public final class PlayAlongService {
 		if (!force && now - lastMetaPublishMs < 5_000L) return;
 		lastMetaPublishMs = now;
 		Map<String, Object> meta = new LinkedHashMap<>();
-		String display = SPDSettings.playAlongUsername();
-		if (display == null || display.isEmpty()) display = "Host";
+		String display = hostDisplayNameForSession();
 		meta.put("displayName", display);
 		meta.put("version", Game.version == null ? "" : Game.version);
 		meta.put("protocolVersion", PlayAlongProtocol.PROTOCOL_VERSION);
@@ -929,6 +987,7 @@ public final class PlayAlongService {
 		info.challenges = Dungeon.challenges;
 		info.modifiers = Dungeon.modifiers;
 		info.hostClass = Dungeon.hero.heroClass != null ? Dungeon.hero.heroClass.name() : "WARRIOR";
+		info.hostDisplayName = hostDisplayNameForSession();
 		info.hostDepth = Dungeon.depth;
 		info.hostPos = Dungeon.hero.pos;
 		info.hostHp = Dungeon.hero.HP;
@@ -2073,19 +2132,7 @@ public final class PlayAlongService {
 	private static GhostState buildLocalGhostState(String action, int pos, boolean isHost) {
 		GhostState g = new GhostState();
 		g.userId = isHost ? "host" : localUserId;
-		if (isHost) {
-			boolean daltonRoom = hostHoldsStreamRoom()
-					|| PlayAlongProtocol.isReservedRoom(SPDSettings.playAlongRelayHostRoomOrNull())
-					|| PlayAlongProtocol.isReservedRoom(relayRoomCode());
-			if (daltonRoom) {
-				g.username = "Dalton";
-			} else {
-				String n = SPDSettings.playAlongUsername();
-				g.username = (n == null || n.isEmpty()) ? "Host" : n;
-			}
-		} else {
-			g.username = clientUsername;
-		}
+		g.username = isHost ? hostDisplayNameForSession() : clientUsername;
 		g.heroClass = Dungeon.hero != null ? Dungeon.hero.heroClass.name() : "WARRIOR";
 		g.heroLvl = Dungeon.hero != null ? Math.max(1, Dungeon.hero.lvl) : 1;
 		g.armorTier = Dungeon.hero != null ? Dungeon.hero.tier() : 0;

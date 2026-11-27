@@ -140,6 +140,8 @@ public final class PlayAlongProtocol {
 		public int challenges;
 		public int modifiers;
 		public String hostClass = "WARRIOR";
+		/** Public-facing host name for join UI / non-dalton rooms. */
+		public String hostDisplayName = "";
 		public int hostDepth = 1;
 		public int hostPos = 0;
 		public int hostHp = 20;
