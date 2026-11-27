@@ -648,19 +648,30 @@ public class InterlevelScene extends PixelScene {
 			//When debugging, we may start a game at a later depth to quickly test something
 			// if this happens, the games quickly generates all prior levels on branch 0 first,
 			// which ensures levelgen consistency with a regular game that was played to that depth.
-			if (DeviceCompat.isDebug() || catchupDepth > 1){
-				int trueDepth = Dungeon.depth;
-				int trueBranch = Dungeon.branch;
-				for (int i = 1; i < trueDepth + (trueBranch == 0 ? 0 : 1); i++){
-					if (!Dungeon.levelHasBeenGenerated(i, 0)){
-						Dungeon.depth = i;
-						Dungeon.branch = 0;
-						Dungeon.level = Dungeon.newLevel();
-						Dungeon.saveLevel(GamesInProgress.curSlot);
+			// Catch-up shops on those skipped floors must not claim a bag the racer can still buy.
+			boolean sealCatchupBags = catchupDepth > 1;
+			if (sealCatchupBags) {
+				com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.sealShopBagsForPregen();
+			}
+			try {
+				if (DeviceCompat.isDebug() || catchupDepth > 1){
+					int trueDepth = Dungeon.depth;
+					int trueBranch = Dungeon.branch;
+					for (int i = 1; i < trueDepth + (trueBranch == 0 ? 0 : 1); i++){
+						if (!Dungeon.levelHasBeenGenerated(i, 0)){
+							Dungeon.depth = i;
+							Dungeon.branch = 0;
+							Dungeon.level = Dungeon.newLevel();
+							Dungeon.saveLevel(GamesInProgress.curSlot);
+						}
 					}
+					Dungeon.depth = trueDepth;
+					Dungeon.branch = trueBranch;
 				}
-				Dungeon.depth = trueDepth;
-				Dungeon.branch = trueBranch;
+			} finally {
+				if (sealCatchupBags) {
+					com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.unsealShopBagsAfterPregen();
+				}
 			}
 
 			Level level = Dungeon.newLevel();
