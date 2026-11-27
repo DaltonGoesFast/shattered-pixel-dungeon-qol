@@ -33,6 +33,8 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.spells.GuidingLight;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.KindofMisc;
+import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfEnergy;
+import com.shatteredpixel.shatteredpixeldungeon.levels.VaultLevel;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
 import com.watabou.utils.Bundle;
@@ -71,6 +73,12 @@ public class Artifact extends KindofMisc {
 			return false;
 
 		} else {
+
+			//standard artifacts cannot be used inside the vault, mainly to prevent exploits with temp vault inventory
+			if (Dungeon.level instanceof VaultLevel && !unique){
+				GLog.w( Messages.get(Artifact.class, "cannot_wear_vault") );
+				return false;
+			}
 
 			if (super.doEquip( hero )){
 
@@ -256,6 +264,20 @@ public class Artifact extends KindofMisc {
 	
 	public void charge(Hero target, float amount){
 		//do nothing by default;
+	}
+
+	public static float rechargeSpeedMultiplier(Char target){
+		float multiplier = 1f;
+
+		multiplier *= RingOfEnergy.rechargeSpeedMultiplier(target);
+
+		if (target instanceof Hero
+				&& ((Hero) target).heroClass != HeroClass.ROGUE
+				&& ((Hero) target).hasTalent(Talent.LIGHT_CLOAK)){
+			multiplier *= 1f + (0.2f * ((Hero) target).pointsInTalent(Talent.LIGHT_CLOAK)/3f);
+		}
+
+		return multiplier;
 	}
 
 	public class ArtifactBuff extends Buff {

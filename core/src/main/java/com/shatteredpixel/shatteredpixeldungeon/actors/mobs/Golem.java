@@ -25,6 +25,7 @@ import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.MagicImmune;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.PinCushion;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Imp;
 import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
@@ -126,17 +127,29 @@ public class Golem extends Mob {
 		enemyTeleCooldown--;
 		if (teleporting){
 			((GolemSprite)sprite).teleParticles(false);
-			if (Actor.findChar(target) == null && Dungeon.level.openSpace[target]) {
-				ScrollOfTeleportation.appear(this, target);
-				selfTeleCooldown = 30;
-			} else {
+			if (!selfTeleport(target)){
+				//try one more time
 				target = Dungeon.level.randomDestination(this);
+				selfTeleport(target);
 			}
 			teleporting = false;
 			spend(TICK);
 			return true;
 		}
 		return super.act();
+	}
+
+	private boolean selfTeleport( int cell ){
+		if (Actor.findChar(cell) == null && Dungeon.level.openSpace[cell]) {
+			PinCushion pin = buff(PinCushion.class);
+			if (pin != null){
+				pin.detach();
+			}
+			ScrollOfTeleportation.appear(this, cell);
+			selfTeleCooldown = 100;
+			return true;
+		}
+		return false;
 	}
 
 	public void onZapComplete(){
@@ -151,6 +164,7 @@ public class Golem extends Mob {
 		for (int i : PathFinder.NEIGHBOURS8){
 			if (Dungeon.level.passable[pos + i]
 				&& Actor.findChar(pos+i) == null
+				&& (Dungeon.level.openSpace[pos+i] || !Char.hasProp(enemy, Property.LARGE))
 				&& Dungeon.level.trueDistance(pos+i, enemy.pos) > Dungeon.level.trueDistance(bestPos, enemy.pos)){
 				bestPos = pos+i;
 			}
@@ -251,6 +265,23 @@ public class Golem extends Mob {
 				}
 
 			}
+		}
+
+		@Override
+		protected boolean handleUnreachableTarget(boolean enemyInFOV, boolean justAlerted) {
+			boolean result = super.handleUnreachableTarget(enemyInFOV, justAlerted);
+
+			//try to self-teleport in these cases, unless we're in stealth gameplay (no random TP there)
+			if (state == WANDERING && !(state instanceof Mob.StealthGameplayWandering)){
+				target =  Dungeon.level.randomDestination( Golem.this );
+				if (!Dungeon.bossLevel() && target != -1 && target != pos && selfTeleCooldown <= 0) {
+					((GolemSprite)sprite).teleParticles(true);
+					teleporting = true;
+					spend( TICK ); //already spent a turn swapping states, so just 1 here
+				}
+			}
+
+			return result;
 		}
 	}
 

@@ -53,6 +53,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroClass;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroSubClass;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.abilities.cleric.PowerOfMany;
+import com.shatteredpixel.shatteredpixeldungeon.actors.hero.abilities.duelist.Challenge;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.abilities.huntress.SpiritHawk;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.spells.DivineSense;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.spells.Stasis;
@@ -566,8 +567,11 @@ public abstract class Level implements Bundlable {
 		if (Dungeon.isModified(Modifiers.DISSONANCE)) {
 			PactRoster.applyDissonance(m);
 		}
-		ChampionEnemy.rollForChampion(m);
 		return m;
+	}
+
+	public void rollForChampion(Mob m){
+		ChampionEnemy.rollForChampion(m);
 	}
 
 	abstract protected void createMobs();
@@ -648,15 +652,18 @@ public abstract class Level implements Bundlable {
 		Swiftthistle.TimeBubble timeBubble = Dungeon.hero.buff(Swiftthistle.TimeBubble.class);
 		if (timeBubble != null) timeBubble.disarmPresses();
 
-		//iron stomach and challenge arena do not persist between floors
+		//These buffs do not persist between floors
 		Talent.WarriorFoodImmunity foodImmune = Dungeon.hero.buff(Talent.WarriorFoodImmunity.class);
 		if (foodImmune != null) foodImmune.detach();
 		ScrollOfChallenge.ChallengeArena arena = Dungeon.hero.buff(ScrollOfChallenge.ChallengeArena.class);
 		if (arena != null) arena.detach();
+		Challenge.DuelParticipant duel = Dungeon.hero.buff(Challenge.DuelParticipant.class);
+		if (duel != null) duel.detach();
 		//awareness also doesn't, honestly it's weird that it's a buff
 		Awareness awareness = Dungeon.hero.buff(Awareness.class);
 		if (awareness != null) awareness.detach();
 
+		//stasis doesn't persist between floors if it is holding an immovable ally
 		Char ally = Stasis.getStasisAlly();
 		if (Char.hasProp(ally, Char.Property.IMMOVABLE)){
 			Dungeon.hero.buff(Stasis.StasisBuff.class).act();
@@ -802,6 +809,8 @@ public abstract class Level implements Bundlable {
 		PathFinder.buildDistanceMap(Dungeon.hero.pos, BArray.or(passable, avoid, null));
 
 		Mob mob = createMob();
+
+		rollForChampion(mob);
 		if (mob.state != mob.PASSIVE) {
 			mob.state = mob.WANDERING;
 		}
@@ -917,17 +926,15 @@ public abstract class Level implements Bundlable {
 			losBlocking[i + width()-1] = solid[i + width()-1] = true;
 		}
 
-		//an open space is large enough to fit large mobs. A space is open when it is not solid
-		// and there is an open corner with both adjacent cells opens
+		//an open space is large enough to fit large mobs. A space is open when
+		// it is open/passable and there is an open/passable corner with both adjacent cells open/passable.
 		for (int i=0; i < length(); i++) {
-			if (solid[i]){
-				openSpace[i] = false;
-			} else {
+			openSpace[i] = false;
+			if ((!solid[i] || passable[i])){
 				for (int j = 1; j < PathFinder.CIRCLE8.length; j += 2){
-					if (solid[i+PathFinder.CIRCLE8[j]]) {
-						openSpace[i] = false;
-					} else if (!solid[i+PathFinder.CIRCLE8[(j+1)%8]]
-							&& !solid[i+PathFinder.CIRCLE8[(j+2)%8]]){
+					if ((!solid[i+PathFinder.CIRCLE8[(j)%8]] || passable[i+PathFinder.CIRCLE8[(j)%8]])
+							&& (!solid[i+PathFinder.CIRCLE8[(j+1)%8]] || passable[i+PathFinder.CIRCLE8[(j+1)%8]])
+							&& (!solid[i+PathFinder.CIRCLE8[(j+2)%8]] || passable[i+PathFinder.CIRCLE8[(j+2)%8]])){
 						openSpace[i] = true;
 						break;
 					}
@@ -1595,7 +1602,8 @@ public abstract class Level implements Bundlable {
 	//only check on base terrain, we want to ignore temporary changes from blobs (e.g. light wall)
 	public boolean invalidHeroPos( int tile ){
 		int flags = Terrain.flags[map[tile]];
-		return (flags & Terrain.PASSABLE) != 0 && (flags & Terrain.AVOID) != 0;
+		//not passable and not avoid
+		return (flags & Terrain.PASSABLE) == 0 && (flags & Terrain.AVOID) == 0;
 	}
 
 	//returns true if the input is a valid tile within the level

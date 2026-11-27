@@ -159,8 +159,8 @@ public class Image extends Visual {
 		
 		beforeQuadDrawSetup();
 
-		NoosaScript script = script();
-		
+		NoosaScript script = NoosaScript.get();
+
 		renderTexturedQuad( script );
 		
 	}
@@ -201,10 +201,6 @@ public class Image extends Visual {
 
 		script.drawQuad( buffer );
 
-	}
-
-	protected NoosaScript script(){
-		return NoosaScript.get();
 	}
 
 	@Override
