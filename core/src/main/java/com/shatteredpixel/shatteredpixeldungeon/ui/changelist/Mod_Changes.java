@@ -33,6 +33,7 @@ public class Mod_Changes {
 
 	public static void addAllChanges( ArrayList<ChangeInfo> changeInfos ){
 		addOverview(changeInfos);
+		add_v4_0_3_QoL_27(changeInfos);
 		add_v4_0_3_QoL_26(changeInfos);
 		add_v4_0_3_QoL_25(changeInfos);
 		add_v4_0_3_QoL_24(changeInfos);
@@ -53,6 +54,21 @@ public class Mod_Changes {
 		add_v4_0_0_QoL_6(changeInfos);
 		add_v4_0_0_QoL_5(changeInfos);
 		add_v4_0_0(changeInfos);
+	}
+
+	private static void add_v4_0_3_QoL_27( ArrayList<ChangeInfo> changeInfos ) {
+		ChangeInfo changes = new ChangeInfo("4.0.3-QoL-27", true, "");
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes = new ChangeInfo(Messages.get(ChangesScene.class, "new"), false, null);
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.DATA), "Desktop Backup & Restore",
+				"**-** Settings → Data → **Backup & Restore** now works on desktop (folder picker)\n" +
+				"**-** Same portable `backup.dat` as Android: rankings, badges, and journal\n" +
+				"**-** Android↔desktop backups are interchangeable"));
 	}
 
 	private static void add_v4_0_3_QoL_26( ArrayList<ChangeInfo> changeInfos ) {

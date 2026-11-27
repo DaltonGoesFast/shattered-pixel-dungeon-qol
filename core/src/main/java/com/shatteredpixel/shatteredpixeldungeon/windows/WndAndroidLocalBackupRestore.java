@@ -108,9 +108,11 @@ public class WndAndroidLocalBackupRestore extends Window {
 		} else {
 
 			String folderName = backupFolder;
-			//have to trim excess from the URI
-			folderName = folderName.substring(folderName.indexOf("%3A")+3);
-			folderName = folderName.replaceAll("%20", " ");
+			// Android SAF URIs look like content://...%3Apath; desktop returns a normal absolute path
+			if (folderName.contains("%3A")) {
+				folderName = folderName.substring(folderName.indexOf("%3A")+3);
+				folderName = folderName.replaceAll("%20", " ");
+			}
 
 			String message = Messages.get(this, "main_body", folderName);
 

@@ -1215,8 +1215,8 @@ public class WndSettings extends WndTabbed {
 				add(chkPlayAlongSharedChat);
 			}
 
-			//only shown on Android (iOS has sync, Desktop can access files)
-			if (DeviceCompat.isAndroid()) {
+			// Android needs SAF backup; desktop gets the same UI as a free win (iOS has sync)
+			if (DeviceCompat.isAndroid() || DeviceCompat.isDesktop()) {
 
 				sep2 = new ColorBlock(1, 1, 0xFF000000);
 				add(sep2);

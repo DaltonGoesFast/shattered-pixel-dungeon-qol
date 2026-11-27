@@ -27,11 +27,13 @@ import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Graphics;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.g2d.PixmapPacker;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
+import com.badlogic.gdx.files.FileHandle;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.watabou.input.ControllerHandler;
 import com.watabou.noosa.Game;
 import com.watabou.utils.PlatformSupport;
 import com.watabou.utils.Point;
+import org.lwjgl.util.tinyfd.TinyFileDialogs;
 
 import java.util.HashMap;
 import java.util.regex.Matcher;
@@ -114,6 +116,48 @@ public class DesktopPlatformSupport extends PlatformSupport {
 	public boolean supportsVibration() {
 		//only supports vibration via controller
 		return ControllerHandler.vibrationSupported();
+	}
+
+	private static final String BACKUP_FOLDER_KEY = "backup_folder";
+
+	@Override
+	public String getExternalDataFolder(String folderName) {
+		if (folderName != null && !folderName.isEmpty()) {
+			FileHandle file = Gdx.files.absolute(folderName);
+			if (file.exists() && file.isDirectory()) {
+				return file.path();
+			}
+		}
+		String saved = SPDSettings.getString(BACKUP_FOLDER_KEY, "");
+		if (saved != null && !saved.isEmpty()) {
+			FileHandle file = Gdx.files.absolute(saved);
+			if (file.exists() && file.isDirectory()) {
+				return file.path();
+			}
+		}
+		return null;
+	}
+
+	@Override
+	public void createExternalDataFolder(String folderName, FolderCreationCallback callback) {
+		String defaultPath = getExternalDataFolder("");
+		if (defaultPath == null || defaultPath.isEmpty()) {
+			defaultPath = System.getProperty("user.home", "");
+		}
+		String title = (folderName != null && !folderName.isEmpty()) ? folderName : "Shattered Backups";
+		String selected = TinyFileDialogs.tinyfd_selectFolderDialog(title, defaultPath);
+		if (selected != null && !selected.isEmpty()) {
+			FileHandle folder = Gdx.files.absolute(selected);
+			if (!folder.exists()) {
+				folder.mkdirs();
+			}
+			if (folder.exists() && folder.isDirectory()) {
+				SPDSettings.put(BACKUP_FOLDER_KEY, folder.path());
+				callback.call(folder.path());
+				return;
+			}
+		}
+		callback.call(null);
 	}
 
 	/* FONT SUPPORT */
