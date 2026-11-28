@@ -48,6 +48,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.Amulet;
 import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
+import com.shatteredpixel.shatteredpixeldungeon.journal.Journal;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.TalismanOfForesight;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.Potion;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.Ring;
@@ -246,6 +247,7 @@ public class Dungeon {
 	
 	public static void init() {
 
+		Journal.loadGlobal();
 		com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.onDungeonInit();
 		initialVersion = version = Game.versionCode;
 		debugRun = ShatteredPixelDungeon.debugSession;
@@ -806,7 +808,8 @@ public class Dungeon {
 	}
 	
 	public static void loadGame( int save, boolean fullLoad ) throws IOException {
-		
+
+		Journal.loadGlobal();
 		Bundle bundle = FileUtils.bundleFromFile( GamesInProgress.gameFile( save ) );
 
 		initialVersion = bundle.getInt( INIT_VER );

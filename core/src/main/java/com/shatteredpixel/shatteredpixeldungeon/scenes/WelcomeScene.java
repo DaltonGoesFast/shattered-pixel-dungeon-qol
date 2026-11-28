@@ -83,6 +83,8 @@ public class WelcomeScene extends PixelScene {
 			return;
 		}
 
+		recoverJournal(previousVersion);
+
 		if (ShatteredPixelDungeon.versionCode == previousVersion && !SPDSettings.intro()) {
 			ShatteredPixelDungeon.switchNoFade(TitleScene.class);
 			return;
@@ -248,6 +250,40 @@ public class WelcomeScene extends PixelScene {
 
 		align(fb);
 		add( fb );
+	}
+
+	/**
+	 * Profiles that already had a version lose journal.dat if a run saved before the file was
+	 * loaded. That file is gone, so fill the journal once. A version of 0 is a fresh install.
+	 */
+	private void recoverJournal(int previousVersion){
+		Journal.loadGlobal();
+		if (SPDSettings.journalFullGrant()) {
+			return;
+		}
+		// fullGrantApplied is true only after it has been read from disk or a write succeeded.
+		if (Journal.fullGrantApplied()) {
+			if (commitJournalBadges()) {
+				SPDSettings.journalFullGrant(true);
+			}
+			return;
+		}
+		if (!Journal.shouldGrantFullJournal(previousVersion, false)) {
+			SPDSettings.journalFullGrant(true);
+			return;
+		}
+		Journal.grantFullCompletion();
+		if (Journal.saveGlobal(true) && commitJournalBadges()) {
+			SPDSettings.journalFullGrant(true);
+		}
+	}
+
+	/** @return false when badges.dat exists but could not be read, so the caller retries later. */
+	private boolean commitJournalBadges(){
+		if (!Badges.unlockJournalCompletion()) {
+			return false;
+		}
+		return Badges.saveGlobal(false);
 	}
 
 	private void updateVersion(int previousVersion){

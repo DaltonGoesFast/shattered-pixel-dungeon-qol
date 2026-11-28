@@ -312,15 +312,24 @@ public class Badges {
 		store( bundle, local );
 	}
 	
-	public static void loadGlobal() {
-		if (global == null) {
-			try {
-				Bundle bundle = FileUtils.bundleFromFile( BADGES_FILE );
-				global = restore( bundle );
+	// badges.dat exists but could not be read. Stay unloaded so a later save cannot replace it.
+	private static boolean unreadable = false;
 
-			} catch (IOException e) {
-				global = new HashSet<>();
-			}
+	public static void loadGlobal() {
+		if (global != null || unreadable) {
+			return;
+		}
+		if (!FileUtils.fileExists(BADGES_FILE)) {
+			global = new HashSet<>();
+			return;
+		}
+		try {
+			Bundle bundle = FileUtils.bundleFromFile( BADGES_FILE );
+			global = restore( bundle );
+
+		} catch (IOException e) {
+			ShatteredPixelDungeon.reportException(e);
+			unreadable = true;
 		}
 	}
 
@@ -328,7 +337,10 @@ public class Badges {
 		saveGlobal(false);
 	}
 
-	public static void saveGlobal(boolean force) {
+	public static boolean saveGlobal(boolean force) {
+		if (global == null || unreadable) {
+			return false;
+		}
 		if (saveNeeded || force) {
 			
 			Bundle bundle = new Bundle();
@@ -339,19 +351,22 @@ public class Badges {
 				saveNeeded = false;
 			} catch (IOException e) {
 				ShatteredPixelDungeon.reportException(e);
+				return false;
 			}
 		}
+		return true;
 	}
 
 	//clears all loaded data
 	public static void unload(){
 		global = null;
+		unreadable = false;
 		local.clear();
 		saveNeeded = false;
 	}
 
 	public static int totalUnlocked(boolean global){
-		if (global) return Badges.global.size();
+		if (global) return Badges.global == null ? 0 : Badges.global.size();
 		else        return Badges.local.size();
 	}
 
@@ -1177,7 +1192,8 @@ public class Badges {
 	
 	private static void displayBadge( Badge badge ) {
 
-		if (badge == null || Dungeon.debugRun || (badge.type != BadgeType.JOURNAL && !Dungeon.customSeedText.isEmpty())) {
+		// An unreadable badges.dat leaves global null. Do not announce a badge that cannot be stored.
+		if (badge == null || global == null || Dungeon.debugRun || (badge.type != BadgeType.JOURNAL && !Dungeon.customSeedText.isEmpty())) {
 			return;
 		}
 		
@@ -1204,22 +1220,51 @@ public class Badges {
 	}
 
 	public static boolean isUnlocked( Badge badge ) {
-		return global.contains( badge );
+		return global != null && global.contains( badge );
 	}
 	
 	public static HashSet<Badge> allUnlocked(){
 		loadGlobal();
+		if (global == null) return new HashSet<>();
 		return new HashSet<>(global);
 	}
 	
 	public static void disown( Badge badge ) {
 		loadGlobal();
+		if (global == null) return;
 		global.remove( badge );
 		saveNeeded = true;
 	}
 	
+	/**
+	 * Journal-completion badges that {@link #validateCatalogBadges()} would unlock once the
+	 * catalog, bestiary, and guidebook are full. Granted silently so startup does not pop them.
+	 * {@link Badge#CATALOG_POTIONS_SCROLLS} is intentionally left out: it tracks identifying
+	 * every potion and scroll during a run, not a row in the journal.
+	 */
+	/** @return false when badges.dat exists but could not be read, so the caller must not save. */
+	public static boolean unlockJournalCompletion(){
+		loadGlobal();
+		if (global == null) return false;
+		boolean blocked = Dungeon.debugRun;
+		Dungeon.debugRun = false;
+		try {
+			unlock(Badge.CATALOG_ONE_EQUIPMENT);
+			unlock(Badge.RESEARCHER_1);
+			unlock(Badge.RESEARCHER_2);
+			unlock(Badge.RESEARCHER_3);
+			unlock(Badge.RESEARCHER_4);
+			unlock(Badge.RESEARCHER_5);
+			unlock(Badge.ALL_RARE_ENEMIES);
+			unlock(Badge.RODNEY);
+		} finally {
+			Dungeon.debugRun = blocked;
+		}
+		return true;
+	}
+
 	public static void unlock( Badge badge ){
-		if (Dungeon.debugRun) return;
+		if (Dungeon.debugRun || global == null) return;
 		if (!isUnlocked(badge) && (badge.type == BadgeType.JOURNAL || Dungeon.customSeedText.isEmpty())){
 			global.add( badge );
 			saveNeeded = true;
@@ -1228,6 +1273,9 @@ public class Badges {
 
 	public static List<Badge> filterReplacedBadges( boolean global ) {
 
+		if (global && Badges.global == null) {
+			return new ArrayList<>();
+		}
 		ArrayList<Badge> badges = new ArrayList<>(global ? Badges.global : Badges.local);
 
 		Iterator<Badge> iterator = badges.iterator();

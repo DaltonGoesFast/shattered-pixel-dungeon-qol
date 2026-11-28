@@ -37,20 +37,25 @@ public class Journal {
 		if (loaded){
 			return;
 		}
-		
-		Bundle bundle;
-		try {
-			bundle = FileUtils.bundleFromFile( JOURNAL_FILE );
-			
-		} catch (IOException e){
-			bundle = new Bundle();
+
+		// A missing file is a new profile. A file that exists but cannot be read must
+		// stay unloaded so saveGlobal cannot replace it with whatever happens to be in memory.
+		if (!FileUtils.fileExists(JOURNAL_FILE)) {
+			fullGrantApplied = false;
+			loaded = true;
+			return;
 		}
-		
-		Catalog.restore( bundle );
-		Bestiary.restore( bundle );
-		Document.restore( bundle );
-		
-		loaded = true;
+
+		try {
+			Bundle bundle = FileUtils.bundleFromFile( JOURNAL_FILE );
+			Catalog.restore( bundle );
+			Bestiary.restore( bundle );
+			Document.restore( bundle );
+			fullGrantApplied = bundle.getBoolean( FULL_GRANT );
+			loaded = true;
+		} catch (IOException e){
+			ShatteredPixelDungeon.reportException(e);
+		}
 	}
 
 	//clears all loaded data
@@ -58,6 +63,8 @@ public class Journal {
 		Catalog.unload();
 		Bestiary.unload();
 		Document.unload();
+		fullGrantApplied = false;
+		pendingFullGrant = false;
 		loaded = false;
 		saveNeeded = false;
 	}
@@ -65,26 +72,72 @@ public class Journal {
 	//package-private
 	static boolean saveNeeded = false;
 
+	/** Written into journal.dat once an existing profile has been filled in. */
+	static final String FULL_GRANT = "journal_full_grant";
+	private static boolean fullGrantApplied = false;
+	/** Filled in memory, not yet confirmed by a successful write of journal.dat. */
+	private static boolean pendingFullGrant = false;
+
+	public static boolean fullGrantApplied(){
+		return fullGrantApplied;
+	}
+
+	/**
+	 * Existing profiles recorded a previous version. Fresh installs (version 0) must not
+	 * be filled, and a grant that already ran must not run again.
+	 */
+	public static boolean shouldGrantFullJournal(int previousVersion, boolean alreadyGranted){
+		return previousVersion > 0 && !alreadyGranted;
+	}
+
+	/** Mark every catalog, bestiary, and document entry complete. Keeps higher counts. */
+	public static void grantFullCompletion(){
+		Catalog.grantAll();
+		Bestiary.grantAll();
+		Document.grantAll();
+		// The on-disk flag is set only after saveGlobal writes this bundle.
+		pendingFullGrant = true;
+		saveNeeded = true;
+	}
+
+	static void store(Bundle bundle){
+		Catalog.store(bundle);
+		Bestiary.store(bundle);
+		Document.store(bundle);
+		bundle.put( FULL_GRANT, fullGrantApplied || pendingFullGrant );
+	}
+
 	public static void saveGlobal(){
 		saveGlobal(false);
 	}
 
-	public static void saveGlobal(boolean force){
+	public static boolean saveGlobal(boolean force){
+		// Play Along joins (and any other path that skips the title journal screens) used to
+		// mutate this empty memory and then overwrite journal.dat. Load disk first.
+		if (!loaded){
+			loadGlobal();
+		}
+		if (!loaded){
+			return false;
+		}
 		if (!force && !saveNeeded){
-			return;
+			return true;
 		}
 		
 		Bundle bundle = new Bundle();
-		
-		Catalog.store(bundle);
-		Bestiary.store(bundle);
-		Document.store(bundle);
+		store(bundle);
 		
 		try {
 			FileUtils.bundleToFile( JOURNAL_FILE, bundle );
+			if (pendingFullGrant) {
+				fullGrantApplied = true;
+			}
+			pendingFullGrant = false;
 			saveNeeded = false;
+			return true;
 		} catch (IOException e) {
 			ShatteredPixelDungeon.reportException(e);
+			return false;
 		}
 		
 	}

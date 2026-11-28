@@ -335,6 +335,19 @@ public enum Bestiary {
 		countEncounters(cls, 1);
 	}
 
+	/** One-time migration. Does not go through {@link #setSeen}, so debug runs cannot block it. */
+	public static void grantAll(){
+		for (Bestiary cat : values()) {
+			for (Class<?> entity : cat.entities()) {
+				cat.seen.put(entity, true);
+				if (cat.encounterCount.get(entity) <= 0) {
+					cat.encounterCount.put(entity, 1);
+				}
+			}
+		}
+		Journal.saveNeeded = true;
+	}
+
 	public static void countEncounters(Class<?> cls, int encounters){
 		if (skipCountingEncounters || Dungeon.debugRun){
 			return;

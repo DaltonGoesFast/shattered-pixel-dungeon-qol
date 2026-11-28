@@ -49,6 +49,17 @@ public class SPDSettings extends GameSettings {
 	public static int version() {
 		return getInt( KEY_VERSION, 0 );
 	}
+
+	/** One-time fill of journal.dat for profiles that already existed when progress was wiped. */
+	public static final String KEY_JOURNAL_FULL_GRANT = "journal_full_grant";
+
+	public static void journalFullGrant( boolean value ) {
+		put( KEY_JOURNAL_FULL_GRANT, value );
+	}
+
+	public static boolean journalFullGrant() {
+		return getBoolean( KEY_JOURNAL_FULL_GRANT, false );
+	}
 	
 	//Display
 	

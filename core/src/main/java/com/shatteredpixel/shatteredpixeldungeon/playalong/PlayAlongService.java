@@ -31,6 +31,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroClass;
 import com.shatteredpixel.shatteredpixeldungeon.desktop.StreamingCommandHandler;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
+import com.shatteredpixel.shatteredpixeldungeon.journal.Journal;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongProtocol.ChatCommandPayload;
@@ -1061,6 +1062,11 @@ public final class PlayAlongService {
 	public static void startClientRun(SessionInfo session, HeroClass heroClass, String rawUsername) {
 		if (session == null || !session.active) return;
 
+		// Joining from the title screen never passes through HeroSelectScene or StartScene,
+		// which are the only places that used to load journal.dat. Load it before the new
+		// run can record a sighting and save over the file.
+		Journal.loadGlobal();
+
 		String joinAddr = clientServerAddress;
 		if (joinAddr == null || joinAddr.isEmpty()) joinAddr = discoveredAddress;
 		if (joinAddr == null || joinAddr.isEmpty()) joinAddr = PlayAlongProtocol.daltonJoinAddress();
@@ -1115,6 +1121,7 @@ public final class PlayAlongService {
 	/** Resume a parked Play Along save for the host's current sessionId. */
 	public static void continueClientRun(SessionInfo session) {
 		if (session == null || !session.active) return;
+		Journal.loadGlobal();
 		int slot = PlayAlongArchives.findSlot(session.sessionId);
 		if (slot <= 0 || !GamesInProgress.gameExists(slot)) {
 			GLog.w("No saved Play Along race for this run — pick a class to join.");
