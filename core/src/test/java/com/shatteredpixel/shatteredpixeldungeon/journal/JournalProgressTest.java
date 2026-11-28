@@ -79,7 +79,10 @@ public class JournalProgressTest {
 			}
 		}
 		assertTrue(Document.HALLS_KING.isPageRead(Document.KING_ATTRITION));
-		assertTrue(Journal.fullGrantApplied());
+		assertFalse(Journal.fullGrantApplied());
+		Bundle bundle = new Bundle();
+		Journal.store(bundle);
+		assertTrue(bundle.getBoolean(Journal.FULL_GRANT));
 	}
 
 	@Test

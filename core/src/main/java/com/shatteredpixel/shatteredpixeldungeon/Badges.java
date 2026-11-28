@@ -312,15 +312,24 @@ public class Badges {
 		store( bundle, local );
 	}
 	
-	public static void loadGlobal() {
-		if (global == null) {
-			try {
-				Bundle bundle = FileUtils.bundleFromFile( BADGES_FILE );
-				global = restore( bundle );
+	// badges.dat exists but could not be read. Stay unloaded so a later save cannot replace it.
+	private static boolean unreadable = false;
 
-			} catch (IOException e) {
-				global = new HashSet<>();
-			}
+	public static void loadGlobal() {
+		if (global != null || unreadable) {
+			return;
+		}
+		if (!FileUtils.fileExists(BADGES_FILE)) {
+			global = new HashSet<>();
+			return;
+		}
+		try {
+			Bundle bundle = FileUtils.bundleFromFile( BADGES_FILE );
+			global = restore( bundle );
+
+		} catch (IOException e) {
+			ShatteredPixelDungeon.reportException(e);
+			unreadable = true;
 		}
 	}
 
@@ -328,7 +337,10 @@ public class Badges {
 		saveGlobal(false);
 	}
 
-	public static void saveGlobal(boolean force) {
+	public static boolean saveGlobal(boolean force) {
+		if (global == null || unreadable) {
+			return false;
+		}
 		if (saveNeeded || force) {
 			
 			Bundle bundle = new Bundle();
@@ -339,19 +351,22 @@ public class Badges {
 				saveNeeded = false;
 			} catch (IOException e) {
 				ShatteredPixelDungeon.reportException(e);
+				return false;
 			}
 		}
+		return true;
 	}
 
 	//clears all loaded data
 	public static void unload(){
 		global = null;
+		unreadable = false;
 		local.clear();
 		saveNeeded = false;
 	}
 
 	public static int totalUnlocked(boolean global){
-		if (global) return Badges.global.size();
+		if (global) return Badges.global == null ? 0 : Badges.global.size();
 		else        return Badges.local.size();
 	}
 
@@ -1204,16 +1219,18 @@ public class Badges {
 	}
 
 	public static boolean isUnlocked( Badge badge ) {
-		return global.contains( badge );
+		return global != null && global.contains( badge );
 	}
 	
 	public static HashSet<Badge> allUnlocked(){
 		loadGlobal();
+		if (global == null) return new HashSet<>();
 		return new HashSet<>(global);
 	}
 	
 	public static void disown( Badge badge ) {
 		loadGlobal();
+		if (global == null) return;
 		global.remove( badge );
 		saveNeeded = true;
 	}
@@ -1224,8 +1241,10 @@ public class Badges {
 	 * {@link Badge#CATALOG_POTIONS_SCROLLS} is intentionally left out: it tracks identifying
 	 * every potion and scroll during a run, not a row in the journal.
 	 */
-	public static void unlockJournalCompletion(){
+	/** @return false when badges.dat exists but could not be read, so the caller must not save. */
+	public static boolean unlockJournalCompletion(){
 		loadGlobal();
+		if (global == null) return false;
 		boolean blocked = Dungeon.debugRun;
 		Dungeon.debugRun = false;
 		try {
@@ -1240,10 +1259,11 @@ public class Badges {
 		} finally {
 			Dungeon.debugRun = blocked;
 		}
+		return true;
 	}
 
 	public static void unlock( Badge badge ){
-		if (Dungeon.debugRun) return;
+		if (Dungeon.debugRun || global == null) return;
 		if (!isUnlocked(badge) && (badge.type == BadgeType.JOURNAL || Dungeon.customSeedText.isEmpty())){
 			global.add( badge );
 			saveNeeded = true;

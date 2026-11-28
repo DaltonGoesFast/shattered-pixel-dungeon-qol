@@ -258,13 +258,12 @@ public class WelcomeScene extends PixelScene {
 	 */
 	private void recoverJournal(int previousVersion){
 		Journal.loadGlobal();
-		boolean already = Journal.fullGrantApplied() || SPDSettings.journalFullGrant();
-		if (already) {
-			// Journal was filled but the settings flag was not stored (interrupted startup).
-			if (Journal.fullGrantApplied() && !SPDSettings.journalFullGrant()) {
-				Badges.loadGlobal();
-				Badges.unlockJournalCompletion();
-				Badges.saveGlobal(false);
+		if (SPDSettings.journalFullGrant()) {
+			return;
+		}
+		// fullGrantApplied is true only after it has been read from disk or a write succeeded.
+		if (Journal.fullGrantApplied()) {
+			if (commitJournalBadges()) {
 				SPDSettings.journalFullGrant(true);
 			}
 			return;
@@ -274,12 +273,17 @@ public class WelcomeScene extends PixelScene {
 			return;
 		}
 		Journal.grantFullCompletion();
-		if (Journal.saveGlobal(true)) {
-			Badges.loadGlobal();
-			Badges.unlockJournalCompletion();
-			Badges.saveGlobal(true);
+		if (Journal.saveGlobal(true) && commitJournalBadges()) {
 			SPDSettings.journalFullGrant(true);
 		}
+	}
+
+	/** @return false when badges.dat exists but could not be read, so the caller retries later. */
+	private boolean commitJournalBadges(){
+		if (!Badges.unlockJournalCompletion()) {
+			return false;
+		}
+		return Badges.saveGlobal(false);
 	}
 
 	private void updateVersion(int previousVersion){

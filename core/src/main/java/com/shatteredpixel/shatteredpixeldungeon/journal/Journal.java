@@ -64,6 +64,7 @@ public class Journal {
 		Bestiary.unload();
 		Document.unload();
 		fullGrantApplied = false;
+		pendingFullGrant = false;
 		loaded = false;
 		saveNeeded = false;
 	}
@@ -72,8 +73,10 @@ public class Journal {
 	static boolean saveNeeded = false;
 
 	/** Written into journal.dat once an existing profile has been filled in. */
-	private static final String FULL_GRANT = "journal_full_grant";
+	static final String FULL_GRANT = "journal_full_grant";
 	private static boolean fullGrantApplied = false;
+	/** Filled in memory, not yet confirmed by a successful write of journal.dat. */
+	private static boolean pendingFullGrant = false;
 
 	public static boolean fullGrantApplied(){
 		return fullGrantApplied;
@@ -92,8 +95,16 @@ public class Journal {
 		Catalog.grantAll();
 		Bestiary.grantAll();
 		Document.grantAll();
-		fullGrantApplied = true;
+		// The on-disk flag is set only after saveGlobal writes this bundle.
+		pendingFullGrant = true;
 		saveNeeded = true;
+	}
+
+	static void store(Bundle bundle){
+		Catalog.store(bundle);
+		Bestiary.store(bundle);
+		Document.store(bundle);
+		bundle.put( FULL_GRANT, fullGrantApplied || pendingFullGrant );
 	}
 
 	public static void saveGlobal(){
@@ -114,14 +125,14 @@ public class Journal {
 		}
 		
 		Bundle bundle = new Bundle();
-		
-		Catalog.store(bundle);
-		Bestiary.store(bundle);
-		Document.store(bundle);
-		bundle.put( FULL_GRANT, fullGrantApplied );
+		store(bundle);
 		
 		try {
 			FileUtils.bundleToFile( JOURNAL_FILE, bundle );
+			if (pendingFullGrant) {
+				fullGrantApplied = true;
+			}
+			pendingFullGrant = false;
 			saveNeeded = false;
 			return true;
 		} catch (IOException e) {
