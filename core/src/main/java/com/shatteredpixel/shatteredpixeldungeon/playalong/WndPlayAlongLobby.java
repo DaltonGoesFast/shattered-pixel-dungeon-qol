@@ -113,6 +113,28 @@ public class WndPlayAlongLobby extends Window {
 		addBody(title);
 		y = title.bottom() + GAP;
 
+		if (!isHostingNow()) {
+			float half = (WIDTH - GAP) / 2f;
+			RedButton btnJoin = new RedButton(Messages.get(this, "join_game"), 7) {
+				@Override
+				protected void onClick() {
+					PlayAlongService.promptRoomCodeJoin();
+				}
+			};
+			btnJoin.setRect(0, y, half, BTN_H);
+			addBody(btnJoin);
+
+			RedButton btnHost = new RedButton(Messages.get(this, "host_game"), 7) {
+				@Override
+				protected void onClick() {
+					promptHostWizard();
+				}
+			};
+			btnHost.setRect(half + GAP, y, half, BTN_H);
+			addBody(btnHost);
+			y = btnHost.bottom() + GAP;
+		}
+
 		btnDisplay = new RedButton(displayButtonLabel(), 7) {
 			@Override
 			protected void onClick() {
@@ -142,28 +164,6 @@ public class WndPlayAlongLobby extends Window {
 		listPane.setRect(0, listTopY, WIDTH, LIST_H);
 		y = listPane.bottom() + GAP;
 		rebuildList();
-
-		RedButton btnJoin = new RedButton(Messages.get(this, "join_code"), 7) {
-			@Override
-			protected void onClick() {
-				PlayAlongService.promptRoomCodeJoin();
-			}
-		};
-		btnJoin.setRect(0, y, WIDTH, BTN_H);
-		addBody(btnJoin);
-		y = btnJoin.bottom() + GAP;
-
-		if (!isHostingNow()) {
-			RedButton btnHost = new RedButton(Messages.get(this, "host"), 7) {
-				@Override
-				protected void onClick() {
-					promptHostWizard();
-				}
-			};
-			btnHost.setRect(0, y, WIDTH, BTN_H);
-			addBody(btnHost);
-			y = btnHost.bottom() + GAP;
-		}
 
 		RedButton btnRefresh = new RedButton(Messages.get(this, "refresh"), 7) {
 			@Override
@@ -221,6 +221,17 @@ public class WndPlayAlongLobby extends Window {
 		btnCopy.setRect(0, y, WIDTH, BTN_H);
 		addBody(btnCopy);
 		y = btnCopy.bottom() + GAP;
+
+		RedButton btnHero = new RedButton(Messages.get(this, "hosting_pick_hero"), 7) {
+			@Override
+			protected void onClick() {
+				hide();
+				ShatteredPixelDungeon.switchNoFade(HeroSelectScene.class);
+			}
+		};
+		btnHero.setRect(0, y, WIDTH, BTN_H);
+		addBody(btnHero);
+		y = btnHero.bottom() + GAP;
 
 		RedButton btnStop = new RedButton(Messages.get(this, "hosting_stop"), 7) {
 			@Override
@@ -382,15 +393,17 @@ public class WndPlayAlongLobby extends Window {
 		StringBuilder sb = new StringBuilder();
 		if (room.official) sb.append("* ");
 		sb.append(name);
-		if (room.displayName != null && !room.displayName.isEmpty()
-				&& !room.displayName.equalsIgnoreCase(room.code)) {
-			sb.append(" [").append(room.code).append("]");
-		}
+		sb.append(" — ");
 		if (room.inDungeon) {
-			sb.append(" D").append(Math.max(1, room.hostDepth));
+			sb.append(Messages.get(WndPlayAlongLobby.class, "room_floor", Math.max(1, room.hostDepth)));
+		} else {
+			sb.append(Messages.get(WndPlayAlongLobby.class, "room_menu"));
 		}
-		sb.append(" · ").append(Math.max(0, room.players)).append("p");
-		if (!compatible) sb.append(" (!ver)");
+		sb.append(" — ");
+		sb.append(Messages.get(WndPlayAlongLobby.class, "room_players", Math.max(0, room.players)));
+		if (!compatible) {
+			sb.append(" — ").append(Messages.get(WndPlayAlongLobby.class, "room_version"));
+		}
 		return sb.toString();
 	}
 
@@ -474,36 +487,7 @@ public class WndPlayAlongLobby extends Window {
 					}
 					return;
 				}
-				if (SPDSettings.playAlongRelayToken().isEmpty()) {
-					promptPublicSecret(name);
-				} else {
-					confirmAndroidThenHost(false, name);
-				}
-			}
-		});
-	}
-
-	private void promptPublicSecret(final String publicName) {
-		ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
-				Messages.get(this, "host_secret_title"),
-				Messages.get(this, "host_secret_prompt"),
-				"",
-				64,
-				false,
-				Messages.get(this, "ok"),
-				Messages.get(this, "cancel")) {
-			@Override
-			public void onSelect(boolean positive, String text) {
-				if (!positive) return;
-				String secret = text == null ? "" : text.trim();
-				if (secret.isEmpty()) {
-					if (status != null) {
-						status.text(Messages.get(WndPlayAlongLobby.this, "host_secret_needed"));
-					}
-					return;
-				}
-				SPDSettings.playAlongRelayToken(secret);
-				confirmAndroidThenHost(false, publicName);
+				confirmAndroidThenHost(false, name);
 			}
 		});
 	}
@@ -528,8 +512,7 @@ public class WndPlayAlongLobby extends Window {
 	}
 
 	private void beginHostAndJump(boolean privateRoom, String publicNameOrNull) {
-		hide();
 		PlayAlongService.startHostFromLobby(privateRoom, publicNameOrNull);
-		ShatteredPixelDungeon.switchNoFade(HeroSelectScene.class);
+		rebuild();
 	}
 }

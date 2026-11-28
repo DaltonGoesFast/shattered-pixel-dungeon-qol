@@ -186,6 +186,17 @@ public class PlayAlongCatchupBagsTest {
 		assertFalse(Dungeon.LimitedDrops.POTION_BANDOLIER.dropped());
 	}
 
+	@Test
+	public void forbiddenRunesKeepsOddUpgradeScrolls() {
+		assertEquals(3, PlayAlongCatchup.upgradeScrollsGranted(3, false));
+		assertEquals(12, PlayAlongCatchup.upgradeScrollsGranted(12, false));
+		assertEquals(0, PlayAlongCatchup.upgradeScrollsGranted(0, true));
+		assertEquals(2, PlayAlongCatchup.upgradeScrollsGranted(3, true));
+		assertEquals(3, PlayAlongCatchup.upgradeScrollsGranted(6, true));
+		assertEquals(5, PlayAlongCatchup.upgradeScrollsGranted(9, true));
+		assertEquals(6, PlayAlongCatchup.upgradeScrollsGranted(12, true));
+	}
+
 	@SafeVarargs
 	private static List<Class<? extends Item>> list(Class<? extends Item>... types) {
 		java.util.ArrayList<Class<? extends Item>> bags = new java.util.ArrayList<>();

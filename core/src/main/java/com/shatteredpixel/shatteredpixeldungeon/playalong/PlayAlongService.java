@@ -59,6 +59,7 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -82,28 +83,47 @@ public final class PlayAlongService {
 	}
 
 	/**
-	 * Fatal doom class used when Dalton dies on the host so client deaths record cleanly in Rankings.
+	 * Fatal doom when the host dies, so client deaths record in Rankings.
+	 * This class is the reserved {@code dalton} room. Other rooms use {@link CommunityWipeDoom}.
 	 */
 	public static class HostWipeDoom implements Hero.Doom {
 		public final int hostDepth;
 		public final String hostCause;
 		public final int victims;
+		/** Name captured when the wipe was built, so the log stays correct after disconnect. */
+		public final String hostLabel;
 
 		public HostWipeDoom() {
-			this(1, "Unknown", 0);
+			this(1, "Unknown", 0, "Dalton");
 		}
 
-		public HostWipeDoom(int hostDepth, String hostCause, int victims) {
+		public HostWipeDoom(int hostDepth, String hostCause, int victims, String hostLabel) {
 			this.hostDepth = hostDepth;
 			this.hostCause = hostCause;
 			this.victims = victims;
+			this.hostLabel = (hostLabel == null || hostLabel.trim().isEmpty())
+					? "the host" : hostLabel.trim();
 		}
 
 		@Override
 		public void onDeath() {
 			Dungeon.fail(this);
-			GLog.n("☠ SOUL PACT BROKEN! Slain by Dalton's demise on Depth %d (%s). %d players wiped!",
-					hostDepth, hostCause, victims);
+			GLog.n("☠ SOUL PACT BROKEN! Slain by %s's demise on Depth %d (%s). %d players wiped!",
+					hostLabel, hostDepth, hostCause, victims);
+		}
+	}
+
+	/**
+	 * Same wipe as {@link HostWipeDoom}, with a rankings line that does not name Dalton.
+	 * The live log still uses the host's display name.
+	 */
+	public static class CommunityWipeDoom extends HostWipeDoom {
+		public CommunityWipeDoom() {
+			super(1, "Unknown", 0, "the host");
+		}
+
+		public CommunityWipeDoom(int hostDepth, String hostCause, int victims, String hostLabel) {
+			super(hostDepth, hostCause, victims, hostLabel);
 		}
 	}
 
@@ -589,7 +609,7 @@ public final class PlayAlongService {
 		} else {
 			GLog.p(Messages.get(PlayAlongService.class, "room_ready", code));
 			System.out.println("[PlayAlong] Relay room code " + code
-					+ ". Set a public room name + host secret to claim a named room.");
+					+ ". Share it from the Play Along lobby, or host a public name for the browser.");
 		}
 		publishRelayMeta(true);
 	}
@@ -611,6 +631,10 @@ public final class PlayAlongService {
 	}
 
 	/** Browser / join-facing host label (never empty). */
+	public static String clientUsername() {
+		return clientUsername != null ? clientUsername : "";
+	}
+
 	public static String hostDisplayNameForSession() {
 		if (hostHoldsStreamRoom()
 				|| PlayAlongProtocol.isReservedRoom(SPDSettings.playAlongRelayHostRoomOrNull())
@@ -620,6 +644,35 @@ public final class PlayAlongService {
 		String n = SPDSettings.playAlongUsername();
 		if (n == null || n.trim().isEmpty()) return "Host";
 		return PlayAlongProtocol.sanitizeUsername(n, "01");
+	}
+
+	/**
+	 * Player-facing host name. {@code Dalton} only while this session is the reserved room.
+	 * Otherwise the host's display name, or {@code the host} when none was sent.
+	 */
+	public static String sessionHostLabel() {
+		SessionInfo session = activeClientSession != null ? activeClientSession : liveSessionInfo;
+		return sessionHostLabel(session);
+	}
+
+	public static String sessionHostLabel(SessionInfo session) {
+		if (streamFeaturesVisible()) return "Dalton";
+		if (role == Role.HOST) {
+			String own = hostDisplayNameForSession();
+			return (own == null || own.trim().isEmpty()) ? "the host" : own.trim();
+		}
+		if (session != null && session.hostDisplayName != null && !session.hostDisplayName.trim().isEmpty()) {
+			return session.hostDisplayName.trim();
+		}
+		return "the host";
+	}
+
+	private static HostWipeDoom wipeDoom(int depth, String cause, int victims) {
+		String label = sessionHostLabel();
+		if (streamFeaturesVisible()) {
+			return new HostWipeDoom(depth, cause, victims, label);
+		}
+		return new CommunityWipeDoom(depth, cause, victims, label);
 	}
 
 	/** Persist display name, refresh relay meta + live session field when hosting. */
@@ -767,8 +820,7 @@ public final class PlayAlongService {
 				return;
 			}
 			if (SPDSettings.playAlongRelayToken().isEmpty()) {
-				GLog.w(Messages.get(PlayAlongService.class, "room_name_needs_secret"));
-				return;
+				SPDSettings.playAlongRelayToken(generateHostSecret());
 			}
 			SPDSettings.playAlongRelayRoomName(name);
 		}
@@ -779,6 +831,17 @@ public final class PlayAlongService {
 		onRelayEndpointChanged();
 		onHostSettingChanged(true);
 		GLog.p(Messages.get(PlayAlongService.class, "host_lobby_starting"));
+	}
+
+	/** Claim password for public room names. Joiners never type this. */
+	private static String generateHostSecret() {
+		final String alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+		SecureRandom rng = new SecureRandom();
+		StringBuilder sb = new StringBuilder(24);
+		for (int i = 0; i < 24; i++) {
+			sb.append(alphabet.charAt(rng.nextInt(alphabet.length())));
+		}
+		return sb.toString();
 	}
 
 	/** Stop hosting from the lobby panel. */
@@ -887,7 +950,40 @@ public final class PlayAlongService {
 
 	public static void onHostRunStarted() {
 		PlayAlongCatchup.onNewHostRun();
+		ShatterCommands.reset();
 		startOrResumeHostSession(false, false, false);
+	}
+
+	/** Host toggles Shatter Commands for this non-dalton room. */
+	public static void setShatterEnabled(boolean enabled) {
+		if (!ShatterCommands.hostCanToggle()) return;
+		ShatterCommands.setRoomEnabled(enabled);
+		if (hostServer != null) {
+			SessionInfo s = hostServer.getActiveSession();
+			if (s != null) s.shatterEnabled = ShatterCommands.roomEnabled();
+			hostServer.broadcastShatterState();
+		}
+	}
+
+	/**
+	 * After a local Shatter press: host broadcasts to clients; client sends to host for relay.
+	 * Caster already spent charges and does not apply locally.
+	 */
+	public static void relayShatterCast(ChatCommandPayload payload) {
+		if (payload == null) return;
+		if (streamFeaturesVisible() || hostHoldsStreamRoom()) return;
+		if (!ShatterCommands.roomEnabled()) return;
+		if (role == Role.HOST && hostServer != null) {
+			hostServer.broadcastShatterCast(payload, payload.username);
+			return;
+		}
+		if (role == Role.CLIENT && client != null) {
+			WireMessage msg = new WireMessage();
+			msg.type = "shatter_cast";
+			msg.chatCommand = payload;
+			msg.username = payload.username;
+			client.send(msg);
+		}
 	}
 
 	public static void onHostRunLoaded() {
@@ -1018,6 +1114,7 @@ public final class PlayAlongService {
 		info.hostPos = Dungeon.hero.pos;
 		info.hostHp = Dungeon.hero.HP;
 		info.hostHt = Dungeon.hero.HT;
+		info.shatterEnabled = !hostHoldsStreamRoom() && ShatterCommands.roomEnabled();
 
 		GhostState hg = buildLocalGhostState("IDLE", Dungeon.hero.pos, true);
 		hostGhost = hg;
@@ -1095,6 +1192,8 @@ public final class PlayAlongService {
 		hostDepth = session.hostDepth;
 		hostPos = session.hostPos;
 		noteHostAscent(session.amuletObtained, session.ascending, session.highestAscent);
+		ShatterCommands.syncRoomEnabledFromSession(session.shatterEnabled);
+		ShatterCommands.beginClientJoinGrace();
 
 		int slot = PlayAlongArchives.allocateForNewRun(session.sessionId);
 		GamesInProgress.selectedClass = heroClass;
@@ -1158,6 +1257,7 @@ public final class PlayAlongService {
 		hostDepth = session.hostDepth;
 		hostPos = session.hostPos;
 		noteHostAscent(session.amuletObtained, session.ascending, session.highestAscent);
+		ShatterCommands.syncRoomEnabledFromSession(session.shatterEnabled);
 		if (clientServerAddress == null || clientServerAddress.isEmpty()) {
 			clientServerAddress = discoveredAddress != null && !discoveredAddress.isEmpty()
 					? discoveredAddress
@@ -1172,7 +1272,7 @@ public final class PlayAlongService {
 		int depth = info != null ? Math.max(1, info.depth) : 1;
 		connectClientAt(session, heroClassName, safeName, true, depth, 0, 0);
 
-		GLog.p("Resuming your Play Along race on Dalton's save!");
+		GLog.p("Resuming your Play Along race on %s's save!", sessionHostLabel());
 		InterlevelScene.mode = InterlevelScene.Mode.CONTINUE;
 		Game.switchScene(InterlevelScene.class);
 	}
@@ -1283,9 +1383,10 @@ public final class PlayAlongService {
 
 		String sid = session.sessionId != null ? session.sessionId.trim() : "";
 		boolean canResume = PlayAlongArchives.hasArchive(sid);
+		String host = sessionHostLabel(session);
 		GLog.w(canResume
-				? "Dalton switched saves — Resume or Leave?"
-				: "Dalton started a new run — Join or Leave?");
+				? host + " switched saves — Resume or Leave?"
+				: host + " started a new run — Join or Leave?");
 		if (Game.scene() != null) {
 			Game.scene().addToFront(new WndPlayAlongSessionSwitch(session, canResume));
 		} else {
@@ -1333,18 +1434,20 @@ public final class PlayAlongService {
 				if (msg.session != null) {
 					activeClientSession = msg.session;
 					noteHostAscent(msg.session.amuletObtained, msg.session.ascending, msg.session.highestAscent);
+					ShatterCommands.syncRoomEnabledFromSession(msg.session.shatterEnabled);
 				}
 				final boolean wasReconnect = clientHasJoinedOnce;
 				clientHasJoinedOnce = true;
 				desyncHintShown = false;
 				Game.runOnRenderThread(() -> {
+					String host = sessionHostLabel();
 					if (wasReconnect) {
-						GLog.p("Reconnected to Dalton's Play Along run as %s!", clientUsername);
+						GLog.p("Reconnected to %s's Play Along run as %s!", host, clientUsername);
 						if (Dungeon.hero != null && Dungeon.level != null && (role == Role.CLIENT || role == Role.SPECTATOR)) {
 							sendClientState(role == Role.SPECTATOR ? "DEAD" : "IDLE", Dungeon.hero.pos);
 						}
 					} else {
-						GLog.p("Joined Dalton's Play Along run as %s!", clientUsername);
+						GLog.p("Joined %s's Play Along run as %s!", host, clientUsername);
 					}
 				});
 			}
@@ -1378,7 +1481,11 @@ public final class PlayAlongService {
 				Game.runOnRenderThread(() -> {
 					Sample.INSTANCE.play(Assets.Sounds.TELEPORT);
 					GameScene.flash(0x60FFFF40);
-					GLog.w("✨ DALTON POPPED AN ANKH! (Run still alive — keep going!)");
+					if (streamFeaturesVisible()) {
+						GLog.w("✨ DALTON POPPED AN ANKH! (Run still alive — keep going!)");
+					} else {
+						GLog.w("✨ %s popped an ankh! (Run still alive — keep going!)", sessionHostLabel());
+					}
 				});
 			}
 
@@ -1455,6 +1562,30 @@ public final class PlayAlongService {
 				if (msg.chatCommand != null) incoming.add(msg.chatCommand);
 				if (incoming.isEmpty()) return;
 				Game.runOnRenderThread(() -> enqueueMirroredChat(incoming));
+			}
+
+			@Override
+			public void onShatterCast(WireMessage msg) {
+				if (msg == null || msg.chatCommand == null) return;
+				final ChatCommandPayload payload = msg.chatCommand;
+				Game.runOnRenderThread(() -> ShatterCommands.applyIncoming(payload));
+			}
+
+			@Override
+			public void onShatterState(WireMessage msg) {
+				if (msg == null) return;
+				Game.runOnRenderThread(() -> {
+					boolean enabled = msg.session != null && msg.session.shatterEnabled;
+					ShatterCommands.syncRoomEnabledFromSession(enabled);
+					if (activeClientSession != null) {
+						activeClientSession.shatterEnabled = enabled;
+					}
+					if (enabled) {
+						GLog.i("Shatter Commands are ON for this room.");
+					} else {
+						GLog.i("Shatter Commands are OFF for this room.");
+					}
+				});
 			}
 
 			@Override
@@ -2055,7 +2186,7 @@ public final class PlayAlongService {
 			activeClientSession.active = false;
 		}
 		final String causeStr = (hCause == null || hCause.isEmpty()) ? "Unknown" : hCause;
-		final HostWipeDoom doom = new HostWipeDoom(hDepth, causeStr, victims);
+		final HostWipeDoom doom = wipeDoom(hDepth, causeStr, victims);
 
 		Game.runOnRenderThread(() -> {
 			if (Dungeon.hero == null || Dungeon.level == null) {
@@ -2071,8 +2202,8 @@ public final class PlayAlongService {
 		if (!Dungeon.hero.isAlive()) {
 			GameScene.flash(0x88FF0000);
 			Sample.INSTANCE.play(SPDSettings.moddedBanners() ? Assets.Sounds.DEATH_MOD : Assets.Sounds.DEATH);
-			GLog.n("☠ SOUL PACT BROKEN! Dalton died on Depth %d (%s). %d players wiped!",
-					doom.hostDepth, doom.hostCause, doom.victims);
+			GLog.n("☠ SOUL PACT BROKEN! %s died on Depth %d (%s). %d players wiped!",
+					doom.hostLabel, doom.hostDepth, doom.hostCause, doom.victims);
 			return;
 		}
 		Dungeon.hero.HP = 0;

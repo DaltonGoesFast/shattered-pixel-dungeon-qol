@@ -33,6 +33,7 @@ public class Mod_Changes {
 
 	public static void addAllChanges( ArrayList<ChangeInfo> changeInfos ){
 		addOverview(changeInfos);
+		add_v4_0_3_QoL_30(changeInfos);
 		add_v4_0_3_QoL_29(changeInfos);
 		add_v4_0_3_QoL_28(changeInfos);
 		add_v4_0_3_QoL_27(changeInfos);
@@ -56,6 +57,28 @@ public class Mod_Changes {
 		add_v4_0_0_QoL_6(changeInfos);
 		add_v4_0_0_QoL_5(changeInfos);
 		add_v4_0_0(changeInfos);
+	}
+
+	private static void add_v4_0_3_QoL_30( ArrayList<ChangeInfo> changeInfos ) {
+		ChangeInfo changes = new ChangeInfo("4.0.3-QoL-30", true, "");
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes = new ChangeInfo(Messages.get(ChangesScene.class, "new"), false, null);
+		changes.hardlight(Window.TITLE_COLOR);
+		changeInfos.add(changes);
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.ENTER), "Play Along Lobby Clarity",
+				"**-** Lobby leads with **Join a game** and **Host a game**\n" +
+				"**-** Hosting shows your code / public name before hero select (copy, pick a hero, stop)\n" +
+				"**-** Public rooms no longer ask for a secret up front (saved claim password; change in Advanced)\n" +
+				"**-** Offline DaltonGoesFast opens the same lobby; community join screens use the host's name"));
+
+		changes.addButton( new ChangeButton(Icons.get(Icons.RANKINGS), "Shatter Commands",
+				"**-** Opt-in PvP for community Play Along rooms (not DaltonGoesFast)\n" +
+				"**-** Host turns Shatter on from the in-game deck; kill charges unlock Trap, Debuff, Spawn, Gas, Bomb, Hex, Degrade, Curse, Champion\n" +
+				"**-** One press hits every other living racer immediately; caster is spared\n" +
+				"**-** Charge cap grows with deepest floor (4 in Sewers → 12 in Halls); Shatter-spawned mobs do not refund charges"));
 	}
 
 	private static void add_v4_0_3_QoL_29( ArrayList<ChangeInfo> changeInfos ) {

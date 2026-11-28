@@ -523,7 +523,7 @@ public class TitleScene extends PixelScene {
 
 			PlayAlongService.pollLiveStatus(false);
 			PlayAlongProtocol.SessionInfo live = PlayAlongService.getLiveSession();
-			boolean isLive = live != null && (live.active || live.inDungeon);
+			boolean isLive = live != null && live.inDungeon;
 
 			if (isLive != liveShown) {
 				liveShown = isLive;
@@ -548,36 +548,11 @@ public class TitleScene extends PixelScene {
 		@Override
 		protected void onClick() {
 			PlayAlongProtocol.SessionInfo live = PlayAlongService.getLiveSession();
-			if (live != null && (live.active || live.inDungeon)) {
+			if (live != null && live.inDungeon) {
 				PlayAlongService.armDiscoveredJoin();
 				ShatteredPixelDungeon.scene().addToFront(new WndPlayAlongJoin(live));
-			} else if (PlayAlongProtocol.ROOM_CODES_ENABLED) {
-				ShatteredPixelDungeon.scene().addToFront(new WndOptions(
-						Messages.get(TitleScene.class, "playalong_offline_title"),
-						Messages.get(TitleScene.class, "playalong_offline_body"),
-						Messages.get(TitleScene.class, "playalong_youtube"),
-						Messages.get(TitleScene.class, "playalong_room")) {
-					@Override
-					protected void onSelect(int index) {
-						if (index == 0) {
-							ShatteredPixelDungeon.platform.openURI("https://www.youtube.com/@DaltonGoesFast");
-						} else {
-							PlayAlongService.promptRoomCodeJoin();
-						}
-					}
-				});
 			} else {
-				ShatteredPixelDungeon.scene().addToFront(new WndOptions(
-						Messages.get(TitleScene.class, "playalong_offline_title"),
-						Messages.get(TitleScene.class, "playalong_offline_body"),
-						Messages.get(TitleScene.class, "playalong_youtube")) {
-					@Override
-					protected void onSelect(int index) {
-						if (index == 0) {
-							ShatteredPixelDungeon.platform.openURI("https://www.youtube.com/@DaltonGoesFast");
-						}
-					}
-				});
+				ShatteredPixelDungeon.scene().addToFront(new com.shatteredpixel.shatteredpixeldungeon.playalong.WndPlayAlongLobby());
 			}
 		}
 

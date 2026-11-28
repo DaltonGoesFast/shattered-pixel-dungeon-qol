@@ -222,6 +222,32 @@ public final class StreamingCommandHandler {
 		lastCurseSlot = null;
 	}
 
+	/** Class name for a chat-weighted bomb roll (no spawn). Used by Shatter Commands. */
+	public static String rollBombClassName() {
+		int idx = Random.chances(CHAT_BOMB_WEIGHTS);
+		return CHAT_BOMB_CLASSES[idx].getName();
+	}
+
+	/** Class name for a Chaotic Censer +3 gas roll (no spawn). */
+	public static String rollGasClassName() {
+		return ChaoticCenser.rollGasClassForChat().getName();
+	}
+
+	/** Class name for a non-blacklisted chat trap (no spawn). */
+	public static String rollTrapClassName() {
+		ArrayList<Class<? extends Trap>> allowed = new ArrayList<>();
+		for (Class<? extends Trap> c : CHAT_TRAP_POOL) {
+			if (!TRAP_BLACKLIST.contains(c)) allowed.add(c);
+		}
+		if (allowed.isEmpty()) return null;
+		return Random.element(allowed).getName();
+	}
+
+	/** Class name for a chat debuff roll (no apply). */
+	public static String rollDebuffClassName() {
+		return Random.element(CHAT_DEBUFFS).getName();
+	}
+
 	@SuppressWarnings("unchecked")
 	private static <T> Class<? extends T> resolveClass(String className, Class<T> expectedSuper) {
 		if (className == null || className.isEmpty()) return null;

@@ -116,6 +116,12 @@ public class WndStreamCommands extends WndTabbed {
 	public static final int TAB_HELP = 2;
 	public static final int TAB_COMMUNITY = 3;
 	public static final int TAB_ROSTER = 4;
+	/** Shatter deck: first tab (non-dalton rooms only). */
+	public static final int TAB_SHATTER = 0;
+
+	public static final int MODE_STREAM = 0;
+	public static final int MODE_SHATTER = 1;
+	public static final int MODE_ROSTER = 2;
 
 	private static final int WIDTH = 132;
 	private static final int GAP = 2;
@@ -193,6 +199,9 @@ public class WndStreamCommands extends WndTabbed {
 		CMD_ICONS.put("sabotage", ItemSpriteSheet.SHRAPNEL_BOMB);
 		CMD_ICONS.put("curse", ItemSpriteSheet.CURSE_INFUSE);
 		CMD_ICONS.put("transmute", ItemSpriteSheet.RECYCLE);
+		CMD_ICONS.put("spawn", ItemSpriteSheet.DUST);
+		CMD_ICONS.put("champion", ItemSpriteSheet.STONE_ENCHANT);
+		CMD_ICONS.put("debuff", ItemSpriteSheet.POTION_JADE);
 	}
 
 	private static final String[][] HELP_CMDS = {
@@ -234,6 +243,9 @@ public class WndStreamCommands extends WndTabbed {
 	private float listTop;
 	/** Community / non-dalton sessions: roster list only, no stream deck tabs. */
 	private final boolean rosterOnly;
+	/** Non-dalton Shatter Commands deck (Shatter + Roster). */
+	private final boolean shatterDeck;
+	private final int deckMode;
 
 	private StreamEconomyState eco;
 	private String pendingLinkCode = null;
@@ -249,18 +261,37 @@ public class WndStreamCommands extends WndTabbed {
 	private ClearableGroup content;
 	private final List<CompactLabeledTab> tabButtons = new ArrayList<>();
 
+	public static int resolveDeckMode() {
+		if (PlayAlongService.streamFeaturesVisible()) return MODE_STREAM;
+		if (PlayAlongService.isHosting() || ShatterCommands.roomEnabled()) return MODE_SHATTER;
+		return MODE_ROSTER;
+	}
+
 	public WndStreamCommands() {
-		this(TAB_SPAWN, !PlayAlongService.streamFeaturesVisible());
+		this(preferredInitialTab(resolveDeckMode()), resolveDeckMode());
 	}
 
 	public WndStreamCommands(int initialTab) {
-		this(initialTab, !PlayAlongService.streamFeaturesVisible());
+		this(initialTab, resolveDeckMode());
 	}
 
+	/** @param rosterOnly when true, force roster-only (legacy community status window). */
 	public WndStreamCommands(int initialTab, boolean rosterOnly) {
+		this(initialTab, rosterOnly ? MODE_ROSTER : resolveDeckMode());
+	}
+
+	public WndStreamCommands(int initialTab, int mode) {
 		super();
-		this.rosterOnly = rosterOnly;
-		this.currentTab = rosterOnly ? TAB_ROSTER : Math.max(0, Math.min(4, initialTab));
+		this.deckMode = mode;
+		this.rosterOnly = mode == MODE_ROSTER;
+		this.shatterDeck = mode == MODE_SHATTER;
+		if (shatterDeck) {
+			this.currentTab = (initialTab == TAB_ROSTER) ? 1 : 0;
+		} else if (rosterOnly) {
+			this.currentTab = TAB_ROSTER;
+		} else {
+			this.currentTab = Math.max(0, Math.min(4, initialTab));
+		}
 		this.eco = PlayAlongService.getCachedEconomy();
 
 		int tabPad = rosterOnly ? 0 : tabHeight();
@@ -280,7 +311,25 @@ public class WndStreamCommands extends WndTabbed {
 		headerGroup = new ClearableGroup();
 		add(headerGroup);
 
-		if (!rosterOnly) {
+		if (shatterDeck) {
+			String[] labels = {"Shatter", "Roster"};
+			for (int i = 0; i < labels.length; i++) {
+				final int idx = i;
+				CompactLabeledTab tab = new CompactLabeledTab(labels[i]) {
+					@Override
+					protected void select(boolean value) {
+						super.select(value);
+						if (selected && currentTab != idx) {
+							currentTab = idx;
+							rebuildTabPage(true);
+						}
+					}
+				};
+				tabButtons.add(tab);
+				add(tab);
+			}
+			layoutTabs();
+		} else if (!rosterOnly) {
 			String[] labels = {"Spawn", "Chaos", "Help", "Comm.", "Roster"};
 			for (int i = 0; i < labels.length; i++) {
 				final int idx = i;
@@ -304,14 +353,29 @@ public class WndStreamCommands extends WndTabbed {
 		rebuildTabPage(true);
 		if (!rosterOnly) {
 			select(currentTab);
-			refreshEconomy(false);
+			if (!shatterDeck) refreshEconomy(false);
 		}
+	}
+
+	private static int preferredInitialTab(int mode) {
+		if (mode == MODE_SHATTER) return TAB_SHATTER;
+		if (mode == MODE_ROSTER) return TAB_ROSTER;
+		if (PlayAlongService.isHosting() || PlayAlongService.isSpectating()) return TAB_ROSTER;
+		return TAB_SPAWN;
 	}
 
 	@Override
 	public void update() {
 		super.update();
 		if (rosterOnly) return;
+		if (shatterDeck) {
+			refreshAccum += Game.elapsed;
+			if (refreshAccum >= 1.0f) {
+				refreshAccum = 0f;
+				if (currentTab == 0) rebuildAllPreservingScroll();
+			}
+			return;
+		}
 		refreshAccum += Game.elapsed;
 		if (refreshAccum >= 4.0f) {
 			refreshAccum = 0f;
@@ -465,6 +529,41 @@ public class WndStreamCommands extends WndTabbed {
 			return;
 		}
 
+		if (shatterDeck) {
+			RenderedTextBlock title = PixelScene.renderTextBlock("Shatter Commands", 9);
+			title.hardlight(TITLE_COLOR);
+			title.setPos(0, py);
+			headerGroup.add(title);
+			py = title.bottom() + 2;
+
+			String chargeLine = "Charges: " + ShatterCommands.charges() + "/" + ShatterCommands.cap();
+			if (ShatterCommands.inJoinGrace()) {
+				chargeLine += " · join grace";
+			}
+			RenderedTextBlock charges = PixelScene.renderTextBlock(chargeLine, 6);
+			charges.hardlight(ShatterCommands.roomEnabled() ? 0x88FF88 : 0xCCCCCC);
+			charges.maxWidth(WIDTH);
+			charges.setPos(0, py);
+			headerGroup.add(charges);
+			py = charges.bottom() + 2;
+
+			if (statusText != null && !statusText.isEmpty()) {
+				RenderedTextBlock status = PixelScene.renderTextBlock(statusText, 6);
+				status.hardlight(statusColor);
+				status.maxWidth(WIDTH);
+				status.setPos(0, py);
+				headerGroup.add(status);
+				py = status.bottom() + 2;
+			}
+
+			ColorBlock sep = new ColorBlock(WIDTH, 1, 0xFF444444);
+			sep.x = 0;
+			sep.y = py;
+			headerGroup.add(sep);
+			listTop = py + 3;
+			return;
+		}
+
 		RenderedTextBlock title = PixelScene.renderTextBlock("Stream Command Deck", 9);
 		title.hardlight(TITLE_COLOR);
 		title.setPos(0, py);
@@ -588,7 +687,13 @@ public class WndStreamCommands extends WndTabbed {
 		content.destroyAndClear();
 		float cy = 0f;
 
-		if (rosterOnly || currentTab == TAB_ROSTER) {
+		if (shatterDeck) {
+			if (currentTab == 0) {
+				cy = buildShatterTab(cy);
+			} else {
+				cy = buildRosterTab(cy);
+			}
+		} else if (rosterOnly || currentTab == TAB_ROSTER) {
 			cy = buildRosterTab(cy);
 		} else if (currentTab == TAB_SPAWN) {
 			cy = buildSpawnTab(cy);
@@ -608,6 +713,75 @@ public class WndStreamCommands extends WndTabbed {
 		if (resetScroll) {
 			pane.scrollTo(0, 0);
 		}
+	}
+
+	private float buildShatterTab(float cy) {
+		if (ShatterCommands.hostCanToggle()) {
+			final boolean on = ShatterCommands.roomEnabled();
+			RedButton btnToggle = new RedButton("Shatter: " + (on ? "ON" : "OFF"), 7) {
+				@Override
+				protected void onClick() {
+					PlayAlongService.setShatterEnabled(!ShatterCommands.roomEnabled());
+					statusText = ShatterCommands.roomEnabled()
+							? "Shatter Commands enabled for this room."
+							: "Shatter Commands disabled.";
+					statusColor = ShatterCommands.roomEnabled() ? 0x55FF55 : 0xFFCC44;
+					rebuildAllPreservingScroll();
+				}
+			};
+			btnToggle.enableScrollPassthrough();
+			btnToggle.setRect(0, cy, WIDTH, 18);
+			if (on) btnToggle.textColor(0x55FF55);
+			content.add(btnToggle);
+			cy = btnToggle.bottom() + 4;
+		} else if (!ShatterCommands.roomEnabled()) {
+			RenderedTextBlock off = PixelScene.renderTextBlock(
+					"Host has not enabled Shatter Commands.", 6);
+			off.hardlight(0xFFCC44);
+			off.maxWidth(WIDTH);
+			off.setPos(0, cy);
+			content.add(off);
+			return off.bottom() + 4;
+		}
+
+		float colW = (WIDTH - GAP) / 2f;
+		String[] cmds = ShatterCommands.orderedCommands();
+		for (int i = 0; i < cmds.length; i++) {
+			final String cmd = cmds[i];
+			int cost = ShatterCommands.costOf(cmd);
+			int col = i % 2;
+			int row = i / 2;
+			float bx = col * (colW + GAP);
+			float by = cy + row * (BTN_H + GAP);
+
+			String title = ShatterCommands.titleOf(cmd);
+			RedButton btn = new RedButton(title + "\n" + cost + " ch", title.length() > 9 ? 5 : 6) {
+				@Override
+				protected void onClick() {
+					String err = ShatterCommands.cast(cmd);
+					if (err != null) {
+						statusText = err;
+						statusColor = 0xFF5555;
+					} else {
+						statusText = "Sent " + ShatterCommands.titleOf(cmd) + "!";
+						statusColor = 0x55FF55;
+					}
+					rebuildAllPreservingScroll();
+				}
+			};
+			btn.multiline = true;
+			btn.leftJustify = true;
+			btn.icon(createCommandIcon(cmd));
+			btn.enableScrollPassthrough();
+			btn.setRect(bx, by, colW, BTN_H);
+
+			boolean canUse = ShatterCommands.canAfford(cmd)
+					&& !ShatterCommands.inJoinGrace();
+			btn.enable(canUse);
+			content.add(btn);
+		}
+		int rows = (cmds.length + 1) / 2;
+		return cy + rows * (BTN_H + GAP);
 	}
 
 	private float buildSpawnTab(float cy) {
@@ -916,9 +1090,8 @@ public class WndStreamCommands extends WndTabbed {
 				&& Dungeon.level != null
 				&& (Dungeon.depth != PlayAlongService.getHostDepth()
 				|| Dungeon.branch != PlayAlongService.getHostBranch())) {
-			String followLabel = PlayAlongService.streamFeaturesVisible()
-					? ("Follow Dalton (Depth " + PlayAlongService.getHostDepth() + ")")
-					: ("Follow host (Depth " + PlayAlongService.getHostDepth() + ")");
+			String followLabel = "Follow " + PlayAlongService.sessionHostLabel()
+					+ " (Depth " + PlayAlongService.getHostDepth() + ")";
 			RedButton btnFollow = new RedButton(followLabel, 7) {
 				@Override
 				protected void onClick() {

@@ -425,7 +425,7 @@ async def test_rooms_list_meta_and_official():
             "d": {
                 "displayName": "Freddy's Run",
                 "version": "4.0.2-QoL",
-                "protocolVersion": 1,
+                "protocolVersion": 2,
                 "hostDepth": 7,
                 "inDungeon": True,
                 "official": True,

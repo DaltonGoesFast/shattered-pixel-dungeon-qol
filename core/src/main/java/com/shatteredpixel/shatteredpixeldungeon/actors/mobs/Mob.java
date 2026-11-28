@@ -1162,6 +1162,7 @@ public abstract class Mob extends Char {
 					Buff.affect(Dungeon.hero, Talent.LethalHasteCooldown.class, 100f);
 					Buff.affect(Dungeon.hero, GreaterHaste.class).set(2 + 2*Dungeon.hero.pointsInTalent(Talent.LETHAL_HASTE));
 				}
+				com.shatteredpixel.shatteredpixeldungeon.playalong.ShatterCommands.awardKillCharge(cause, this);
 			}
 
 		}

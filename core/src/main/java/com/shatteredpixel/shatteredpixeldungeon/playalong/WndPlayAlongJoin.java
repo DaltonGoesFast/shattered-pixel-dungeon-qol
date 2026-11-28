@@ -64,18 +64,22 @@ public class WndPlayAlongJoin extends Window {
 		super();
 		this.joinAddress = PlayAlongService.peekJoinAddress();
 
+		boolean stream = PlayAlongService.streamFeaturesVisible();
 		this.username = SPDSettings.playAlongUsername();
-		if (this.username.isEmpty()) {
+		if (this.username == null) this.username = "";
+		if (stream && this.username.isEmpty()) {
 			this.username = "Chatter";
 		}
 
-		boolean stream = PlayAlongService.streamFeaturesVisible();
 		String hostLabel = communityHostLabel(session);
-		String titleTxt = session.active
-				? "Play Along [LIVE]"
-				: (stream ? "DaltonGoesFast [LIVE]" : "Play Along");
+		String titleTxt;
+		if (stream) {
+			titleTxt = session.active ? "Play Along [LIVE]" : "DaltonGoesFast [LIVE]";
+		} else {
+			titleTxt = hostLabel;
+		}
 		RenderedTextBlock title = PixelScene.renderTextBlock(titleTxt, 10);
-		title.hardlight(0xFF4444);
+		title.hardlight(stream ? 0xFF4444 : TITLE_COLOR);
 		title.setPos((WIDTH - title.width()) / 2f, 2);
 		PixelScene.align(title);
 		add(title);
@@ -96,7 +100,7 @@ public class WndPlayAlongJoin extends Window {
 				statusTxt = hostLabel + ": Depth " + session.hostDepth
 						+ " (" + session.hostHp + "/" + session.hostHt + " HP)\n"
 						+ "Players: " + session.activePlayers + " • Seed: " + seedDisplay + "\n"
-						+ "Goal: Get the Amulet before the host dies!";
+						+ "Goal: Get the Amulet before " + hostLabel + " dies!";
 			}
 		} else if (session.inDungeon) {
 			statusTxt = stream
@@ -187,26 +191,11 @@ public class WndPlayAlongJoin extends Window {
 				add(btnResume);
 				pos = btnResume.bottom() + GAP;
 			} else {
-				btnName = new RedButton("Name: " + username, 7) {
+				final boolean community = !stream;
+				btnName = new RedButton(nameButtonLabel(community), 7) {
 					@Override
 					protected void onClick() {
-						ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
-								"Chatter Name",
-								"3-16 alphanumeric characters (shown above your ghost):",
-								username,
-								16,
-								false,
-								"Set",
-								"Cancel") {
-							@Override
-							public void onSelect(boolean positive, String text) {
-								if (positive && text != null && !text.trim().isEmpty()) {
-									username = PlayAlongProtocol.sanitizeUsername(text, "01");
-									SPDSettings.playAlongUsername(username);
-									btnName.text("Name: " + username);
-								}
-							}
-						});
+						promptDisplayName(community);
 					}
 				};
 				btnName.setRect(0, pos, WIDTH, 16);
@@ -238,12 +227,13 @@ public class WndPlayAlongJoin extends Window {
 				refreshClassHighlight();
 				pos += 20 + GAP + 1;
 
-				StyledButton btnDropIn = new RedButton("DROP INTO RUN", 8) {
+				String joinLabel = community
+						? Messages.get(this, "join_run")
+						: "DROP INTO RUN";
+				StyledButton btnDropIn = new RedButton(joinLabel, 8) {
 					@Override
 					protected void onClick() {
-						hide();
-						PlayAlongService.useJoinAddress(joinAddress);
-						PlayAlongService.startClientRun(session, selectedClass, username);
+						startDropIn(session, community);
 					}
 				};
 				btnDropIn.icon(Icons.get(Icons.ENTER));
@@ -252,18 +242,6 @@ public class WndPlayAlongJoin extends Window {
 				add(btnDropIn);
 				pos = btnDropIn.bottom() + GAP;
 			}
-		}
-
-		if (PlayAlongProtocol.ROOM_CODES_ENABLED) {
-			RedButton btnRoom = new RedButton(Messages.get(this, "join_code"), 7) {
-				@Override
-				protected void onClick() {
-					PlayAlongService.promptRoomCodeJoin();
-				}
-			};
-			btnRoom.setRect(0, pos, WIDTH, 16);
-			add(btnRoom);
-			pos = btnRoom.bottom() + GAP;
 		}
 
 		if (stream) {
@@ -306,6 +284,74 @@ public class WndPlayAlongJoin extends Window {
 			return room;
 		}
 		return "Host";
+	}
+
+	private String nameButtonLabel(boolean community) {
+		if (username == null || username.isEmpty()) {
+			return Messages.get(this, "name_unset");
+		}
+		return Messages.get(this, "name_set", username);
+	}
+
+	private void promptDisplayName(boolean community) {
+		String title = community
+				? Messages.get(this, "display_title")
+				: "Chatter Name";
+		String body = community
+				? Messages.get(this, "display_prompt")
+				: "3-16 alphanumeric characters (shown above your ghost):";
+		String ok = community ? Messages.get(this, "ok") : "Set";
+		String cancel = community ? Messages.get(this, "cancel") : "Cancel";
+		ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
+				title,
+				body,
+				username == null ? "" : username,
+				16,
+				false,
+				ok,
+				cancel) {
+			@Override
+			public void onSelect(boolean positive, String text) {
+				if (!positive || text == null || text.trim().isEmpty()) return;
+				username = PlayAlongProtocol.sanitizeUsername(text, "01");
+				SPDSettings.playAlongUsername(username);
+				if (btnName != null) {
+					btnName.text(nameButtonLabel(community));
+				}
+			}
+		});
+	}
+
+	private void startDropIn(SessionInfo session, boolean community) {
+		if (community && (username == null || username.isEmpty())) {
+			ShatteredPixelDungeon.scene().addToFront(new WndTextInput(
+					Messages.get(this, "display_title"),
+					Messages.get(this, "display_prompt"),
+					"",
+					16,
+					false,
+					Messages.get(this, "ok"),
+					Messages.get(this, "cancel")) {
+				@Override
+				public void onSelect(boolean positive, String text) {
+					if (!positive || text == null || text.trim().isEmpty()) return;
+					username = PlayAlongProtocol.sanitizeUsername(text, "01");
+					SPDSettings.playAlongUsername(username);
+					if (btnName != null) {
+						btnName.text(nameButtonLabel(true));
+					}
+					finishDropIn(session);
+				}
+			});
+			return;
+		}
+		finishDropIn(session);
+	}
+
+	private void finishDropIn(SessionInfo session) {
+		hide();
+		PlayAlongService.useJoinAddress(joinAddress);
+		PlayAlongService.startClientRun(session, selectedClass, username);
 	}
 
 	private static String formatLinkLine(StreamEconomyState eco) {

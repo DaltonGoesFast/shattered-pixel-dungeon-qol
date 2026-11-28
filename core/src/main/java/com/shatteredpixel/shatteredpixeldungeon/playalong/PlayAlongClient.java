@@ -59,6 +59,8 @@ public class PlayAlongClient {
 		void onKillExpRewardNotice(WireMessage msg);
 		void onStreamMessage(WireMessage msg);
 		void onChatCommand(WireMessage msg);
+		void onShatterCast(WireMessage msg);
+		void onShatterState(WireMessage msg);
 		/**
 		 * @param everOpened false when the socket never completed open (connect
 		 *                   failed). True after any successful open this session,
@@ -347,6 +349,12 @@ public class PlayAlongClient {
 							case "chat_command":
 							case "chat_command_batch":
 								listener.onChatCommand(msg);
+								break;
+							case "shatter_cast":
+								listener.onShatterCast(msg);
+								break;
+							case "shatter_state":
+								listener.onShatterState(msg);
 								break;
 						}
 					} catch (Exception ignored) {

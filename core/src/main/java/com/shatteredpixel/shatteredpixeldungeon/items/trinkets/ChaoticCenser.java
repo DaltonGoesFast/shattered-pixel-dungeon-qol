@@ -88,6 +88,26 @@ public class ChaoticCenser extends Trinket {
 		}
 	}
 
+	/** Pick a gas class with chat (+3) odds. Does not spawn. */
+	public static Class<? extends Blob> rollGasClassForChat() {
+		int level = 3;
+		Class<? extends Blob> gasToSpawn;
+		switch (Random.chances(GAS_CAT_CHANCES[level])) {
+			case 0: default:
+				do {
+					gasToSpawn = Random.element(COMMON_GASSES.keySet());
+				} while (!Regeneration.regenOn() && gasToSpawn == Regrowth.class);
+				break;
+			case 1:
+				gasToSpawn = Random.element(UNCOMMON_GASSES.keySet());
+				break;
+			case 2:
+				gasToSpawn = Random.element(RARE_GASSES.keySet());
+				break;
+		}
+		return gasToSpawn;
+	}
+
 	/** Spawn random gas for chat command. Uses level 3 distribution (40/40/20). Returns gas name on success, null on failure. */
 	public static String spawnGasForChat() {
 		return spawnGasForChat(null, null);

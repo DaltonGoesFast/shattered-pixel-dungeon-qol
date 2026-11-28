@@ -249,6 +249,11 @@ public class Dungeon {
 
 		Journal.loadGlobal();
 		com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.onDungeonInit();
+		if (com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongService.isClientJoining()) {
+			com.shatteredpixel.shatteredpixeldungeon.playalong.ShatterCommands.onClientDungeonInit();
+		} else {
+			com.shatteredpixel.shatteredpixeldungeon.playalong.ShatterCommands.reset();
+		}
 		initialVersion = version = Game.versionCode;
 		debugRun = ShatteredPixelDungeon.debugSession;
 		boolean looping = Legacy.loopPending();
@@ -550,6 +555,7 @@ public class Dungeon {
 			hero.buff(AscensionChallenge.class).onLevelSwitch();
 		}
 		com.shatteredpixel.shatteredpixeldungeon.playalong.PlayAlongCatchup.consumeFreshAscentFloor();
+		com.shatteredpixel.shatteredpixeldungeon.playalong.ShatterCommands.noteDepth(depth);
 
 		Mob.restoreAllies( level, pos );
 
@@ -718,6 +724,7 @@ public class Dungeon {
 			Command.store( bundle );
 			Rebirth.store( bundle );
 			Legacy.store( bundle );
+			com.shatteredpixel.shatteredpixeldungeon.playalong.ShatterCommands.store( bundle );
 			Modifiers.storeEvolution( bundle );
 			bundle.put( MOBS_TO_CHAMPION, mobsToChampion );
 			bundle.put( HERO, hero );
@@ -834,6 +841,7 @@ public class Dungeon {
 		Command.restore( bundle );
 		Rebirth.restore( bundle );
 		Legacy.restore( bundle );
+		com.shatteredpixel.shatteredpixeldungeon.playalong.ShatterCommands.restore( bundle );
 		Modifiers.restoreEvolution( bundle );
 		Dungeon.mobsToChampion = bundle.getFloat( MOBS_TO_CHAMPION );
 		

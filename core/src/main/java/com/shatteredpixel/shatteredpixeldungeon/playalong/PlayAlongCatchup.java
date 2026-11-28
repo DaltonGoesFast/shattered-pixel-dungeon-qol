@@ -14,6 +14,7 @@
 package com.shatteredpixel.shatteredpixeldungeon.playalong;
 
 import com.google.gson.annotations.SerializedName;
+import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.AscensionChallenge;
@@ -267,7 +268,8 @@ public final class PlayAlongCatchup {
 			rememberGrant(offer.sessionId, offer.epoch);
 			if (ascent.active) {
 				applyAscentPlan(ascent);
-				arrivalMessage = "Catch-up: Dalton is ascending. You arrive on floor " + spawnDepth
+				arrivalMessage = "Catch-up: " + PlayAlongService.sessionHostLabel()
+						+ " is ascending. You arrive on floor " + spawnDepth
 						+ ". The way back is sealed.";
 			} else {
 				arrivalMessage = "Catch-up: you arrive on floor " + spawnDepth
@@ -296,7 +298,7 @@ public final class PlayAlongCatchup {
 		bossId = "";
 		Dungeon.depth = spawnDepth;
 		applyAscentPlan(ascent);
-		arrivalMessage = "Dalton is ascending. You arrive on floor " + spawnDepth
+		arrivalMessage = PlayAlongService.sessionHostLabel() + " is ascending. You arrive on floor " + spawnDepth
 				+ ". The way back is sealed.";
 		System.out.println("[PlayAlongCatchup] ascent drop-in on floor " + spawnDepth);
 		return spawnDepth;
@@ -423,7 +425,7 @@ public final class PlayAlongCatchup {
 		}
 		String boss = lastBossId();
 		if (boss.isEmpty() || !current().enabled) {
-			return "Catch-up is off until Dalton has killed a region boss.";
+			return "Catch-up is off until " + PlayAlongService.sessionHostLabel() + " has killed a region boss.";
 		}
 		return describeOffer(boss);
 	}
@@ -431,7 +433,7 @@ public final class PlayAlongCatchup {
 	public static String describeOffer(String boss) {
 		Config cfg = current();
 		if (!cfg.hasBoss(boss)) {
-			return "Catch-up is off until Dalton has killed a region boss.";
+			return "Catch-up is off until " + PlayAlongService.sessionHostLabel() + " has killed a region boss.";
 		}
 		Row row = cfg.row(boss);
 		StringBuilder sb = new StringBuilder();
@@ -439,7 +441,7 @@ public final class PlayAlongCatchup {
 		sb.append(": floor ").append(row.spawnFloor);
 		sb.append(", lvl ").append(row.level);
 		sb.append(", STR ").append(row.str);
-		sb.append(", ").append(row.sou).append(" SoU");
+		sb.append(", ").append(upgradeScrollsGranted(row.sou)).append(" SoU");
 		sb.append(", tier ").append(row.weaponTier).append("/").append(row.armorTier);
 		sb.append(" weapon/armor, +0 wand or ring, healing, food, identify, ");
 		sb.append(bagList(bagProgressDepth(PlayAlongService.getHostDepth(), row.spawnFloor, boss)));
@@ -462,7 +464,7 @@ public final class PlayAlongCatchup {
 			sb.append(label(boss)).append(": floor ").append(row.spawnFloor);
 			sb.append(" lvl ").append(row.level);
 			sb.append(" STR ").append(row.str);
-			sb.append(" SoU x").append(row.sou);
+			sb.append(" SoU x").append(upgradeScrollsGranted(row.sou));
 			sb.append(" weapon ").append(weaponName(cls, row.weaponTier));
 			sb.append(" armor ").append(armorName(row.armorTier));
 			sb.append(" sigil lvl ").append(Math.max(0, (row.level - 1) / 2));
@@ -588,9 +590,10 @@ public final class PlayAlongCatchup {
 		int bagDepth = bagProgressDepth(PlayAlongService.getHostDepth(), row.spawnFloor, boss);
 		ensureBags(hero.belongings.backpack, bagDepth);
 
-		if (row.sou > 0) {
+		int souCount = upgradeScrollsGranted(row.sou);
+		if (souCount > 0) {
 			ScrollOfUpgrade sou = new ScrollOfUpgrade();
-			sou.quantity(row.sou);
+			sou.quantity(souCount);
 			sou.identify().collect();
 		}
 		PotionOfHealing healing = new PotionOfHealing();
@@ -720,6 +723,20 @@ public final class PlayAlongCatchup {
 		}
 	}
 
+	/**
+	 * Forbidden Runes removes every even scheduled upgrade scroll (the 2nd, 4th, 6th, …),
+	 * the same cut level generation uses. The 1st, 3rd, and 5th still drop.
+	 */
+	static int upgradeScrollsGranted(int configured) {
+		return upgradeScrollsGranted(configured, Dungeon.isChallenged(Challenges.NO_SCROLLS));
+	}
+
+	static int upgradeScrollsGranted(int configured, boolean forbiddenRunes) {
+		if (configured <= 0) return 0;
+		if (!forbiddenRunes) return configured;
+		return (configured + 1) / 2;
+	}
+
 	private static void prepareGear(MeleeWeapon weapon) {
 		weapon.identify();
 		weapon.enchantment = null;
@@ -739,7 +756,7 @@ public final class PlayAlongCatchup {
 		String armor = hero.belongings.armor != null ? hero.belongings.armor.getClass().getSimpleName() : "none";
 		return "Catch-up (" + label(boss) + "): floor " + row.spawnFloor
 				+ ", level " + hero.lvl + ", STR " + hero.STR
-				+ ", " + row.sou + " upgrade scrolls, "
+				+ ", " + upgradeScrollsGranted(row.sou) + " upgrade scrolls, "
 				+ weapon + " / " + armor
 				+ ", bags [" + bagList(bagDepth) + "]"
 				+ ". Upstairs is sealed. Donor EXP "

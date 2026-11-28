@@ -464,10 +464,76 @@ public class PlayAlongServer extends WebSocketServer {
 			case "stream_cmd_req":
 				handleStreamCommandRequest(conn, msg);
 				break;
+			case "shatter_cast":
+				handleShatterCast(conn, msg);
+				break;
 			default:
 				// Strict host authority: ignore any unauthorized or host-only packet types from clients.
 				break;
 		}
+	}
+
+	private void handleShatterCast(WebSocket conn, WireMessage msg) {
+		if (PlayAlongService.hostHoldsStreamRoom()) return;
+		SessionInfo session = activeSession;
+		if (session == null || !session.active || !ShatterCommands.roomEnabled()) return;
+		ClientRecord sender = connToClient.get(conn);
+		if (sender == null || !sender.alive) return;
+		ChatCommandPayload payload = msg.chatCommand;
+		if (payload == null || payload.command == null) return;
+		if (payload.username == null || payload.username.isEmpty()) {
+			payload.username = sender.username;
+		}
+		broadcastShatterCast(payload, sender.username);
+		Game.runOnRenderThread(() -> ShatterCommands.applyIncoming(payload));
+	}
+
+	/**
+	 * Relay a Shatter cast to every living racer except {@code excludeUsername}.
+	 * DaltonGoesFast drops these.
+	 */
+	public void broadcastShatterCast(ChatCommandPayload payload, String excludeUsername) {
+		if (PlayAlongService.hostHoldsStreamRoom()) return;
+		SessionInfo session = activeSession;
+		if (session == null || !session.active || payload == null) return;
+		if (!ShatterCommands.roomEnabled()) return;
+
+		WireMessage msg = new WireMessage();
+		msg.type = "shatter_cast";
+		msg.sessionId = session.sessionId;
+		msg.chatCommand = payload;
+		String json = PlayAlongProtocol.GSON.toJson(msg);
+
+		String excludeNorm = normalizeChatUsername(excludeUsername);
+		String excludeSanitized = excludeNorm.isEmpty()
+				? ""
+				: PlayAlongProtocol.sanitizeUsername(excludeNorm, "01").toLowerCase(Locale.ROOT);
+
+		for (Map.Entry<WebSocket, ClientRecord> entry : connToClient.entrySet()) {
+			WebSocket conn = entry.getKey();
+			ClientRecord rec = entry.getValue();
+			if (rec == null || !rec.alive) continue;
+			if (!excludeNorm.isEmpty()) {
+				String recNorm = normalizeChatUsername(rec.username);
+				if (recNorm.equals(excludeNorm)
+						|| (!excludeSanitized.isEmpty() && recNorm.equals(excludeSanitized))) {
+					continue;
+				}
+			}
+			safeSend(conn, json);
+		}
+	}
+
+	public void broadcastShatterState() {
+		if (PlayAlongService.hostHoldsStreamRoom()) return;
+		SessionInfo session = activeSession;
+		if (session == null || !session.active) return;
+		session.shatterEnabled = ShatterCommands.roomEnabled();
+		WireMessage msg = new WireMessage();
+		msg.type = "shatter_state";
+		msg.sessionId = session.sessionId;
+		msg.session = snapshotSessionInfo();
+		sendToSessionClients(PlayAlongProtocol.GSON.toJson(msg));
 	}
 
 	private boolean allowRate(WebSocket conn) {
@@ -515,24 +581,25 @@ public class PlayAlongServer extends WebSocketServer {
 		}
 
 		SessionInfo session = activeSession;
+		String hostName = PlayAlongService.hostDisplayNameForSession();
 		if (session == null || !session.active) {
 			if (isRejoin && session == null && !sessionExplicitlyEnded
 					&& (System.currentTimeMillis() - serverStartedAtMs) < BOOT_REJOIN_GRACE_MS) {
 				conn.close(1013, "Host is loading save");
 				return;
 			}
-			sendJoinError(conn, "Dalton is not currently hosting a Play Along run.");
+			sendJoinError(conn, hostName + " is not currently hosting a Play Along run.");
 			return;
 		}
 		if (isRejoin && msg.sessionId != null && !msg.sessionId.isEmpty()
 				&& session.sessionId != null && !session.sessionId.isEmpty()
 				&& !msg.sessionId.equals(session.sessionId)) {
-			sendJoinError(conn, "Dalton started a different Play Along run! Return to title to join.");
+			sendJoinError(conn, hostName + " started a different Play Along run! Return to title to join.");
 			return;
 		}
 		if (msg.modVersion != null && !msg.modVersion.isEmpty()
 				&& !session.version.isEmpty() && !msg.modVersion.equals(session.version)) {
-			sendJoinError(conn, "Version mismatch: Dalton is running " + session.version + ". Please update to play along.");
+			sendJoinError(conn, "Version mismatch: " + hostName + " is running " + session.version + ". Please update to play along.");
 			return;
 		}
 		if (clientsByUserId.size() >= MAX_CLIENTS && (msg.userId == null || !clientsByUserId.containsKey(msg.userId))) {
@@ -907,6 +974,7 @@ public class PlayAlongServer extends WebSocketServer {
 		copy.activePlayers = countAliveClients();
 		PlayAlongCatchup.fillSession(copy);
 		stampAscent(copy);
+		copy.shatterEnabled = !PlayAlongService.hostHoldsStreamRoom() && ShatterCommands.roomEnabled();
 		return copy;
 	}
 

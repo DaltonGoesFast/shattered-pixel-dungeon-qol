@@ -43,7 +43,7 @@ import java.util.regex.Pattern;
  */
 public final class PlayAlongProtocol {
 
-	public static final int PROTOCOL_VERSION = 1;
+	public static final int PROTOCOL_VERSION = 2;
 	/**
 	 * Player → host cap, in characters. The relay closes a player socket with
 	 * 1009 when an incoming player frame exceeds this many bytes. Client sends
@@ -158,6 +158,8 @@ public final class PlayAlongProtocol {
 		public String catchupBoss = "";
 		public int catchupEpoch = 0;
 		public String catchupConfig = "";
+		/** Shatter Commands room flag. Always false for DaltonGoesFast. */
+		public boolean shatterEnabled = false;
 	}
 
 	public static class StreamEconomyState {

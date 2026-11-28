@@ -33,12 +33,18 @@ public class WndPlayAlongSessionSwitch extends WndOptions {
 	private final SessionInfo session;
 	private final boolean canResume;
 
+	private static String sessionSwitchBody(SessionInfo session, boolean canResume) {
+		String host = PlayAlongService.sessionHostLabel(session);
+		if (canResume) {
+			return host + " switched saves.\nResume your race on this run?";
+		}
+		return host + " started a new run.\nJoin with a new hero?";
+	}
+
 	public WndPlayAlongSessionSwitch(SessionInfo session, boolean canResume) {
 		super(
 				"Play Along",
-				canResume
-						? "Dalton switched saves.\nResume your race on this run?"
-						: "Dalton started a new run.\nJoin with a new hero?",
+				sessionSwitchBody(session, canResume),
 				canResume ? "Resume" : "Join",
 				"Leave"
 		);
