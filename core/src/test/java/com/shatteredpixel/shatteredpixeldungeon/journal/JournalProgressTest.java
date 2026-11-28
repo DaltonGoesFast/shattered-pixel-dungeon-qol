@@ -21,6 +21,7 @@
 
 package com.shatteredpixel.shatteredpixeldungeon.journal;
 
+import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Rat;
 import com.shatteredpixel.shatteredpixeldungeon.items.Ankh;
@@ -47,6 +48,12 @@ public class JournalProgressTest {
 	public void resetJournal() {
 		Dungeon.debugRun = false;
 		Journal.unload();
+	}
+
+	@Test
+	public void unreadableBadgesDoNotCrashTheJournalGrid() {
+		Badges.unload();
+		assertTrue(Badges.filterReplacedBadges(true).isEmpty());
 	}
 
 	@Test

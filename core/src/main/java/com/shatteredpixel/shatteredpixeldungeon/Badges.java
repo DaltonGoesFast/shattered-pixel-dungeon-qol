@@ -1192,7 +1192,8 @@ public class Badges {
 	
 	private static void displayBadge( Badge badge ) {
 
-		if (badge == null || Dungeon.debugRun || (badge.type != BadgeType.JOURNAL && !Dungeon.customSeedText.isEmpty())) {
+		// An unreadable badges.dat leaves global null. Do not announce a badge that cannot be stored.
+		if (badge == null || global == null || Dungeon.debugRun || (badge.type != BadgeType.JOURNAL && !Dungeon.customSeedText.isEmpty())) {
 			return;
 		}
 		
@@ -1272,6 +1273,9 @@ public class Badges {
 
 	public static List<Badge> filterReplacedBadges( boolean global ) {
 
+		if (global && Badges.global == null) {
+			return new ArrayList<>();
+		}
 		ArrayList<Badge> badges = new ArrayList<>(global ? Badges.global : Badges.local);
 
 		Iterator<Badge> iterator = badges.iterator();
