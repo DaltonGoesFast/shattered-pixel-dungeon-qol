@@ -1218,6 +1218,30 @@ public class Badges {
 		saveNeeded = true;
 	}
 	
+	/**
+	 * Journal-completion badges that {@link #validateCatalogBadges()} would unlock once the
+	 * catalog, bestiary, and guidebook are full. Granted silently so startup does not pop them.
+	 * {@link Badge#CATALOG_POTIONS_SCROLLS} is intentionally left out: it tracks identifying
+	 * every potion and scroll during a run, not a row in the journal.
+	 */
+	public static void unlockJournalCompletion(){
+		loadGlobal();
+		boolean blocked = Dungeon.debugRun;
+		Dungeon.debugRun = false;
+		try {
+			unlock(Badge.CATALOG_ONE_EQUIPMENT);
+			unlock(Badge.RESEARCHER_1);
+			unlock(Badge.RESEARCHER_2);
+			unlock(Badge.RESEARCHER_3);
+			unlock(Badge.RESEARCHER_4);
+			unlock(Badge.RESEARCHER_5);
+			unlock(Badge.ALL_RARE_ENEMIES);
+			unlock(Badge.RODNEY);
+		} finally {
+			Dungeon.debugRun = blocked;
+		}
+	}
+
 	public static void unlock( Badge badge ){
 		if (Dungeon.debugRun) return;
 		if (!isUnlocked(badge) && (badge.type == BadgeType.JOURNAL || Dungeon.customSeedText.isEmpty())){

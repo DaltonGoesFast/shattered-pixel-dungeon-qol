@@ -328,6 +328,19 @@ public enum Catalog {
 		countUses(cls, 1);
 	}
 
+	/** One-time migration. Does not go through {@link #setSeen}, so debug runs cannot block it. */
+	public static void grantAll(){
+		for (Catalog cat : values()) {
+			for (Class<?> item : cat.items()) {
+				cat.seen.put(item, true);
+				if (cat.useCount.get(item) <= 0) {
+					cat.useCount.put(item, 1);
+				}
+			}
+		}
+		Journal.saveNeeded = true;
+	}
+
 	public static void countUses(Class<?> cls, int uses){
 		if (Dungeon.debugRun) return;
 		for (Catalog cat : values()) {

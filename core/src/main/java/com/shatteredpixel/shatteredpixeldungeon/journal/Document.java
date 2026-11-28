@@ -131,6 +131,16 @@ public enum Document {
 		return true;
 	}
 
+	/** One-time migration. Marks every page found and read, including lore. */
+	public static void grantAll(){
+		for (Document doc : values()) {
+			for (String page : doc.pageNames()) {
+				doc.pagesStates.put(page, READ);
+			}
+		}
+		Journal.saveNeeded = true;
+	}
+
 	public boolean readPage( String page ) {
 		if (Dungeon.debugRun) return false;
 		if (pagesStates.containsKey(page)){
